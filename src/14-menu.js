@@ -21,15 +21,33 @@ function guideTick(){ if(entHidden(S.p))S.guide.hidden=true; if(!OPT.hints||!sta
   if(guideEl.dataset.html!==html){ guideEl.dataset.html=html; guideEl.innerHTML='<h4>GUÍA <span>H oculta</span></h4><ul>'+html+'</ul>'; } }
 // menú principal / pausa
 let paused=false;
-function showMenu(pane){ ov.hidden=false; el('end').hidden=true; const m=el('menu'); m.hidden=false; m.querySelectorAll('[data-pane]').forEach(p=>{ p.hidden=p.dataset.pane!==pane; }); m.classList.toggle('paused',paused); el('mTitle').textContent=paused?'PAUSA':'PROJECT LOST HORIZON'; syncOptUI(); }
+function showMenu(pane){ ov.hidden=false; el('end').hidden=true; const m=el('menu'); m.hidden=false; const sv=hasSave(); el('btnContinue').hidden=!sv||paused; if(sv)el('btnContinue').innerHTML='CONTINUAR <small>'+sv.tag+'</small>'; m.querySelectorAll('[data-pane]').forEach(p=>{ p.hidden=p.dataset.pane!==pane; }); m.classList.toggle('paused',paused); el('mTitle').textContent=paused?'PAUSA':'PROJECT LOST HORIZON'; syncOptUI(); }
 function syncOptUI(){ el('oSens').value=OPT.sens; el('oSensV').textContent=OPT.sens.toFixed(1); el('oInv').checked=OPT.invY; el('oView').value=OPT.view; el('oPost').checked=OPT.post; el('oShadow').checked=OPT.shadows; el('oVol').value=OPT.vol; el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; el('oHints').checked=OPT.hints; }
 function readOptUI(){ OPT.sens=+el('oSens').value; OPT.invY=el('oInv').checked; OPT.view=el('oView').value; OPT.post=el('oPost').checked; OPT.shadows=el('oShadow').checked; OPT.vol=+el('oVol').value; OPT.hints=el('oHints').checked; el('oSensV').textContent=OPT.sens.toFixed(1); el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; saveOpt(); applyOpt(); if(AC)beep(900,0.05,'sine',0.04); }
-function startGame(withIntro){ initAudio(); applyOpt(); setPower(true); started=true; paused=false; uiOpen=false; ov.hidden=true; third=OPT.view==='3'; try{gl.requestPointerLock();}catch(e){} if(withIntro)intro(); else codec(CODEC.start); }
-function pauseGame(){ if(paused||!started)return; paused=true; uiOpen=true; try{document.exitPointerLock();}catch(e){} showMenu('pause'); }
+function startGame(withIntro,silent){ initAudio(); applyOpt(); if(!silent)setPower(true); started=true; paused=false; uiOpen=false; ov.hidden=true; el('end').hidden=true; third=OPT.view==='3'; try{gl.requestPointerLock();}catch(e){} if(withIntro)intro(); else if(!silent)codec(CODEC.start); }
+// guardado automático en puntos clave; CONTINUAR en el menú
+const pickEnt=e=>({name:e.name,x:e.x,z:e.z,hp:e.hp,ammo:e.ammo,key:e.key,file:e.file,crouch:e.crouch,down:e.down});
+function saveGame(tag){ if(!started||S.over)return; try{ const d={v:1,tag,when:Date.now(),t:S.t,ctrl:S.p.name,yaw,p:pickEnt(S.p),c:pickEnt(S.c),W:Object.assign({},W),
+  guards:S.guards.map(g=>({x:g.x,z:g.z,fx:g.fx,fz:g.fz,wi:g.wi,dead:g.dead,down:g.down,fear:g.fear,hasKey:g.hasKey})),clues:S.clues.slice(),kill:S.kill,ko:S.ko,alarms:S.alarms,interro:S.interro,base:S.base,cigs:S.cigs,inCell:S.inCell,dogsDone:S.dogsDone,capturedOnce:!!S.capturedOnce,swaps:S.swaps,teamKO:S.teamKO,ammoTaken:S.ammoTaken,wrongCode:S.wrongCode,halloTalked:S.halloTalked,codecSeen:S.codecSeen,flashSeen:S.flashSeen,guide:S.guide,vidal:S.vidal,reinforced:S.reinforced,dogKills:S.dogKills,cellEscaped:!!S.cellEscaped,calls:S.calls||null};
+  localStorage.setItem('lh-save',JSON.stringify(d)); S.savedT=2.5; }catch(e){} }
+function hasSave(){ try{ return JSON.parse(localStorage.getItem('lh-save')||'null'); }catch(e){ return null; } }
+function loadGame(){ const d=hasSave(); if(!d)return null; reset();
+  if(d.reinforced){ S.reinforced=true; S.guards.push(mkGuard(REFDEF,true)); }
+  d.guards.forEach((sg,i)=>{ const g=S.guards[i]; if(!g)return; Object.assign(g,{x:sg.x,z:sg.z,fx:sg.fx,fz:sg.fz,wi:sg.wi,dead:sg.dead,down:sg.down,fear:sg.fear,hasKey:sg.hasKey}); g.state='patrol'; g.susp=0;
+    if(g.dead||g.down>0){ S.bodies.push({x:g.x,z:g.z,dead:g.dead,g,carried:false,hidden:false}); g.fall=1; g.fig.g.rotation.z=Math.PI/2; g.fig.g.position.y=0.26; g.mark.visible=false; } g.fig.g.position.x=g.x; g.fig.g.position.z=g.z; });
+  const byName={CUTTLAS:S.p,ROIG:S.c}; [d.p,d.c].forEach(e=>{ const t=byName[e.name]; if(t)Object.assign(t,e); }); if(d.ctrl==='ROIG'){ const a=S.p; S.p=S.c; S.c=a; }
+  Object.assign(W,d.W); dynamicDoors.office.visible=!W.officeOpen; dynamicDoors.vault.visible=!W.vaultOpen; dynamicDoors.yard.visible=!!W.yardDoorClosed; setPower(W.power!==false);
+  ['clues','kill','ko','alarms','interro','base','cigs','inCell','dogsDone','capturedOnce','swaps','teamKO','ammoTaken','wrongCode','halloTalked','codecSeen','flashSeen','guide','vidal','dogKills','cellEscaped','t'].forEach(k=>{ if(d[k]!==undefined)S[k]=d[k]; }); if(d.calls)S.calls=d.calls;
+  if(barsMesh)barsMesh.visible=!W.cellOpen; vidalFig.g.visible=!!S.inCell; yaw=d.yaw||yaw; pitch=0; S.camH=undefined; updHud(); renderNote(); el('hCig').textContent=S.cigs;
+  el('hObj').textContent=S.inCell?'OBJETIVO: CONVENCE AL CABO VIDAL':(S.p.file||S.c.file)?'OBJETIVO: SAL POR LA PUERTA SURESTE':W.vaultOpen?'OBJETIVO: COGE EL EXPEDIENTE':'OBJETIVO: ENTRA EN EL ARCHIVO';
+  S.c.fig.g.position.set(S.c.x,0,S.c.z); S.c.fig.g.rotation.z=0; return d; }
+function continueGame(){ const d=loadGame(); if(!d){ showMenu('main'); return; } startGame(false,true); flash('CONTINUAR · '+clockStr(),d.tag+'. '+(S.p.name==='ROIG'?'Controlas a Roig.':'Controlas a Cuttlas.')+' R abre la radio si no sabes seguir.',6); }
+function pauseGame(){ if(paused||!started)return; paused=true; uiOpen=true; unlockPtr(); showMenu('pause'); }
 function resumeGame(){ if(!paused)return; paused=false; uiOpen=false; ov.hidden=true; try{gl.requestPointerLock();}catch(e){} }
 el('menu').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; const go=b.dataset.go; if(AC)beep(700,0.04,'square',0.03);
   if(go==='main')showMenu(paused?'pause':'main'); else if(go)showMenu(go);
-  else if(b.id==='btnStart'){ reset(); startGame(true); }
+  else if(b.id==='btnStart'){ reset(); try{localStorage.removeItem('lh-save');}catch(e){} startGame(true); }
+  else if(b.id==='btnContinue')continueGame();
   else if(b.id==='btnResume')resumeGame();
   else if(b.id==='btnRestart'){ reset(); paused=false; uiOpen=false; ov.hidden=true; el('end').hidden=true; try{gl.requestPointerLock();}catch(e){} codec(CODEC.start); }
   else if(b.id==='btnQuit'){ reset(); paused=false; started=false; uiOpen=false; showMenu('main'); } });

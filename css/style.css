@@ -44,7 +44,7 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 #note .e{color:var(--dim)}
 /* cine */
 .bar{position:absolute;left:0;right:0;height:0;background:#000;z-index:5;transition:height .9s cubic-bezier(.4,0,.2,1);pointer-events:none}
-#barT{top:0} #barB{bottom:0} .cine .bar{height:12%}
+#barT{top:0} #barB{bottom:0} .cine .bar{height:12%} .cine #guide,.cine #flash{display:none}
 #title{position:absolute;left:max(24px,env(safe-area-inset-left,0px));bottom:16%;z-index:7;pointer-events:none;font-family:var(--display);color:#fff;font-size:11px;line-height:2;letter-spacing:1px;text-shadow:0 0 8px #000;max-width:80%}
 #title .big{font-size:18px;color:var(--amber);display:block;margin-top:6px}
 #title .s{color:var(--dim);font-size:9px;display:block}
@@ -92,3 +92,10 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 #guide ul{list-style:none;margin:0;padding:0;font-size:18px;line-height:1.2}
 #guide li{margin-bottom:4px;color:var(--dim)} #guide li.now{color:var(--fg)} #guide li.ok{color:var(--green);opacity:.7}
 @media (max-width:640px){#guide{display:none}.opts-grid{grid-template-columns:1fr}}
+
+/* pantalla de derrota: la llamada que nadie contesta */
+#btnContinue small{display:block;font-family:var(--body);font-size:16px;text-transform:none;color:#5a4410;margin-top:2px}
+.yell{font-family:var(--display);color:var(--codec);font-size:11px;line-height:2.4;margin:10px 0;border-left:2px solid var(--codec);padding-left:12px}
+.yell span{display:block;opacity:0;animation:yell .6s steps(1) forwards}
+.yell span:nth-child(2){animation-delay:.9s} .yell span:nth-child(3){animation-delay:1.9s;color:#fff;font-size:14px}
+@keyframes yell{to{opacity:1}}
