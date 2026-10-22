@@ -49,7 +49,7 @@ function reset(){
   S.p={name:'CUTTLAS',fig:playerFig,x:wx(start.x),z:wx(start.y),fx:1,fz:0,hp:5,ammo:8,crouch:false,hurtT:0,carry:null,key:false,file:false,moving:false,run:false,down:0,shotT:0};
   S.c={name:'ROIG',fig:roigFig,x:wx(start.x),z:wx(start.y),fx:1,fz:0,hp:5,ammo:12,crouch:false,hurtT:0,carry:null,key:false,file:false,moving:false,run:false,down:0,shotT:0,ko:0};
   for(const o of [[0,1],[1,0],[0,-1],[-1,0]]){ if(!solidT(start.x+o[0],start.y+o[1])){ S.c.x=wx(start.x+o[0]); S.c.z=wx(start.y+o[1]); break; } } roigFig.g.visible=true; roigFig.g.rotation.z=0; roigFig.g.position.set(S.c.x,0,S.c.z); playerFig.g.rotation.z=0;
-  S.swaps=0; S.teamKO=0; S.guide={};
+  S.swaps=0; S.cOrder='wait'; S.orders=0; S.teamKO=0; S.guide={};
   if(S.guards)S.guards.forEach(g=>{scene.remove(g.fig.g);scene.remove(g.mark);});
   S.guards=GDEF.map(d=>mkGuard(d)); S.bodies=[]; S.kill=0; S.ko=0; S.alarms=0; S.base='calma'; S.alertT=0; S.over=false; S.t=0; S.reinforced=false; S.wrongCode=0; S.halloTalked=false; S.interro=0;
   S.clues=[]; S.flashSeen={}; S.recoil=0; S.muzzle=0; S.fixTimer=0; S.freeze=0; S.codecSeen={}; S.cigs=3; S.smoke=0; S.stepT=0; S.inCell=false; S.dogsDone=false; S.dogKills=0; S.vidal={stage:0,fail:0,cool:0}; S.ammoTaken={}; if(S.dogs)S.dogs.forEach(d=>scene.remove(d.fig.g)); S.dogs=[]; W.cellOpen=false; if(barsMesh)barsMesh.visible=true; vidalFig.g.visible=false; flow=null;
