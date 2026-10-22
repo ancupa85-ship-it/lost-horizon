@@ -10,7 +10,7 @@ const path=require('path');
   await p.goto('file://'+path.resolve(__dirname,'..','index.html')); await p.waitForTimeout(1500);
   const ok=(c,msg)=>{ if(!c){ console.error('FALLO:',msg); process.exitCode=1; } else console.log('ok  ',msg); };
   ok(await p.evaluate(()=>!!window.__LH),'motor cargado y estado expuesto');
-  await p.click('#btnStart'); await p.waitForTimeout(800);
+  await p.click('[data-go="brief"]'); await p.click('#btnStart'); await p.waitForTimeout(800);
   await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(400);
   for(let i=0;i<9;i++)await p.evaluate(()=>window.__LH.codecNext());
   ok(await p.evaluate(()=>window.__LH.S.guards.length>0),'guardias creados');

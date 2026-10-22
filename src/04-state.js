@@ -37,6 +37,7 @@ function mkGuard(d,red){ const p=d.wps[0]; const g={name:d.name,role:d.role,nerv
   g.mark=new THREE.Sprite(new THREE.SpriteMaterial({map:MK.ex,transparent:true})); g.mark.scale.set(0.6,0.6,1); g.mark.visible=false; scene.add(g.mark); return g; }
 const halloFig=figure({uniform:0xe8e8e0,pants:0x9a9a90,hair:'#b0b0b0',glasses:true,skin:'#e0c0a0',old:true,suit:true,plain:true}); halloFig.g.position.set(wx(31),0,wx(13)+0.4); halloFig.g.rotation.y=Math.PI; scene.add(halloFig.g);
 const playerFig=figure({uniform:0x2e3630,pants:0x262c28,hair:'#2a1a10',stubble:true,pistol:true,suit:true,plain:true,gloves:true,band:'#5a6a7a'}); playerFig.g.visible=false; scene.add(playerFig.g);
+const roigFig=figure({uniform:0x2a3038,pants:0x23282c,hair:'#3a2418',female:true,pistol:true,suit:true,plain:true,gloves:true,skin:'#e6c0a0'}); roigFig.g.visible=false; scene.add(roigFig.g);
 const vidalFig=figure({uniform:0x4f5a3c,cap:0x3f4a34,moustache:true,rosary:true,rank:1,holster:true,skin:'#d8a880'}); vidalFig.g.position.set(wx(31),0,wx(11)); vidalFig.g.visible=false; scene.add(vidalFig.g);
 let barsMesh=null; scene.traverse(o=>{ if(o.isMesh&&o.material===M.bars)barsMesh=o; });
 const ember=new THREE.PointLight(0xff7a30,0,3.5); scene.add(ember);
@@ -45,7 +46,10 @@ const puffs=[]; for(let i=0;i<10;i++){ const sp=new THREE.Sprite(new THREE.Sprit
 let third=false;
 
 function reset(){
-  S.p={x:wx(start.x),z:wx(start.y),hp:5,ammo:8,crouch:false,hurtT:0,carry:null,key:false,file:false,moving:false,run:false};
+  S.p={name:'CUTTLAS',fig:playerFig,x:wx(start.x),z:wx(start.y),fx:1,fz:0,hp:5,ammo:8,crouch:false,hurtT:0,carry:null,key:false,file:false,moving:false,run:false,down:0,shotT:0};
+  S.c={name:'ROIG',fig:roigFig,x:wx(start.x),z:wx(start.y),fx:1,fz:0,hp:5,ammo:12,crouch:false,hurtT:0,carry:null,key:false,file:false,moving:false,run:false,down:0,shotT:0,ko:0};
+  for(const o of [[0,1],[1,0],[0,-1],[-1,0]]){ if(!solidT(start.x+o[0],start.y+o[1])){ S.c.x=wx(start.x+o[0]); S.c.z=wx(start.y+o[1]); break; } } roigFig.g.visible=true; roigFig.g.rotation.z=0; roigFig.g.position.set(S.c.x,0,S.c.z); playerFig.g.rotation.z=0;
+  S.swaps=0; S.teamKO=0; S.guide={};
   if(S.guards)S.guards.forEach(g=>{scene.remove(g.fig.g);scene.remove(g.mark);});
   S.guards=GDEF.map(d=>mkGuard(d)); S.bodies=[]; S.kill=0; S.ko=0; S.alarms=0; S.base='calma'; S.alertT=0; S.over=false; S.t=0; S.reinforced=false; S.wrongCode=0; S.halloTalked=false; S.interro=0;
   S.clues=[]; S.flashSeen={}; S.recoil=0; S.muzzle=0; S.fixTimer=0; S.freeze=0; S.codecSeen={}; S.cigs=3; S.smoke=0; S.stepT=0; S.inCell=false; S.dogsDone=false; S.dogKills=0; S.vidal={stage:0,fail:0,cool:0}; S.ammoTaken={}; if(S.dogs)S.dogs.forEach(d=>scene.remove(d.fig.g)); S.dogs=[]; W.cellOpen=false; if(barsMesh)barsMesh.visible=true; vidalFig.g.visible=false; flow=null;

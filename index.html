@@ -18,6 +18,7 @@
     <span>LUZ: <b id="hPow">GENERADOR</b></span>
     <span>HORA: <b id="hClock">02:10</b></span>
     <span>TABACO: <b id="hCig">3</b></span>
+    <span>PISTAS: <b id="hClue">0/10</b></span>
     <span id="hObj">OBJETIVO: ENTRA EN EL ARCHIVO</span>
   </div>
   <div id="prompt" hidden></div>
@@ -34,16 +35,76 @@
     <canvas id="pR" width="32" height="32"></canvas>
     <div class="foot">E / CLIC · CONTINUAR</div>
   </div>
+  <div id="guide" hidden></div>
   <div id="ov" class="overlay">
-    <div class="card">
-      <h2>PROJECT LOST HORIZON · MISIÓN 1 · DE PROFUNDIS</h2>
-      <p>Tarsis, noviembre de 1983, 02:10. Lluvia. Has salido de los barracones por la alcantarilla. Enfrente, el centro de comunicaciones y el archivo del teniente coronel Alarcón. Dentro está el expediente que dice qué eres.</p>
-      <p><span class="k">Clic</span> captura el ratón · <span class="k">WASD</span> moverse · <span class="k">Shift</span> correr · <span class="k">Ctrl</span> agacharse · <span class="k">E</span> usar / leer / hablar / seguir el códec · <span class="k">F</span> agarrar e interrogar · <span class="k">C</span> cargar cuerpos · <span class="k">Clic</span> disparar · <span class="k">V</span> cambiar de vista · <span class="k">Q</span> fumar (8 s quieto, cura) · <span class="k">Tab</span> cuaderno</p>
-      <p class="m">La oscuridad te esconde si vas agachado. Los focos te delatan. Los guardias mienten según a quién sirven y cuánto los aprietes; si los aprietas de más, gritan. El archivo tiene una clave: nadie te la va a dar entera.</p>
-      <p class="m">Tienes hasta las 02:19. Después sueltan la perrera: siete perros, y si te alcanzan despiertas en una celda de la que solo se sale hablando.</p>
-      <p class="m">Necesita ratón y teclado.</p>
-      <button id="btnStart">EMPEZAR</button>
+    <div class="card menu" id="menu">
+      <h1 class="logo"><span id="mTitle">PROJECT LOST HORIZON</span><small>MISIÓN 1 · DE PROFUNDIS</small></h1>
+      <nav data-pane="main" class="mm">
+        <button data-go="brief">NUEVA PARTIDA</button>
+        <button data-go="how">CÓMO SE JUEGA</button>
+        <button data-go="ctrl">CONTROLES</button>
+        <button data-go="opt">OPCIONES</button>
+        <p class="m">Tarsis, 1983. Un expediente, una base, siete perros y algo que canta bajo el templo. Necesita ratón y teclado.</p>
+      </nav>
+      <nav data-pane="pause" class="mm" hidden>
+        <button id="btnResume">REANUDAR</button>
+        <button data-go="how">CÓMO SE JUEGA</button>
+        <button data-go="ctrl">CONTROLES</button>
+        <button data-go="opt">OPCIONES</button>
+        <button id="btnRestart" class="ghost">REINICIAR LA MISIÓN</button>
+        <button id="btnQuit" class="ghost">SALIR AL MENÚ</button>
+      </nav>
+      <section data-pane="brief" hidden>
+        <h2>INFORME DE MISIÓN</h2>
+        <p>Tarsis, noviembre de 1983, 02:10. Lluvia. Cuttlas y la teniente Roig han salido de los barracones por la alcantarilla. Enfrente, el centro de comunicaciones y el archivo del teniente coronel Alarcón. Dentro está el expediente que dice qué eres.</p>
+        <p class="m">La oscuridad te esconde si vas agachado. Los focos te delatan. Los guardias mienten según a quién sirven y cuánto los aprietes. El archivo tiene una clave: nadie te la va a dar entera.</p>
+        <p class="m">Tienes hasta las 02:19. Después sueltan la perrera: siete perros, y si te alcanzan despiertas en una celda de la que solo se sale hablando.</p>
+        <button id="btnStart">EMPEZAR</button> <button data-go="main" class="ghost">VOLVER</button>
+      </section>
+      <section data-pane="how" hidden>
+        <h2>CÓMO SE JUEGA</h2>
+        <ol class="how">
+          <li><b>Esconderte.</b> Agáchate (<span class="k">Ctrl</span>) en zonas oscuras hasta que el HUD diga <b>OCULTO</b>. Los focos y la brasa del cigarro te delatan. Correr hace ruido.</li>
+          <li><b>Interrogar.</b> Llega por la espalda a un guardia que no te haya visto y pulsa <span class="k">F</span> cuando aparezca la marca <b>F</b> sobre su cabeza. Pregúntale por la clave, la llave o el templo. Si no suelta prenda, <b>APRIETA</b>: cada guardia aguanta un número distinto de apretones antes de gritar. Después duérmelo, mátalo o suéltalo (correrá a avisar).</li>
+          <li><b>Recoger pistas.</b> Todo lo que lees o te cuentan va al <b>cuaderno</b> (<span class="k">Tab</span>): teletipo, escritorio de Alarcón, la presa de la celda, los propios guardias. Los leales mienten.</li>
+          <li><b>El archivo.</b> Tiene un teclado de cuatro cifras. La clave no está escrita en ningún sitio: sale de cruzar pistas. Dos errores y suena la alarma.</li>
+          <li><b>Roig.</b> Te sigue, se agacha cuando te agachas y, si os descubren, dispara con silenciador (duerme, no mata) hasta quedarse sin balas. <span class="k">X</span> cambia el control entre los dos en cualquier momento; el que sueltas sigue luchando solo.</li>
+          <li><b>Curarte.</b> <span class="k">Q</span> enciende un cigarro: ocho segundos quieto para recuperar dos corazones. Tienes tres.</li>
+          <li><b>El reloj.</b> A las 02:19 sueltan siete perros. Se matan a tiros o se apartan de una patada (<span class="k">F</span>). Si te derriban, despiertas en la celda y solo sales convenciendo al cabo Vidal con lo que hayas averiguado.</li>
+          <li><b>Salir.</b> Con el expediente, la puerta sureste. Cómo salgas (sin alarmas, con muertos, entre medias) decide el final.</li>
+        </ol>
+        <button data-go="main" class="ghost">VOLVER</button>
+      </section>
+      <section data-pane="ctrl" hidden>
+        <h2>CONTROLES</h2>
+        <table class="keys">
+          <tr><td><span class="k">Clic</span></td><td>captura el ratón · dispara</td><td><span class="k">WASD</span></td><td>moverse</td></tr>
+          <tr><td><span class="k">Ratón</span></td><td>mirar</td><td><span class="k">Shift</span></td><td>correr (ruido)</td></tr>
+          <tr><td><span class="k">Ctrl</span></td><td>agacharse</td><td><span class="k">E</span></td><td>usar · leer · hablar · seguir el códec</td></tr>
+          <tr><td><span class="k">F</span></td><td>agarrar e interrogar · patada a un perro</td><td><span class="k">C</span></td><td>cargar o soltar un cuerpo</td></tr>
+          <tr><td><span class="k">X</span></td><td>cambiar entre Cuttlas y Roig</td><td><span class="k">V</span></td><td>primera o tercera persona</td></tr>
+          <tr><td><span class="k">Q</span></td><td>fumar (8 s quieto, +2 vida)</td><td><span class="k">Tab</span></td><td>cuaderno de pistas</td></tr>
+          <tr><td><span class="k">1-9</span></td><td>elegir opción en un diálogo</td><td><span class="k">H</span></td><td>mostrar u ocultar la guía</td></tr>
+          <tr><td><span class="k">Esc</span></td><td>pausa y opciones</td><td></td><td></td></tr>
+        </table>
+        <button data-go="main" class="ghost">VOLVER</button>
+      </section>
+      <section data-pane="opt" hidden>
+        <h2>OPCIONES</h2>
+        <div class="opts-grid">
+          <label>Sensibilidad del ratón <output id="oSensV">1.0</output></label><input id="oSens" type="range" min="0.3" max="2.5" step="0.1" value="1">
+          <label>Invertir eje vertical</label><input id="oInv" type="checkbox">
+          <label>Vista al empezar</label><select id="oView"><option value="1">Primera persona</option><option value="3">Tercera persona</option></select>
+          <label>Contornos de cómic (postproceso)</label><input id="oPost" type="checkbox" checked>
+          <label>Sombras (quítalas si va lento)</label><input id="oShadow" type="checkbox" checked>
+          <label>Volumen <output id="oVolV">80%</output></label><input id="oVol" type="range" min="0" max="1" step="0.05" value="0.8">
+          <label>Guía en pantalla</label><input id="oHints" type="checkbox" checked>
+        </div>
+        <p class="m">Se guardan en este navegador.</p>
+        <button data-go="main" class="ghost">VOLVER</button>
+      </section>
     </div>
+    <div class="card" id="end" hidden></div>
   </div>
 </div>
 <script src="vendor/three.min.js"></script>
@@ -58,8 +119,10 @@
 <script src="src/08-input.js"></script>
 <script src="src/09-util.js"></script>
 <script src="src/10-actions.js"></script>
-<script src="src/11-cinematics.js"></script>
-<script src="src/12-endings.js"></script>
-<script src="src/13-loop.js"></script>
+<script src="src/11-team.js"></script>
+<script src="src/12-cinematics.js"></script>
+<script src="src/13-endings.js"></script>
+<script src="src/14-menu.js"></script>
+<script src="src/15-loop.js"></script>
 </body>
 </html>
