@@ -50,6 +50,7 @@ function roigLines(){ const me=S.p.name, R=S.c, n=S.calls.roig, L=[]; const RR=(
   if(S.inCell){ RR('Estoy aquí dentro contigo. Nunca me dejas atrás, Cuttlas; ni cuando te lo pido.'); RR('El cabo escucha a Halloran. Mírala a ella cuando le hables a él.'); return L; }
   if(R.ammo===0)RR('Sin balas. Me quedan las manos y la mala leche. Si os ven, mantente cerca.');
   else if(R.ammo<=4)RR('Me quedan '+R.ammo+'. Después, las manos.');
+  else if(S.cOrder==='wait')RR('Estoy donde me dejaste, agachada. Si disparo es porque os han visto. Si me quieres detrás, ya sabes cómo pedirlo.');
   else RR('Estoy a dos pasos. Si disparo es porque os han visto; si no disparo, agradécemelo luego.');
   if(S.kill>0&&!S.flashSeen.roigKill){ S.flashSeen.roigKill=true; RR('Has matado a uno. Antes no lo hacías. O sí, y no te acuerdas. Yo sí me acuerdo.'); }
   else if(!W.vaultOpen&&(S.clues.includes('peris')||S.clues.includes('c130'))&&!S.clues.includes('roma')&&!S.clues.includes('vulgata')&&n>=1){ RR('De profundis. Mi madre lo rezaba: es el ciento treinta... en nuestra Biblia. Alarcón no usa la nuestra. La suya va uno por detrás.'); addClue('roma'); }

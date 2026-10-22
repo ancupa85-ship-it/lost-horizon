@@ -12,7 +12,7 @@ npm start          # sirve la carpeta en http://localhost:8080
 o simplemente abre `index.html` en Chrome/Firefox (el juego pide el ratón al hacer clic).
 
 Controles: WASD mover · ratón mirar · Ctrl agacharse · Shift correr · E usar/hablar · F agarrar e interrogar / patada ·
-C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
+C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · G orden a Roig (sígueme / espera) · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
 Tab cuaderno · R radio (Control 141.12, Roig 140.85 y una frecuencia que no figura en el manual) · H guía · Esc pausa y opciones.
 El menú de inicio tiene "Cómo se juega", "Controles", "Opciones" y, si hay partida guardada, CONTINUAR.
 
@@ -73,7 +73,8 @@ node tests/shots.js         # capturas
   y con dos de las pistas del teclado una llamada suya suelta la de Roma; la frecuencia 000.00 aparece cuando has
   tocado la Fuente, cortado la luz o pasado por la celda.
 - Los guardias leales mienten bajo interrogatorio; apretar de más los hace gritar.
-- Roig (teniente, segunda infiltrada) sigue al personaje controlado, se agacha con él, busca sombra si él se esconde y,
-  cuando un guardia pasa a alerta o un perro se acerca, dispara con silenciador (duerme, no mata; 12 balas). Los guardias
+- Roig (teniente, segunda infiltrada) espera agachada donde está hasta que G le ordena seguirte; siguiéndote se agacha
+  contigo y busca sombra si tú te escondes. Solo dispara, con silenciador (duerme, no mata; 12 balas), cuando un guardia
+  está en alerta (os han descubierto) o un perro se le echa encima. Los guardias
   la ven igual que a Cuttlas; si la hieren cae 40 s y no se puede controlar. X cambia el control y el inventario (llave,
   expediente) viaja con quien controlas.

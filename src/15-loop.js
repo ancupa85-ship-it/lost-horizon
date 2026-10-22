@@ -48,8 +48,8 @@ function update(dt){ const P=S.p; S.t+=dt;
       if(g.fixing&&Math.hypot(g.x-wx(21),g.z-wx(8))<T*1.6){ g.fixing=false; setPower(true); g.state='patrol'; flash('AVISO','Un guardia ha vuelto a arrancar el generador.',4); }
       else if(Math.hypot(g.x-tx,g.z-tz)<T*0.7||g.searchT<=0){ if(g.searchT<=0){g.state='patrol';g.fixing=false;} else g.target={x:tx+(Math.random()-0.5)*T*4,z:tz+(Math.random()-0.5)*T*4}; } }
     else { sp=1.7; const w=g.wps[g.wi]; tx=wx(w[0]); tz=wx(w[1]); if(Math.hypot(g.x-tx,g.z-tz)<0.15)g.wi=(g.wi+1)%g.wps.length; }
-    const ddx=tx-g.x,ddz=tz-g.z,L=Math.hypot(ddx,ddz)||1; g.moving=false;
-    if(L>0.12){ const ox=g.x,oz=g.z; move(g,ddx/L*sp*dt,ddz/L*sp*dt,0.4); const mv=Math.abs(g.x-ox)+Math.abs(g.z-oz); g.moving=mv>0.004; if(mv<0.004){ if(g.state==='patrol')g.wi=(g.wi+1)%g.wps.length; else g.target={x:g.x+(Math.random()-0.5)*T*3,z:g.z+(Math.random()-0.5)*T*3}; } g.fx=ddx/L; g.fz=ddz/L; }
+    const ddx=tx-g.x,ddz=tz-g.z,L0=Math.hypot(ddx,ddz),L=L0||1; g.moving=false;
+    if(L0>0.12){ const ox=g.x,oz=g.z; move(g,ddx/L*sp*dt,ddz/L*sp*dt,0.4); const mv=Math.abs(g.x-ox)+Math.abs(g.z-oz); g.moving=mv>0.004; if(mv<0.004){ if(g.state==='patrol')g.wi=(g.wi+1)%g.wps.length; else g.target={x:g.x+(Math.random()-0.5)*T*3,z:g.z+(Math.random()-0.5)*T*3}; } g.fx=ddx/L; g.fz=ddz/L; }
     if(g.state==='alert'&&seeP){ const dd=dist(g,V)||1; g.fx=(V.x-g.x)/dd; g.fz=(V.z-g.z)/dd; }
     g.fig.g.position.set(g.x,0,g.z); g.fig.g.rotation.y=Math.atan2(g.fx,g.fz); animFig(g.fig,g.moving,dt,g.state==='alert');
     g.mark.visible=g.state!=='patrol'; g.mark.material.map=g.state==='alert'?MK.ex:MK.q; g.mark.position.set(g.x,2.3,g.z);
@@ -86,7 +86,7 @@ function drawHud(){ const w=hud.width,h=hud.height; hctx.clearRect(0,0,w,h); if(
   if(P.key){ hctx.fillStyle='#f0b240'; hctx.fillText('LLAVE',16,h-38); } if(P.file){ hctx.fillStyle='#4fc77a'; hctx.fillText('EXPEDIENTE',16,h-56); }
   if(S.smoke>0){ hctx.fillStyle='#f0b240'; hctx.textAlign='center'; hctx.fillText('FUMANDO · '+Math.ceil(S.smoke)+' s · QUIETO',cx,cy+40); hctx.fillStyle='rgba(240,178,64,.25)'; hctx.fillRect(cx-60,cy+52,120,4); hctx.fillStyle='#f0b240'; hctx.fillRect(cx-60,cy+52,120*(1-S.smoke/8),4); }
   if(S.dogs.some(d=>!d.dead)){ hctx.fillStyle='#e0483a'; hctx.textAlign='left'; hctx.fillText('PERROS: '+S.dogs.filter(d=>!d.dead).length,16,h-74); }
-  if(S.c){ const C=S.c; hctx.textAlign='right'; hctx.fillStyle=C.down>0?'#e0483a':'#4fb9d6'; hctx.fillText(C.name+(C.down>0?' · HERIDA '+Math.ceil(C.down)+' s':' · '+'♥'.repeat(Math.max(0,C.hp))+'·'.repeat(5-Math.max(0,C.hp))+' · '+C.ammo+' · X CAMBIAR'),w-16,h-20); if(C.hurtT>0){ hctx.fillStyle='rgba(224,72,58,.5)'; hctx.fillRect(w-140,h-14,124,3); } }
+  if(S.c){ const C=S.c; hctx.textAlign='right'; hctx.fillStyle=C.down>0?'#e0483a':'#4fb9d6'; hctx.fillText(C.name+(C.down>0?' · HERIDA '+Math.ceil(C.down)+' s':' · '+'♥'.repeat(Math.max(0,C.hp))+'·'.repeat(5-Math.max(0,C.hp))+' · '+C.ammo+' · '+(S.cOrder==='follow'?'SIGUE':'ESPERA')+' · G ORDEN · X CAMBIAR'),w-16,h-20); if(C.hurtT>0){ hctx.fillStyle='rgba(224,72,58,.5)'; hctx.fillRect(w-140,h-14,124,3); } }
   if(S.swapT>0){ hctx.fillStyle='rgba(79,185,214,'+(S.swapT*0.8)+')'; hctx.fillRect(0,0,w,h); hctx.fillStyle='#fff'; hctx.font='12px "Press Start 2P",monospace'; hctx.textAlign='center'; hctx.fillText(P.name,cx,cy-60); }
   if(S.freeze>0){ hctx.fillStyle='#ff4a3a'; hctx.font='48px "Press Start 2P",monospace'; hctx.textAlign='center'; hctx.fillText('!',cx,cy-40); }
   if(S.savedT>0){ S.savedT-=0.016; hctx.fillStyle='#f0b240'; hctx.font='8px "Press Start 2P",monospace'; hctx.textAlign='right'; hctx.fillText('● GUARDADO',w-16,h-40); }
@@ -99,5 +99,5 @@ function radar(w,h){ const sc=3.4, rw=COLS*sc, rh=ROWS*sc, ox=w-rw-16, oy=44; hc
   if(S.c){ hctx.fillStyle=S.c.down>0?'#e0483a':'#4fb9d6'; hctx.fillRect(ox+S.c.x/T*sc-2,oy+S.c.z/T*sc-2,4,4); }
   const px=ox+P.x/T*sc, pz=oy+P.z/T*sc, f=fwd(); hctx.fillStyle='#4fc77a'; hctx.beginPath(); hctx.moveTo(px+f.x*5,pz+f.z*5); hctx.lineTo(px-f.z*3-f.x*3,pz+f.x*3-f.z*3); hctx.lineTo(px+f.z*3-f.x*3,pz-f.x*3-f.z*3); hctx.closePath(); hctx.fill(); hctx.restore(); }
 
-window.__LH={releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,INTER,codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
+window.__LH={teamOrder,releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,INTER,codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
 resize(); reset(); requestAnimationFrame(loop);
