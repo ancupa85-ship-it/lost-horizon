@@ -1,0 +1,10 @@
+'use strict';
+// ---------- AUDIO
+let AC=null, hum=null;
+function beep(f,d,type,vol,slide){ if(!AC)return; try{const o=AC.createOscillator(),g=AC.createGain();o.type=type||'square';o.frequency.value=f; if(slide)o.frequency.exponentialRampToValueAtTime(slide,AC.currentTime+d); g.gain.value=vol||0.05;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+d);o.stop(AC.currentTime+d);}catch(e){} }
+function noiseBurst(d,vol){ if(!AC)return; try{ const b=AC.createBuffer(1,AC.sampleRate*d,AC.sampleRate); const data=b.getChannelData(0); for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length); const s=AC.createBufferSource(); s.buffer=b; const g=AC.createGain(); g.gain.value=vol; const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1200; s.connect(f); f.connect(g); g.connect(AC.destination); s.start(); }catch(e){} }
+function initAudio(){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(); o.type='sawtooth'; o.frequency.value=38; const o2=AC.createOscillator(); o2.type='sine'; o2.frequency.value=57; const g=AC.createGain(); g.gain.value=0.05; const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=160; o.connect(f); o2.connect(f); f.connect(g); g.connect(AC.destination); o.start(); o2.start(); hum={gain:g};
+  const n=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate); const d=n.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1; const src=AC.createBufferSource(); src.buffer=n; src.loop=true; const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=3200; bp.Q.value=0.5; const rg=AC.createGain(); rg.gain.value=0.028; src.connect(bp); bp.connect(rg); rg.connect(AC.destination); src.start(); }catch(e){} }
+let sirenT=0; function siren(dt){ if(!AC)return; if(S.alertT>0){ sirenT+=dt; if(sirenT>0.5){sirenT=0; beep(700+Math.sin(S.t*3)*200,0.45,'square',0.03);} } }
+function bark(){ beep(170,0.07,'sawtooth',0.07,120); setTimeout(()=>beep(140,0.09,'sawtooth',0.06,90),80); }
+function alertJingle(){ beep(1480,0.09,'square',0.09); setTimeout(()=>beep(1180,0.35,'square',0.08),90); }

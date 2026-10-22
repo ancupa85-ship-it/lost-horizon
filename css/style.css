@@ -1,0 +1,63 @@
+/* Layout: una sola pantalla; el visor 3D con cel-shading ocupa todo, el HUD, el códec y las bandas de cine flotan encima. Monotema oscuro deliberado. */
+:root{
+  --bg:#05070c; --panel:rgba(8,12,16,.92); --fg:#d6e4dc; --dim:#7d948a;
+  --amber:#f0b240; --red:#e0483a; --green:#4fc77a; --cyan:#4fb9d6; --codec:#7fd4a0;
+  --display:"Press Start 2P",monospace; --body:"VT323","Courier New",monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:21px;overflow:hidden;
+  padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px));padding-block:0}
+#app{position:relative;width:100%;height:100%;overflow:hidden;background:#000}
+#gl,#hud{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{pointer-events:none}
+.top{position:absolute;left:0;right:0;top:0;display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;
+  padding:8px max(16px,env(safe-area-inset-left,0px)) 8px max(16px,env(safe-area-inset-right,0px));
+  font-family:var(--display);font-size:9px;line-height:1.7;background:linear-gradient(rgba(5,7,12,.85),rgba(5,7,12,0));pointer-events:none;transition:opacity .4s}
+.top b{color:var(--amber)} .top .st-calma{color:var(--green)} .top .st-sospecha{color:var(--amber)} .top .st-cierre{color:var(--red)}
+#prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-family:var(--display);font-size:10px;color:var(--cyan);
+  background:var(--panel);border:1px solid #223;padding:8px 12px;pointer-events:none;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
+#flash{position:absolute;left:0;right:0;bottom:0;background:rgba(6,10,14,.9);border-top:2px solid var(--cyan);padding:10px max(16px,env(safe-area-inset-left,0px)) 12px;
+  font-size:21px;line-height:1.25;pointer-events:none;z-index:3}
+#flash small{display:block;font-family:var(--display);font-size:9px;color:var(--cyan);margin-bottom:6px}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(3,5,8,.86);padding:16px;box-sizing:border-box;overflow:auto;z-index:6}
+.card{max-width:560px;width:100%;background:#0b1116;border:2px solid var(--amber);padding:18px 20px;font-size:21px;line-height:1.3;box-sizing:border-box}
+.card h2{font-family:var(--display);font-size:12px;color:var(--amber);margin:0 0 12px;text-wrap:balance;line-height:1.6}
+.card p{margin:0 0 10px} .card .k{color:var(--cyan)} .card .m{color:var(--dim);font-size:18px}
+button{font-family:var(--display);font-size:10px;background:var(--amber);color:#1a1200;border:0;padding:12px 16px;cursor:pointer;margin-top:6px}
+button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+#dlg{position:absolute;left:50%;bottom:6%;transform:translateX(-50%);width:min(620px,94%);background:var(--panel);border:2px solid var(--cyan);padding:14px 16px;box-sizing:border-box;max-height:80%;overflow:auto;z-index:4}
+#dlg h3{font-family:var(--display);font-size:10px;color:var(--cyan);margin:0 0 8px;line-height:1.6}
+#dlg .txt{margin:0 0 10px;line-height:1.25}
+#dlg .st{color:var(--amber);font-size:18px;margin:4px 0 8px}
+#dlg .opts{display:flex;flex-direction:column;gap:4px}
+#dlg .opts button{text-align:left;background:#101a21;color:var(--fg);border:1px solid #243640;padding:8px 10px;margin:0;font-family:var(--body);font-size:20px}
+#dlg .opts button:hover{border-color:var(--cyan)} #dlg .opts button .n{color:var(--cyan);font-family:var(--display);font-size:9px;margin-right:8px}
+#dlg .opts button.danger{border-color:#5a2a26} #dlg .opts button.soft{border-color:#2a5a3a}
+#dlg .code{font-family:var(--display);font-size:22px;letter-spacing:10px;color:var(--amber);background:#000;padding:10px;text-align:center;margin:8px 0}
+#dlg .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+#dlg .pad button{text-align:center}
+#note{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:48px;width:min(380px,90%);background:var(--panel);border:2px solid var(--amber);padding:12px 14px;box-sizing:border-box;max-height:70%;overflow:auto;z-index:4}
+#note h3{font-family:var(--display);font-size:10px;color:var(--amber);margin:0 0 8px}
+#note ul{margin:0;padding-left:18px;line-height:1.25} #note li{margin-bottom:6px}
+#note .e{color:var(--dim)}
+/* cine */
+.bar{position:absolute;left:0;right:0;height:0;background:#000;z-index:5;transition:height .9s cubic-bezier(.4,0,.2,1);pointer-events:none}
+#barT{top:0} #barB{bottom:0} .cine .bar{height:12%}
+#title{position:absolute;left:max(24px,env(safe-area-inset-left,0px));bottom:16%;z-index:7;pointer-events:none;font-family:var(--display);color:#fff;font-size:11px;line-height:2;letter-spacing:1px;text-shadow:0 0 8px #000;max-width:80%}
+#title .big{font-size:18px;color:var(--amber);display:block;margin-top:6px}
+#title .s{color:var(--dim);font-size:9px;display:block}
+#skip{position:absolute;right:max(24px,env(safe-area-inset-right,0px));bottom:14%;z-index:7;font-family:var(--display);font-size:8px;color:var(--dim);pointer-events:none}
+#fade{position:absolute;inset:0;background:#000;z-index:5;pointer-events:none;transition:opacity 1.2s;opacity:0}
+/* códec */
+#codec{position:absolute;left:0;right:0;bottom:0;height:min(46%,330px);background:linear-gradient(#071a12,#04100b 70%,#000);border-top:2px solid var(--codec);z-index:5;display:grid;grid-template-columns:120px 1fr 120px;grid-template-rows:auto 1fr auto;gap:6px 14px;
+  padding:12px max(16px,env(safe-area-inset-left,0px)) 12px max(16px,env(safe-area-inset-right,0px));box-sizing:border-box;color:var(--codec);font-family:var(--body)}
+#codec canvas{width:120px;height:120px;image-rendering:pixelated;border:2px solid #1f5a3a;background:#031;grid-row:1/3}
+#codec .freq{grid-column:2;font-family:var(--display);font-size:10px;letter-spacing:2px;display:flex;justify-content:space-between}
+#codec .freq .who{color:#fff}
+#codec .cl{grid-column:2;font-size:24px;line-height:1.2;overflow:hidden;min-width:0}
+#codec .cl .cur{color:#fff}
+#codec .foot{grid-column:1/4;font-family:var(--display);font-size:8px;color:#4a8a66;text-align:right}
+@media (max-width:640px){#codec{grid-template-columns:72px 1fr 72px}#codec canvas{width:72px;height:72px}#codec .cl{font-size:19px}}
+@media (max-width:520px){.top{font-size:7px}.card{font-size:18px}body{font-size:18px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

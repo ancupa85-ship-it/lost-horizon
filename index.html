@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lost Horizon: De Profundis</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+  <canvas id="hud"></canvas>
+  <div class="top" id="top">
+    <span>BASE: <b id="hState" class="st-calma">CALMA</b></span>
+    <span>VIDA: <b id="hHp">♥♥♥♥♥</b></span>
+    <span>MUNICIÓN: <b id="hAmmo">8</b></span>
+    <span>LUZ: <b id="hPow">GENERADOR</b></span>
+    <span>HORA: <b id="hClock">02:10</b></span>
+    <span>TABACO: <b id="hCig">3</b></span>
+    <span id="hObj">OBJETIVO: ENTRA EN EL ARCHIVO</span>
+  </div>
+  <div id="prompt" hidden></div>
+  <div id="flash" hidden></div>
+  <div id="note" hidden><h3>CUADERNO (Tab)</h3><ul id="noteList"><li class="e">Nada todavía. Lee, escucha, aprieta.</li></ul></div>
+  <div id="dlg" hidden><h3 id="dlgTitle"></h3><div id="dlgTxt" class="txt"></div><div id="dlgOpts" class="opts"></div></div>
+  <div id="barT" class="bar"></div><div id="barB" class="bar"></div>
+  <div id="title" hidden></div><div id="skip" hidden>E · SALTAR</div>
+  <div id="fade"></div>
+  <div id="codec" hidden>
+    <canvas id="pL" width="32" height="32"></canvas>
+    <div class="freq"><span id="cWho" class="who">CONTROL</span><span id="cFreq">141.12</span></div>
+    <div class="cl" id="cTxt"></div>
+    <canvas id="pR" width="32" height="32"></canvas>
+    <div class="foot">E / CLIC · CONTINUAR</div>
+  </div>
+  <div id="ov" class="overlay">
+    <div class="card">
+      <h2>PROJECT LOST HORIZON · MISIÓN 1 · DE PROFUNDIS</h2>
+      <p>Tarsis, noviembre de 1983, 02:10. Lluvia. Has salido de los barracones por la alcantarilla. Enfrente, el centro de comunicaciones y el archivo del teniente coronel Alarcón. Dentro está el expediente que dice qué eres.</p>
+      <p><span class="k">Clic</span> captura el ratón · <span class="k">WASD</span> moverse · <span class="k">Shift</span> correr · <span class="k">Ctrl</span> agacharse · <span class="k">E</span> usar / leer / hablar / seguir el códec · <span class="k">F</span> agarrar e interrogar · <span class="k">C</span> cargar cuerpos · <span class="k">Clic</span> disparar · <span class="k">V</span> cambiar de vista · <span class="k">Q</span> fumar (8 s quieto, cura) · <span class="k">Tab</span> cuaderno</p>
+      <p class="m">La oscuridad te esconde si vas agachado. Los focos te delatan. Los guardias mienten según a quién sirven y cuánto los aprietes; si los aprietas de más, gritan. El archivo tiene una clave: nadie te la va a dar entera.</p>
+      <p class="m">Tienes hasta las 02:19. Después sueltan la perrera: siete perros, y si te alcanzan despiertas en una celda de la que solo se sale hablando.</p>
+      <p class="m">Necesita ratón y teclado.</p>
+      <button id="btnStart">EMPEZAR</button>
+    </div>
+  </div>
+</div>
+<script src="vendor/three.min.js"></script>
+<script src="src/00-boot.js"></script>
+<script src="src/01-map.js"></script>
+<script src="src/02-render.js"></script>
+<script src="src/03-figures.js"></script>
+<script src="src/04-state.js"></script>
+<script src="src/05-audio.js"></script>
+<script src="src/06-ui.js"></script>
+<script src="src/07-codec.js"></script>
+<script src="src/08-input.js"></script>
+<script src="src/09-util.js"></script>
+<script src="src/10-actions.js"></script>
+<script src="src/11-cinematics.js"></script>
+<script src="src/12-endings.js"></script>
+<script src="src/13-loop.js"></script>
+</body>
+</html>
