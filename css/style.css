@@ -1,3 +1,4 @@
+[hidden]{display:none!important}
 /* Layout: una sola pantalla; el visor 3D con cel-shading ocupa todo, el HUD, el códec y las bandas de cine flotan encima. Monotema oscuro deliberado. */
 :root{
   --bg:#05070c; --panel:rgba(8,12,16,.92); --fg:#d6e4dc; --dim:#7d948a;

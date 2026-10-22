@@ -23,7 +23,7 @@ function update(dt){ const P=S.p; S.t+=dt;
     if(dd>1.0){ const ox=d.x,oz=d.z; move(d,dx2/L2*6.2*dt,dz2/L2*6.2*dt,0.3); if(Math.abs(d.x-ox)+Math.abs(d.z-oz)<0.005){ move(d,(Math.random()-0.5)*0.4,(Math.random()-0.5)*0.4,0.3); } d.fx=dx2/L2; d.fz=dz2/L2; d.fig.phase+=dt*16; }
     else { d.biteT-=dt; if(d.biteT<=0){ d.biteT=1.0; bark(); P.hp--; P.hurtT=0.5; updHud(); if(P.hp<=0){ captured(); } } }
     if(Math.random()<dt*0.25)bark();
-    d.fig.g.position.set(d.x,0,d.z); d.fig.g.rotation.y=Math.atan2(d.fx,d.fz); const sn=Math.sin(d.fig.phase); d.fig.legs.forEach((l,i)=>l.rotation.x=(i<2?sn:-sn)*0.8); });
+    d.fig.g.position.set(d.x,0,d.z); d.fig.g.rotation.y=Math.atan2(d.fx,d.fz); animDog(d.fig,dt,dd>1.0); });
   if(S.vidal.cool>0)S.vidal.cool-=dt;
   if(P.hurtT>0)P.hurtT-=dt; if(P.carry){P.carry.x=P.x+f.x*0.6;P.carry.z=P.z+f.z*0.6;}
   const hidden=playerHidden()&&S.smoke<=0;
@@ -91,5 +91,5 @@ function radar(w,h){ const sc=3.4, rw=COLS*sc, rh=ROWS*sc, ox=w-rw-16, oy=44; hc
   S.dogs.forEach(d=>{ if(d.dead)return; hctx.fillStyle='#ff6a5a'; hctx.fillRect(ox+d.x/T*sc-1.5,oy+d.z/T*sc-1.5,3,3); });
   const px=ox+P.x/T*sc, pz=oy+P.z/T*sc, f=fwd(); hctx.fillStyle='#4fc77a'; hctx.beginPath(); hctx.moveTo(px+f.x*5,pz+f.z*5); hctx.lineTo(px-f.z*3-f.x*3,pz+f.x*3-f.z*3); hctx.lineTo(px+f.z*3-f.x*3,pz-f.x*3-f.z*3); hctx.closePath(); hctx.fill(); hctx.restore(); }
 
-window.__LH={releaseDogs,captured,startSmoke,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,INTER,codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
+window.__LH={releaseDogs,captured,startSmoke,wx,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,INTER,codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
 resize(); reset(); requestAnimationFrame(loop);
