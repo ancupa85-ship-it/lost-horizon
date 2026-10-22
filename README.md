@@ -13,7 +13,8 @@ o simplemente abre `index.html` en Chrome/Firefox (el juego pide el ratón al ha
 
 Controles: WASD mover · ratón mirar · Ctrl agacharse · Shift correr · E usar/hablar · F agarrar e interrogar / patada ·
 C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
-Tab cuaderno · H guía · Esc pausa y opciones. El menú de inicio tiene "Cómo se juega", "Controles" y "Opciones".
+Tab cuaderno · R radio (Control 141.12, Roig 140.85 y una frecuencia que no figura en el manual) · H guía · Esc pausa y opciones.
+El menú de inicio tiene "Cómo se juega", "Controles", "Opciones" y, si hay partida guardada, CONTINUAR.
 
 ## Estructura
 
@@ -38,7 +39,7 @@ src/
   13-endings.js     finales
   14-menu.js        menú principal, pausa, opciones (localStorage) y guía paso a paso
   15-loop.js        update(), IA de guardias y perros, render, HUD y radar
-tests/smoke.js      prueba corta sin cabeza (perros, celda, Vidal)
+tests/smoke.js      prueba corta sin cabeza (perros, radio, captura → celda, Vidal, guardar/continuar, segunda derrota)
 tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
 tests/shots.js      capturas de referencia en tests/shots/
 tools/build-artifact.py  empaqueta todo en un solo HTML para publicarlo como Artifact
@@ -60,8 +61,17 @@ node tests/shots.js         # capturas
 
 - Clave del archivo: **0129** (salmo 130 *De profundis*, numerado como la Vulgata, CXXIX). Dos errores y suena la alarma.
 - Reloj de misión desde las 02:10. A los 7 minutos Control avisa; a las 02:19 sueltan 7 perros.
-- Si te capturan despiertas en la celda con Halloran. Solo sales convenciendo al cabo Vidal en tres preguntas,
-  cuyas respuestas correctas dependen de las pistas reunidas (la Fuente, el expediente o el teletipo, el salmo).
+- Cualquier derrota (guardias, perros, forcejeo) pasa por `defeat()`: la primera vez hay cinemática de captura
+  (la voz de Alarcón: «No lo maten. Llévenlo con la doctora.») y despiertas en la celda con Halloran; solo sales
+  convenciendo al cabo Vidal en tres preguntas, cuyas respuestas dependen de las pistas reunidas (la Fuente, el
+  expediente o el teletipo, el salmo). La segunda derrota es el final «Cuarta sesión».
+- Guardado automático en los puntos clave (llave, despacho, archivo, expediente, celda, salida de la celda) en
+  `localStorage`; CONTINUAR en el menú y ÚLTIMO PUNTO en la pantalla de derrota lo recuperan. Empezar una partida nueva lo borra.
+- Cinemáticas con cámara guiada: intro, la perrera (02:19), la apertura del archivo, la captura y el final.
+  Si el puntero se desbloquea (Esc del navegador, cambio de ventana) la partida se pausa sola.
+- Radio (R) al estilo códec: Control responde según el momento (celda, perros, llave, archivo…); Roig da pistas,
+  y con dos de las pistas del teclado una llamada suya suelta la de Roma; la frecuencia 000.00 aparece cuando has
+  tocado la Fuente, cortado la luz o pasado por la celda.
 - Los guardias leales mienten bajo interrogatorio; apretar de más los hace gritar.
 - Roig (teniente, segunda infiltrada) sigue al personaje controlado, se agacha con él, busca sombra si él se esconde y,
   cuando un guardia pasa a alerta o un perro se acerca, dispara con silenciador (duerme, no mata; 12 balas). Los guardias

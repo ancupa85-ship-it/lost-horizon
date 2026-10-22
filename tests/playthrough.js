@@ -22,6 +22,8 @@ const {chromium}=require('playwright'); const path=require('path');
   // pausa
   await p.keyboard.press('Escape'); await frames(1); ok(await ev(()=>!document.getElementById('ov').hidden&&!document.querySelector('[data-pane="pause"]').hidden),'Esc abre la pausa');
   await p.keyboard.press('Escape'); await frames(1); ok(await ev(()=>document.getElementById('ov').hidden),'Esc reanuda');
+  await ev(()=>{ if(document.pointerLockElement)document.exitPointerLock(); else { window.__LH.locked=true; document.dispatchEvent(new Event('pointerlockchange')); } }); await wait(300); await frames(2); ok(await ev(()=>window.__LH.paused&&!document.querySelector('[data-pane="pause"]').hidden),'perder el ratón pausa sola la partida');
+  await p.click('#btnResume'); await frames(1); await ev(()=>{window.__LH.locked=true;}); ok(await ev(()=>!window.__LH.paused&&document.getElementById('ov').hidden),'REANUDAR cierra la pausa');
   // interrogatorio a Ibarra por la espalda
   await ev(()=>{ const L=window.__LH; L.S.c.ammo=0; L.S.bodies.length=0; L.S.guards.forEach(g=>{ g.state='patrol'; g.susp=0; g.down=0; g.held=false; }); const g=L.S.guards.find(g=>g.name.includes('Ibarra')); g.x=L.wx(13); g.z=L.wx(5); g.wps=[[13,5]]; g.wi=0; g.state='patrol'; g.fx=0; g.fz=-1; L.S.p.x=g.x; L.S.p.z=g.z+1.2; L.yaw=0; L.S.c.x=g.x+1; L.S.c.z=g.z+2; });
   await frames(4);
@@ -41,7 +43,7 @@ const {chromium}=require('playwright'); const path=require('path');
   // teclado
   await ev(()=>window.__LH.openKeypad()); for(const k of ['0','1','2','9'])await ev((k)=>window.__LH.keypadIn(k),k); await ev(()=>window.__LH.keypadIn('ok')); await frames(1);
   ok(await ev(()=>window.__LH.W.vaultOpen),'archivo abierto con 0129');
-  await wait(1700); await frames(2); await closeCodec(); await frames(1);
+  ok(await ev(()=>!!window.__LH.cut),'cinemática al abrir el archivo'); await ev(()=>window.__LH.cutSkip()); await wait(1500); await frames(2); await closeCodec(); await frames(1);
   await use(8,18,0); ok(await ev(()=>window.__LH.S.p.file),'expediente recogido'); await p.keyboard.press('1'); await wait(1300); await frames(2); await closeCodec(); await frames(1);
   // cambio a Roig y vuelta: el inventario viaja con el control
   await ev(()=>window.__LH.swapChar()); await frames(2);

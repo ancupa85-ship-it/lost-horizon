@@ -16,7 +16,7 @@ function intro(){ const px=wx(start.x),pz=wx(start.y);
    {dur:5,from:[wx(8),9,wx(10)],to:[px+6,3.5,pz+4],look:[px,1,pz],title:'<span class="s">ANDREW CUTTLAS · SUJETO LH-07</span>MISIÓN 1<span class="big">DE PROFUNDIS</span>'},
    {dur:3,from:[px+6,3.5,pz+4],to:[px,1.6,pz],look:[px+8,1.4,pz],look2:[px+8,1.6,pz]},
   ],()=>{ codec(CODEC.start); }); }
-function outro(){ const P=S.p; try{document.exitPointerLock();}catch(e){}
+function outro(){ const P=S.p; unlockPtr();
   startCut([
    {dur:5,from:[P.x,1.6,P.z],to:[P.x-6,9,P.z-6],look:[P.x,1,P.z],title:'<span class="s">SALIDA SURESTE · 03:0'+(((S.t/60)|0)%10)+'</span>FIN DE LA MISIÓN 1'},
    {dur:3,from:[P.x-6,9,P.z-6],to:[P.x-6,22,P.z-6],look:[P.x,1,P.z]},

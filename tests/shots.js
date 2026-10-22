@@ -21,9 +21,16 @@ const {chromium}=require('playwright'); const path=require('path'); const fs=req
   // 2b) Roig de frente
   await p.evaluate(()=>{ const L=window.__LH; L.third=false; L.S.c.x=L.S.p.x; L.S.c.z=L.S.p.z-2.6; L.S.c.fx=0; L.S.c.fz=1; L.yaw=0; L.pitch=-0.05; }); await shot('roig');
   // 3) perros
-  await p.evaluate(()=>{ const L=window.__LH; L.third=false; L.releaseDogs(); }); await p.waitForTimeout(300); await closeCodec();
+  await p.evaluate(()=>{ const L=window.__LH; L.third=false; L.releaseDogs(); }); await p.waitForTimeout(1200); await p.screenshot({path:path.join(out,'perrera.png')}); console.log('captura perrera');
+  await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(1200); await closeCodec();
   await p.evaluate(()=>{ const L=window.__LH; L.S.p.x=L.wx?L.wx(22):45; L.S.p.z=L.wx?L.wx(6):13; L.yaw=0; L.pitch=-0.1; L.S.dogs.forEach((d,i)=>{ d.x=L.S.p.x+(i-3)*0.9; d.z=L.S.p.z-3.2; d.fx=0; d.fz=1; }); }); await p.waitForTimeout(120); await p.screenshot({path:path.join(out,'perros.png')}); console.log('captura perros');
   // 4) Vidal en la celda
-  await p.evaluate(()=>window.__LH.captured()); await p.waitForTimeout(5500); await closeCodec(); await frames(2);
+  await p.evaluate(()=>window.__LH.captured('guards')); await p.waitForTimeout(1500); await p.screenshot({path:path.join(out,'captura.png')}); console.log('captura captura');
+  await p.waitForTimeout(4200); await p.screenshot({path:path.join(out,'alarcon.png')}); console.log('captura alarcon');
+  await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(2900); await closeCodec(); await frames(2);
   await p.evaluate(()=>{ const L=window.__LH; L.yaw=0.33; L.pitch=0.02; }); await shot('vidal');
+  // 5) radio y pantalla de derrota
+  await p.evaluate(()=>window.__LH.radioMenu()); await p.waitForTimeout(200); await p.screenshot({path:path.join(out,'radio.png')}); console.log('captura radio');
+  await p.keyboard.press('1'); await p.waitForTimeout(400); await p.screenshot({path:path.join(out,'codec-control.png')}); console.log('captura codec-control'); await closeCodec();
+  await p.evaluate(()=>window.__LH.defeat('guards')); await p.waitForTimeout(900); await p.screenshot({path:path.join(out,'derrota.png')}); console.log('captura derrota');
   console.log('errores',errs); await b.close(); })();
