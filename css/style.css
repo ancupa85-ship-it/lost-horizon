@@ -1,3 +1,4 @@
+[hidden]{display:none!important}
 /* Layout: una sola pantalla; el visor 3D con cel-shading ocupa todo, el HUD, el códec y las bandas de cine flotan encima. Monotema oscuro deliberado. */
 :root{
   --bg:#05070c; --panel:rgba(8,12,16,.92); --fg:#d6e4dc; --dim:#7d948a;
@@ -61,3 +62,33 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 @media (max-width:640px){#codec{grid-template-columns:72px 1fr 72px}#codec canvas{width:72px;height:72px}#codec .cl{font-size:19px}}
 @media (max-width:520px){.top{font-size:7px}.card{font-size:18px}body{font-size:18px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* menú principal y pausa */
+.card.menu{max-width:640px}
+.logo{margin:0 0 14px;font-family:var(--display);line-height:1.6}
+.logo span{display:block;font-size:16px;color:var(--amber);letter-spacing:1px}
+.logo small{display:block;font-size:9px;color:var(--dim);margin-top:4px}
+.mm{display:flex;flex-direction:column;gap:6px}
+.mm button{width:100%;text-align:left;padding:12px 14px}
+.menu button.ghost{background:transparent;color:var(--fg);border:1px solid #2a3a44}
+.menu button.ghost:hover{border-color:var(--cyan)}
+.menu button:hover{filter:brightness(1.1)}
+.menu .m{margin-top:10px}
+.how{margin:0 0 12px;padding-left:20px;line-height:1.3}
+.how li{margin-bottom:8px} .how b{color:var(--amber)}
+.keys{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:19px}
+.keys td{padding:4px 6px;border-bottom:1px solid #16222a;vertical-align:top}
+.keys td:nth-child(1),.keys td:nth-child(3){white-space:nowrap;width:1%}
+.opts-grid{display:grid;grid-template-columns:1fr auto;gap:10px 16px;align-items:center;margin-bottom:12px}
+.opts-grid label{font-size:20px} .opts-grid output{color:var(--amber);margin-left:6px}
+.opts-grid input[type=range]{width:160px;accent-color:var(--amber)}
+.opts-grid input[type=checkbox]{width:20px;height:20px;accent-color:var(--amber)}
+.opts-grid select{font-family:var(--body);font-size:18px;background:#101a21;color:var(--fg);border:1px solid #243640;padding:4px 6px}
+.menu.paused{border-color:var(--cyan)}
+/* guía en pantalla */
+#guide{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:48px;width:min(360px,46%);background:rgba(6,10,14,.78);border-left:2px solid var(--amber);padding:8px 10px;box-sizing:border-box;pointer-events:none;z-index:2}
+#guide h4{font-family:var(--display);font-size:8px;color:var(--amber);margin:0 0 6px;display:flex;justify-content:space-between}
+#guide h4 span{color:var(--dim)}
+#guide ul{list-style:none;margin:0;padding:0;font-size:18px;line-height:1.2}
+#guide li{margin-bottom:4px;color:var(--dim)} #guide li.now{color:var(--fg)} #guide li.ok{color:var(--green);opacity:.7}
+@media (max-width:640px){#guide{display:none}.opts-grid{grid-template-columns:1fr}}

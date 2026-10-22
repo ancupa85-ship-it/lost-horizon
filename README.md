@@ -11,8 +11,9 @@ npm start          # sirve la carpeta en http://localhost:8080
 ```
 o simplemente abre `index.html` en Chrome/Firefox (el juego pide el ratón al hacer clic).
 
-Controles: WASD mover · ratón mirar · C agacharse · Shift correr · E usar/hablar · F agarrar/patada ·
-G cargar cuerpo · clic disparar · V cambiar vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) · Tab cuaderno.
+Controles: WASD mover · ratón mirar · Ctrl agacharse · Shift correr · E usar/hablar · F agarrar e interrogar / patada ·
+C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
+Tab cuaderno · H guía · Esc pausa y opciones. El menú de inicio tiene "Cómo se juega", "Controles" y "Opciones".
 
 ## Estructura
 
@@ -32,10 +33,14 @@ src/
   08-input.js       teclado, ratón, pointer lock
   09-util.js        línea de visión, colisiones, visión de guardias, alarma
   10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo
-  11-cinematics.js  cámaras guiadas, bandas y títulos
-  12-endings.js     finales
-  13-loop.js        update(), IA de guardias y perros, render, HUD y radar
-tests/smoke.js      prueba sin cabeza con Playwright
+  11-team.js        la compañera (Roig): sigue, se esconde, dispara con silenciador; X intercambia el control
+  12-cinematics.js  cámaras guiadas, bandas y títulos
+  13-endings.js     finales
+  14-menu.js        menú principal, pausa, opciones (localStorage) y guía paso a paso
+  15-loop.js        update(), IA de guardias y perros, render, HUD y radar
+tests/smoke.js      prueba corta sin cabeza (perros, celda, Vidal)
+tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
+tests/shots.js      capturas de referencia en tests/shots/
 tools/build-artifact.py  empaqueta todo en un solo HTML para publicarlo como Artifact
 ```
 
@@ -46,7 +51,9 @@ numérico importa. `window.__LH` expone el estado para depurar desde la consola.
 
 ```bash
 npm i -D playwright     # una vez; necesita Chromium (npx playwright install chromium)
-npm test
+npm test                # prueba corta
+node tests/playthrough.js   # partida completa (varios minutos sin GPU)
+node tests/shots.js         # capturas
 ```
 
 ## Diseño
@@ -56,3 +63,7 @@ npm test
 - Si te capturan despiertas en la celda con Halloran. Solo sales convenciendo al cabo Vidal en tres preguntas,
   cuyas respuestas correctas dependen de las pistas reunidas (la Fuente, el expediente o el teletipo, el salmo).
 - Los guardias leales mienten bajo interrogatorio; apretar de más los hace gritar.
+- Roig (teniente, segunda infiltrada) sigue al personaje controlado, se agacha con él, busca sombra si él se esconde y,
+  cuando un guardia pasa a alerta o un perro se acerca, dispara con silenciador (duerme, no mata; 12 balas). Los guardias
+  la ven igual que a Cuttlas; si la hieren cae 40 s y no se puede controlar. X cambia el control y el inventario (llave,
+  expediente) viaja con quien controlas.
