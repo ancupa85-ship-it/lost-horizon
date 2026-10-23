@@ -17,6 +17,8 @@ const path=require('path');
   const settle=async()=>{ for(let i=0;i<30;i++){ await closeCodec(); if(await p.evaluate(()=>!window.__LH.uiOpen&&!window.__LH.cut&&!window.__LH.codecQ))break; await p.waitForTimeout(150);} };
   await settle();
   ok(await p.evaluate(()=>window.__LH.S.guards.length>0),'guardias creados');
+  ok(await p.evaluate(()=>{ const L=window.__LH; const M=L.MAPSRC.map(r=>r.split('')); const solid=c=>'#WTcg'.includes(c); const seen=new Set(); const q=[[2,2]]; seen.add('2,2'); while(q.length){ const [x,y]=q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{ const nx=x+dx,ny=y+dy; const k=nx+','+ny; if(nx<0||ny<0||ny>=M.length||nx>=M[0].length||seen.has(k)||solid(M[ny][nx]))return; seen.add(k); q.push([nx,ny]); }); }
+    return L.INTER.every(it=>seen.has(it.x+','+it.y)||[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen.has((it.x+dx)+','+(it.y+dy)))); }),'todos los puntos de interacción (teclado, puertas, pistas) son alcanzables: ninguna caja los tapa');
   await p.evaluate(()=>{window.__LH.third=true;}); await p.waitForTimeout(300);
   // órdenes a Roig: por defecto espera; G la hace seguir
   const frames=async(n)=>{ for(let i=0;i<n;i++)await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>r()))); };
