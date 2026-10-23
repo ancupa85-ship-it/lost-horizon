@@ -11,6 +11,12 @@ for f in srcs:
     t=open(os.path.join(R,'src',f),encoding='utf-8').read()
     t=re.sub(r"^'use strict';\n",'',t)
     t=t.replace("throw new Error('THREE no cargado');","return;")
+    if f=='05-music.js':
+        import base64
+        for k in ('sigilo','accion'):
+            mp=os.path.join(R,'assets','music',k+'.mp3')
+            if os.path.exists(mp):
+                t=t.replace("'assets/music/"+k+".mp3'","'data:audio/mpeg;base64,"+base64.b64encode(open(mp,'rb').read()).decode()+"'")
     js.append('// ===== '+f+'\n'+t)
 body=re.search(r'<body>\n(.*?)\n<script src="vendor/three.min.js">',html,re.S).group(1)
 out=('<title>Lost Horizon: De Profundis</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n'

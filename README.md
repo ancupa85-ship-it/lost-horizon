@@ -12,7 +12,7 @@ npm start          # sirve la carpeta en http://localhost:8080
 o simplemente abre `index.html` en Chrome/Firefox (el juego pide el ratón al hacer clic).
 
 Controles: WASD mover · ratón mirar · Ctrl agacharse · Shift correr · E usar/hablar · F agarrar e interrogar / patada ·
-C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · G orden a Roig (sígueme / espera) · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
+C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · G orden a Roig (sígueme / espera) · T silenciador · E junto a un caído: quitarle el uniforme · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
 Tab cuaderno · R radio (Control 141.12, Roig 140.85 y una frecuencia que no figura en el manual) · H guía · Esc pausa y opciones.
 El menú de inicio tiene "Cómo se juega", "Controles", "Opciones" y, si hay partida guardada, CONTINUAR.
 
@@ -29,6 +29,7 @@ src/
   03-figures.js     personajes de bloques con cara pixelada, perros, marcas ! y ?, brazos del jugador
   04-state.js       estado de partida, pistas, guardias, diálogos de interrogatorio, reset
   05-audio.js       sintetizador WebAudio (zumbido, sirena, ladridos, disparos)
+  05-music.js       banda sonora: assets/music/sigilo.mp3 (menú y sigilo) y accion.mp3 (alarma), fundidos y atenuación en códec
   06-ui.js          avisos, cuaderno, diálogos, HUD
   07-codec.js       códec con retratos pixelados y texto mecanografiado; guiones
   08-input.js       teclado, ratón, pointer lock
@@ -42,7 +43,8 @@ src/
 tests/smoke.js      prueba corta sin cabeza (perros, radio, captura → celda, Vidal, guardar/continuar, segunda derrota)
 tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
 tests/shots.js      capturas de referencia en tests/shots/
-tools/build-artifact.py  empaqueta todo en un solo HTML para publicarlo como Artifact
+assets/music/       los dos temas a 96 kb/s (los originales están en el proyecto)
+tools/build-artifact.py  empaqueta todo en un solo HTML (música incrustada en base64) para publicarlo como Artifact
 ```
 
 Los archivos de `src/` se cargan en orden como scripts clásicos y comparten ámbito, así que el orden
@@ -72,6 +74,10 @@ node tests/shots.js         # capturas
 - Radio (R) al estilo códec: Control responde según el momento (celda, perros, llave, archivo…); Roig da pistas,
   y con dos de las pistas del teclado una llamada suya suelta la de Roma; la frecuencia 000.00 aparece cuando has
   tocado la Fuente, cortado la luz o pasado por la celda.
+- Detección por distancias (1 unidad = 1 m): visto a más de 7,5 m el guardia no da la alarma, duda ~2 s (`doubtT`) y se
+  acerca a mirar; a menos de 7,5 m acumula sospecha y da la alarma. Con silenciador (T) el disparo no alerta a nadie; sin él,
+  alarma general. Junto a un guardia caído, E roba el uniforme (`stripUniform`): los guardias solo te ven a menos de 3 m y
+  un disparo sin silenciador o cualquier alarma te desenmascara. Las constantes están en `ALARM_D` y `DISG_D` (09-util).
 - Los guardias leales mienten bajo interrogatorio; apretar de más los hace gritar.
 - Roig (teniente, segunda infiltrada) espera agachada donde está hasta que G le ordena seguirte; siguiéndote se agacha
   contigo y busca sombra si tú te escondes. Solo dispara, con silenciador (duerme, no mata; 12 balas), cuando un guardia

@@ -15,6 +15,7 @@
     <span>BASE: <b id="hState" class="st-calma">CALMA</b></span>
     <span>VIDA: <b id="hHp">♥♥♥♥♥</b></span>
     <span>MUNICIÓN: <b id="hAmmo">8</b></span>
+    <span id="hDis" hidden>UNIFORME: <b>TROPA</b></span>
     <span>LUZ: <b id="hPow">GENERADOR</b></span>
     <span>HORA: <b id="hClock">02:10</b></span>
     <span>TABACO: <b id="hCig">3</b></span>
@@ -69,6 +70,9 @@
           <li><b>Interrogar.</b> Llega por la espalda a un guardia que no te haya visto y pulsa <span class="k">F</span> cuando aparezca la marca <b>F</b> sobre su cabeza. Pregúntale por la clave, la llave o el templo. Si no suelta prenda, <b>APRIETA</b>: cada guardia aguanta un número distinto de apretones antes de gritar. Después duérmelo, mátalo o suéltalo (correrá a avisar).</li>
           <li><b>Recoger pistas.</b> Todo lo que lees o te cuentan va al <b>cuaderno</b> (<span class="k">Tab</span>): teletipo, escritorio de Alarcón, la presa de la celda, los propios guardias. Los leales mienten.</li>
           <li><b>El archivo.</b> Tiene un teclado de cuatro cifras. La clave no está escrita en ningún sitio: sale de cruzar pistas. Dos errores y suena la alarma.</li>
+          <li><b>Música.</b> «The Unmarked Doorway» acompaña el menú y el sigilo; cuando salta la alarma entra «Cornered in Iron». El volumen de la música va aparte en Opciones.</li>
+          <li><b>Distancias.</b> Si un guardia te ve a más de ocho metros no da la alarma: duda unos segundos y se acerca a mirar. A menos de siete metros y medio, alarma. Con el silenciador puesto (<span class="k">T</span>) nadie oye tus disparos, pero un cuerpo a la vista sigue delatándote.</li>
+          <li><b>Uniforme.</b> Junto a un guardia dormido o muerto, <span class="k">E</span> le quita la guerrera y el casco. Vestido de tropa solo te calan a menos de tres metros o si disparas sin silenciador; la alarma te desenmascara.</li>
           <li><b>Roig.</b> Espera agachada donde la dejes hasta que le ordenes seguirte con <span class="k">G</span> (y <span class="k">G</span> otra vez para que espere). Solo dispara, con silenciador (duerme, no mata), cuando os han descubierto o un perro va a por ella. <span class="k">X</span> cambia el control entre los dos en cualquier momento.</li>
           <li><b>Curarte.</b> <span class="k">Q</span> enciende un cigarro: ocho segundos quieto para recuperar dos corazones. Tienes tres.</li>
           <li><b>El reloj.</b> A las 02:19 sueltan siete perros. Se matan a tiros o se apartan de una patada (<span class="k">F</span>). Si te derriban, despiertas en la celda y solo sales convenciendo al cabo Vidal con lo que hayas averiguado.</li>
@@ -84,7 +88,8 @@
           <tr><td><span class="k">Ctrl</span></td><td>agacharse</td><td><span class="k">E</span></td><td>usar · leer · hablar · seguir el códec</td></tr>
           <tr><td><span class="k">F</span></td><td>agarrar e interrogar · patada a un perro</td><td><span class="k">C</span></td><td>cargar o soltar un cuerpo</td></tr>
           <tr><td><span class="k">X</span></td><td>cambiar entre Cuttlas y Roig</td><td><span class="k">V</span></td><td>primera o tercera persona</td></tr>
-          <tr><td><span class="k">G</span></td><td>orden a Roig: sígueme / espera aquí</td><td></td><td></td></tr>
+          <tr><td><span class="k">G</span></td><td>orden a Roig: sígueme / espera aquí</td><td><span class="k">T</span></td><td>poner o quitar el silenciador</td></tr>
+          <tr><td><span class="k">E</span></td><td>junto a un guardia caído: quitarle el uniforme</td><td></td><td></td></tr>
           <tr><td><span class="k">Q</span></td><td>fumar (8 s quieto, +2 vida)</td><td><span class="k">Tab</span></td><td>cuaderno de pistas</td></tr>
           <tr><td><span class="k">1-9</span></td><td>elegir opción en un diálogo</td><td><span class="k">H</span></td><td>mostrar u ocultar la guía</td></tr>
           <tr><td><span class="k">Esc</span></td><td>pausa y opciones</td><td><span class="k">R</span></td><td>radio: llamar a Control, a Roig o a la 000.00</td></tr>
@@ -100,6 +105,7 @@
           <label>Contornos de cómic (postproceso)</label><input id="oPost" type="checkbox" checked>
           <label>Sombras (quítalas si va lento)</label><input id="oShadow" type="checkbox" checked>
           <label>Volumen <output id="oVolV">80%</output></label><input id="oVol" type="range" min="0" max="1" step="0.05" value="0.8">
+          <label>Música <output id="oMusicV">60%</output></label><input id="oMusic" type="range" min="0" max="1" step="0.05" value="0.6">
           <label>Guía en pantalla</label><input id="oHints" type="checkbox" checked>
         </div>
         <p class="m">Se guardan en este navegador.</p>
@@ -116,6 +122,7 @@
 <script src="src/03-figures.js"></script>
 <script src="src/04-state.js"></script>
 <script src="src/05-audio.js"></script>
+<script src="src/05-music.js"></script>
 <script src="src/06-ui.js"></script>
 <script src="src/07-codec.js"></script>
 <script src="src/08-input.js"></script>
