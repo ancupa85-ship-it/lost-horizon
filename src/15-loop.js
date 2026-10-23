@@ -31,6 +31,9 @@ function update(dt){ const P=S.p; S.t+=dt;
   S.bodies.forEach(b=>{ b.hidden=shadowT(tile(b.x),tile(b.z)); b.g.fig.g.position.x=b.x; b.g.fig.g.position.z=b.z; if(!b.dead){b.g.x=b.x;b.g.z=b.z;} });
   if(!W.power){ S.fixTimer-=dt; if(S.fixTimer<=0&&!S.guards.some(g=>g.fixing)){ let best=null,bd=1e9; S.guards.forEach(g=>{ if(g.dead||g.down>0||g.held||g.state==='alert')return; const d=Math.hypot(g.x-wx(21),g.z-wx(8)); if(d<bd){bd=d;best=g;} }); if(best){best.fixing=true;best.state='search';best.target={x:wx(22),z:wx(9)};best.searchT=60;} } }
   if(S.alertT>0)S.alertT-=dt; siren(dt);
+  // la alarma dura 10 s desde la última vez que alguien te vio; después buscan un poco y la base vuelve a la calma
+  { const hs=el('hState'); if(S.alertT>0){ hs.textContent='ALARMA · '+Math.ceil(S.alertT)+' s'; hs.className='st-cierre'; S.alertHud=true; } else if(S.alertHud){ S.alertHud=false; updHud(); } }
+  if(S.alertT<=0&&S.base==='sospecha'&&!S.dogs.some(d=>!d.dead)&&!S.guards.some(g=>!g.dead&&g.down<=0&&g.state!=='patrol')){ S.calmT=(S.calmT||0)+dt; if(S.calmT>2){ S.calmT=0; S.base='calma'; updHud(); flash('BASE EN CALMA','Los guardias vuelven a sus rondas. Nadie ha visto nada que quiera contar.',4); } } else S.calmT=0;
   S.guards.forEach(g=>{ if(g.fall!==undefined&&g.fall<1){ g.fall=Math.min(1,g.fall+dt*3.5); const k=g.fall; g.fig.g.rotation.z=Math.PI/2*k; g.fig.g.position.y=0.26*k; }
     if(g.dead||g.held)return;
     if(g.down>0){ g.down-=dt; if(g.down<=0){ g.fall=undefined; const b=S.bodies.find(b=>b.g===g); if(b){ if(b.carried)P.carry=null; S.bodies.splice(S.bodies.indexOf(b),1);} g.fig.g.rotation.z=0; g.fig.g.position.y=0; g.state='search'; g.searchT=8; g.target={x:P.x,z:P.z}; setBase('sospecha'); flash('AVISO','Un guardia derribado despierta y da la voz de sospecha.',4);} return; }
@@ -38,7 +41,7 @@ function update(dt){ const P=S.p; S.t+=dt;
     const C=S.c; const cAlive=C&&C.down<=0; let visC=cAlive?(entHidden(C)?T*1.3:!W.power?T*3:C.crouch?T*5.5:T*8):0; if(cAlive&&C.disguise)visC=Math.min(visC,DISG_D);
     const seeP0=sees(g,P,visRange,half), seeC=cAlive&&sees(g,C,visC,half); const seeP=seeP0||seeC; const V=(seeP0&&seeC)?(dist(g,P)<=dist(g,C)?P:C):(seeP0?P:C);
     if(seeP){ const dv=dist(g,V);
-      if(dv<ALARM_D||V.disguise){ g.susp+=dt*(dv<T*3?3.5:1.4)*(P.run?1.5:1); if(g.susp>=1){ raiseAlarm(V); g.target={x:V.x,z:V.z}; } else if(g.state==='patrol'){ g.state='suspect'; g.target={x:V.x,z:V.z}; g.searchT=4; } }
+      if(S.alertT>0)S.alertT=10; if(dv<ALARM_D||V.disguise){ g.susp+=dt*(dv<T*3?3.5:1.4)*(P.run?1.5:1); if(g.susp>=1){ raiseAlarm(V); g.target={x:V.x,z:V.z}; } else if(g.state==='patrol'){ g.state='suspect'; g.target={x:V.x,z:V.z}; g.searchT=4; } }
       else { // de lejos no da la alarma: duda unos segundos y se acerca a mirar
         g.susp=Math.min(0.95,g.susp+dt*0.4); if(g.state==='patrol'){ g.state='suspect'; g.doubtT=2.2; g.searchT=9; if(!S.flashSeen.doubt){ S.flashSeen.doubt=true; flash('TE HA VISTO DE LEJOS','Duda. Si te quedas a la vista vendrá a mirar; a menos de siete metros dará la alarma.',5); } }
         if(g.state!=='alert'){ g.target={x:V.x,z:V.z}; g.searchT=Math.max(g.searchT,3); } } }
@@ -46,7 +49,7 @@ function update(dt){ const P=S.p; S.t+=dt;
     if(P.run&&!seeP&&!P.disguise&&dist(g,P)<T*4&&g.state==='patrol'){ g.state='suspect'; g.target={x:P.x,z:P.z}; g.searchT=3; }
     if(g.state!=='alert'){ const b=S.bodies.find(b=>!b.hidden&&!b.carried&&sees(g,b,T*6,half)); if(b){ if(b.dead)raiseAlarm(b); else { g.state='search'; g.target={x:b.x,z:b.z}; g.searchT=6; setBase('sospecha'); } } }
     let tx,tz,sp;
-    if(g.state==='alert'){ if(S.alertT<=0){g.state='search';g.searchT=9;} sp=4.2; if(seeP)g.target={x:V.x,z:V.z}; tx=g.target.x;tz=g.target.z; if(!seeP){ const fs=flowStep(g); if(fs){tx=fs.x;tz=fs.z;} }
+    if(g.state==='alert'){ if(S.alertT<=0){g.state='search';g.searchT=5;} sp=4.2; if(seeP)g.target={x:V.x,z:V.z}; tx=g.target.x;tz=g.target.z; if(!seeP){ const fs=flowStep(g); if(fs){tx=fs.x;tz=fs.z;} }
       if(seeP&&dist(g,V)<T*9){ g.shotT-=dt; if(g.shotT<=0){ g.shotT=1.3; beep(60,0.1,'square',0.1); noiseBurst(0.12,0.25); const hitP=0.55*(V.crouch?0.7:1)*(V.moving?0.8:1); if(Math.random()<hitP){ V.hp--; V.hurtT=0.5; updHud(); if(V.hp<=0){ if(V===P)defeat('guards'); else downEnt(V,40); } } } } }
     else if(g.state==='suspect'||g.state==='search'){ sp=2.6; g.searchT-=dt; tx=g.target.x;tz=g.target.z; if(g.doubtT>0){ g.doubtT-=dt; if(!seeP)g.doubtT=0; }
       if(g.fixing&&Math.hypot(g.x-wx(21),g.z-wx(8))<T*1.6){ g.fixing=false; setPower(true); g.state='patrol'; flash('AVISO','Un guardia ha vuelto a arrancar el generador.',4); }

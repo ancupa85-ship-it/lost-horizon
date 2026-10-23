@@ -78,6 +78,8 @@ node tests/shots.js         # capturas
   acerca a mirar; a menos de 7,5 m acumula sospecha y da la alarma. Con silenciador (T) el disparo no alerta a nadie; sin él,
   alarma general. Junto a un guardia caído, E roba el uniforme (`stripUniform`): los guardias solo te ven a menos de 3 m y
   un disparo sin silenciador o cualquier alarma te desenmascara. Las constantes están en `ALARM_D` y `DISG_D` (09-util).
+- La alarma (`S.alertT`) dura 10 s desde la última vez que un guardia vio a Cuttlas o a Roig; al acabar buscan 5 s y, si
+  nadie queda alerta ni buscando, la base pasa de `sospecha` a `calma` (`cierre` es permanente). Cajas (`c`) por los patios.
 - Los guardias leales mienten bajo interrogatorio; apretar de más los hace gritar.
 - Roig (teniente, segunda infiltrada) espera agachada donde está hasta que G le ordena seguirte; siguiéndote se agacha
   contigo y busca sombra si tú te escondes. Solo dispara, con silenciador (duerme, no mata; 12 balas), cuando un guardia

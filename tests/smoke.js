@@ -35,6 +35,10 @@ const path=require('path');
   ok(await p.evaluate(()=>{ const L=window.__LH; const g=L.S.guards[0]; return g.z<L.wx(2)+9.5; }),'tras dudar, se acerca a mirar');
   await setup(6); await frames(70);
   ok(await p.evaluate(()=>{ const L=window.__LH; return L.S.alarms===1; }),'visto a 6 m: alarma');
+  ok(await p.evaluate(()=>document.getElementById('hState').textContent.startsWith('ALARMA')),'el HUD muestra la cuenta atrás de la alarma');
+  // escondido: la alarma caduca, buscan un poco y la base vuelve a la calma
+  await p.evaluate(()=>{ const L=window.__LH; L.S.p.x=L.wx(2); L.S.p.z=L.wx(26); L.S.p.crouch=true; L.S.alertT=0.6; }); await frames(240);
+  ok(await p.evaluate(()=>{ const L=window.__LH; return L.S.alertT<=0&&L.S.base==='calma'&&L.S.guards.every(g=>g.dead||g.down>0||g.state==='patrol')&&document.getElementById('hState').textContent==='CALMA'; }),'sin que te vean, la alarma se apaga y la base vuelve a la calma');
   // silenciador: disparo sin alarma
   await setup(6); await p.evaluate(()=>{ const L=window.__LH; L.S.p.ammo=8; L.S.silencer=false; L.keys&&(L.keys.length=0); }); await p.keyboard.press('t'); await frames(1);
   ok(await p.evaluate(()=>window.__LH.S.silencer===true&&document.getElementById('hAmmo').textContent.includes('SIL')),'T pone el silenciador y lo marca el HUD');
@@ -43,7 +47,7 @@ const path=require('path');
   await p.evaluate(()=>{ const L=window.__LH; L.S.silencer=false; L.S.p.ammo=8; L.shoot(); });
   ok(await p.evaluate(()=>window.__LH.S.alarms===1),'disparo sin silenciador: alarma');
   // uniforme: dormir a un guardia, quitárselo, y comprobar la distancia de 3 m
-  await setup(2); await p.evaluate(()=>{ const L=window.__LH; L.S.bodies.forEach(b=>{ b.x=L.wx(30); b.z=L.wx(26); }); const g=L.S.guards[2]; g.x=L.wx(2); g.z=L.wx(2)+2; g.wps=[[2,Math.floor(g.z/2)]]; g.wi=0; L.knock(g,false); L.S.p.x=g.x; L.S.p.z=g.z+1; L.S.alertT=0; L.S.alarms=0; });
+  await setup(2); await p.evaluate(()=>{ const L=window.__LH; L.S.bodies.forEach(b=>{ b.x=L.wx(2); b.z=L.wx(26); }); const g=L.S.guards[2]; g.x=L.wx(2); g.z=L.wx(2)+2; g.wps=[[2,Math.floor(g.z/2)]]; g.wi=0; L.knock(g,false); L.S.p.x=g.x; L.S.p.z=g.z+1; L.S.alertT=0; L.S.alarms=0; });
   await frames(40); ok(await p.evaluate(()=>document.getElementById('prompt').textContent.includes('UNIFORME')),'aviso E · QUITARLE EL UNIFORME junto al caído');
   await p.evaluate(()=>window.__LH.doUse()); await frames(1);
   ok(await p.evaluate(()=>{ const L=window.__LH; return L.S.p.disguise===true&&L.S.p.fig===L.S.p.figU&&L.S.p.figBase.g.visible===false&&!document.getElementById('hDis').hidden; }),'uniforme puesto: figura de tropa y HUD');

@@ -15,4 +15,4 @@ const ALARM_D=7.5, DISG_D=3; // metros: de más lejos dudan y se acercan; con un
 function raiseAlarm(where){ [S.p,S.c].forEach(e=>{ if(e&&e.disguise){ setDisguise(e,false); flash('TE HAN CALADO','El uniforme ya no engaña a nadie. Vuelves a ser el intruso.',5); } });
   if(S.alertT<=0){S.alarms++; alertJingle(); S.freeze=0.5; app.classList.add('cine'); setTimeout(()=>{ if(!cut)app.classList.remove('cine'); },900);
     if(!S.codecSeen.alarm){ S.codecSeen.alarm=true; setTimeout(()=>{ if(!S.over&&!uiOpen)codec(CODEC.alarm); },1200); } }
-  S.alertT=14; setBase(S.alarms>=2?'cierre':'sospecha'); S.guards.forEach(g=>{ if(!g.dead&&g.down<=0&&!g.held){g.state='alert';g.target={x:where.x,z:where.z};g.fixing=false;} }); }
+  S.alertT=10; setBase(S.alarms>=2?'cierre':'sospecha'); S.guards.forEach(g=>{ if(!g.dead&&g.down<=0&&!g.held){g.state='alert';g.target={x:where.x,z:where.z};g.fixing=false;} }); }
