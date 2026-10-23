@@ -87,6 +87,13 @@ const path=require('path');
   await p.evaluate(()=>window.__LH.defeat('guards')); await p.waitForTimeout(400);
   ok(await p.evaluate(()=>window.__LH.S.over&&!document.getElementById('end').hidden&&document.getElementById('end').textContent.includes('CUARTA SESIÓN')&&document.getElementById('end').textContent.includes('CUTTLAAAAAS')),'segunda captura: pantalla de derrota CUARTA SESIÓN con el grito del códec');
   ok(await p.evaluate(()=>!document.getElementById('btnAgain').hidden),'botón ÚLTIMO PUNTO disponible');
+  // nueva partida tras la derrota: la celda vuelve a estar disponible
+  await p.evaluate(()=>document.getElementById('btnRestart2').click()); await p.waitForTimeout(300); await settle();
+  ok(await p.evaluate(()=>!window.__LH.S.capturedOnce&&!window.__LH.S.over&&!window.__LH.S.inCell),'DESDE EL PRINCIPIO limpia la marca de captura');
+  await p.evaluate(()=>window.__LH.defeat('guards')); await p.waitForTimeout(300);
+  ok(await p.evaluate(()=>!!window.__LH.cut&&!window.__LH.S.over),'en la nueva partida la primera captura vuelve a llevar a la celda, no a CUARTA SESIÓN');
+  await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(2900); await settle(); await p.waitForTimeout(300);
+  ok(await p.evaluate(()=>window.__LH.S.inCell===true&&!window.__LH.S.over),'nueva partida: de nuevo en la celda');
   await p.screenshot({path:path.resolve(__dirname,'last.png')});
   ok(errs.length===0,'sin errores de consola '+(errs.length?JSON.stringify(errs):''));
   await b.close();
