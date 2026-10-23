@@ -65,8 +65,10 @@ node tests/shots.js         # capturas
 - Reloj de misión desde las 02:10. A los 7 minutos Control avisa; a las 02:19 sueltan 7 perros.
 - Cualquier derrota (guardias, perros, forcejeo) pasa por `defeat()`: la primera vez hay cinemática de captura
   (la voz de Alarcón: «No lo maten. Llévenlo con la doctora.») y despiertas en la celda con Halloran; solo sales
-  convenciendo al cabo Vidal en tres preguntas, cuyas respuestas dependen de las pistas reunidas (la Fuente, el
-  expediente o el teletipo, el salmo). La segunda derrota es el final «Cuarta sesión».
+  se sale convenciendo al cabo Vidal en tres preguntas (sin tiempos de espera al fallar; al tercer fallo deja de
+  escuchar) o con la llave del hermano de Vidal, escondida bajo la losa suelta del rincón (sales sin balas).
+  Halloran da en la celda las pistas necesarias para las dos salidas, así que la celda siempre se resuelve.
+  La segunda derrota de la misma partida es el final «Cuarta sesión».
 - Guardado automático en los puntos clave (llave, despacho, archivo, expediente, celda, salida de la celda) en
   `localStorage`; CONTINUAR en el menú y ÚLTIMO PUNTO en la pantalla de derrota lo recuperan. Empezar una partida nueva lo borra.
 - Cinemáticas con cámara guiada: intro, la perrera (02:19), la apertura del archivo, la captura y el final.

@@ -28,6 +28,7 @@ const path=require('path');
   await p.keyboard.press('g'); await frames(2); ok(await p.evaluate(()=>window.__LH.S.cOrder==='wait'),'G otra vez: vuelve a esperar');
   // distancias: visto de lejos duda y se acerca, de cerca alarma; silenciador; uniforme
   const setup=async(gd)=>{ await settle(); await p.evaluate((gd)=>{ const L=window.__LH; L.S.codecSeen.alarm=true; L.S.p.hp=5; L.S.alertT=0; L.S.guards.forEach(g=>{ g.shotT=999; }); L.S.alarms=0; L.S.base='calma'; L.S.c.x=L.wx(2); L.S.c.z=L.wx(26); L.S.c.crouch=true; L.S.c.ammo=0; L.S.guards.forEach(g=>{ g.state='patrol'; g.susp=0; g.doubtT=0; g.down=0; g.held=false; g.wps=[[Math.floor(g.x/2),Math.floor(g.z/2)]]; g.wi=0; });
+    L.S.guards.forEach((g,i)=>{ if(i===0)return; g.x=L.wx(24+(i%8)); g.z=L.wx(29); g.fx=0; g.fz=1; g.wps=[[24+(i%8),29]]; g.wi=0; g.fig.g.position.set(g.x,0,g.z); });
     const g=L.S.guards[0]; g.x=L.wx(2); g.z=L.wx(2)+gd; g.fx=0; g.fz=-1; g.wps=[[2,Math.floor(g.z/2)]]; g.state='patrol'; L.S.p.x=L.wx(2); L.S.p.z=L.wx(2); L.S.p.crouch=false; L.yaw=Math.PI; },gd); };
   await setup(10); await frames(12);
   ok(await p.evaluate(()=>{ const L=window.__LH; const g=L.S.guards[0]; return g.state==='suspect'&&L.S.alarms===0&&g.doubtT>0; }),'visto a 10 m: el guardia duda, sin alarma');
@@ -40,9 +41,9 @@ const path=require('path');
   await p.evaluate(()=>{ const L=window.__LH; L.S.p.x=L.wx(2); L.S.p.z=L.wx(26); L.S.p.crouch=true; L.S.alertT=0.6; }); await frames(240);
   ok(await p.evaluate(()=>{ const L=window.__LH; return L.S.alertT<=0&&L.S.base==='calma'&&L.S.guards.every(g=>g.dead||g.down>0||g.state==='patrol')&&document.getElementById('hState').textContent==='CALMA'; }),'sin que te vean, la alarma se apaga y la base vuelve a la calma');
   // silenciador: disparo sin alarma
-  await setup(6); await p.evaluate(()=>{ const L=window.__LH; L.S.p.ammo=8; L.S.silencer=false; L.keys&&(L.keys.length=0); }); await p.keyboard.press('t'); await frames(1);
+  await setup(6); await p.evaluate(()=>{ const L=window.__LH; const g=L.S.guards[0]; g.fx=0; g.fz=1; L.S.p.ammo=8; L.S.silencer=false; L.keys&&(L.keys.length=0); }); await p.keyboard.press('t'); await frames(1);
   ok(await p.evaluate(()=>window.__LH.S.silencer===true&&document.getElementById('hAmmo').textContent.includes('SIL')),'T pone el silenciador y lo marca el HUD');
-  await p.evaluate(()=>{ const L=window.__LH; L.yaw=Math.PI; L.pitch=0; L.shoot(); });
+  await p.evaluate(()=>{ const L=window.__LH; L.yaw=Math.PI; L.pitch=0.8; const g=L.S.guards[0]; g.fx=0; g.fz=1; g.susp=0; g.state='patrol'; L.shoot(); });
   ok(await p.evaluate(()=>{ const L=window.__LH; return L.S.alarms===0&&L.S.p.ammo===7; }),'disparo con silenciador: nadie da la alarma');
   await p.evaluate(()=>{ const L=window.__LH; L.S.silencer=false; L.S.p.ammo=8; L.shoot(); });
   ok(await p.evaluate(()=>window.__LH.S.alarms===1),'disparo sin silenciador: alarma');
@@ -94,6 +95,16 @@ const path=require('path');
   ok(await p.evaluate(()=>!!window.__LH.cut&&!window.__LH.S.over),'en la nueva partida la primera captura vuelve a llevar a la celda, no a CUARTA SESIÓN');
   await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(2900); await settle(); await p.waitForTimeout(300);
   ok(await p.evaluate(()=>window.__LH.S.inCell===true&&!window.__LH.S.over),'nueva partida: de nuevo en la celda');
+  // Vidal sin espera: tres fallos no acaban la partida; la llave de la losa abre la reja
+  const vid=()=>p.evaluate(()=>{const it=window.__LH.INTER.find(i=>i.x===31&&i.y===12);it.f();});
+  await vid(); await p.waitForTimeout(300); await press('1'); await press('1');
+  ok(await p.evaluate(()=>window.__LH.S.vidal.fail===1&&!window.__LH.S.vidal.cool&&document.getElementById('dlg').hidden),'fallar con Vidal no impone espera');
+  await vid(); await p.waitForTimeout(300); await press('1'); await press('1'); await vid(); await p.waitForTimeout(300); await press('1'); await press('1');
+  ok(await p.evaluate(()=>window.__LH.S.vidal.fail===3&&window.__LH.S.vidal.gone&&!window.__LH.S.over&&window.__LH.S.inCell),'tres fallos: Vidal deja de escuchar pero no es fin de partida');
+  await p.evaluate(()=>{const it=window.__LH.INTER.find(i=>i.x===30&&i.y===13);it.f();}); await p.waitForTimeout(300); await press('1');
+  ok(await p.evaluate(()=>window.__LH.S.cellKey===true),'la losa suelta esconde la llave');
+  await vid(); await p.waitForTimeout(400);
+  ok(await p.evaluate(()=>window.__LH.W.cellOpen&&!window.__LH.S.inCell&&window.__LH.S.p.ammo===0&&!window.__LH.S.over),'la llave abre la reja y se vuelve a la misión (sin balas)');
   await p.screenshot({path:path.resolve(__dirname,'last.png')});
   ok(errs.length===0,'sin errores de consola '+(errs.length?JSON.stringify(errs):''));
   await b.close();
