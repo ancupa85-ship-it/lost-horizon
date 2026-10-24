@@ -1,7 +1,12 @@
 'use strict';
 // ---------- BUCLE
 let last=0;
-function loop(ts){ requestAnimationFrame(loop); const dt=Math.min(0.05,(ts-last)/1000||0.016); last=ts; if(started&&!uiOpen&&!S.over&&!cut)update(dt); else if(started){ S.t+=dt; } cutTick(dt); codecTick(dt); rainUpdate(dt); music.tick(dt); render(dt); }
+// vigilante de rendimiento: si el juego va a menos de ~22 fps durante unos segundos, baja la calidad por pasos (resolución, sombras, contornos)
+let perfEma=0.016, perfSlow=0, perfStep=0;
+function perfWatch(raw){ if(!started||paused||raw<=0||raw>0.25)return; perfEma+=(raw-perfEma)*0.05; if(perfEma>0.045)perfSlow+=raw; else perfSlow=Math.max(0,perfSlow-raw*0.5); if(perfSlow<4||perfStep>=3)return; perfSlow=0; perfStep++; perfEma=0.016;
+  if(perfStep===1){ renderer.setPixelRatio(Math.min(devicePixelRatio,0.85)); resize(); } else if(perfStep===2){ OPT.shadows=false; applyOpt(); } else { OPT.post=false; applyOpt(); }
+  try{ syncOptUI(); }catch(e){} flash('MODO LIGERO '+perfStep+'/3','El juego iba lento: '+(perfStep===1?'bajo la resolución.':perfStep===2?'quito las sombras.':'quito los contornos.')+' Puedes cambiarlo en Opciones.',6); }
+function loop(ts){ requestAnimationFrame(loop); const raw=(ts-last)/1000||0.016; perfWatch(raw); const dt=Math.min(0.05,raw); last=ts; if(started&&!uiOpen&&!S.over&&!cut)update(dt); else if(started){ S.t+=dt; } cutTick(dt); codecTick(dt); rainUpdate(dt); music.tick(dt); render(dt); }
 function update(dt){ const P=S.p; S.t+=dt;
   S.spotlit=false; spots.forEach(s=>{ const a=S.t*0.35+s.ph; const tx=s.cx+Math.cos(a)*s.rad, tz=s.cz+Math.sin(a)*s.rad; s.tg.position.set(tx,0,tz); if(W.power&&Math.hypot(tx-P.x,tz-P.z)<2.4&&!interior(tile(P.x),tile(P.z)))S.spotlit=true; });
   if(S.freeze>0){ S.freeze-=dt; return; }
@@ -107,5 +112,5 @@ function radar(w,h){ const sc=3.4, rw=COLS*sc, rh=ROWS*sc, ox=w-rw-16, oy=44; hc
   if(S.c){ hctx.fillStyle=S.c.down>0?'#e0483a':'#4fb9d6'; hctx.fillRect(ox+S.c.x/T*sc-2,oy+S.c.z/T*sc-2,4,4); }
   const px=ox+P.x/T*sc, pz=oy+P.z/T*sc, f=fwd(); hctx.fillStyle='#4fc77a'; hctx.beginPath(); hctx.moveTo(px+f.x*5,pz+f.z*5); hctx.lineTo(px-f.z*3-f.x*3,pz+f.x*3-f.z*3); hctx.lineTo(px+f.z*3-f.x*3,pz-f.x*3-f.z*3); hctx.closePath(); hctx.fill(); hctx.restore(); }
 
-window.__LH={MAPSRC,music,toggleSilencer,stripUniform,setDisguise,nearestBody,teamOrder,releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,INTER,codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
+window.__LH={MAPSRC,perfWatch,get perfStep(){return perfStep},music,toggleSilencer,stripUniform,setDisguise,nearestBody,teamOrder,releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,INTER,codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
 resize(); reset(); requestAnimationFrame(loop);

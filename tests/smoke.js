@@ -17,6 +17,8 @@ const path=require('path');
   const settle=async()=>{ for(let i=0;i<30;i++){ await closeCodec(); if(await p.evaluate(()=>!window.__LH.uiOpen&&!window.__LH.cut&&!window.__LH.codecQ))break; await p.waitForTimeout(150);} };
   await settle();
   ok(await p.evaluate(()=>window.__LH.S.guards.length>0),'guardias creados');
+  // vigilante de rendimiento: con frames lentos baja la calidad por pasos
+  ok(await p.evaluate(()=>{ const L=window.__LH; for(let i=0;i<60;i++)L.perfWatch(0.1); const a=L.perfStep; for(let i=0;i<60;i++)L.perfWatch(0.1); return a===1&&L.perfStep===2&&L.OPT.shadows===false; }),'si va lento, baja la resolución y luego quita las sombras solo');
   ok(await p.evaluate(()=>{ const L=window.__LH; const M=L.MAPSRC.map(r=>r.split('')); const solid=c=>'#WTcg'.includes(c); const seen=new Set(); const q=[[2,2]]; seen.add('2,2'); while(q.length){ const [x,y]=q.shift(); [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{ const nx=x+dx,ny=y+dy; const k=nx+','+ny; if(nx<0||ny<0||ny>=M.length||nx>=M[0].length||seen.has(k)||solid(M[ny][nx]))return; seen.add(k); q.push([nx,ny]); }); }
     return L.INTER.every(it=>seen.has(it.x+','+it.y)||[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>seen.has((it.x+dx)+','+(it.y+dy)))); }),'todos los puntos de interacción (teclado, puertas, pistas) son alcanzables: ninguna caja los tapa');
   await p.evaluate(()=>{window.__LH.third=true;}); await p.waitForTimeout(300);
@@ -107,6 +109,7 @@ const path=require('path');
   ok(await p.evaluate(()=>window.__LH.S.cellKey===true),'la losa suelta esconde la llave');
   await vid(); await p.waitForTimeout(400);
   ok(await p.evaluate(()=>window.__LH.W.cellOpen&&!window.__LH.S.inCell&&window.__LH.S.p.ammo===0&&!window.__LH.S.over),'la llave abre la reja y se vuelve a la misión (sin balas)');
+  ok(await p.evaluate(()=>!!document.getElementById('oSimple')&&typeof figureBox==='function'&&'simpleFig' in window.__LH.OPT),'opción de personajes sencillos disponible');
   await p.screenshot({path:path.resolve(__dirname,'last.png')});
   ok(errs.length===0,'sin errores de consola '+(errs.length?JSON.stringify(errs):''));
   await b.close();

@@ -35,6 +35,7 @@ src/
   08-input.js       teclado, ratón, pointer lock
   09-util.js        línea de visión, colisiones, visión de guardias, alarma
   10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo
+  03-figures.js     personajes torneados (cabeza esférica con cara pintada, peinados por guardia) y modelos sencillos opcionales
   11-team.js        la compañera (Roig): sigue, se esconde, dispara con silenciador; X intercambia el control
   12-cinematics.js  cámaras guiadas, bandas y títulos
   13-endings.js     finales

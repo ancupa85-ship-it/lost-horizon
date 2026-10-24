@@ -1,6 +1,6 @@
 'use strict';
 // ---------- MENÚ, OPCIONES, PAUSA Y GUÍA
-const OPT={sens:1,invY:false,view:'1',post:true,shadows:true,vol:0.8,music:0.6,hints:true};
+const OPT={sens:1,invY:false,view:'1',post:true,shadows:true,vol:0.8,music:0.6,hints:true,simpleFig:false};
 try{ Object.assign(OPT,JSON.parse(localStorage.getItem('lh-opt')||'{}')); }catch(e){}
 function saveOpt(){ try{ localStorage.setItem('lh-opt',JSON.stringify(OPT)); }catch(e){} }
 function applyOpt(){ usePost=!!OPT.post&&!!rt; if(renderer.shadowMap.enabled!==!!OPT.shadows){ renderer.shadowMap.enabled=!!OPT.shadows; scene.traverse(o=>{ if(o.isMesh){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.needsUpdate=true); } }); }
@@ -24,8 +24,8 @@ function guideTick(){ if(entHidden(S.p))S.guide.hidden=true; if(!OPT.hints||!sta
 // menú principal / pausa
 let paused=false;
 function showMenu(pane){ ov.hidden=false; el('end').hidden=true; const m=el('menu'); m.hidden=false; const sv=hasSave(); el('btnContinue').hidden=!sv||paused; if(sv)el('btnContinue').innerHTML='CONTINUAR <small>'+sv.tag+'</small>'; m.querySelectorAll('[data-pane]').forEach(p=>{ p.hidden=p.dataset.pane!==pane; }); m.classList.toggle('paused',paused); el('mTitle').textContent=paused?'PAUSA':'PROJECT LOST HORIZON'; syncOptUI(); }
-function syncOptUI(){ el('oSens').value=OPT.sens; el('oSensV').textContent=OPT.sens.toFixed(1); el('oInv').checked=OPT.invY; el('oView').value=OPT.view; el('oPost').checked=OPT.post; el('oShadow').checked=OPT.shadows; el('oVol').value=OPT.vol; el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; el('oMusic').value=OPT.music; el('oMusicV').textContent=Math.round(OPT.music*100)+'%'; el('oHints').checked=OPT.hints; }
-function readOptUI(){ OPT.sens=+el('oSens').value; OPT.invY=el('oInv').checked; OPT.view=el('oView').value; OPT.post=el('oPost').checked; OPT.shadows=el('oShadow').checked; OPT.vol=+el('oVol').value; OPT.music=+el('oMusic').value; OPT.hints=el('oHints').checked; el('oSensV').textContent=OPT.sens.toFixed(1); el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; el('oMusicV').textContent=Math.round(OPT.music*100)+'%'; saveOpt(); applyOpt(); if(AC)beep(900,0.05,'sine',0.04); }
+function syncOptUI(){ el('oSens').value=OPT.sens; el('oSensV').textContent=OPT.sens.toFixed(1); el('oInv').checked=OPT.invY; el('oView').value=OPT.view; el('oPost').checked=OPT.post; el('oShadow').checked=OPT.shadows; el('oSimple').checked=!!OPT.simpleFig; el('oVol').value=OPT.vol; el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; el('oMusic').value=OPT.music; el('oMusicV').textContent=Math.round(OPT.music*100)+'%'; el('oHints').checked=OPT.hints; }
+function readOptUI(){ OPT.sens=+el('oSens').value; OPT.invY=el('oInv').checked; OPT.view=el('oView').value; OPT.post=el('oPost').checked; OPT.shadows=el('oShadow').checked; OPT.simpleFig=el('oSimple').checked; OPT.vol=+el('oVol').value; OPT.music=+el('oMusic').value; OPT.hints=el('oHints').checked; el('oSensV').textContent=OPT.sens.toFixed(1); el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; el('oMusicV').textContent=Math.round(OPT.music*100)+'%'; saveOpt(); applyOpt(); if(AC)beep(900,0.05,'sine',0.04); }
 function startGame(withIntro,silent){ initAudio(); applyOpt(); if(!silent)setPower(true); started=true; paused=false; uiOpen=false; ov.hidden=true; el('end').hidden=true; third=OPT.view==='3'; try{gl.requestPointerLock();}catch(e){} if(withIntro)intro(); else if(!silent)codec(CODEC.start); }
 // guardado automático en puntos clave; CONTINUAR en el menú
 const pickEnt=e=>({name:e.name,x:e.x,z:e.z,hp:e.hp,ammo:e.ammo,key:e.key,file:e.file,crouch:e.crouch,down:e.down,disguise:!!e.disguise});
