@@ -2,7 +2,7 @@
 const {chromium}=require('playwright'); const path=require('path');
 (async()=>{ const b=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const p=await b.newPage({viewport:{width:1280,height:720}});
-  await p.goto('file://'+path.resolve(__dirname,'..','index.html')); await p.waitForTimeout(1500);
+  await p.goto('file://'+path.resolve(__dirname,'..','index.html')+'?gfx=full'); await p.waitForTimeout(1500);
   await p.click('[data-go="brief"]'); await p.click('#btnStart'); await p.waitForTimeout(800); await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(400);
   for(let i=0;i<24;i++){ if(!(await p.evaluate(()=>!!window.__LH.codecQ)))break; await p.evaluate(()=>window.__LH.codecNext()); await p.waitForTimeout(60);} 
   await p.evaluate(()=>{ const L=window.__LH; L.locked=true; L.S.freezeAI=true; L.S.c.x=L.wx(2); L.S.c.z=L.wx(26); L.S.c.ammo=0; L.S.alertT=0; const px=L.wx(25),pz=L.wx(23.2); L.S.p.x=px; L.S.p.z=pz; L.yaw=0; L.pitch=-0.08; L.S.codecSeen.alarm=true;

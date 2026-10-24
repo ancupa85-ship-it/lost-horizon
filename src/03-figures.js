@@ -51,7 +51,7 @@ function sph(r,mat,ws,hs,noShadow){ const m=new THREE.Mesh(new THREE.SphereGeome
 // miembro redondeado de una pieza (torno): empieza en y=0 y baja h, con los extremos romos
 function limb(rT,rB,h,mat){ const pts=[new THREE.Vector2(0,0),new THREE.Vector2(rT*0.75,0),new THREE.Vector2(rT,-h*0.08),new THREE.Vector2(rB,-h*0.92),new THREE.Vector2(rB*0.75,-h),new THREE.Vector2(0,-h)]; const m=new THREE.Mesh(new THREE.LatheGeometry(pts,7),mat); m.castShadow=true; return m; }
 // modelos sencillos (cajas) para equipos lentos: se eligen en Opciones y se aplican al recargar
-const SIMPLE_FIG=(()=>{ try{ return !!JSON.parse(localStorage.getItem('lh-opt')||'{}').simpleFig; }catch(e){ return false; } })();
+const SIMPLE_FIG=(()=>{ try{ const o=JSON.parse(localStorage.getItem('lh-opt')||'{}'); return 'simpleFig' in o?!!o.simpleFig:!!WEAK_GPU; }catch(e){ return !!WEAK_GPU; } })();
 function faceTexBox(o){ return ptex(16,16,(x)=>{ const skin=o.skin||'#e8b890', hair=o.hair||'#2a1a10';
   x.fillStyle=skin; x.fillRect(0,0,16,16);
   x.fillStyle=shade(skin,0.86); x.fillRect(0,0,2,16); x.fillRect(14,0,2,16); x.fillRect(0,13,16,3);        // sombra lateral y mandíbula

@@ -109,6 +109,7 @@ const path=require('path');
   ok(await p.evaluate(()=>window.__LH.S.cellKey===true),'la losa suelta esconde la llave');
   await vid(); await p.waitForTimeout(400);
   ok(await p.evaluate(()=>window.__LH.W.cellOpen&&!window.__LH.S.inCell&&window.__LH.S.p.ammo===0&&!window.__LH.S.over),'la llave abre la reja y se vuelve a la misión (sin balas)');
+  ok(await p.evaluate(()=>typeof WEAK_GPU!=='undefined'&&WEAK_GPU===true&&window.__LH.OPT.shadows===false&&window.__LH.OPT.post===false&&typeof SIMPLE_FIG!=='undefined'&&SIMPLE_FIG===true),'gráfica por software detectada: arranca en modo ligero con personajes sencillos');
   ok(await p.evaluate(()=>!!document.getElementById('oSimple')&&typeof figureBox==='function'&&'simpleFig' in window.__LH.OPT),'opción de personajes sencillos disponible');
   await p.screenshot({path:path.resolve(__dirname,'last.png')});
   ok(errs.length===0,'sin errores de consola '+(errs.length?JSON.stringify(errs):''));
