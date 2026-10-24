@@ -42,7 +42,7 @@ function loadGame(){ const d=hasSave(); if(!d)return null; reset();
   Object.assign(W,d.W); dynamicDoors.office.visible=!W.officeOpen; dynamicDoors.vault.visible=!W.vaultOpen; dynamicDoors.yard.visible=!!W.yardDoorClosed; setPower(W.power!==false);
   ['clues','kill','ko','alarms','interro','base','cigs','inCell','dogsDone','capturedOnce','swaps','cOrder','orders','silencer','disguises','teamKO','ammoTaken','wrongCode','halloTalked','codecSeen','flashSeen','guide','vidal','dogKills','cellEscaped','cellKey','t'].forEach(k=>{ if(d[k]!==undefined)S[k]=d[k]; }); if(d.calls)S.calls=d.calls;
   if(barsMesh)barsMesh.visible=!W.cellOpen; vidalFig.g.visible=!!S.inCell; yaw=d.yaw||yaw; pitch=0; S.camH=undefined; updHud(); renderNote(); el('hCig').textContent=S.cigs;
-  el('hObj').textContent=S.inCell?(S.cellKey?'OBJETIVO: ABRE LA REJA CON LA LLAVE':S.vidal.gone?'OBJETIVO: BUSCA OTRA SALIDA DE LA CELDA':'OBJETIVO: HABLA CON HALLORAN Y CONVENCE A VIDAL'):(S.p.file||S.c.file)?'OBJETIVO: SAL POR LA PUERTA SURESTE':W.vaultOpen?'OBJETIVO: COGE EL EXPEDIENTE':'OBJETIVO: ENTRA EN EL ARCHIVO';
+  updObj();
   S.c.fig.g.position.set(S.c.x,0,S.c.z); S.c.fig.g.rotation.z=0; return d; }
 function continueGame(){ const d=loadGame(); if(!d){ showMenu('main'); return; } startGame(false,true); flash('CONTINUAR · '+clockStr(),d.tag+'. '+(S.p.name==='ROIG'?'Controlas a Roig.':'Controlas a Cuttlas.')+' R abre la radio si no sabes seguir.',6); }
 function pauseGame(){ if(paused||!started)return; paused=true; uiOpen=true; unlockPtr(); showMenu('pause'); }

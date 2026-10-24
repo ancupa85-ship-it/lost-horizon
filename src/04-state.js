@@ -8,6 +8,7 @@ const CLUES={
   c1983:'Moya: "la clave es 1983". Lo dijo demasiado rápido.',
   roma:'Alarcón reza en latín con la Vulgata y cuenta los salmos como Roma, no como los protestantes. "Uno menos."',
   llave:'La llave del despacho la lleva el cabo Ibarra.',
+  pozo:'Compuerta de la excavación (sur): cerrada con candados, "sólo personal del programa". Control: lo de abajo es la siguiente misión.',
   tele:'Teletipo: la clave del archivo no se transmite; "procedimiento habitual". Cuatro operarios de baja por "voces". Halloran no debe saberlo.',
   vulgata:'Biblia Vulgata en el escritorio, la cinta en PSALMUS CXXIX: "De profundis clamavi ad te". Margen: "Ella también clama. Nadie la oye. — A."',
   hallo:'Halloran: la clave es el rezo de Alarcón, pero él numera como la Vulgata. "Si cuenta usted como un protestante, se equivocará de salmo."',
@@ -42,6 +43,9 @@ const roigFig=figure({uniform:0x2a3038,pants:0x23282c,hair:'#3a2418',female:true
 const playerFigU=figure({uniform:0x4f5a3c,helmet:0x4a5a3a,hair:'#2a1a10',stubble:true,pistol:true,gloves:true}); playerFigU.g.visible=false; scene.add(playerFigU.g);
 const roigFigU=figure({uniform:0x4f5a3c,helmet:0x4a5a3a,hair:'#3a2418',female:true,pistol:true,gloves:true,skin:'#e6c0a0'}); roigFigU.g.visible=false; scene.add(roigFigU.g);
 function setDisguise(e,on){ if(!e||!e.figBase)return; const old=e.fig; e.disguise=!!on; e.fig=on?e.figU:e.figBase; if(old!==e.fig){ e.fig.g.position.copy(old.g.position); e.fig.g.rotation.copy(old.g.rotation); e.fig.g.scale.copy(old.g.scale); e.fig.g.visible=old.g.visible; old.g.visible=false; } if(e===S.p)updHud(); }
+// compuerta de la excavación (misión 2): cerrada, con cartel
+(function(){ const hatch=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.18,1.7),M.metal); hatch.position.set(wx(20),0.09,wx(26)); hatch.receiveShadow=true; scene.add(hatch); const bar=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.08,0.12),M.dark); bar.position.set(wx(20),0.22,wx(26)); scene.add(bar);
+  const post=new THREE.Mesh(new THREE.BoxGeometry(0.06,1.3,0.06),M.dark); post.position.set(wx(20)+1.1,0.65,wx(26)); scene.add(post); const sign=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.4,0.04),toon({color:0xd8c860})); sign.position.set(wx(20)+1.1,1.15,wx(26)); scene.add(sign); })();
 const vidalFig=figure({uniform:0x4f5a3c,cap:0x3f4a34,moustache:true,rosary:true,rank:1,holster:true,skin:'#d8a880'}); vidalFig.g.position.set(wx(31),0,wx(11)); vidalFig.g.visible=false; scene.add(vidalFig.g);
 let barsMesh=null; scene.traverse(o=>{ if(o.isMesh&&o.material===M.bars)barsMesh=o; });
 const ember=new THREE.PointLight(0xff7a30,0,3.5); scene.add(ember);
@@ -59,6 +63,6 @@ function reset(){
   S.clues=[]; S.flashSeen={}; S.recoil=0; S.muzzle=0; S.fixTimer=0; S.freeze=0; S.codecSeen={}; S.cigs=3; S.smoke=0; S.stepT=0; S.inCell=false; S.capturedOnce=false; S.cellEscaped=false; S.capturing=false; S.dogsDone=false; S.dogKills=0; S.vidal={stage:0,fail:0,cool:0,gone:false}; S.cellKey=false; S.keyHint=''; S.ammoTaken={}; if(S.dogs)S.dogs.forEach(d=>scene.remove(d.fig.g)); S.dogs=[]; W.cellOpen=false; if(barsMesh)barsMesh.visible=true; vidalFig.g.visible=false; flow=null;
   W.officeOpen=false; W.vaultOpen=false; W.yardDoorClosed=false; setPower(true); el('hCig').textContent=3;
   dynamicDoors.office.visible=true; dynamicDoors.vault.visible=true; dynamicDoors.yard.visible=false;
-  yaw=-Math.PI/2; pitch=0; updHud(); el('hObj').textContent='OBJETIVO: ENTRA EN EL ARCHIVO'; renderNote();
+  yaw=-Math.PI/2; pitch=0; updHud(); updObj(); renderNote();
 }
 function setPower(on){ W.power=on; lamps.forEach(L=>L.intensity=on?L.userData.i||(L.userData.i=L.intensity):0.0); lampPosts.forEach(b=>b.material.color.set(on?0xffd080:0x332218)); spots.forEach(s=>{s.s.intensity=on?2.4:0; s.beam.visible=on;}); emergency.intensity=on?0:0.9; scene.fog.density=on?0.026:0.04; el('hPow').textContent=on?'GENERADOR':'APAGADO'; el('hPow').style.color=on?'':'#e0483a'; if(hum)hum.gain.gain.setTargetAtTime(on?0.05:0.012,AC.currentTime,0.5); }
