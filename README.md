@@ -12,7 +12,7 @@ npm start          # sirve la carpeta en http://localhost:8080
 o simplemente abre `index.html` en Chrome/Firefox (el juego pide el ratón al hacer clic).
 
 Controles: WASD mover · ratón mirar · Ctrl agacharse · Shift correr · E usar/hablar · F agarrar e interrogar / patada ·
-C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
+C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · G orden a Roig (sígueme / espera) · T silenciador · E junto a un caído: quitarle el uniforme · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
 Tab cuaderno · R radio (Control 141.12, Roig 140.85 y una frecuencia que no figura en el manual) · H guía · Esc pausa y opciones.
 El menú de inicio tiene "Cómo se juega", "Controles", "Opciones" y, si hay partida guardada, CONTINUAR.
 
@@ -29,11 +29,13 @@ src/
   03-figures.js     personajes de bloques con cara pixelada, perros, marcas ! y ?, brazos del jugador
   04-state.js       estado de partida, pistas, guardias, diálogos de interrogatorio, reset
   05-audio.js       sintetizador WebAudio (zumbido, sirena, ladridos, disparos)
+  05-music.js       banda sonora: assets/music/sigilo.mp3 (menú y sigilo) y accion.mp3 (alarma), fundidos y atenuación en códec
   06-ui.js          avisos, cuaderno, diálogos, HUD
   07-codec.js       códec con retratos pixelados y texto mecanografiado; guiones
   08-input.js       teclado, ratón, pointer lock
   09-util.js        línea de visión, colisiones, visión de guardias, alarma
   10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo
+  03-figures.js     personajes torneados (cabeza esférica con cara pintada, peinados por guardia) y modelos sencillos opcionales
   11-team.js        la compañera (Roig): sigue, se esconde, dispara con silenciador; X intercambia el control
   12-cinematics.js  cámaras guiadas, bandas y títulos
   13-endings.js     finales
@@ -42,7 +44,8 @@ src/
 tests/smoke.js      prueba corta sin cabeza (perros, radio, captura → celda, Vidal, guardar/continuar, segunda derrota)
 tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
 tests/shots.js      capturas de referencia en tests/shots/
-tools/build-artifact.py  empaqueta todo en un solo HTML para publicarlo como Artifact
+assets/music/       los dos temas a 96 kb/s (los originales están en el proyecto)
+tools/build-artifact.py  empaqueta todo en un solo HTML (música incrustada en base64) para publicarlo como Artifact
 ```
 
 Los archivos de `src/` se cargan en orden como scripts clásicos y comparten ámbito, así que el orden
@@ -63,8 +66,10 @@ node tests/shots.js         # capturas
 - Reloj de misión desde las 02:10. A los 7 minutos Control avisa; a las 02:19 sueltan 7 perros.
 - Cualquier derrota (guardias, perros, forcejeo) pasa por `defeat()`: la primera vez hay cinemática de captura
   (la voz de Alarcón: «No lo maten. Llévenlo con la doctora.») y despiertas en la celda con Halloran; solo sales
-  convenciendo al cabo Vidal en tres preguntas, cuyas respuestas dependen de las pistas reunidas (la Fuente, el
-  expediente o el teletipo, el salmo). La segunda derrota es el final «Cuarta sesión».
+  se sale convenciendo al cabo Vidal en tres preguntas (sin tiempos de espera al fallar; al tercer fallo deja de
+  escuchar) o con la llave del hermano de Vidal, escondida bajo la losa suelta del rincón (sales sin balas).
+  Halloran da en la celda las pistas necesarias para las dos salidas, así que la celda siempre se resuelve.
+  La segunda derrota de la misma partida es el final «Cuarta sesión».
 - Guardado automático en los puntos clave (llave, despacho, archivo, expediente, celda, salida de la celda) en
   `localStorage`; CONTINUAR en el menú y ÚLTIMO PUNTO en la pantalla de derrota lo recuperan. Empezar una partida nueva lo borra.
 - Cinemáticas con cámara guiada: intro, la perrera (02:19), la apertura del archivo, la captura y el final.
@@ -72,8 +77,15 @@ node tests/shots.js         # capturas
 - Radio (R) al estilo códec: Control responde según el momento (celda, perros, llave, archivo…); Roig da pistas,
   y con dos de las pistas del teclado una llamada suya suelta la de Roma; la frecuencia 000.00 aparece cuando has
   tocado la Fuente, cortado la luz o pasado por la celda.
+- Detección por distancias (1 unidad = 1 m): visto a más de 7,5 m el guardia no da la alarma, duda ~2 s (`doubtT`) y se
+  acerca a mirar; a menos de 7,5 m acumula sospecha y da la alarma. Con silenciador (T) el disparo no alerta a nadie; sin él,
+  alarma general. Junto a un guardia caído, E roba el uniforme (`stripUniform`): los guardias solo te ven a menos de 3 m y
+  un disparo sin silenciador o cualquier alarma te desenmascara. Las constantes están en `ALARM_D` y `DISG_D` (09-util).
+- La alarma (`S.alertT`) dura 10 s desde la última vez que un guardia vio a Cuttlas o a Roig; al acabar buscan 5 s y, si
+  nadie queda alerta ni buscando, la base pasa de `sospecha` a `calma` (`cierre` es permanente). Cajas (`c`) por los patios.
 - Los guardias leales mienten bajo interrogatorio; apretar de más los hace gritar.
-- Roig (teniente, segunda infiltrada) sigue al personaje controlado, se agacha con él, busca sombra si él se esconde y,
-  cuando un guardia pasa a alerta o un perro se acerca, dispara con silenciador (duerme, no mata; 12 balas). Los guardias
+- Roig (teniente, segunda infiltrada) espera agachada donde está hasta que G le ordena seguirte; siguiéndote se agacha
+  contigo y busca sombra si tú te escondes. Solo dispara, con silenciador (duerme, no mata; 12 balas), cuando un guardia
+  está en alerta (os han descubierto) o un perro se le echa encima. Los guardias
   la ven igual que a Cuttlas; si la hieren cae 40 s y no se puede controlar. X cambia el control y el inventario (llave,
   expediente) viaja con quien controlas.
