@@ -2,7 +2,12 @@
 // ---------- RENDER: toon + contornos por postproceso
 const gl=document.getElementById('gl'), hud=document.getElementById('hud'), hctx=hud.getContext('2d');
 const renderer=new THREE.WebGLRenderer({canvas:gl,antialias:false,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.25)); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+// detección de gráfica: por software (SwiftShader, llvmpipe…) o móvil/integrada → arrancar en modo ligero, salvo ?gfx=full
+const GPU_INFO=(()=>{ try{ const c=renderer.getContext(); const ext=c.getExtension('WEBGL_debug_renderer_info'); return ext?String(c.getParameter(ext.UNMASKED_RENDERER_WEBGL)):''; }catch(e){ return ''; } })();
+const GFX_FORCE=/gfx=full/.test(location.search);
+const WEAK_GPU=!GFX_FORCE&&/swiftshader|llvmpipe|software|microsoft basic|mesa offscreen/i.test(GPU_INFO);
+const MOBILE_GPU=!GFX_FORCE&&!WEAK_GPU&&(/mali|adreno|powervr|apple gpu|apple a\d|intel\(r\) (hd|uhd)|iris/i.test(GPU_INFO)||/android|iphone|ipad/i.test(navigator.userAgent));
+renderer.setPixelRatio((WEAK_GPU||MOBILE_GPU)?1:Math.min(devicePixelRatio,1.25)); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0x070a12); scene.fog=new THREE.FogExp2(0x070a12,0.026);
 const camera=new THREE.PerspectiveCamera(70,1,0.1,120); camera.rotation.order='YXZ'; scene.add(camera);
 const grad=(()=>{const c=document.createElement('canvas');c.width=4;c.height=1;const x=c.getContext('2d');['#262626','#6a6a6a','#b4b4b4','#ffffff'].forEach((col,i)=>{x.fillStyle=col;x.fillRect(i,0,1,1);});const t=new THREE.CanvasTexture(c);t.minFilter=t.magFilter=THREE.NearestFilter;return t;})();

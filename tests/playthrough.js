@@ -31,20 +31,21 @@ const {chromium}=require('playwright'); const path=require('path');
   await ev(()=>window.__LH.doGrab()); await frames(1);
   ok(await ev(()=>!document.getElementById('dlg').hidden&&document.getElementById('dlgTitle').textContent.includes('Ibarra')),'diálogo de interrogatorio abierto');
   await p.keyboard.press('2'); await frames(1); await p.keyboard.press('4'); await frames(1); await p.keyboard.press('2'); await frames(1);
-  ok(await ev(()=>window.__LH.S.p.key===true),'Ibarra suelta la llave tras apretar');
+  ok(await ev(()=>window.__LH.S.p.key===true),'Ibarra suelta la llave tras apretar'); await frames(2);
+  ok(await ev(()=>document.getElementById('hObj').textContent.includes('3/6')&&document.getElementById('hObj').textContent.includes('DESPACHO')),'objetivo 3/6: abrir el despacho');
   ok(await ev(()=>window.__LH.S.clues.includes('llave')),'pista de la llave en el cuaderno');
   await p.keyboard.press('5'); await frames(2); ok(await ev(()=>window.__LH.S.ko===1&&document.getElementById('dlg').hidden),'guardia dormido y diálogo cerrado');
   // despacho: puerta, escritorio y teletipo
   const use=async(x,y,yaw)=>{ await ev(([x,y,yaw])=>{ const L=window.__LH; L.S.p.x=L.wx(x); L.S.p.z=L.wx(y); L.yaw=yaw; },[x,y,yaw]); await frames(2); await ev(()=>window.__LH.doUse()); await frames(1); };
-  await use(4,16,0); ok(await ev(()=>window.__LH.W.officeOpen),'despacho abierto con la llave');
+  await use(4,16,0); ok(await ev(()=>window.__LH.W.officeOpen),'despacho abierto con la llave'); await frames(2); ok(await ev(()=>document.getElementById('hObj').textContent.includes('4/6')),'objetivo 4/6: la clave del archivo');
   await use(3,18,0); ok(await ev(()=>window.__LH.S.clues.includes('vulgata')),'escritorio leído: pista Vulgata'); await p.keyboard.press('1'); await frames(1);
   await use(2,12,Math.PI/2); ok(await ev(()=>window.__LH.S.clues.includes('tele')),'teletipo leído'); await p.keyboard.press('1'); await frames(1);
   ok(await ev(()=>document.getElementById('hClue').textContent.startsWith('3/')),'contador de pistas en el HUD');
   // teclado
   await ev(()=>window.__LH.openKeypad()); for(const k of ['0','1','2','9'])await ev((k)=>window.__LH.keypadIn(k),k); await ev(()=>window.__LH.keypadIn('ok')); await frames(1);
-  ok(await ev(()=>window.__LH.W.vaultOpen),'archivo abierto con 0129');
+  ok(await ev(()=>window.__LH.W.vaultOpen),'archivo abierto con 0129'); await frames(2); ok(await ev(()=>document.getElementById('hObj').textContent.includes('5/6')&&document.getElementById('hObj').textContent.includes('EXPEDIENTE')),'objetivo 5/6: coger el expediente');
   ok(await ev(()=>!!window.__LH.cut),'cinemática al abrir el archivo'); await ev(()=>window.__LH.cutSkip()); await wait(1500); await frames(2); await closeCodec(); await frames(1);
-  await use(8,18,0); ok(await ev(()=>window.__LH.S.p.file),'expediente recogido'); await p.keyboard.press('1'); await wait(1300); await frames(2); await closeCodec(); await frames(1);
+  await use(8,18,0); ok(await ev(()=>window.__LH.S.p.file),'expediente recogido'); await frames(2); ok(await ev(()=>document.getElementById('hObj').textContent.includes('6/6')&&document.getElementById('hObj').textContent.includes('SURESTE')),'objetivo 6/6: salir por la puerta sureste'); await p.keyboard.press('1'); await wait(1300); await frames(2); await closeCodec(); await frames(1);
   // cambio a Roig y vuelta: el inventario viaja con el control
   await ev(()=>window.__LH.swapChar()); await frames(2);
   ok(await ev(()=>window.__LH.S.p.name==='ROIG'&&window.__LH.S.p.file&&!window.__LH.S.c.file),'X cambia a Roig y el expediente va con ella');

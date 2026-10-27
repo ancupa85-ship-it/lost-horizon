@@ -7,7 +7,7 @@ const {chromium}=require('playwright'); const path=require('path'); const fs=req
   const ev=(f,a)=>p.evaluate(f,a); const frames=async(n)=>{ for(let i=0;i<n;i++)await ev(()=>new Promise(r=>requestAnimationFrame(()=>r()))); };
   const closeCodec=async()=>{ for(let i=0;i<24;i++){ if(!(await ev(()=>!!window.__LH.codecQ)))break; await ev(()=>window.__LH.codecNext()); await p.waitForTimeout(60);} };
   const calm=()=>ev(()=>{ const L=window.__LH; L.locked=true; L.S.c.ammo=0; L.S.alertT=0; L.S.guards.forEach(g=>{ g.state='patrol'; g.susp=0; g.wps=[[Math.floor(g.x/2),Math.floor(g.z/2)]]; g.wi=0; }); });
-  await p.goto('file://'+path.resolve(__dirname,'..','index.html')); await p.waitForTimeout(1500);
+  await p.goto('file://'+path.resolve(__dirname,'..','index.html')+'?gfx=full'); await p.waitForTimeout(1500);
   await p.waitForTimeout(400); await p.screenshot({path:path.join(out,'menu.png')}); console.log('captura menu');
   await p.click('[data-go="how"]'); await p.waitForTimeout(300); await p.screenshot({path:path.join(out,'como.png')}); await p.click('[data-pane="how"] [data-go="main"]');
   await p.click('[data-go="brief"]'); await p.click('#btnStart'); await p.waitForTimeout(800); await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(400);
