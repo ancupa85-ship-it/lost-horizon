@@ -50,6 +50,9 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 #title .s{color:var(--dim);font-size:9px;display:block}
 #skip{position:absolute;right:max(24px,env(safe-area-inset-right,0px));bottom:14%;z-index:7;font-family:var(--display);font-size:8px;color:var(--dim);pointer-events:none}
 #fade{position:absolute;inset:0;background:#000;z-index:5;pointer-events:none;transition:opacity 1.2s;opacity:0}
+#load{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;font-family:var(--display);color:#fff;text-align:center;padding:0 24px}
+#load small{color:var(--dim);font-size:8px;letter-spacing:1px} #load span{font-size:16px;color:var(--amber);text-shadow:0 0 10px #000} #load em{font-style:normal;font-size:8px;color:var(--dim);animation:blink 1s steps(2) infinite}
+@keyframes blink{to{opacity:.2}}
 /* códec */
 #codec{position:absolute;left:0;right:0;bottom:0;height:min(46%,330px);background:linear-gradient(#071a12,#04100b 70%,#000);border-top:2px solid var(--codec);z-index:5;display:grid;grid-template-columns:120px 1fr 120px;grid-template-rows:auto 1fr auto;gap:6px 14px;
   padding:12px max(16px,env(safe-area-inset-left,0px)) 12px max(16px,env(safe-area-inset-right,0px));box-sizing:border-box;color:var(--codec);font-family:var(--body)}

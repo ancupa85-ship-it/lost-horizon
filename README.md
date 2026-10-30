@@ -24,9 +24,9 @@ css/style.css       estilos (fuentes pixel, letterbox, códec)
 vendor/three.min.js Three.js r128 (MIT)
 src/
   00-boot.js        comprobación del motor
-  01-map.js         mapa de 36×28 casillas, leyenda y consultas (sólido, vista, sombra, interior)
-  02-render.js      escena, materiales toon, texturas planas, luces, sombras, lluvia, postproceso de bordes
-  03-figures.js     personajes de bloques con cara pixelada, perros, marcas ! y ?, brazos del jugador
+  01-map.js         motor de mapa por zonas: plano activo, leyenda y consultas (sólido, vista, sombra, interior)
+  02-render.js      escena, materiales toon, texturas planas, postproceso; buildWorld(zona)/unloadWorld() levantan y quitan la geometría y luces de la zona
+  03-figures.js     personajes torneados (cabeza esférica con cara pintada, peinados por guardia), modelos sencillos opcionales, perros, marcas ! y ?, brazos del jugador
   04-state.js       estado de partida, pistas, guardias, diálogos de interrogatorio, reset
   05-audio.js       sintetizador WebAudio (zumbido, sirena, ladridos, disparos)
   05-music.js       banda sonora: assets/music/sigilo.mp3 (menú y sigilo) y accion.mp3 (alarma), fundidos y atenuación en códec
@@ -34,8 +34,8 @@ src/
   07-codec.js       códec con retratos pixelados y texto mecanografiado; guiones
   08-input.js       teclado, ratón, pointer lock
   09-util.js        línea de visión, colisiones, visión de guardias, alarma
-  10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo
-  03-figures.js     personajes torneados (cabeza esférica con cara pintada, peinados por guardia) y modelos sencillos opcionales
+  10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo, compuerta
+  10-zones.js       zonas: plano, guardias, props y puntos de interacción de la base y de la galería de acceso; enterZone()/travel() con pantalla de carga
   11-team.js        la compañera (Roig): sigue, se esconde, dispara con silenciador; X intercambia el control
   12-cinematics.js  cámaras guiadas, bandas y títulos
   13-endings.js     finales
@@ -43,7 +43,7 @@ src/
   15-loop.js        update(), IA de guardias y perros, render, HUD y radar
 tests/smoke.js      prueba corta sin cabeza (perros, radio, captura → celda, Vidal, guardar/continuar, segunda derrota)
 tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
-tests/shots.js      capturas de referencia en tests/shots/
+tests/shots.js      capturas de referencia en tests/shots/ (tests/shots-guards.js: fila de guardias; tests/shots-galeria.js: la galería)
 assets/music/       los dos temas a 96 kb/s (los originales están en el proyecto)
 tools/build-artifact.py  empaqueta todo en un solo HTML (música incrustada en base64) para publicarlo como Artifact
 ```
@@ -59,6 +59,22 @@ npm test                # prueba corta
 node tests/playthrough.js   # partida completa (varios minutos sin GPU)
 node tests/shots.js         # capturas
 ```
+
+## Zonas
+
+El mundo está partido en zonas (`ZONES` en `src/10-zones.js`); solo una está cargada. Cada zona define su plano
+(`src`), inicio, guardias (`guards`), puntos de interacción (`inter`), props, luces, focos y si es exterior
+(`outdoor`: luna, lluvia, cielo) o interior (`indoor`: suelo y techo de roca en todas las casillas, agua en las `s`).
+`enterZone(id, [x,y], yaw)` descarga la anterior y construye la nueva; `travel()` hace lo mismo con fundido y
+pantalla de carga, y guarda la partida al llegar. Al salir de una zona se conserva el estado de sus guardias
+(posición, dormidos, muertos, uniforme robado) y de sus perros en `S.zoneState`, y vuelve a aplicarse al entrar;
+el guardado (`lh-save`, v2) incluye la zona actual y ese estado. Para añadir una zona: un plano nuevo en `ZONES`,
+un punto de interacción con `travel()` en cada extremo del paso, y `exitTo` para que el objetivo del radar
+señale la salida cuando el objetivo está en otra zona.
+
+Zonas actuales: `base` (la de siempre) y `galeria` (galería de acceso a la excavación, bajo la compuerta del
+patio sur en (20,26)). La compuerta se abre con la llave de Alarcón; abajo hay un guardia, munición, el parte
+de extracción y la puerta blindada ALEPH-07, que es la antesala de la misión 2.
 
 ## Diseño
 
