@@ -13,9 +13,14 @@ function objective(){ const P=S.p, C=S.c; const file=!!(P.file||(C&&C.file));
   if(P.key||(C&&C.key))return {step:3,text:'ABRE EL DESPACHO DE ALARCÓN (EDIFICIO OESTE)',x:4,y:15};
   const ib=S.guards.find(g=>g.hasKey); if(ib&&!ib.dead)return {step:2,text:'CONSIGUE LA LLAVE DEL DESPACHO: EL CABO IBARRA LA LLEVA',gx:ib.x,gz:ib.z,x:Math.floor(ib.x/T),y:Math.floor(ib.z/T)};
   return {step:2,text:'SIN LLAVE: VUELA LA CERRADURA DEL DESPACHO (1 BALA, RUIDO)',x:4,y:15}; }
+// misión 2: laboratorio → compuerta (tres grupos) o canal → templo → montacargas
+function objective2(){ if(S.zone==='templo')return {step:3,text:'SUBE EN EL MONTACARGAS (NORESTE DEL TEMPLO)',x:18,y:2};
+  if(!S.clues.includes('lista'))return {step:1,text:'ENTRA EN EL LABORATORIO (ESTE) Y BUSCA LA LISTA DE SUJETOS',x:20,y:12};
+  const n=W.gens.filter(v=>!v).length; if(W.gateOpen)return {step:2,text:'LA COMPUERTA HA CAÍDO: BAJA AL TEMPLO POR EL SUR',x:14,y:21};
+  return {step:2,text:'BAJA AL TEMPLO: PARA LOS TRES GRUPOS ('+n+'/3) PARA QUE CAIGA LA COMPUERTA, O SIGUE EL CANAL DEL OESTE',x:n?14:3,y:n?19:9}; }
 // fuera de la base, el objetivo apunta a la salida que lleva de vuelta
-function objectiveHere(){ const o=objective(); if(!o||!ZONE||ZONE.id==='base'||!ZONE.exitTo)return o; const ex=ZONE.exitTo.base; if(!ex)return o; return {step:o.step,text:'SUBE A LA BASE · '+o.text,x:ex[0],y:ex[1]}; }
-let lastObj=''; function updObj(){ const o=objectiveHere(); const t=(o.step?'OBJETIVO '+o.step+'/6: ':'OBJETIVO: ')+o.text; if(t!==lastObj){ lastObj=t; el('hObj').textContent=t; } return o; }
+function objectiveHere(){ if(S.mission===2)return objective2(); const o=objective(); if(!o||!ZONE||ZONE.id==='base'||!ZONE.exitTo)return o; const ex=ZONE.exitTo.base; if(!ex)return o; return {step:o.step,text:'SUBE A LA BASE · '+o.text,x:ex[0],y:ex[1]}; }
+let lastObj=''; function updObj(){ const o=objectiveHere(); const t=(o.step?'OBJETIVO '+o.step+(S.mission===2?'/3: ':'/6: '):'OBJETIVO: ')+o.text; if(t!==lastObj){ lastObj=t; el('hObj').textContent=t; } return o; }
 function renderNote(){ el('noteList').innerHTML=S.clues.length?S.clues.map(k=>'<li>'+CLUES[k]+'</li>').join(''):'<li class="e">Nada todavía. Lee, escucha, aprieta.</li>'; }
 let dlgOpts=[];
 function openDialog(title,html,opts){ uiOpen=true; unlockPtr(); el('dlgTitle').textContent=title; el('dlgTxt').innerHTML=html; dlgOpts=opts; const box=el('dlgOpts'); box.innerHTML=''; box.className='opts';

@@ -9,12 +9,17 @@ const CLUES={
   roma:'Alarcón reza en latín con la Vulgata y cuenta los salmos como Roma, no como los protestantes. "Uno menos."',
   llave:'La llave del despacho la lleva el cabo Ibarra.',
   pozo:'Compuerta de la excavación (patio sur): dos candados con el troquel de Alarcón; su llave los abre. Debajo, la galería de acceso. Control: lo de abajo es la siguiente misión.',
-  aleph:'Galería de acceso: la puerta blindada ALEPH-07 sólo se abre desde dentro, y lo que respira está detrás. El guardia de abajo dice que la semana que viene "bajan al siguiente".',
+  aleph:'Galería de acceso: la puerta blindada ALEPH-07 tiene un lector que reconoce la banda del expediente LH-07; lo que respira está detrás. El guardia de abajo dice que la semana que viene "bajan al siguiente".',
   tele:'Teletipo: la clave del archivo no se transmite; "procedimiento habitual". Cuatro operarios de baja por "voces". Halloran no debe saberlo.',
   vulgata:'Biblia Vulgata en el escritorio, la cinta en PSALMUS CXXIX: "De profundis clamavi ad te". Margen: "Ella también clama. Nadie la oye. — A."',
   hallo:'Halloran: la clave es el rezo de Alarcón, pero él numera como la Vulgata. "Si cuenta usted como un protestante, se equivocará de salmo."',
   fuente:'Bajo el templo hay algo que respira y canta. Lo llaman "la carga". Los que bajan vuelven sordos, o no vuelven.',
-  file:'EXPEDIENTE LH-07. Sujeto: Cuttlas, A. Memoria borrada tres veces. "El sujeto recuerda una cocina." Recomiendan una cuarta sesión.'
+  file:'EXPEDIENTE LH-07. Sujeto: Cuttlas, A. Memoria borrada tres veces. "El sujeto recuerda una cocina." Recomiendan una cuarta sesión.',
+  protocolo:'Protocolo de extracción: la compuerta del sur la sujeta un electroimán con los tres grupos electrógenos; sin los tres, cae y queda abierta. El canal de desagüe del oeste baja al templo por su cuenta.',
+  lista:'Lista de sujetos del programa: siete nombres, cinco bajas, uno retirado. LH-04 era Vidal, J. El séptimo, activo, eres tú. Candidata a LH-08: Roig, E.',
+  silla:'La silla de las sesiones: correas, electrodos y un tubo que baja al pozo. No borran la memoria con drogas: la tapan con lo que canta abajo.',
+  alarcon:'Alarcón baja a rezar al templo a las tres, solo, con la escolta a diez pasos. Cuando paran los grupos lo de abajo deja de llorar y él no duerme.',
+  luz:'Bajo el agua del templo late una luz que no viene de ninguna lámpara. Nadie la ha visto entera. "La carga" es una persona, o lo fue.'
 };
 const GENERIC={clave:[{f:0,t:'Ni idea. Yo soy de la garita, la clave es cosa de Alarcón.'}],llave:[{f:0,t:'La del despacho la tiene el cabo Ibarra. Pregúntale a él, si te deja.',clue:'llave'}],templo:[{f:0,t:'De eso no se habla.'},{f:2,t:'Dicen que canta. Por la noche, cuando paran los generadores. Yo no quiero oírlo.',clue:'fuente'}]};
 const GDEF=[
@@ -34,7 +39,7 @@ const GDEF=[
  {name:'Soldado de radio',role:'comunicaciones',nerve:2,loyal:1,wps:[[2,11],[10,11],[10,14],[2,14]],look:{uniform:0x5a6050,cap:0x4a5040,hair:'#141010',hairStyle:'largo'},q:{templo:[{f:0,t:'De eso no se habla.'},{f:1,t:'Por el teletipo llegan partes de "la carga". Bajas por voces. Yo solo los paso.',clue:'fuente'}]}},
  {name:'Soldado de puerta',role:'salida',nerve:3,loyal:1,wps:[[24,20],[33,20],[33,25],[24,25]],look:{uniform:0x4f5a3c,rifle:true,hair:'#8a3a1a',hairStyle:'tupe'},q:{}},
 ];
-function mkGuard(d,red){ const p=d.wps[0]; const g={name:d.name,role:d.role,nerve:d.nerve,loyal:d.loyal,hasKey:!!d.hasKey,q:d.q,wps:d.wps,wi:1,x:wx(p[0]),z:wx(p[1]),fx:1,fz:0,state:'patrol',susp:0,target:null,searchT:0,shotT:0,down:0,dead:false,fear:0,red:!!red,fixing:false,moving:false};
+function mkGuard(d,red){ const p=d.wps[0]; const g={name:d.name,role:d.role,nerve:d.nerve,loyal:d.loyal,hasKey:!!d.hasKey,q:d.q,wps:d.wps,wi:d.wps.length>1?1:0,x:wx(p[0]),z:wx(p[1]),fx:d.face?d.face[0]:1,fz:d.face?d.face[1]:0,state:'patrol',susp:0,target:null,searchT:0,shotT:0,down:0,dead:false,fear:0,red:!!red,fixing:false,moving:false};
   const look=Object.assign({},d.look||{uniform:0x4f5a3c,helmet:0x4a5a3a,rifle:true}); if(red){ look.helmet=0x8a2a2a; delete look.cap; } g.fig=figure(look); g.fig.g.position.set(g.x,0,g.z); scene.add(g.fig.g);
   g.mark=new THREE.Sprite(new THREE.SpriteMaterial({map:MK.ex,transparent:true})); g.mark.scale.set(0.6,0.6,1); g.mark.visible=false; scene.add(g.mark); return g; }
 const halloFig=figure({uniform:0xe8e8e0,pants:0x9a9a90,hair:'#b0b0b0',glasses:true,skin:'#e0c0a0',old:true,suit:true,plain:true}); halloFig.g.position.set(wx(31),0,wx(13)+0.4); halloFig.g.rotation.y=Math.PI;
@@ -50,15 +55,15 @@ const puffTex=(()=>{const c=document.createElement('canvas');c.width=32;c.height
 const puffs=[]; for(let i=0;i<10;i++){ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex,transparent:true,opacity:0,depthWrite:false})); sp.scale.set(0.3,0.3,1); scene.add(sp); puffs.push({sp,t:9}); }
 let third=false;
 
-function reset(){
+function reset(m){
   if(S.guards)S.guards.forEach(g=>{scene.remove(g.fig.g);scene.remove(g.mark);}); if(S.dogs)S.dogs.forEach(d=>scene.remove(d.fig.g));
   S.p={name:'CUTTLAS',fig:playerFig,x:0,z:0,fx:1,fz:0,hp:5,ammo:8,crouch:false,hurtT:0,carry:null,key:false,file:false,moving:false,run:false,down:0,shotT:0};
   S.c={name:'ROIG',fig:roigFig,x:0,z:0,fx:1,fz:0,hp:5,ammo:12,crouch:false,hurtT:0,carry:null,key:false,file:false,moving:false,run:false,down:0,shotT:0,ko:0};
   roigFig.g.visible=true; roigFig.g.rotation.z=0; playerFig.g.rotation.z=0;
   S.swaps=0; S.cOrder='wait'; S.orders=0; S.silencer=false; S.disguises=0; S.p.figBase=playerFig; S.p.figU=playerFigU; S.c.figBase=roigFig; S.c.figU=roigFigU; S.p.disguise=false; S.c.disguise=false; playerFigU.g.visible=false; roigFigU.g.visible=false; S.teamKO=0; S.guide={};
   S.guards=[]; S.bodies=[]; S.dogs=[]; S.zoneState={}; S.zone=null; S.refPending=false; S.traveling=false; S.kill=0; S.ko=0; S.alarms=0; S.base='calma'; S.alertT=0; S.over=false; S.t=0; S.reinforced=false; S.wrongCode=0; S.halloTalked=false; S.interro=0;
-  S.clues=[]; S.flashSeen={}; S.recoil=0; S.muzzle=0; S.fixTimer=0; S.freeze=0; S.codecSeen={}; S.cigs=3; S.smoke=0; S.stepT=0; S.inCell=false; S.capturedOnce=false; S.cellEscaped=false; S.capturing=false; S.dogsDone=false; S.dogsOut=false; S.dogKills=0; S.vidal={stage:0,fail:0,cool:0,gone:false}; S.cellKey=false; S.keyHint=''; S.ammoTaken={}; flow=null;
-  W.cellOpen=false; W.officeOpen=false; W.vaultOpen=false; W.yardDoorClosed=false; W.hatchOpen=false; W.power=true; el('hCig').textContent=3;
-  yaw=-Math.PI/2; pitch=0; enterZone('base',null,yaw,{fresh:true}); updHud(); updObj(); renderNote();
+  S.clues=[]; S.flashSeen={}; S.recoil=0; S.muzzle=0; S.fixTimer=0; S.freeze=0; S.codecSeen={}; S.cigs=3; S.smoke=0; S.stepT=0; S.inCell=false; S.capturedOnce=false; S.cellEscaped=false; S.capturing=false; S.mission=m===2?2:1; S.dogsDone=S.mission===2; S.dogsOut=false; S.dogKills=0; S.vidal={stage:0,fail:0,cool:0,gone:false}; S.cellKey=false; S.keyHint=''; S.ammoTaken={}; flow=null;
+  W.cellOpen=false; W.officeOpen=false; W.vaultOpen=false; W.yardDoorClosed=false; W.hatchOpen=false; W.power=true; W.gens=[true,true,true]; W.gateOpen=false; el('hCig').textContent=3;
+  if(S.mission===2){ yaw=Math.PI; pitch=0; enterZone('excavacion',null,yaw,{fresh:true}); } else { yaw=-Math.PI/2; pitch=0; enterZone('base',null,yaw,{fresh:true}); } updHud(); updObj(); renderNote();
 }
 function setPower(on){ W.power=on; lamps.forEach(L=>L.intensity=on?L.userData.i||(L.userData.i=L.intensity):0.0); lampPosts.forEach(b=>b.material.color.set(on?0xffd080:0x332218)); spots.forEach(s=>{s.s.intensity=on?2.4:0; s.beam.visible=on;}); if(emergency)emergency.intensity=on?0:0.9; scene.fog.density=on?(ZONE.fog||0.026):(ZONE.fogOff||0.04); el('hPow').textContent=on?'GENERADOR':'APAGADO'; el('hPow').style.color=on?'':'#e0483a'; if(hum)hum.gain.gain.setTargetAtTime(on?0.05:0.012,AC.currentTime,0.5); }

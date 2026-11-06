@@ -6,6 +6,7 @@
   "scripts": {
     "start": "npx --yes serve -l 8080 .",
     "test": "node tests/smoke.js",
+    "test:m2": "node tests/mission2.js",
     "build:artifact": "python3 tools/build-artifact.py"
   },
   "devDependencies": {
