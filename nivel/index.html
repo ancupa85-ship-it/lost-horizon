@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lost Horizon: La Torre</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<style>
+:root{--ink:#e9e4d4;--dim:#9a9686;--green:#7dff9a;--amber:#ffb347;--red:#ff4a3a;--bg:#06080d}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;color:var(--ink);font-family:'VT323',monospace}
+[hidden]{display:none!important}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+#radar{position:fixed;top:14px;right:14px;width:170px;height:170px;border:2px solid #2c4a36;background:rgba(4,14,8,.78);border-radius:6px;image-rendering:pixelated}
+.hud{position:fixed;pointer-events:none;text-shadow:0 2px 0 #000}
+#obj{top:14px;left:16px;font-size:22px;max-width:min(560px,60vw);line-height:1.05}
+#obj b{font-family:'Press Start 2P';font-size:10px;color:var(--amber);display:block;margin-bottom:6px;letter-spacing:1px}
+#state{top:192px;right:14px;width:170px;text-align:center;font-family:'Press Start 2P';font-size:10px;padding:6px 0;border-radius:4px;background:rgba(0,0,0,.55)}
+#state.calma{color:var(--green)} #state.sospecha{color:var(--amber)} #state.alarma{color:#fff;background:rgba(200,30,20,.85)} #state.busqueda{color:var(--amber);background:rgba(90,50,0,.7)}
+#bottom{left:16px;bottom:14px;display:flex;gap:14px;align-items:flex-end}
+#hpw{width:200px;height:12px;border:2px solid #555;background:#200;border-radius:3px;overflow:hidden}
+#hp{height:100%;width:100%;background:linear-gradient(#7dff9a,#2fae55)}
+#mode{font-family:'Press Start 2P';font-size:11px;padding:6px 8px;border-radius:4px;background:rgba(0,0,0,.6)}
+#mode.letal{color:var(--red);border:1px solid var(--red)} #mode.noletal{color:#7fd4ff;border:1px solid #7fd4ff}
+#inv{font-size:20px;color:var(--dim)}
+#prompt{left:50%;bottom:22%;transform:translateX(-50%);font-family:'Press Start 2P';font-size:12px;background:rgba(0,0,0,.65);padding:8px 12px;border-radius:4px;color:#fff;white-space:nowrap}
+#toast{left:50%;top:18%;transform:translateX(-50%);font-size:26px;text-align:center;max-width:80vw;color:#fff;background:rgba(0,0,0,.5);padding:4px 12px;border-radius:4px}
+#cross{left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border:2px solid rgba(255,255,255,.8);border-radius:50%}
+#cross::after{content:'';position:absolute;left:8px;top:8px;width:2px;height:2px;background:#fff}
+#cross.hit{border-color:var(--red)}
+#hurt{position:fixed;inset:0;pointer-events:none;background:radial-gradient(transparent 50%,rgba(170,0,0,.55));opacity:0;transition:opacity .25s}
+#bars{position:fixed;inset:0;pointer-events:none}
+#bars::before,#bars::after{content:'';position:absolute;left:0;right:0;height:0;background:#000;transition:height .5s}
+#bars::before{top:0} #bars::after{bottom:0}
+#bars.on::before,#bars.on::after{height:11vh}
+.panel{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(3,5,9,.86);z-index:5}
+.card{width:min(760px,92vw);max-height:92vh;overflow:auto;padding:26px 30px;border:2px solid #34503d;background:#0a110d;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,.6)}
+.card h1{font-family:'Press Start 2P';font-size:22px;margin:0 0 6px;color:var(--ink);letter-spacing:1px;line-height:1.35}
+.card h2{font-family:'Press Start 2P';font-size:11px;color:var(--amber);margin:18px 0 8px}
+.card p,.card li{font-size:22px;line-height:1.15;margin:6px 0;color:var(--ink)}
+.card .sub{color:var(--dim);font-size:22px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:20px}
+.keys span:nth-child(odd){color:var(--green);font-family:'Press Start 2P';font-size:10px;padding-top:4px}
+button{font-family:'Press Start 2P';font-size:12px;padding:12px 16px;margin:14px 10px 0 0;border:2px solid var(--green);background:#0f2416;color:var(--green);border-radius:4px;cursor:pointer}
+button:hover,button:focus-visible{background:var(--green);color:#041;outline:none}
+button.alt{border-color:#666;color:#bbb;background:#151515}
+#codec{position:fixed;left:50%;bottom:4vh;transform:translateX(-50%);width:min(820px,94vw);display:flex;gap:16px;align-items:flex-start;background:rgba(2,12,6,.93);border:2px solid #3e7a4f;border-radius:6px;padding:14px 16px;z-index:4}
+#cWho{font-family:'Press Start 2P';font-size:10px;color:var(--green);min-width:120px;line-height:1.6}
+#cWho small{display:block;color:var(--dim);font-family:'VT323';font-size:18px}
+#cTxt{font-size:25px;line-height:1.1;flex:1;min-height:56px}
+#cNext{position:absolute;right:12px;bottom:6px;font-size:16px;color:var(--dim)}
+#codec.doc{background:#efe6cc;border-color:#8b7d5a} #codec.doc #cTxt{color:#1b1a14} #codec.doc #cWho{color:#6b2f1a}
+#codec.mind #cWho{color:#9fb6ff} #codec.mind{border-color:#4b5f9a;background:rgba(6,8,20,.93)} #codec.mind #cTxt{font-style:italic}
+#codec.fuente{border-color:#9a3f2b;background:rgba(20,4,2,.93)} #codec.fuente #cWho{color:#ff7a5a}
+#keypad .card{width:min(360px,92vw);text-align:center}
+#kpScreen{font-family:'Press Start 2P';font-size:26px;letter-spacing:10px;background:#031;color:var(--green);padding:14px;border:2px solid #264;border-radius:4px;margin:8px 0}
+#kpGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#kpGrid button{margin:0;padding:14px 0;font-size:14px}
+#kpMsg{min-height:24px;font-size:20px;color:var(--amber)}
+#notes .card ul{padding-left:20px}
+#endStats{display:grid;grid-template-columns:auto auto;gap:4px 24px;font-size:22px;justify-content:start}
+#endStats span:nth-child(odd){color:var(--dim)}
+.mem{border-left:3px solid var(--amber);padding:6px 12px;margin:12px 0;background:rgba(255,180,70,.06)}
+.sor{border-left:3px solid #9fb6ff;padding:6px 12px;margin:12px 0;background:rgba(150,170,255,.06)}
+@media (max-width:700px){#obj{font-size:18px}#radar{width:120px;height:120px}#state{top:140px;width:120px}}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="bars"></div>
+<div id="hurt"></div>
+<canvas id="radar" class="hud" width="170" height="170"></canvas>
+<div id="obj" class="hud"><b>OBJETIVO</b><span id="objT"></span></div>
+<div id="state" class="hud calma">CALMA</div>
+<div id="bottom" class="hud"><div><div id="hpw"><div id="hp"></div></div></div><div id="mode" class="noletal">NO LETAL</div><div id="inv"></div></div>
+<div id="prompt" class="hud" hidden></div>
+<div id="toast" class="hud" hidden></div>
+<div id="cross" class="hud" hidden></div>
+
+<div id="codec" hidden><div id="cWho"></div><div id="cTxt"></div><div id="cNext">E ▸</div></div>
+
+<div id="start" class="panel"><div class="card">
+  <h1>LOST HORIZON<br>LA TORRE</h1>
+  <p class="sub">Tarsis, marismas del Guadalquivir. 14 de noviembre de 1983, 02:40.</p>
+  <p>Entra en la base por el embarcadero, sube al archivo del centro de comunicaciones, abre la caja fuerte y sal con el expediente ALEPH-07. Por arriba o por abajo, matando o sin matar: el nivel se puede terminar de todas las maneras.</p>
+  <h2>CONTROLES</h2>
+  <div class="keys">
+    <span>WASD · RATÓN</span><span>moverse · mirar</span>
+    <span>SHIFT · C</span><span>correr (hace ruido) · agacharse</span>
+    <span>ESPACIO</span><span>saltar (cajas, tejados)</span>
+    <span>E</span><span>usar: trepar escaleras, leer, teclado, tirolina</span>
+    <span>F</span><span>derribo por la espalda (o cayendo encima desde arriba)</span>
+    <span>CLIC DCHO · CLIC</span><span>apuntar · disparar</span>
+    <span>Q</span><span>cambiar letal / no letal (bala o dardo, cuchillo o estrangulamiento)</span>
+    <span>R · G</span><span>cargar / soltar un cuerpo · lanzar un cargador vacío para distraer</span>
+    <span>TAB · ESC</span><span>cuaderno · pausa</span>
+  </div>
+  <button id="btnGo">INFILTRARSE</button>
+</div></div>
+
+<div id="pause" class="panel" hidden><div class="card">
+  <h1>PAUSA</h1>
+  <p class="sub">Haz clic en CONTINUAR para volver a capturar el ratón.</p>
+  <button id="btnResume">CONTINUAR</button><button id="btnRetryP" class="alt">ÚLTIMO PUNTO</button><button id="btnRestartP" class="alt">EMPEZAR DE NUEVO</button>
+</div></div>
+
+<div id="notes" class="panel" hidden><div class="card">
+  <h1>CUADERNO</h1>
+  <h2>OBJETIVO</h2><p id="nObj"></p>
+  <h2>NOTAS</h2><ul id="nList"></ul>
+  <p class="sub">TAB para cerrar</p>
+</div></div>
+
+<div id="keypad" class="panel" hidden><div class="card">
+  <h2>CAJA FUERTE · ARCHIVO</h2>
+  <div id="kpScreen">____</div>
+  <div id="kpMsg"></div>
+  <div id="kpGrid"></div>
+  <button id="kpClose" class="alt">SALIR (E)</button>
+</div></div>
+
+<div id="over" class="panel" hidden><div class="card">
+  <h1 style="color:var(--red)">MISIÓN FALLIDA</h1>
+  <p id="overTxt" class="sub"></p>
+  <button id="btnRetry">ÚLTIMO PUNTO</button><button id="btnRestart" class="alt">EMPEZAR DE NUEVO</button>
+</div></div>
+
+<div id="end" class="panel" hidden><div class="card">
+  <h1>FIN DEL NIVEL<br>LA TORRE</h1>
+  <p id="endExit" class="sub"></p>
+  <div id="endStats"></div>
+  <div id="endMem" class="mem"></div>
+  <div id="endSor" class="sor"></div>
+  <button id="btnAgain">JUGAR OTRA VEZ</button>
+</div></div>
+
+<script src="../vendor/three.min.js"></script>
+<script src="torre.js"></script>
+</body>
+</html>
