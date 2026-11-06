@@ -9,6 +9,6 @@ const {chromium}=require('playwright'); const path=require('path');
   await p.click('#btnM2'); await p.waitForTimeout(600); await p.evaluate(()=>window.__LH.cutSkip()); await p.waitForTimeout(300); await closeCodec(); await settle();
   await shot('excavacion',14,3,Math.PI,0.05); await shot('canal',12,11,Math.PI*0.75,0.1); await shot('laboratorio',21,12,-Math.PI/2,0.05); await shot('compuerta',14,17,Math.PI,0.05);
   await p.evaluate(()=>{ const L=window.__LH; [0,1,2].forEach(i=>L.toggleGen(i)); L.S.fixTimer=9999; }); await shot('compuerta-caida',14,17,Math.PI,0.05);
-  await p.evaluate(()=>window.__LH.travel('templo',[2,16],0)); await p.waitForTimeout(1400); await p.screenshot({path:path.resolve(__dirname,'shots','m2-carga.png')}); await p.waitForTimeout(1600); await settle(); await p.waitForTimeout(1500); await settle();
+  await p.evaluate(()=>window.__LH.travel('templo',[2,17],0)); await p.waitForTimeout(1400); await p.screenshot({path:path.resolve(__dirname,'shots','m2-carga.png')}); await p.waitForTimeout(1600); await settle(); await p.waitForTimeout(1500); await settle();
   await shot('templo',6,12,-Math.PI*0.75,0.05); await shot('alberca',11,10,0,0.15); await shot('montacargas',15,4,-Math.PI/2,0);
   await b.close(); console.log('capturas m2 listas'); })();
