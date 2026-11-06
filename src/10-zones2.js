@@ -82,6 +82,12 @@ function excProps(add){
   const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.6,0.45),toon({color:0xd8c860})); sign.position.set(wx(14),2.5,wx(19)-1.05); add(sign);
   for(let k=0;k<4;k++){ const st=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.25,0.5),M.stone); st.position.set(wx(14),-0.12-k*0.25,wx(21)+0.3+k*0.45); add(st); }
   const hole=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.4),new THREE.MeshBasicMaterial({color:0x050608})); hole.rotation.x=-Math.PI/2; hole.position.set(wx(14),0.05,wx(21)+1.2); add(hole);
+  // la bajada al templo se ve desde lejos: barandilla, poste con rótulo y lámpara verde encima
+  for(const dx of [-1,1]){ const post=new THREE.Mesh(new THREE.BoxGeometry(0.06,1.0,0.06),M.metal); post.position.set(wx(14)+dx,0.5,wx(21)+0.4); add(post); const rail=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,1.6),M.metal); rail.position.set(wx(14)+dx,0.95,wx(21)+1.0); add(rail); }
+  const sp=new THREE.Mesh(new THREE.BoxGeometry(0.08,2.6,0.08),M.dark); sp.position.set(wx(14)+1.3,1.3,wx(21)-0.6); add(sp);
+  const sg=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.5,0.05),toon({color:0x3fd080})); sg.position.set(wx(14)+1.3,2.2,wx(21)-0.6); add(sg);
+  const gl2=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.2,0.3),toon({color:0x9ff0c0})); gl2.position.set(wx(14),2.85,wx(21)+0.4); add(gl2);
+  const gL=new THREE.PointLight(0x7fd4a0,1.6,12,1.3); gL.position.set(wx(14),2.5,wx(21)+0.4); add(gL);
   // puerta blindada vista desde dentro: rótulo
   const s2=new THREE.Mesh(new THREE.PlaneGeometry(1.6,0.45),toon({color:0xc8b850})); s2.position.set(wx(14.5),2.4,wx(0)+1.05); s2.rotation.y=Math.PI; add(s2); }
 function excSync(){ if(dynamicDoors.gate)dynamicDoors.gate.visible=!W.gateOpen; applyGens(); }
