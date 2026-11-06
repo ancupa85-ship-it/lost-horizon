@@ -19,6 +19,7 @@ const CODEC={
  warn:[{who:'CONTROL',text:'Llevas demasiado dentro. A las 02:19 sueltan la perrera: siete perros. No les ganas corriendo; o los paras o te paran.'}],
  dogs:[{who:'CONTROL',text:'Perrera abierta. Siete. Si te cogen vivo, lo que venga después no es cosa nuestra.'}],
  cell:[{who:'CONTROL',text:'...'},{who:'———',freq:'000.00',port:'fuente',text:'te han bajado un piso. otro más y me oyes sin radio. el que reza fuera tiene un hermano aquí conmigo.'}],
+ down:[{who:'CONTROL',text:'Estás bajo el patio. Eso no es esta noche, Cuttlas: mira lo que haya que mirar y sube. La puerta blindada del fondo no se abre desde fuera.'},{who:'———',freq:'000.00',port:'fuente',text:'más cerca. te oigo contar desde aquí. no bajes todavía: aún no sabes tu número.'}],
  vault:[{who:'CONTROL',text:'Puerta abierta. Coge el expediente y sal por la puerta sureste. No lo leas, Cuttlas. Eso no está en la misión.'}],
  file:[{who:'CONTROL',text:'...Te dije que no lo leyeras.'},{who:'CONTROL',text:'Da igual. Mañana no te acordarás. Sal por la puerta sureste y entrégalo. Corto.'},{who:'———',freq:'000.00',port:'fuente',text:'de profundis clamavi ad te. te oigo contar. tú también cuentas como ellos. baja. baja. baja.'},{who:'CUTTLAS',freq:'000.00',port:'fuente',text:'¿Quién habla?'},{who:'———',freq:'000.00',port:'fuente',text:'la que también clama. nadie la oye. tú sí.'}],
 };

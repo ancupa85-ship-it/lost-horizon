@@ -10,7 +10,7 @@ function playerHidden(){ const P=S.p; return S.spotlit?false:(shadowT(tile(P.x),
 const REFDEF={name:'Refuerzo',role:'puerta',nerve:3,loyal:2,wps:[[26,26],[33,26],[33,23],[26,23]],q:{}};
 function clockStr(){ const mins=10+Math.floor((S.t||0)/60); return '0'+(2+Math.floor(mins/60))+':'+String(mins%60).padStart(2,'0'); }
 function setBase(st){ if(S.base===st)return; const o={calma:0,sospecha:1,cierre:2}; if(o[st]<o[S.base])return; S.base=st; updHud();
-  if(st==='cierre'&&!S.reinforced){ S.reinforced=true; W.yardDoorClosed=true; dynamicDoors.yard.visible=true; S.guards.push(mkGuard(REFDEF,true)); flash('BASE EN CIERRE','Se cierra la puerta entre los patios. Un refuerzo cubre la salida. Ya solo se sale por abajo o por la fuerza.',7); beep(110,0.8,'sawtooth',0.08); } }
+  if(st==='cierre'&&!S.reinforced){ S.reinforced=true; W.yardDoorClosed=true; if(S.zone==='base'){ if(dynamicDoors.yard)dynamicDoors.yard.visible=true; S.guards.push(mkGuard(REFDEF,true)); } else S.refPending=true; flash('BASE EN CIERRE','Se cierra la puerta entre los patios. Un refuerzo cubre la salida. Ya solo se sale por abajo o por la fuerza.',7); beep(110,0.8,'sawtooth',0.08); } }
 const ALARM_D=7.5, DISG_D=3; // metros: de más lejos dudan y se acercan; con uniforme solo te calan a menos de 3
 function raiseAlarm(where){ [S.p,S.c].forEach(e=>{ if(e&&e.disguise){ setDisguise(e,false); flash('TE HAN CALADO','El uniforme ya no engaña a nadie. Vuelves a ser el intruso.',5); } });
   if(S.alertT<=0){S.alarms++; alertJingle(); S.freeze=0.5; app.classList.add('cine'); setTimeout(()=>{ if(!cut)app.classList.remove('cine'); },900);

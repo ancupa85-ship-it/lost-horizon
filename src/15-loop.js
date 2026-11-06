@@ -12,7 +12,7 @@ function update(dt){ const P=S.p; S.t+=dt;
   if(S.freeze>0){ S.freeze-=dt; return; }
   // reloj de misión y perrera
   { const mins=10+Math.floor(S.t/60); el('hClock').textContent='0'+(2+Math.floor(mins/60))+':'+String(mins%60).padStart(2,'0'); }
-  if(!S.dogsDone&&!S.inCell){ if(S.t>420&&!S.codecSeen.warn){S.codecSeen.warn=true; codec(CODEC.warn); return;} if(S.t>540&&!S.dogs.length)releaseDogs(); }
+  if(!S.dogsDone&&!S.inCell){ if(S.t>420&&!S.codecSeen.warn){S.codecSeen.warn=true; codec(CODEC.warn); return;} if(S.t>540&&!S.dogs.length&&S.zone==='base'&&!S.dogsOut){ S.dogsOut=true; releaseDogs(); } }
   flowT-=dt; if(flowT<=0&&(S.dogs.some(d=>!d.dead)||S.guards.some(g=>g.state==='alert'))){ flowT=0.3; buildFlow(); }
   let dx=0,dz=0; const f=fwd(); const r={x:Math.cos(yaw),z:-Math.sin(yaw)};
   if(keys.w||keys.ArrowUp){dx+=f.x;dz+=f.z;} if(keys.s||keys.ArrowDown){dx-=f.x;dz-=f.z;} if(keys.d||keys.ArrowRight){dx+=r.x;dz+=r.z;} if(keys.a||keys.ArrowLeft){dx-=r.x;dz-=r.z;}
@@ -111,11 +111,11 @@ function radar(w,h){ const sc=3.4, rw=COLS*sc, rh=ROWS*sc, ox=w-rw-16, oy=44; hc
   S.dogs.forEach(d=>{ if(d.dead)return; hctx.fillStyle='#ff6a5a'; hctx.fillRect(ox+d.x/T*sc-1.5,oy+d.z/T*sc-1.5,3,3); });
   if(S.c){ hctx.fillStyle=S.c.down>0?'#e0483a':'#4fb9d6'; hctx.fillRect(ox+S.c.x/T*sc-2,oy+S.c.z/T*sc-2,4,4); }
   // objetivo: rombo amarillo en el radar y brújula con distancia debajo
-  const ob=objective(); if(ob){ const tx=ob.gx!=null?ob.gx:wx(ob.x), tz=ob.gz!=null?ob.gz:wx(ob.y); const mx=ox+tx/T*sc, mz=oy+tz/T*sc, pul=3+Math.sin(S.t*6)*1.2; hctx.strokeStyle='#ffe066'; hctx.lineWidth=1.5; hctx.beginPath(); hctx.moveTo(mx,mz-pul); hctx.lineTo(mx+pul,mz); hctx.lineTo(mx,mz+pul); hctx.lineTo(mx-pul,mz); hctx.closePath(); hctx.stroke();
+  const ob=objectiveHere(); if(ob){ const tx=ob.gx!=null?ob.gx:wx(ob.x), tz=ob.gz!=null?ob.gz:wx(ob.y); const mx=ox+tx/T*sc, mz=oy+tz/T*sc, pul=3+Math.sin(S.t*6)*1.2; hctx.strokeStyle='#ffe066'; hctx.lineWidth=1.5; hctx.beginPath(); hctx.moveTo(mx,mz-pul); hctx.lineTo(mx+pul,mz); hctx.lineTo(mx,mz+pul); hctx.lineTo(mx-pul,mz); hctx.closePath(); hctx.stroke();
     const dx=tx-P.x, dz=tz-P.z, dist=Math.hypot(dx,dz); const f=fwd(); const rel=Math.atan2(dx*f.z-dz*f.x,dx*f.x+dz*f.z); const cx=ox+rw/2, cy=oy+rh+14;
     hctx.fillStyle='#ffe066'; hctx.font='7px "Press Start 2P",monospace'; hctx.textAlign='center'; hctx.fillText('OBJ · '+Math.round(dist)+' m',cx+12,cy+3);
     hctx.save(); hctx.translate(cx-rw/2+10,cy); hctx.rotate(rel); hctx.beginPath(); hctx.moveTo(0,-6); hctx.lineTo(4,4); hctx.lineTo(0,2); hctx.lineTo(-4,4); hctx.closePath(); hctx.fill(); hctx.restore(); }
   const px=ox+P.x/T*sc, pz=oy+P.z/T*sc, f=fwd(); hctx.fillStyle='#4fc77a'; hctx.beginPath(); hctx.moveTo(px+f.x*5,pz+f.z*5); hctx.lineTo(px-f.z*3-f.x*3,pz+f.x*3-f.z*3); hctx.lineTo(px+f.z*3-f.x*3,pz-f.x*3-f.z*3); hctx.closePath(); hctx.fill(); hctx.restore(); }
 
-window.__LH={MAPSRC,perfWatch,get perfStep(){return perfStep},music,toggleSilencer,stripUniform,setDisguise,nearestBody,teamOrder,releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,INTER,codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
+window.__LH={get MAPSRC(){return ZONE.src},get ZONE(){return ZONE},ZONES,travel,enterZone,perfWatch,get perfStep(){return perfStep},music,toggleSilencer,stripUniform,setDisguise,nearestBody,teamOrder,releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,get INTER(){return INTER},codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
 resize(); reset(); requestAnimationFrame(loop);

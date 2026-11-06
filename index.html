@@ -29,6 +29,7 @@
   <div id="barT" class="bar"></div><div id="barB" class="bar"></div>
   <div id="title" hidden></div><div id="skip" hidden>E · SALTAR</div>
   <div id="fade"></div>
+  <div id="load" hidden><small id="loadSub"></small><span id="loadTitle"></span><em>CARGANDO ZONA</em></div>
   <div id="codec" hidden>
     <canvas id="pL" width="32" height="32"></canvas>
     <div class="freq"><span id="cWho" class="who">CONTROL</span><span id="cFreq">141.12</span></div>
@@ -66,7 +67,7 @@
       <section data-pane="how" hidden>
         <h2>CÓMO SE JUEGA</h2>
         <ol class="how">
-          <li><b>La misión, en orden.</b> 1) La llave del despacho la lleva el cabo Ibarra (patio norte): agárralo por la espalda. 2) Abre el despacho de Alarcón, el edificio del oeste. 3) Averigua la clave del archivo cruzando pistas (escritorio, teletipo, interrogatorios, Halloran). 4) Teclea la clave en el archivo. 5) Coge el expediente LH-07. 6) Sal por la puerta sureste. El HUD muestra el paso actual y el radar marca el objetivo con un rombo amarillo y la distancia. La compuerta de la excavación (sur) está cerrada: es la misión 2.</li>
+          <li><b>La misión, en orden.</b> 1) La llave del despacho la lleva el cabo Ibarra (patio norte): agárralo por la espalda. 2) Abre el despacho de Alarcón, el edificio del oeste. 3) Averigua la clave del archivo cruzando pistas (escritorio, teletipo, interrogatorios, Halloran). 4) Teclea la clave en el archivo. 5) Coge el expediente LH-07. 6) Sal por la puerta sureste. El HUD muestra el paso actual y el radar marca el objetivo con un rombo amarillo y la distancia. La compuerta de la excavación (patio sur) se abre con la llave de Alarcón y baja a la galería de acceso, una zona aparte con su carga: abajo hay un guardia, munición y la puerta blindada ALEPH-07, que es la misión 2. La escalera te devuelve arriba.</li>
           <li><b>Esconderte.</b> Agáchate (<span class="k">Ctrl</span>) en zonas oscuras hasta que el HUD diga <b>OCULTO</b>. Los focos y la brasa del cigarro te delatan. Correr hace ruido.</li>
           <li><b>Interrogar.</b> Llega por la espalda a un guardia que no te haya visto y pulsa <span class="k">F</span> cuando aparezca la marca <b>F</b> sobre su cabeza. Pregúntale por la clave, la llave o el templo. Si no suelta prenda, <b>APRIETA</b>: cada guardia aguanta un número distinto de apretones antes de gritar. Después duérmelo, mátalo o suéltalo (correrá a avisar).</li>
           <li><b>Recoger pistas.</b> Todo lo que lees o te cuentan va al <b>cuaderno</b> (<span class="k">Tab</span>): teletipo, escritorio de Alarcón, la presa de la celda, los propios guardias. Los leales mienten.</li>
@@ -131,6 +132,7 @@
 <script src="src/08-input.js"></script>
 <script src="src/09-util.js"></script>
 <script src="src/10-actions.js"></script>
+<script src="src/10-zones.js"></script>
 <script src="src/11-team.js"></script>
 <script src="src/12-cinematics.js"></script>
 <script src="src/13-endings.js"></script>
