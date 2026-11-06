@@ -79,7 +79,9 @@ const INTER_GAL=[
  {x:2,y:2,label:'E · SUBIR A LA BASE',f:()=>travel('base',[20,25],0)},
  {x:12,y:3,label:()=>S.ammoTaken.g?'':'E · COGER MUNICIÓN (6)',f:()=>{ S.ammoTaken.g=true; S.p.ammo+=6; updHud(); beep(1000,0.08,'square',0.04); }},
  {x:13,y:10,label:'E · LEER EL PARTE DE EXTRACCIÓN',f:()=>{ addClue('aleph'); openDialog('PARTE DE EXTRACCIÓN · ALEPH-07 · NOV 83','<p>CARGA: ESTABLE. RENDIMIENTO: 104 %. RUIDO: PERSISTENTE (NO MECÁNICO).</p><p>SUJETO LH-06: RETIRADO (SORDERA, AFASIA). PRÓXIMO SUJETO: LH-07, A LA ESPERA DE LA 4ª SESIÓN.</p><p>Firma: Alarcón. Al margen, a lápiz: "Vidal, J. — baja."</p>',[{t:'Cerrar',f:closeDialog}]); }},
- {x:7,y:15,label:'E · PUERTA BLINDADA · ALEPH-07',f:()=>{ addClue('aleph'); openDialog('PUERTA BLINDADA','<p>Acero de un palmo, sin cerradura por fuera. Rotulado a plantilla: <b>ALEPH-07 — SÓLO PERSONAL DEL PROGRAMA</b>. Se abre desde dentro.</p><p>Al apoyar la mano, el metal está tibio. Detrás, el zumbido sube y baja despacio, como alguien que respira dormido.</p><p>Control: «Ahí no, Cuttlas. Todavía no. Eso es la siguiente misión.»</p>',[{t:'Cerrar',f:closeDialog}]); }},
+ {x:7,y:15,label:'E · PUERTA BLINDADA · ALEPH-07',f:()=>{ addClue('aleph'); const file=!!(S.p.file||(S.c&&S.c.file));
+   if(file)openDialog('PUERTA BLINDADA','<p>Acero de un palmo, rotulado a plantilla: <b>ALEPH-07 — SÓLO PERSONAL DEL PROGRAMA</b>. Y debajo, un lector: el expediente lleva una banda metálica en el lomo. La puerta la reconoce. Se abre.</p><p>Control: «Cuttlas. Tienes el expediente. La misión es salir. Lo de abajo no existe.»</p><p>Roig: «Si bajamos, no volvemos a subir por aquí. Tú decides.»</p>',[{t:'Bajar · MISIÓN 2 «DESCENSO»',f:()=>{ closeDialog(); startMission(2,true); }},{t:'Todavía no',f:closeDialog}]);
+   else openDialog('PUERTA BLINDADA','<p>Acero de un palmo, sin cerradura por fuera. Rotulado a plantilla: <b>ALEPH-07 — SÓLO PERSONAL DEL PROGRAMA</b>. Debajo, un lector de banda metálica.</p><p>Al apoyar la mano, el metal está tibio. Detrás, el zumbido sube y baja despacio, como alguien que respira dormido.</p><p>Control: «Ahí no, Cuttlas. Todavía no. Primero el expediente.»</p>',[{t:'Cerrar',f:closeDialog}]); }},
 ];
 function galProps(add){
   const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.6,0.5),toon({color:0xc8b850})); sign.position.set(wx(7.5),2.3,wx(15)-0.3); add(sign);
@@ -106,7 +108,7 @@ function enterZone(id,at,face,o){ o=o||{}; const z=ZONES[id]; if(!z)throw new Er
   if(S.refPending&&id==='base'){ S.refPending=false; S.guards.push(mkGuard(REFDEF,true)); }
   const t=at||[start.x,start.y]; const P=S.p, C=S.c; P.x=wx(t[0]); P.z=wx(t[1]); P.moving=false;
   if(C){ let placed=false; for(const d of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]){ if(!solidT(t[0]+d[0],t[1]+d[1])){ C.x=wx(t[0]+d[0]); C.z=wx(t[1]+d[1]); placed=true; break; } } if(!placed){ C.x=P.x; C.z=P.z; } C.fig.g.position.set(C.x,0,C.z); C.carry=null; }
-  if(face!==undefined&&face!==null)yaw=face; S.camH=undefined; if(z.sync)z.sync(); setPower(W.power); updObj(); }
+  if(face!==undefined&&face!==null)yaw=face; S.camH=undefined; setPower(W.power); if(z.sync)z.sync(); updObj(); }
 // viaje entre zonas con fundido y pantalla de carga
 function travel(to,at,face){ if(S.traveling||S.over)return; const z=ZONES[to]; if(!z)return; S.traveling=true; uiOpen=true; promptEl.hidden=true; const L=el('load'); el('loadTitle').textContent=z.title; el('loadSub').textContent=z.sub||''; fadeEl.style.opacity=1; beep(140,0.4,'sine',0.04,70);
   setTimeout(()=>{ L.hidden=false; enterZone(to,at,face); saveGame(z.title.charAt(0)+z.title.slice(1).toLowerCase());
