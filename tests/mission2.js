@@ -12,7 +12,7 @@ const {chromium}=require('playwright'); const path=require('path');
   let fails=0; const ok=async(c,msg)=>{ if(!c){ fails++; console.error('FALLO:',msg,await dump()); process.exitCode=1; } else console.log('ok  ',msg); };
   const closeCodec=async()=>{ for(let i=0;i<24;i++){ if(!(await ev(()=>!!window.__LH.codecQ)))break; await ev(()=>window.__LH.codecNext()); await wait(60);} };
   const settle=async()=>{ for(let i=0;i<40;i++){ if(await ev(()=>!!window.__LH.cut))await ev(()=>window.__LH.cutSkip()); await closeCodec(); if(await ev(()=>!window.__LH.uiOpen&&!window.__LH.cut&&!window.__LH.codecQ&&!window.__LH.S.traveling))break; await wait(150);} };
-  const use=async(x,y,yaw)=>{ await settle(); await ev(([x,y,yaw])=>{ const L=window.__LH; L.S.p.x=L.wx(x); L.S.p.z=L.wx(y); if(yaw!=null)L.yaw=yaw; L.S.c.x=L.S.p.x; L.S.c.z=L.S.p.z; },[x,y,yaw]); await frames(2); await ev(()=>window.__LH.doUse()); await frames(1); };
+  const use=async(x,y,yaw)=>{ await settle(); await ev(([x,y,yaw])=>{ const L=window.__LH; L.S.p.x=L.wx(x); L.S.p.z=L.wx(y); if(yaw!=null)L.yaw=yaw; L.S.c.x=L.S.p.x; L.S.c.z=L.S.p.z; },[x,y,yaw]); await frames(2); await ev(()=>{ window.__LH.useGrace=0; window.__LH.doUse(); }); await frames(1); };
   const canWalk=async()=>{ await ev(()=>{ const L=window.__LH; L.locked=true; L.S.walk0=[L.S.p.x,L.S.p.z]; L.keys.w=true; }); await frames(10); return ev(()=>{ const L=window.__LH; L.keys.w=false; const [x0,z0]=L.S.walk0; const moved=Math.hypot(L.S.p.x-x0,L.S.p.z-z0)>0.05; L.S.p.x=x0; L.S.p.z=z0; return moved; }); };
   const calm=async()=>{ await settle(); await ev(()=>{ const L=window.__LH; L.S.alertT=0; L.S.alarms=0; L.S.base='calma'; L.S.freeze=0; L.locked=true; L.S.codecSeen.alarm=true; L.S.guards.forEach(g=>{ g.state='patrol'; g.susp=0; g.shotT=999; g.fixing=false; }); L.S.c.crouch=true; }); };
   // menú: MISIÓN 2 arranca con su propia intro y su códec
@@ -57,6 +57,8 @@ const {chromium}=require('playwright'); const path=require('path');
   ok(await ev(()=>{ const L=window.__LH; return L.S.zone==='templo'&&L.S.guards.length===3&&L.S.guards[0].name.includes('Alarcón')&&L.S.guards[0].fz===-1; }),'el templo carga con Alarcón mirando al agua y su escolta');
   ok(await ev(()=>document.getElementById('hObj').textContent.includes('3/3')&&document.getElementById('hObj').textContent.includes('MONTACARGAS')),'objetivo 3/3: el montacargas');
   ok(await canWalk(),'al llegar al templo se puede andar (la casilla de llegada no es una columna)');
+  ok(await ev(()=>{ const L=window.__LH; return L.useGrace>0&&Math.floor(L.S.p.x/2)===3&&Math.floor(L.S.p.z/2)===17; }),'se llega junto a la escalera, no encima, y E no actúa justo al llegar');
+  await ev(()=>{ window.__LH.useGrace=performance.now()+5000; window.__LH.doUse(); }); await frames(2); ok(await ev(()=>window.__LH.S.zone==='templo'&&!window.__LH.S.traveling),'un E de más tras el códec no te devuelve arriba');
   await ev(()=>{ window.__LH.S.t+=1; }); await frames(2); ok(await ev(()=>{ const L=window.__LH; return L.ZONE.tick&&L.S.zone==='templo'; }),'la luz de la Fuente late');
   await calm(); await use(11,4,0); ok(await ev(()=>window.__LH.S.clues.includes('luz')),'mirar el agua da la pista de la luz'); await p.keyboard.press('1'); await frames(1);
   // interrogar a Alarcón por la espalda
@@ -66,7 +68,7 @@ const {chromium}=require('playwright'); const path=require('path');
   for(const k of ['4','4','4','4','3'])await p.keyboard.press(k).then(()=>frames(1));
   ok(await ev(()=>window.__LH.S.clues.includes('alarcon')),'apretando cuatro veces confiesa: pista de Alarcón'); await p.keyboard.press('5'); await frames(2);
   // vuelta a la excavación y de nuevo al templo (estado conservado), y montacargas
-  await calm(); await use(2,17,0); await wait(2600); await settle(); ok(await ev(()=>window.__LH.S.zone==='excavacion'&&window.__LH.W.gateOpen),'subir a la excavación conserva la compuerta abierta');
+  await calm(); await use(3,17,Math.PI/2); await wait(2600); await settle(); ok(await ev(()=>window.__LH.S.zone==='excavacion'&&window.__LH.W.gateOpen),'subir a la excavación conserva la compuerta abierta');
   await calm(); ok(await canWalk(),'al volver a la excavación se puede andar');
   await calm(); await use(14,21,Math.PI); await wait(2600); await settle(); ok(await ev(()=>window.__LH.S.zone==='templo'&&window.__LH.S.guards[0].down>0),'al volver, Alarcón sigue dormido donde cayó');
   await calm(); await use(18,2,0); await frames(2);

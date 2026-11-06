@@ -52,7 +52,7 @@ function excInter(){ return [
  {x:22,y:10,label:'E · LEER EL PROTOCOLO DE EXTRACCIÓN',f:()=>{ addClue('protocolo'); openDialog('PROTOCOLO DE EXTRACCIÓN · ALEPH-07','<p>1. Los tres grupos electrógenos alimentan la bomba, el electroimán de la compuerta y la iluminación por sectores. 2. La compuerta de extracción permanece sellada mientras haya corriente en los tres; <b>sin los tres grupos cae por su peso y no vuelve a sellarse</b>. 3. El canal de desagüe del oeste drena al templo: <b>prohibido el paso</b>.</p><p>Al margen: "Si para la bomba, para el ruido. Si para el ruido, Alarcón no duerme. — S."</p>',[{t:'Cerrar',f:closeDialog}]); }},
  {x:26,y:10,label:'E · ABRIR EL ARCHIVADOR · LISTA DE SUJETOS',f:()=>{ const had=S.clues.includes('lista'); addClue('lista'); openDialog('LISTA DE SUJETOS · PROGRAMA LOST HORIZON','<p>LH-01 SERRA, M. — baja (1980). LH-02 OSUNA, R. — baja. LH-03 KELLER, D. — baja. LH-04 VIDAL, J. — baja (1982). LH-05 BAENA, T. — baja. LH-06 — retirado (sordera, afasia).</p><p><b>LH-07 CUTTLAS, A. — ACTIVO. 4ª sesión: pendiente.</b></p><p>LH-08 — sin asignar. Candidata propuesta: ROIG, E.</p>',[{t:'Cerrar',f:()=>{ closeDialog(); if(!had){ saveGame('Con la lista'); updObj(); setTimeout(()=>{ if(!uiOpen&&!S.over&&!cut)codec(CODEC.lista); },600); } }}]); }},
  {x:24,y:13,label:'E · LA SILLA',f:()=>{ addClue('silla'); openDialog('LA SILLA','<p>Correas de cuero, electrodos, un altavoz de rejilla que da a un tubo. El tubo baja al pozo.</p><p>No borran la memoria con drogas. La tapan con lo que canta abajo. Conoces el olor del cuero. Conoces el tubo.</p><p class="m">RECUERDO: una voz que dice "otra vez", y debajo de la voz, otra voz que no es humana y que pide perdón.</p>',[{t:'Cerrar',f:closeDialog}]); }},
- {x:14,y:21,label:'E · BAJAR AL TEMPLO',f:()=>travel('templo',[2,17],-Math.PI/2)},
+ {x:14,y:21,label:'E · BAJAR AL TEMPLO',f:()=>travel('templo',[3,17],-Math.PI/2)},
 ]; }
 function genLabel(i){ return W.gens[i]?'E · PARAR EL GRUPO '+(i+1):'E · ARRANCAR EL GRUPO '+(i+1); }
 function gensOff(){ return W.gens.filter(v=>!v).length; }
@@ -136,12 +136,12 @@ function temProps(add){
 }
 function temTick(dt){ if(!temF.light)return; const n=W.gens?gensOff():0; const calm=n/3; const a=S.t*(2.2-calm*1.4); temF.light.intensity=1.2+Math.sin(a)*(0.7-calm*0.5)+calm*0.6; temF.glow.material.opacity=0.28+Math.sin(a*0.5)*0.08; }
 const INTER_TEM=[
- {x:2,y:17,label:'E · VOLVER A LA EXCAVACIÓN',f:()=>travel('excavacion',[14,21],Math.PI)},
+ {x:2,y:17,label:'E · VOLVER A LA EXCAVACIÓN',f:()=>travel('excavacion',[14,20],0)},
  {x:11,y:3,label:'E · MIRAR EL AGUA',f:()=>{ const had=S.clues.includes('luz'); addClue('luz'); openDialog('EL AGUA','<p>Tibia. Debajo, una luz que no viene de ninguna lámpara y que late despacio'+(gensOff()===3?', tranquila: con los grupos parados respira como quien duerme':', a destiempo, como alguien que aguanta')+'.</p><p>No la ves entera. Nadie la ha visto entera. Ves tu cara en el agua y, por un momento, no es la tuya.</p>'+(had?'':'<p class="m">RECUERDO: una cocina con la luz de la tarde. No es tuyo. Es de ella, o de los seis anteriores.</p>'),[{t:'Apartar la mirada',f:closeDialog}]); }},
  {x:18,y:2,label:'E · SUBIR EN EL MONTACARGAS',f:()=>{ if(S.over)return; S.over=true; outro2(); }},
 ];
 ZONES.templo={id:'templo',title:'EL TEMPLO',sub:'BAJO LA EXCAVACIÓN · LA FUENTE',desc:'Columnas de hace tres mil años y un agua que late con luz propia. El coronel reza en la orilla. El montacargas del fondo sube a la torre.',
-  src:MAPSRC_TEM,start:[2,17],indoor:true,sky:0x030806,fog:0.05,fogOff:0.07,ambient:0x203a30,ambientI:0.9,guards:GDEF_TEM,inter:INTER_TEM,exitTo:{excavacion:[2,17]},
+  src:MAPSRC_TEM,start:[3,17],indoor:true,sky:0x030806,fog:0.05,fogOff:0.07,ambient:0x203a30,ambientI:0.9,guards:GDEF_TEM,inter:INTER_TEM,exitTo:{excavacion:[2,17]},
   lights:[[4.5,2.5,0xffc070,0.8,9,2.6],[17.5,16.5,0xffc070,0.7,9,2.6],[18.5,2.5,0xffd080,1.0,6,3.0]],props:temProps,tick:temTick,
   onEnter(){ saveGame('En el templo'); if(!S.codecSeen.templo){ S.codecSeen.templo=true; setTimeout(()=>{ if(!uiOpen&&!S.over&&!cut)codec(CODEC.templo); },1200); } }};
 // entrada a la misión 2 desde la galería (misión 1, con el expediente en la mano) o desde el menú

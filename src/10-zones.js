@@ -112,4 +112,4 @@ function enterZone(id,at,face,o){ o=o||{}; const z=ZONES[id]; if(!z)throw new Er
 // viaje entre zonas con fundido y pantalla de carga
 function travel(to,at,face){ if(S.traveling||S.over)return; const z=ZONES[to]; if(!z)return; S.traveling=true; uiOpen=true; promptEl.hidden=true; const L=el('load'); el('loadTitle').textContent=z.title; el('loadSub').textContent=z.sub||''; fadeEl.style.opacity=1; beep(140,0.4,'sine',0.04,70);
   setTimeout(()=>{ L.hidden=false; enterZone(to,at,face); saveGame(z.title.charAt(0)+z.title.slice(1).toLowerCase());
-    setTimeout(()=>{ L.hidden=true; fadeEl.style.opacity=0; uiOpen=false; S.traveling=false; flash(z.title,z.desc||'',6); if(z.onEnter)z.onEnter(); },900); },1000); }
+    setTimeout(()=>{ L.hidden=true; fadeEl.style.opacity=0; uiOpen=false; S.traveling=false; useGrace=performance.now()+1200; flash(z.title,z.desc||'',6); if(z.onEnter)z.onEnter(); },900); },1000); }
