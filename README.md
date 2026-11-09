@@ -36,6 +36,7 @@ src/
   09-util.js        línea de visión, colisiones, visión de guardias, alarma
   10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo, compuerta
   10-zones.js       zonas: plano, guardias, props y puntos de interacción de la base y de la galería de acceso; enterZone()/travel() con pantalla de carga
+  10-zones2.js      misión 2 «Descenso»: la excavación (laboratorio, tres grupos electrógenos por sectores, compuerta de extracción, canal) y el templo (la Fuente, Alarcón, montacargas); startMission()
   11-team.js        la compañera (Roig): sigue, se esconde, dispara con silenciador; X intercambia el control
   12-cinematics.js  cámaras guiadas, bandas y títulos
   13-endings.js     finales
@@ -43,7 +44,8 @@ src/
   15-loop.js        update(), IA de guardias y perros, render, HUD y radar
 tests/smoke.js      prueba corta sin cabeza (perros, radio, captura → celda, Vidal, guardar/continuar, segunda derrota)
 tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
-tests/shots.js      capturas de referencia en tests/shots/ (tests/shots-guards.js: fila de guardias; tests/shots-galeria.js: la galería)
+tests/mission2.js    recorrido completo de la misión 2: laboratorio, grupos y compuerta, canal, templo, Alarcón, montacargas, final y derrota
+tests/shots.js      capturas de referencia en tests/shots/ (tests/shots-guards.js: fila de guardias; tests/shots-galeria.js: la galería; tests/shots-m2.js: la misión 2)
 assets/music/       los dos temas a 96 kb/s (los originales están en el proyecto)
 tools/build-artifact.py  empaqueta todo en un solo HTML (música incrustada en base64) para publicarlo como Artifact
 ```
@@ -74,7 +76,24 @@ señale la salida cuando el objetivo está en otra zona.
 
 Zonas actuales: `base` (la de siempre) y `galeria` (galería de acceso a la excavación, bajo la compuerta del
 patio sur en (20,26)). La compuerta se abre con la llave de Alarcón; abajo hay un guardia, munición, el parte
-de extracción y la puerta blindada ALEPH-07, que es la antesala de la misión 2.
+de extracción y la puerta blindada ALEPH-07, que con el expediente LH-07 en la mano da paso a la misión 2.
+
+## Misión 2 «Descenso»
+
+`src/10-zones2.js`. Se arranca con `startMission(2)` desde el menú (MISIÓN 2 · DESCENSO), desde la pantalla
+final de la misión 1 o desde la puerta blindada de la galería. `S.mission` vale 2: no hay perrera ni celda (la
+derrota lleva directa a «Cuarta sesión»), el reloj empieza a las 03:10, los objetivos son `objective2()` (3 pasos)
+y el guardado (`lh-save`, v3) incluye la misión. Zonas:
+
+- `excavacion` (30×24): la blindada queda cerrada al norte. Al este, el laboratorio con el protocolo de extracción,
+  la lista de sujetos y la silla. Tres grupos electrógenos (`gens`: `[x,y,xReparar,yReparar]`) alimentan por
+  sectores las luces (`ZONE.dark(x,y)` = el grupo más cercano está parado: sombra y visión corta, `litAt()`) y el
+  electroimán de la compuerta de extracción `X` del sur: sin los tres, `W.gateOpen` y cae para siempre. Un guardia
+  va a arrancar cada grupo parado (`genOff()`, generaliza la reparación del generador de la base). Alternativa sin
+  tocar nada: el canal de desagüe del oeste (agua, sombra) que rodea la compuerta.
+- `templo` (22×20): columnas, la alberca con la luz de la Fuente (late más despacio cuantos más grupos haya
+  parados, `ZONE.tick`), el coronel Alarcón rezando de cara al agua (guardia quieto, `face`; interrogable, nerve 5)
+  con su escolta, y el montacargas del noreste que termina la misión (`outro2`, finales propios en 13-endings).
 
 ## Diseño
 
