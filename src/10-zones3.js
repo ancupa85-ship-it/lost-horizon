@@ -90,7 +90,7 @@ function torProps(add){
   // rótulo de la puerta este
   const sE=new THREE.Mesh(new THREE.PlaneGeometry(1.4,0.45),toon({color:0xd8c860})); sE.position.set(wx(27)-1.05,2.6,wx(11)); sE.rotation.y=-Math.PI/2; add(sE);
   prop(5,13,0.9,0.5,0.9,M.olive); prop(20,15,0.9,0.5,0.9,M.olive); }
-function torSync(){ if(torF.fire){ torF.fire.visible=!!W.burned; torF.fireL.intensity=W.burned?1.6:0; } }
+function torSync(){ if(torF.fire){ torF.fire.visible=!!W.burned; torF.fireL.intensity=W.burned?1.6:0; } if(W.burned&&W.power&&!(S.burnT>0))S.burnT=2; /* partida cargada con el archivo ardiendo: la luz se irá igual */ }
 ZONES.torre={id:'torre',title:'LA TORRE',sub:'CENTRO DE COMUNICACIONES Y ARCHIVO · SUPERFICIE',desc:'El patio de la torre: la zona más vigilada de Tarsis. En el edificio, el archivo (oeste) y la radio (este). La puerta del este da al perímetro.',
   src:MAPSRC_TOR,start:[2,20],outdoor:true,guards:GDEF_TOR,inter:torInter(),exitTo:{perimetro:[27,11]},
   lights:[[9.5,4,0xfff0c0,0.9,9,2.6],[16.5,4,0xd0e8ff,0.9,9,2.6],[23.5,5.5,0xfff0c0,0.7],[2.5,20.5,0xffd080,0.9,6,3.0],[26,11,0xfff0c0,0.8]],
@@ -158,7 +158,7 @@ function perProps(add){
   prop(24,2,1.2,0.9,0.8,M.olive); }
 ZONES.perimetro={id:'perimetro',title:'EL PERÍMETRO',sub:'VALLA Y MARISMA · EMBARCADERO · CARRETERA DE ROTA',desc:'La valla, la marisma y, al fondo, las dos salidas de Tarsis: el bote del embarcadero y la carretera de Rota. El foco de la torreta barre el barro.',
   src:MAPSRC_PER,start:[1,8],outdoor:true,guards:GDEF_PER,inter:INTER_PER,exitTo:{torre:[0,8]},
-  lights:[[26.5,9.5,0xffe0a0,0.9],[29,1.5,0xfff0c0,0.9],[16,1.5,0xfff4d0,0.6]],spots:[[16,1,16,8,7,1]],props:perProps,
+  lights:[[26.5,9.5,0xffe0a0,0.9],[29,1.5,0xfff0c0,0.9],[16,1.5,0xfff4d0,0.6]],spots:[[16,1,16,8,7,1]],props:perProps,sync(){ if(W.burned&&W.power)setPower(false); },
   onEnter(){ saveGame('En el perímetro'); if(!S.codecSeen.m3per){ S.codecSeen.m3per=true; setTimeout(()=>{ if(!uiOpen&&!S.over&&!cut)codec(CODEC.m3per); },1200); } }};
 // objetivo de la misión 3: la torre (lista, gasolina, radio) → puerta este → el bote o la carretera
 function objective3(){ const lista=S.clues.includes('lista3');
