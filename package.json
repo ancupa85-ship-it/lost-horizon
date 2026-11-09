@@ -7,7 +7,9 @@
     "start": "npx --yes serve -l 8080 .",
     "test": "node tests/smoke.js",
     "test:m2": "node tests/mission2.js",
-    "build:artifact": "python3 tools/build-artifact.py"
+    "build:artifact": "python3 tools/build-artifact.py",
+    "test:m3": "node tests/mission3.js",
+    "shots:m3": "node tests/shots-m3.js"
   },
   "devDependencies": {
     "playwright": "^1.47.0"

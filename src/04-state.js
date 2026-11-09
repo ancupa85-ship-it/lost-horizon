@@ -19,7 +19,15 @@ const CLUES={
   lista:'Lista de sujetos del programa: siete nombres, cinco bajas, uno retirado. LH-04 era Vidal, J. El séptimo, activo, eres tú. Candidata a LH-08: Roig, E.',
   silla:'La silla de las sesiones: correas, electrodos y un tubo que baja al pozo. No borran la memoria con drogas: la tapan con lo que canta abajo.',
   alarcon:'Alarcón baja a rezar al templo a las tres, solo, con la escolta a diez pasos. Cuando paran los grupos lo de abajo deja de llorar y él no duerme.',
-  luz:'Bajo el agua del templo late una luz que no viene de ninguna lámpara. Nadie la ha visto entera. "La carga" es una persona, o lo fue.'
+  luz:'Bajo el agua del templo late una luz que no viene de ninguna lámpara. Nadie la ha visto entera. "La carga" es una persona, o lo fue.',
+  ocana:'Torre: la lista completa del programa (todos los nombres desde 1969) está en el archivo, la puerta oeste del edificio. La guarda el sargento Ocaña.',
+  lista3:'Lista completa: cuarenta y una fichas desde 1969, niños de la inclusa de Rota los primeros. LH-08 Roig, E.: pendiente de la firma de Alarcón, fecha mañana. "Destruir tras la cuarta sesión."',
+  gasolina:'El depósito de gasolina está al este del patio de la torre. El cuadro eléctrico de toda la torre y del perímetro está en la pared del archivo: si el archivo arde, se va la luz de arriba.',
+  radio:'La radio de la torre (sala este) llama a la Compañía por frecuencia fija. Descolgar es entregarse: cuarta sesión y una cama. "Obedecer, cuando ya no cabe otra cosa, puede ser la forma de acusar."',
+  verja:'Perímetro: la verja de la valla tiene un guardia y la torreta del norte barre la marisma con un foco.',
+  valla:'La valla tiene un agujero al sur de la verja, abierto por los perros hace meses. Por ahí se pasa sin cruzar la verja.',
+  embarcadero:'Dos salidas de Tarsis: el bote del embarcadero (este de la marisma; el barquero no pregunta y no vuelve) y la carretera de Rota (noreste, con un control). "A Rota se va por la carretera. Al mar se va a nada."',
+  fuego:'El archivo de la torre arde con catorce años de papel dentro. Lo que hubiera en la lista, ya solo lo recuerda quien lo haya leído.'
 };
 const GENERIC={clave:[{f:0,t:'Ni idea. Yo soy de la garita, la clave es cosa de Alarcón.'}],llave:[{f:0,t:'La del despacho la tiene el cabo Ibarra. Pregúntale a él, si te deja.',clue:'llave'}],templo:[{f:0,t:'De eso no se habla.'},{f:2,t:'Dicen que canta. Por la noche, cuando paran los generadores. Yo no quiero oírlo.',clue:'fuente'}]};
 const GDEF=[
@@ -62,8 +70,8 @@ function reset(m){
   roigFig.g.visible=true; roigFig.g.rotation.z=0; playerFig.g.rotation.z=0;
   S.swaps=0; S.cOrder='wait'; S.orders=0; S.silencer=false; S.disguises=0; S.p.figBase=playerFig; S.p.figU=playerFigU; S.c.figBase=roigFig; S.c.figU=roigFigU; S.p.disguise=false; S.c.disguise=false; playerFigU.g.visible=false; roigFigU.g.visible=false; S.teamKO=0; S.guide={};
   S.guards=[]; S.bodies=[]; S.dogs=[]; S.zoneState={}; S.zone=null; S.refPending=false; S.traveling=false; S.kill=0; S.ko=0; S.alarms=0; S.base='calma'; S.alertT=0; S.over=false; S.t=0; S.reinforced=false; S.wrongCode=0; S.halloTalked=false; S.interro=0;
-  S.clues=[]; S.flashSeen={}; S.recoil=0; S.muzzle=0; S.fixTimer=0; S.freeze=0; S.codecSeen={}; S.cigs=3; S.smoke=0; S.stepT=0; S.inCell=false; S.capturedOnce=false; S.cellEscaped=false; S.capturing=false; S.mission=m===2?2:1; S.dogsDone=S.mission===2; S.dogsOut=false; S.dogKills=0; S.vidal={stage:0,fail:0,cool:0,gone:false}; S.cellKey=false; S.keyHint=''; S.ammoTaken={}; flow=null;
-  W.cellOpen=false; W.officeOpen=false; W.vaultOpen=false; W.yardDoorClosed=false; W.hatchOpen=false; W.power=true; W.gens=[true,true,true]; W.gateOpen=false; el('hCig').textContent=3;
-  if(S.mission===2){ yaw=Math.PI; pitch=0; enterZone('excavacion',null,yaw,{fresh:true}); } else { yaw=-Math.PI/2; pitch=0; enterZone('base',null,yaw,{fresh:true}); } updHud(); updObj(); renderNote();
+  S.clues=[]; S.flashSeen={}; S.recoil=0; S.muzzle=0; S.fixTimer=0; S.freeze=0; S.codecSeen={}; S.cigs=3; S.smoke=0; S.stepT=0; S.inCell=false; S.capturedOnce=false; S.cellEscaped=false; S.capturing=false; S.mission=(m===2||m===3)?m:1; S.dogsDone=S.mission>=2; S.gas=false; S.prev=null; S.ending=null; S.burnT=0; S.dogsOut=false; S.dogKills=0; S.vidal={stage:0,fail:0,cool:0,gone:false}; S.cellKey=false; S.keyHint=''; S.ammoTaken={}; flow=null;
+  W.cellOpen=false; W.officeOpen=false; W.vaultOpen=false; W.yardDoorClosed=false; W.hatchOpen=false; W.power=true; W.gens=[true,true,true]; W.gateOpen=false; W.burned=false; el('hCig').textContent=3;
+  if(S.mission===3){ yaw=-Math.PI/4; pitch=0; enterZone('torre',null,yaw,{fresh:true}); } else if(S.mission===2){ yaw=Math.PI; pitch=0; enterZone('excavacion',null,yaw,{fresh:true}); } else { yaw=-Math.PI/2; pitch=0; enterZone('base',null,yaw,{fresh:true}); } updHud(); updObj(); renderNote();
 }
 function setPower(on){ W.power=on; lamps.forEach(L=>L.intensity=on?L.userData.i||(L.userData.i=L.intensity):0.0); lampPosts.forEach(b=>b.material.color.set(on?0xffd080:0x332218)); spots.forEach(s=>{s.s.intensity=on?2.4:0; s.beam.visible=on;}); if(emergency)emergency.intensity=on?0:0.9; scene.fog.density=on?(ZONE.fog||0.026):(ZONE.fogOff||0.04); el('hPow').textContent=on?'GENERADOR':'APAGADO'; el('hPow').style.color=on?'':'#e0483a'; if(hum)hum.gain.gain.setTargetAtTime(on?0.05:0.012,AC.currentTime,0.5); }

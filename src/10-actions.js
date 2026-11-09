@@ -12,7 +12,7 @@ function releaseDogs(n,quiet){ S.dogs=[]; n=n||7; for(let i=0;i<n;i++){ const f=
   if(uiOpen||cut){ flash('LA PERRERA','Oyes las cadenas caer antes de verlos. Siete. Vienen del patio norte y conocen las puertas mejor que tú.',7); return; }
   startCut([{dur:3.4,from:[wx(22),3.6,wx(6.5)],to:[wx(22),1.5,wx(3.4)],look:[wx(22),0.6,wx(1)],title:'<span class="s">'+clockStr()+' · PATIO NORTE</span>LA PERRERA'}],()=>{ flash('LA PERRERA','Oyes las cadenas caer antes de verlos. Siete. Vienen del patio norte y conocen las puertas mejor que tú.',7); setTimeout(()=>{ if(!uiOpen&&!S.over&&!cut)codec(CODEC.dogs); },900); }); }
 // cualquier derrota: la primera vez te llevan a la celda; la segunda, se acabó
-function defeat(how){ if(S.over||S.capturing)return; if(S.mission===2||S.capturedOnce||S.inCell){ S.over=true; showEnd(false,how==='cell'?'cell':'again'); return; } captured(how); }
+function defeat(how){ if(S.over||S.capturing)return; if(S.mission>=2||S.capturedOnce||S.inCell){ S.over=true; showEnd(false,how==='cell'?'cell':'again'); return; } captured(how); }
 function captured(how){ if(S.capturing)return; S.capturing=true; S.capturedOnce=true; const P0=S.p; S.lying=true; S.smoke=0; if(P0.carry){P0.carry.carried=false;P0.carry=null;} unlockPtr(); beep(60,1.2,'sawtooth',0.08);
   const px=P0.x,pz=P0.z, who=P0.name==='ROIG'?'LA TENIENTE ROIG':'CUTTLAS';
   startCut([
@@ -31,7 +31,7 @@ function doGrab(){ if(uiOpen||S.over)return; const g=nearestGuard(2.0); if(!g){ 
   beep(200,0.1,'square',0.05); renderInterro(g); }
 function fearText(g){ const n=g.fear; if(n>=g.nerve)return 'Está al límite. Si aprietas más, grita.'; if(n>=g.nerve-1)return 'Tiembla. Le cuesta respirar.'; if(n>=2)return 'Respira rápido.'; return 'Aguanta. Te mide.'; }
 function renderInterro(g){ const opts=[
-  {t:S.mission===2?'«¿La lista? ¿Los nombres?»':'«¿La clave del archivo?»',f:()=>ask(g,'clave')},{t:S.mission===2?'«¿Cómo se baja? ¿Cómo se sale?»':'«¿Quién tiene la llave del despacho?»',f:()=>ask(g,'llave')},{t:'«¿Qué hay bajo el templo?»',f:()=>ask(g,'templo')},
+  {t:S.mission===3?'«¿La lista completa? ¿Dónde está?»':S.mission===2?'«¿La lista? ¿Los nombres?»':'«¿La clave del archivo?»',f:()=>ask(g,'clave')},{t:S.mission===3?'«¿Cómo se sale de Tarsis?»':S.mission===2?'«¿Cómo se baja? ¿Cómo se sale?»':'«¿Quién tiene la llave del despacho?»',f:()=>ask(g,'llave')},{t:'«¿Qué hay bajo el templo?»',f:()=>ask(g,'templo')},
   {t:'Apretar',f:()=>squeeze(g),cls:'danger'},{t:'Dormirlo',f:()=>{knock(g,false);closeDialog();},cls:'soft'},{t:'Matarlo',f:()=>{knock(g,true);closeDialog();},cls:'danger'},{t:'Soltarlo',f:()=>{release(g);closeDialog();}}];
   openDialog(g.name+' · '+g.role+' · miedo '+g.fear+'/'+g.nerve, '<p>'+g.last+'</p><p class="st">'+fearText(g)+'</p>', opts); }
 function ask(g,key){ const list=(g.q&&g.q[key])||GENERIC[key]; let best=list[0]; list.forEach(e=>{ if(e.f<=g.fear)best=e; }); g.last='«'+best.t+'»'; if(best.clue)addClue(best.clue); if(best.key&&g.hasKey&&!S.p.key){ giveKey(); g.last+=' <span class="st">Le quitas la llave.</span>'; } renderInterro(g); }

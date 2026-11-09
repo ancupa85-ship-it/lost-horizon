@@ -37,6 +37,7 @@ src/
   10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo, compuerta
   10-zones.js       zonas: plano, guardias, props y puntos de interacción de la base y de la galería de acceso; enterZone()/travel() con pantalla de carga
   10-zones2.js      misión 2 «Descenso»: la excavación (laboratorio, tres grupos electrógenos por sectores, compuerta de extracción, canal) y el templo (la Fuente, Alarcón, montacargas); startMission()
+  10-zones3.js      misión 3 «Tarsis»: el patio de la torre (archivo con la lista completa, sala de radio, depósito de gasolina) y el perímetro (valla, marisma, embarcadero, carretera de Rota); objective3()
   11-team.js        la compañera (Roig): sigue, se esconde, dispara con silenciador; X intercambia el control
   12-cinematics.js  cámaras guiadas, bandas y títulos
   13-endings.js     finales
@@ -45,7 +46,8 @@ src/
 tests/smoke.js      prueba corta sin cabeza (perros, radio, captura → celda, Vidal, guardar/continuar, segunda derrota)
 tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
 tests/mission2.js    recorrido completo de la misión 2: laboratorio, grupos y compuerta, canal, templo, Alarcón, montacargas, final y derrota
-tests/shots.js      capturas de referencia en tests/shots/ (tests/shots-guards.js: fila de guardias; tests/shots-galeria.js: la galería; tests/shots-m2.js: la misión 2)
+tests/mission3.js    recorrido completo de la misión 3: torre, lista, gasolina, incendio, radio, perímetro, los cuatro finales, derrota, guardado y encadenado desde la misión 2
+tests/shots.js      capturas de referencia en tests/shots/ (tests/shots-guards.js: fila de guardias; tests/shots-galeria.js: la galería; tests/shots-m2.js: la misión 2; tests/shots-m3.js: la misión 3)
 assets/music/       los dos temas a 96 kb/s (los originales están en el proyecto)
 tools/build-artifact.py  empaqueta todo en un solo HTML (música incrustada en base64) para publicarlo como Artifact
 ```
@@ -94,6 +96,26 @@ y el guardado (`lh-save`, v3) incluye la misión. Zonas:
 - `templo` (22×20): columnas, la alberca con la luz de la Fuente (late más despacio cuantos más grupos haya
   parados, `ZONE.tick`), el coronel Alarcón rezando de cara al agua (guardia quieto, `face`; interrogable, nerve 5)
   con su escolta, y el montacargas del noreste que termina la misión (`outro2`, finales propios en 13-endings).
+
+## Misión 3 «Tarsis»
+
+`src/10-zones3.js`. Se arranca con `startMission(3,intro,prev)` desde el menú (MISIÓN 3 · TARSIS) o desde la pantalla
+final de la misión 2, que pasa en `prev` (`carryState()`: compuerta caída, lista de siete nombres, muertes) lo que la
+misión 3 hereda para sus finales. `S.mission` vale 3: sin perrera ni celda, el reloj empieza a las 03:40
+(`CLOCK_BASE` en 09-util), objetivos `objective3()` (3 pasos). Zonas:
+
+- `torre` (28×22, exterior con lluvia y dos reflectores): el montacargas del templo llega al rincón suroeste. El
+  edificio tiene el **archivo** (puerta oeste: la lista completa, pista `lista3`; y, con gasolina, «rociar y prender»:
+  `burnArchive()` → `W.burned`, alarma, llamas, y a los 5 s `setPower(false)`: el cuadro eléctrico está ahí y nadie
+  lo repara) y la **sala de radio** (puerta este: llamar a la Compañía = entregarse, final «Séneca»). El depósito
+  del este da la gasolina (`S.gas`). La puerta este (27,11) lleva al perímetro. Siete guardias, con el sargento
+  Ocaña (archivero, nerve 4) y el radiotelegrafista (nerve 1), que cuentan dónde está la lista y cómo se sale.
+- `perimetro` (32×18): la valla `W` en x=5 con su verja (5,8) vigilada y el agujero de los perros (5,13); la
+  marisma (`s` con láminas de agua y cañas en `props`), la torreta con el foco, y las dos salidas: el bote del
+  embarcadero (29,9) y la carretera de Rota (29,1), las dos con confirmación.
+- Finales (13-endings, `S.ending`): radio → **SÉNECA**; bote → **EL MAR** o, con el archivo quemado, **EL INCENDIO**;
+  carretera con `lista3` → **NÍNIVE** (con el archivo quemado, la Fuente queda libre a propósito); sin la lista →
+  **LA CARRETERA DE ROTA**. Derrota → «Cuarta sesión». No hay misión 4.
 
 ## Diseño
 

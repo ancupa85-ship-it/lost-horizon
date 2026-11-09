@@ -151,4 +151,6 @@ ZONES.templo={id:'templo',title:'EL TEMPLO',sub:'BAJO LA EXCAVACIÓN · LA FUENT
   lights:[[4.5,2.5,0xffc070,0.8,9,2.6],[17.5,16.5,0xffc070,0.7,9,2.6],[18.5,2.5,0xffd080,1.0,6,3.0]],props:temProps,tick:temTick,
   onEnter(){ saveGame('En el templo'); if(!S.codecSeen.templo){ S.codecSeen.templo=true; setTimeout(()=>{ if(!uiOpen&&!S.over&&!cut)codec(CODEC.templo); },1200); } }};
 // entrada a la misión 2 desde la galería (misión 1, con el expediente en la mano) o desde el menú
-function startMission(m,withIntro){ reset(m); try{localStorage.removeItem('lh-save');}catch(e){} startGame(withIntro); }
+function startMission(m,withIntro,prev){ reset(m); if(prev)S.prev=prev; try{localStorage.removeItem('lh-save');}catch(e){} startGame(withIntro); }
+// lo que la misión 3 hereda de la 2 (si se encadenan desde la pantalla final)
+function carryState(){ return {gate:!!W.gateOpen,lista:S.clues.includes('lista'),kill:S.kill,alarcon:S.clues.includes('alarcon')}; }

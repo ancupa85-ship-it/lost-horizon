@@ -23,6 +23,18 @@ function intro2(){ const px=wx(start.x),pz=wx(start.y);
    {dur:4.5,from:[px+5,3,pz+3],to:[px+1.5,1.7,pz+1.5],look:[px,1.3,pz],title:'<span class="s">ANDREW CUTTLAS · SUJETO LH-07</span>MISIÓN 2<span class="big">DESCENSO</span>'},
    {dur:2.5,from:[px+1.5,1.7,pz+1.5],to:[px,1.6,pz],look:[px,1.4,pz+8],look2:[px,1.6,pz+8]},
   ],()=>{ codec(CODEC.m2start); }); }
+function intro3(){ const px=wx(start.x),pz=wx(start.y);
+  startCut([
+   {dur:4,fade:true,title:'<span class="s">DOCUMENTO DESCLASIFICADO · 2026</span>LAURA SOROLLA, PERIODISTA:<br>«DE LA TORRE HAY CUATRO VERSIONES. NINGUNA ES LA MISMA DOS VECES.»'},
+   {dur:6,from:[wx(13),22,wx(26)],to:[wx(13),9,wx(12)],look:[wx(13),4,wx(4)],title:'<span class="s">TARSIS · 21 DE NOVIEMBRE DE 1983 · 03:40</span>CENTRO DE COMUNICACIONES · LA TORRE<span class="big">PROJECT LOST HORIZON</span>'},
+   {dur:4.5,from:[px+6,4,pz-4],to:[px+1.5,1.7,pz-1.5],look:[px,1.3,pz],title:'<span class="s">ANDREW CUTTLAS · SUJETO LH-07</span>MISIÓN 3<span class="big">TARSIS</span>'},
+   {dur:2.5,from:[px+1.5,1.7,pz-1.5],to:[px,1.6,pz],look:[px+6,1.4,pz-6],look2:[px+6,1.6,pz-6]},
+  ],()=>{ codec(CODEC.m3start); }); }
+function outro3(kind){ const P=S.p; unlockPtr(); const t=kind==='radio'?'LA RADIO · '+clockStr():kind==='bote'?'EL EMBARCADERO · '+clockStr():'LA CARRETERA DE ROTA · '+clockStr();
+  startCut([
+   {dur:5,from:[P.x-3,1.6,P.z+3],to:[P.x-2,3,P.z+2],look:[P.x,1.2,P.z],title:'<span class="s">'+t+'</span>FIN DE LA MISIÓN 3'},
+   {dur:3.5,from:[P.x-2,3,P.z+2],to:[P.x-6,14,P.z-6],look:[P.x,1,P.z]},
+  ],()=>showEnd(true)); }
 function outro2(){ const P=S.p; unlockPtr();
   startCut([
    {dur:5,from:[P.x-3,1.6,P.z+3],to:[P.x-2,2.6,P.z+2],look:[P.x,1.2,P.z],title:'<span class="s">MONTACARGAS · '+clockStr()+'</span>FIN DE LA MISIÓN 2'},
