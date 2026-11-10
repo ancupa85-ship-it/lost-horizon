@@ -98,11 +98,29 @@ function rainTick(dt){ for(let i=0;i<RAIN_N;i++){ const d=rs[i]*dt; let y=rp[i*6
 // ---------- escena de Blender
 const b64=s=>{ const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return u.buffer; };
 let ready=false; const stats={meshes:0,inst:0,tris:0};
+// ---------- personas: mallas con esqueleto, reposo y andar; el equipo (casco, capote, arma) se cuelga del hueso que le toca
+const GEAR=[], PEOPLE=[];
+function fixPersona(m,n){ const tela=/suit|pants|boots/.test(n); m.roughness=tela?0.82:0.62; m.metalness=0; m.envMapIntensity=0.35; if(/casualsuit/.test(n))m.color.setScalar(1.2); if(m.transparent){ m.transparent=false; m.alphaTest=0.35; m.depthWrite=true; } }
+function loadPeople(done){ const list=(D.info.people||[]).filter(q=>D.people&&D.people[q.name]); let left=list.length; if(!left)return done();
+  list.forEach(q=>new THREE.GLTFLoader().parse(b64(D.people[q.name]),'',g=>{ const root=g.scene; root.position.set(q.pos[0],q.pos[2],-q.pos[1]); root.rotation.y=q.rz; scene.add(root);
+    root.traverse(o=>{ if(o.isMesh){ o.frustumCulled=false; o.castShadow=true; o.receiveShadow=true; fixPersona(o.material,(o.material.name||'').replace(/\.\d+$/,'')); if(o.material.map)o.material.map.anisotropy=4; stats.tris+=(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3; } });
+    const mixer=new THREE.AnimationMixer(root), acts={}; g.animations.forEach(c=>{ acts[c.name]=mixer.clipAction(c); }); if(acts.idle)acts.idle.play(); mixer.update(0); root.updateMatrixWorld(true);
+    GEAR.filter(x=>x.who===q.name).forEach(x=>{ const b=root.getObjectByName(x.bone); if(b)b.attach(x.mesh); });
+    const p={q,root,mixer,acts,i:0,yaw:q.rz,wps:(q.wps||[]).map(w=>[w[0]*T+T/2,w[1]*T+T/2])};
+    if(p.wps.length>1&&acts.walk){ acts.idle.stop(); acts.walk.play(); root.position.set(p.wps[0][0],q.pos[2],p.wps[0][1]); p.i=1; }
+    PEOPLE.push(p); if(!--left)done(); },e=>{ console.error('persona',q.name,e); if(!--left)done(); })); }
+const WALK_V=1.5/1.25;   // metros por ciclo / segundos por ciclo: los pies no patinan
+function peopleTick(dt){ PEOPLE.forEach(p=>{ p.mixer.update(dt); if(p.wps.length<2||!p.acts.walk)return; const w=p.wps[p.i], r=p.root.position; const dx=w[0]-r.x, dz=w[1]-r.z, d=Math.hypot(dx,dz);
+    if(d<0.08){ p.i=(p.i+1)%p.wps.length; return; } const want=Math.atan2(dx,dz); let da=want-p.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI;
+    p.yaw+=Math.max(-2.4*dt,Math.min(2.4*dt,da)); const turning=Math.abs(da)>0.5; p.acts.walk.timeScale=turning?0.5:1; const v=(turning?0.25:1)*WALK_V*dt; r.x+=Math.sin(p.yaw)*Math.min(v,d); r.z+=Math.cos(p.yaw)*Math.min(v,d); p.root.rotation.y=p.yaw; }); }
+
 new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
   g.scene.updateMatrixWorld(true); const groups=new Map(), singles=[];
   g.scene.traverse(o=>{ if(!o.isMesh)return; const n=(o.material.name||'').replace(/\.\d+$/,'');
+    const gm=/^gear_([a-z]+)_(head|spine_03|hand_r)_/.exec(o.name||'');
+    if(gm){ const c=new THREE.Mesh(o.geometry,M[n.slice(3)]||o.material); c.applyMatrix4(o.matrixWorld); c.castShadow=true; c.receiveShadow=true; scene.add(c); GEAR.push({who:gm[1],bone:gm[2],mesh:c}); stats.meshes++; return; }
     if(n.indexOf('lh_')===0&&M[n.slice(3)])o.material=M[n.slice(3)];
-    else if(/^(cuttlas|ibarra|moya|peris)_/.test(n)){ const m=o.material; const tela=/suit|pants|boots/.test(n); m.roughness=tela?0.82:0.62; m.metalness=0; m.envMapIntensity=0.35; if(/casualsuit/.test(n))m.color.setScalar(1.7); if(m.transparent){ m.transparent=false; m.alphaTest=0.35; m.depthWrite=true; } }
+    else if(/^(cuttlas|ibarra|moya|peris)_/.test(n))fixPersona(o.material,n);
     else { const m=o.material; if(m.map)m.map.anisotropy=4; m.roughness=Math.min(1,(m.roughness||1)*0.72); if(m.emissiveMap||m.name.toLowerCase().indexOf('glass')>=0){ } m.envMapIntensity=0.7; }
     o.userData.noShadow=/street_lamp|wall_lamp/i.test(o.material.name||'')||['bombilla','foco','baliza','ventana_on'].indexOf(n.slice(3))>=0;
     const k=o.geometry.uuid+'|'+o.material.uuid; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(o); });
@@ -110,7 +128,7 @@ new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
     if(list.length<3){ list.forEach(m=>{ const c=new THREE.Mesh(m.geometry,m.material); c.applyMatrix4(m.matrixWorld); c.castShadow=!m.userData.noShadow; c.receiveShadow=true; scene.add(c); stats.meshes++; }); return; }
     const im=new THREE.InstancedMesh(o.geometry,o.material,list.length); list.forEach((m,i)=>im.setMatrixAt(i,m.matrixWorld)); im.instanceMatrix.needsUpdate=true; im.frustumCulled=false; im.castShadow=!o.userData.noShadow; im.receiveShadow=true; scene.add(im); stats.meshes++; stats.inst+=list.length; });
   lamps.forEach(L=>{ if(L.castShadow)L.shadow.needsUpdate=true; });
-  ready=true; el('load').textContent='CLIC PARA ENTRAR'; el('intro').classList.add('ok');
+  loadPeople(()=>{ ready=true; el('load').textContent='CLIC PARA ENTRAR'; el('intro').classList.add('ok'); });
 },e=>{ el('load').textContent='No se pudo cargar la escena: '+(e&&e.message||e); });
 
 // ---------- resplandor
@@ -155,10 +173,10 @@ if(Q.get('v')){ const v=VIEWS[(+Q.get('v')||1)-1]; P.x=v[0]; P.z=v[1]; P.yaw=v[2
 
 addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); if(composer)composer.setSize(innerWidth,innerHeight); });
 let last=performance.now(), fpsT=0, fpsN=0, t=0;
-function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt; move(dt); rainTick(dt); spotTick(t);
+function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt; move(dt); rainTick(dt); spotTick(t); peopleTick(dt);
   if(finalPass)finalPass.uniforms.time.value=t; if(composer){ bloom.enabled=useBloom; composer.render(); } else renderer.render(scene,camera);
   fpsT+=dt; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (F/G) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window.__ESC={scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
+window.__ESC={PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
 })();

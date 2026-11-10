@@ -521,10 +521,13 @@ def person(pos, rotz, pose='pie', poncho=False, head='', hair=True, gun='', suit
         ha = V(P['ha'][0]); rbox('oscuro', (0.028, 0.19, 0.036), ha + V((0, -0.1, 0.035)), 0.006, 1, None, M0); rbox('oscuro', (0.03, 0.04, 0.1), ha + V((0, -0.02, -0.01)), 0.008, 1, None, M0)
         rcyl('oscuro', 0.017, 0.14, ha + V((0, -0.26, 0.04)), 'Y', 0.004, 10, M0)   # silenciador
 
-def gear(M0, meta, head='', poncho=False, gun='', seed=0.0):
+def gear(M0, meta, head='', poncho=False, gun='', seed=0.0, part=None):
     """Equipo sobre una persona de MakeHuman (casco o gorra, capote, arma), colocado con las medidas de su esqueleto."""
     V = Vector; hb, ht, nk = V(meta['head']), V(meta['head_tip']), V(meta['neck_01']); up = (ht - hb).normalized()
     H = V((0, 0, 1)).rotation_difference(up).to_matrix().to_4x4(); hd = hb + up * 0.105 + V((0, -0.012, 0))
+    if part not in (None, 'head'): head = ''
+    if part not in (None, 'spine_03'): poncho = False; gun = '' if gun == 'hombro' else gun
+    if part not in (None, 'hand_r'): gun = gun if gun == 'hombro' else ''
     if head == 'casco':
         ell('oliva', hd + H @ V((0, 0.012, 0.035)), (0.112, 0.135, 0.1), M0, H, cut=-0.12); ell('oliva', hd + H @ V((0, 0.008, 0.024)), (0.126, 0.152, 0.02), M0, H)
         for s in (1, -1): cap('cuero', hd + H @ V((s * 0.088, -0.02, 0.0)), hd + H @ V((s * 0.035, -0.075, -0.125)), 0.007, 0.007, M0)
@@ -544,6 +547,7 @@ def gear(M0, meta, head='', poncho=False, gun='', seed=0.0):
         rbox('oscuro', (0.028, 0.19, 0.036), ha + V((0, -0.08, 0.04)), 0.006, 1, None, M0); rbox('oscuro', (0.03, 0.04, 0.1), ha + V((0, 0.0, -0.005)), 0.008, 1, None, M0)
         rcyl('oscuro', 0.017, 0.14, ha + V((0, -0.24, 0.045)), 'Y', 0.004, 10, M0)   # silenciador
 
+PEOPLE_OUT = []
 def people():
     """Los personajes del nivel en su sitio: Cuttlas agazapado tras las cajas de la entrada y los tres guardias del patio sur.
     Si están las personas de MakeHuman (tools/blender/personas.py) se usan esas; si no, los maniquíes."""
@@ -551,10 +555,20 @@ def people():
             ('ibarra', wpos(12.6, 4.2), 0.6, dict(poncho=True, head='gorra', gun='hombro', seed=1.3), dict(pose='pie', poncho=True, head='gorra', gun='hombro', seed=1.3)),
             ('moya', wpos(20.4, 15.6), -1.9, dict(head='casco', gun='terciado'), dict(pose='firme', head='casco', gun='terciado')),
             ('peris', wpos(26.4, 6.6), 2.4, dict(), dict(pose='pie'))]
+    walk = {'ibarra': [[13, 4], [13, 9], [9, 9], [9, 4]], 'moya': [[20, 19], [33, 19], [33, 20], [20, 20]]}   # rondas del visor, por casillas libres
     for name, pos, rz, g, old in cast:
-        i = 'persona_' + name
+        i = 'persona_' + name; M0 = Matrix.Translation(pos) @ Matrix.Rotation(rz, 4, 'Z')
         if has_ph(i):
-            put(i, pos, rz); gear(Matrix.Translation(pos) @ Matrix.Rotation(rz, 4, 'Z'), json.load(open(os.path.join(PHDIR, i, 'meta.json'))), **g)
+            meta = json.load(open(os.path.join(PHDIR, i, 'meta.json')))
+            if GLB and os.path.exists(os.path.join(PHDIR, i, i + '_anim.glb')):   # el visor la carga animada; aquí solo va su equipo, una pieza por hueso
+                for a, b in zip(walk.get(name, []), walk.get(name, [])[1:] + walk.get(name, [])[:1]):
+                    for k in range(21):
+                        cx, cy = round(a[0] + (b[0] - a[0]) * k / 20), round(a[1] + (b[1] - a[1]) * k / 20)
+                        if cell(cx, cy) not in '.PGg': print('AVISO ronda de', name, 'pisa', cx, cy, cell(cx, cy), flush=True)
+                PEOPLE_OUT.append({'name': name, 'pos': [round(v, 3) for v in pos], 'rz': rz, 'wps': walk.get(name, [])})
+                for part in ('head', 'spine_03', 'hand_r'):
+                    gear(M0, meta, part=part, **g); flush_smooth('gear_%s_%s' % (name, part))
+            else: put(i, pos, rz); gear(M0, meta, **g)
         else: person(pos, rz, **old)
     flush_smooth('gente')
 
@@ -737,11 +751,12 @@ build_materials(); build_world(); build_props()
 if GLB:
     import json
     for img in bpy.data.images:
-        if img.size[0] > 512: img.scale(512, 512)
+        lim = 256 if any(k in img.name for k in ('_arm_', '_nor_', 'lamp', 'opacity')) else 512   # los mapas de brillo y relieve de los modelos, y lo que lleva transparencia (PNG), más pequeños
+        if img.size[0] > lim: img.scale(lim, lim)
     L_ = []
     for o in LIGHTS:
         d = o.rotation_euler.to_quaternion() @ Vector((0, 0, -1)); L_.append({'kind': o.data.type, 'name': o.name.split('.')[0], 'pos': [round(v, 3) for v in o.location], 'color': [round(v, 3) for v in o.data.color], 'power': o.data.energy, 'dir': [round(v, 3) for v in d]})
-    json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD)}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
+    json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD), 'people': PEOPLE_OUT}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
     for o in bpy.data.objects: o.select_set(o.type == 'MESH' and o.name in col.objects)
     kw = dict(filepath=GLB, export_format='GLB', use_selection=True, export_yup=True, export_cameras=False, export_lights=False, export_animations=False, export_image_format='JPEG')
     try: bpy.ops.export_scene.gltf(**kw, export_image_quality=72)

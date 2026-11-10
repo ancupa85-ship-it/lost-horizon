@@ -21,10 +21,10 @@ PEOPLE = {
                           'thigh_l': (0.1, -1, 0.08), 'calf_l': (0.0, 0.1, -1), 'thigh_r': (-0.08, -0.3, -1), 'calf_r': (0, 1, -0.13), 'foot_r': (0, 0.25, -1),
                           'upperarm_l': (0.12, -0.55, -1), 'lowerarm_l': (-0.3, -1, 0.05), 'upperarm_r': (-0.12, -0.35, -1), 'lowerarm_r': (0.12, -1, -0.3)}),
     'ibarra': dict(macro=dict(age=0.6, muscle=0.6, weight=0.58), skin='middleage_caucasian_male', hair='short01', hair_tint=(0.4, 0.33, 0.28),
-                   clothes=[('male_casualsuit01', OLIVA), ('toigo_ankle_boots_male', NEGRO)], pose=dict(STAND, head=(0.12, -0.1, 1))),
+                   clothes=[('male_casualsuit01', OLIVA), ('toigo_ankle_boots_male', NEGRO)], pose=dict(STAND, head=(0.12, -0.1, 1)), walks=True),
     'moya': dict(macro=dict(age=0.78, muscle=0.7, weight=0.62), skin='old_caucasian_male', hair=None,
                  clothes=[('male_casualsuit01', (0.3, 0.36, 0.22)), ('toigo_ankle_boots_male', NEGRO)],
-                 curl={'_l': 0.7, '_r': 0.7},
+                 curl={'_l': 0.7, '_r': 0.7}, walks=True,
                  pose={'upperarm_r': (-0.22, 0.1, -1), 'lowerarm_r': (0.55, -0.75, -0.4), 'upperarm_l': (0.2, -0.3, -1), 'lowerarm_l': (-0.5, -0.65, 0.5)}),
     'peris': dict(macro=dict(age=0.42, muscle=0.5, weight=0.42), skin='young_caucasian_male2', hair='short03', hair_tint=(0.75, 0.6, 0.5),
                   clothes=[('male_casualsuit01', (0.37, 0.43, 0.26)), ('toigo_ankle_boots_male', NEGRO)], pose=dict(STAND, head=(-0.2, -0.12, 1), spine_03=(0.02, 0.03, 1))),
@@ -52,7 +52,64 @@ def pose(arm, dirs, curl=None):
         W[bn.name] = W0 @ q.to_matrix().to_4x4() if q is not None else W0
     return W
 
-def build(name):
+def walk_dirs(P, ph):
+    """Direcciones de los huesos en la fase ph (0..1) del ciclo de andar; el tronco y, si no balancea, los brazos conservan la postura."""
+    d = dict(P['pose']); s2 = math.sin; c2 = math.cos
+    for side, f, sx in (('_l', ph, 1), ('_r', ph + 0.5, -1)):
+        th = 0.42 * s2(2 * math.pi * f); k = 0.12 + 0.95 * max(0.0, c2(2 * math.pi * (f - 0.95))) ** 2
+        d['thigh' + side] = (sx * 0.03, -s2(th), -c2(th)); d['calf' + side] = (0, -s2(th - k), -c2(th - k))
+        if P.get('swing'):
+            a = -0.3 * s2(2 * math.pi * f); d['upperarm' + side] = (sx * 0.1, -s2(a), -c2(a)); d['lowerarm' + side] = (sx * 0.03, -s2(a + 0.3), -c2(a + 0.3))
+    return d
+
+def export_anim(name, P, arm):
+    """Versión con esqueleto para el visor: malla aligerada, texturas pequeñas y dos animaciones (reposo y andar) en pistas NLA."""
+    d = os.path.join(OUT, 'persona_' + name); off = Vector(json.load(open(os.path.join(d, 'meta.json')))['off'])
+    meshes = [o for o in bpy.data.objects if o.type == 'MESH']; dg = bpy.context.evaluated_depsgraph_get()
+    for o in meshes:
+        for md in [m for m in o.modifiers if m.type == 'ARMATURE']: o.modifiers.remove(md)
+    bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
+    total = sum(sum(len(f.vertices) - 2 for f in o.evaluated_get(dg).data.polygons) for o in meshes); ratio = min(1.0, 6000 / total)   # en triángulos
+    for o in meshes:
+        o.modifiers.new('dec', 'DECIMATE').ratio = ratio
+    bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
+    for o in meshes:
+        me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg); o.modifiers.clear(); o.data = me
+        me.polygons.foreach_set('use_smooth', [True] * len(me.polygons)); o.modifiers.new('esqueleto', 'ARMATURE').object = arm; o.name = name + '_' + o.name.split('.')[-1]
+        for mat in me.materials:
+            mat.name = name + '_' + mat.name.split('.')[-1]; nt = mat.node_tree; bs = nt.nodes.get('Principled BSDF'); fine = any(k in mat.name for k in ('short', 'eyebrow', 'eyelash'))
+            for inp in ('Normal',) if fine else ('Normal', 'Alpha'):
+                for l in list(bs.inputs[inp].links): nt.links.remove(l)
+            if not fine: mat.blend_method = 'OPAQUE'
+            for n in list(nt.nodes):
+                if n.type == 'TEX_IMAGE' and not n.outputs[0].links and not n.outputs[1].links: nt.nodes.remove(n)
+                elif n.type == 'TEX_IMAGE' and n.image:
+                    lim = 256 if fine or 'low-poly' in mat.name else 512
+                    if n.image.size[0] > lim: n.image.scale(lim, lim * n.image.size[1] // n.image.size[0]); n.image.pack()
+    arm.location = off; arm.name = name; ad = arm.animation_data_create(); bones = [b_.name for b_ in arm.data.bones]
+    def bake(track, frames):
+        act = bpy.data.actions.new(track); ad.action = act; prev = {}
+        for f, dirs in frames:
+            for pb in arm.pose.bones: pb.rotation_mode = 'QUATERNION'; pb.rotation_quaternion = (1, 0, 0, 0)
+            pose(arm, dirs, P.get('curl'))
+            for bn in bones:
+                pb = arm.pose.bones[bn]; q = pb.rotation_quaternion.copy()
+                if bn in prev and prev[bn].dot(q) < 0: q.negate()
+                pb.rotation_quaternion = q; prev[bn] = q; pb.keyframe_insert('rotation_quaternion', frame=f)
+        ad.action = None; tr = ad.nla_tracks.new(); tr.name = track; tr.strips.new(track, int(frames[0][0]), act)
+    base = dict(P['pose']); rest = lambda bn: tuple(arm.data.bones[bn].matrix_local.to_3x3() @ Vector((0, 1, 0)))
+    breath = dict(base); v = Vector(base.get('spine_03', rest('spine_03'))).normalized() + Vector((0, 0.035, 0)); breath['spine_03'] = tuple(v)
+    v = Vector(base.get('head', rest('head'))).normalized() + Vector((0.05, -0.02, 0)); breath['head'] = tuple(v)
+    bake('idle', [(1, base), (49, breath), (97, base)])
+    if P.get('walks'): bake('walk', [(1 + k * 2, walk_dirs(P, k / 15)) for k in range(16)])
+    for pb in arm.pose.bones: pb.rotation_quaternion = (1, 0, 0, 0)
+    for o in bpy.data.objects: o.select_set(o.type in ('MESH', 'ARMATURE'))
+    f = os.path.join(d, 'persona_' + name + '_anim.glb')
+    bpy.ops.export_scene.gltf(filepath=f, export_format='GLB', use_selection=True, export_yup=True, export_animations=True, export_animation_mode='NLA_TRACKS', export_force_sampling=True,
+                              export_image_format='JPEG', export_image_quality=72, export_skins=True, export_def_bones=False, export_frame_range=False)
+    print('ANIM', name, os.path.getsize(f) // 1024, 'KB', sum(len(o.data.polygons) for o in meshes), 'caras', flush=True)
+
+def build(name, anim=False):
     P = PEOPLE[name]
     bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.preferences.addon_enable(module='bl_ext.user_default.mpfb')
     from bl_ext.user_default.mpfb.services.humanservice import HumanService
@@ -76,6 +133,7 @@ def build(name):
     if P.get('hair_tint'):
         for o in bpy.data.objects:
             if o.type == 'MESH' and P['hair'] in o.name: tint(o, P['hair_tint'])
+    if anim: return export_anim(name, P, arm)
     W = pose(arm, P['pose'], P.get('curl')); bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
     aw = arm.matrix_world.copy(); J = {k: aw @ W[k].to_translation() for k in ('head', 'neck_01', 'hand_l', 'hand_r', 'upperarm_l', 'upperarm_r', 'pelvis')}
     for k in ('hand_l', 'hand_r', 'head'): J[k + '_tip'] = aw @ (W[k] @ Vector((0, arm.data.bones[k].length, 0)))
@@ -92,7 +150,7 @@ def build(name):
     off = Vector((-(mn.x + mx.x) / 2, -(mn.y + mx.y) / 2, -mn.z))
     for o in meshes:
         o.data.transform(Matrix.Translation(off)); o.data.polygons.foreach_set('use_smooth', [True] * len(o.data.polygons))
-    meta = {k: list(v + off) for k, v in J.items()}; meta['height'] = mx.z - mn.z; meta['faces'] = sum(len(o.data.polygons) for o in meshes)
+    meta = {k: list(v + off) for k, v in J.items()}; meta['off'] = list(off); meta['height'] = mx.z - mn.z; meta['faces'] = sum(len(o.data.polygons) for o in meshes)
     for im in bpy.data.images:
         if im.size[0] > 1024: im.scale(1024, 1024 * im.size[1] // im.size[0]); im.pack()
     d = os.path.join(OUT, 'persona_' + name); os.makedirs(d, exist_ok=True)
@@ -110,4 +168,5 @@ def build(name):
                 sc.world = bpy.data.worlds.new('w'); sc.world.color = (0.12, 0.12, 0.14)
             sc.render.filepath = os.path.join(PREVIEW, 'persona_%s_%d.png' % (name, k)); bpy.ops.render.render(write_still=True)
 
-for n in ([a for a in sys.argv[1:] if a in PEOPLE] or list(PEOPLE)): build(n)
+for n in ([a for a in sys.argv[1:] if a in PEOPLE] or list(PEOPLE)):
+    build(n); build(n, anim=True)
