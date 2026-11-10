@@ -13,6 +13,8 @@
     "test:recon": "node tests/recon.js",
     "test:models": "node tests/models.js",
     "build:models": "python3 tools/build-models.py",
+    "build:portraits": "python3 tools/build-portraits.py",
+    "blender": "python3 tools/blender/modelos.py",
     "export:templates": "node tools/export-templates.js"
   },
   "devDependencies": {

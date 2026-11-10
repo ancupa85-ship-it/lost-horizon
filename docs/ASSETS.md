@@ -19,7 +19,7 @@ Para quitar un modelo, borra su `.glb` y vuelve a ejecutar el paso 3.
 
 | Hueco | Qué es | Huella (ancho × alto × fondo, m) | Triángulos (máx.) | Notas |
 |---|---|---|---|---|
-| `caja` | Caja de madera de los patios | 1,8 × 1,3 × 1,8 | 300 | Tapa la vista: no la hagas más baja de 1,2 m. El juego la gira de 90 en 90 grados para que no se repita. |
+| `caja` | Caja de madera de los patios | 1,8 × 1,3 × 1,8 | 400 | Tapa la vista: no la hagas más baja de 1,2 m. El juego la gira de 90 en 90 grados para que no se repita. |
 | `camion` | Camión aparcado (bloque de 2 × 2 casillas) | 4 × 2,2 × 4 | 3 000 | La huella es cuadrada: un camión de 2,4 × 4 m con su lona, o camión y remolque. Es pared: no se pasa ni se ve a través. |
 | `generador` | Grupo electrógeno | 1,8 × 1,4 × 1,4 (tubo de escape hasta 2,9) | 1 500 | El punto de uso (apagar y encender) está delante, hacia +Z. |
 | `farola` | Poste de farola exterior | 0,3 × 3,3 × 0,3 | 300 | La bombilla encendida la pone el juego a 3,25 m de altura, en el eje del poste. |
@@ -63,6 +63,15 @@ La colisión y la línea de visión van por casillas de 2 × 2 m, no por la mall
 | Cielo de noche | `#070a12` |
 | Agua de la excavación | `#16323e` |
 | Luz de la Fuente | verde `#40ff60` atenuado |
+
+## Modelos y retratos que ya están dentro
+
+- `caja` y `camion` salen de `tools/blender/modelos.py`, un script de Blender (bpy) que construye el modelo, lo mide y lo
+  exporta. Se ejecuta con `npm run blender` (necesita `pip install bpy`) o pegándolo en la pestaña Scripting de Blender para
+  retocar el modelo a mano antes de exportar. Para cambiar una pieza, edita su función y vuelve a ejecutar.
+- Retratos del códec: `assets/retratos/<personaje>.jpg` (192 × 192; `cuttlas`, `roig`, `control`, `fuente`) y
+  `python3 tools/build-portraits.py`. El juego les pone el tinte verde y las líneas de la pantalla. Sin retrato, se ve el pixelado.
+  El de Cuttlas está hecho con Gemini.
 
 ## Lo siguiente (aún sin hueco: se añade al llegar el primer modelo)
 

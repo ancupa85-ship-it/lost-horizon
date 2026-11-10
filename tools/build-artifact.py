@@ -23,6 +23,9 @@ pack=open(os.path.join(R,'assets','models','pack.js'),encoding='utf-8').read() i
 models=''
 if 'LH_MODELS={}' not in pack and 'LH_MODELS=' in pack:
     models='<script>\n'+open(os.path.join(R,'vendor','GLTFLoader.js'),encoding='utf-8').read()+'\n</script>\n<script>\n'+pack+'</script>\n'
+# retratos del códec (assets/retratos/pack.js), si los hay
+rp=os.path.join(R,'assets','retratos','pack.js')
+if os.path.exists(rp) and 'LH_PORTRAITS={}' not in open(rp,encoding='utf-8').read(): models+='<script>\n'+open(rp,encoding='utf-8').read()+'</script>\n'
 body=re.search(r'<body>\n(.*?)\n<script src="vendor/three.min.js">',html,re.S).group(1)
 out=('<title>Lost Horizon: De Profundis</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n'
  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">\n'
