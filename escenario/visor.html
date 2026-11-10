@@ -20,8 +20,10 @@ canvas{display:block;touch-action:none}
 #estado.sos{color:#ffd23a}#estado.ale{color:#ff4a3a}
 #aviso{position:fixed;top:30%;left:0;right:0;text-align:center;font-size:22px;letter-spacing:.2em;color:#ff4a3a;text-shadow:0 2px 6px #000;pointer-events:none}
 #aviso.cap{font-size:40px}
+#mira{position:fixed;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 3px #000;pointer-events:none}
+#mira[hidden]{display:none}
 </style>
 <div id="intro"><h1>TARSIS</h1><p>Base hispano-americana, marismas del Guadalquivir. Noviembre de 1983, 02:10.<br>Escenario a escala del primer nivel, para recorrerlo a pie.</p>
-<p>W A S D mueven a Cuttlas · C agacharse o levantarse · Mayús paso ligero · ratón para mirar · V cámara libre · 1 a 4 cambian de vista · F y G niebla · J y K exposición · B resplandor · H oculta el texto · Esc suelta el ratón</p><div id="load">CARGANDO…</div></div>
-<div id="estado" class="ok" hidden><span id="estadoT">SIGILO</span><i><b id="estadoB"></b></i></div><div id="aviso"></div>
+<p>W A S D para moverse · ratón para mirar · botón derecho apunta · C agacharse · Mayús correr · V tercera persona · 1 a 4 cambian de vista · F y G niebla · J y K exposición · B resplandor · H oculta el texto · Esc suelta el ratón</p><div id="load">CARGANDO…</div></div>
+<div id="estado" class="ok" hidden><span id="estadoT">SIGILO</span><i><b id="estadoB"></b></i></div><div id="aviso"></div><div id="mira" hidden></div>
 <div id="hud"><span id="fps"></span></div>

@@ -19,7 +19,7 @@ PEOPLE = {
                     stand=dict(STAND, upperarm_r=(-0.1, -0.02, -1), lowerarm_r=(-0.02, -0.4, -1)),
                     sneak_arms={'upperarm_l': (0.14, -0.35, -1), 'lowerarm_l': (-0.15, -1, -0.2), 'upperarm_r': (-0.14, -0.35, -1), 'lowerarm_r': (0.1, -1, -0.25)}, macro=dict(age=0.58, muscle=0.82, weight=0.48), skin='young_caucasian_male_special_suit', hair='short02', hair_tint=(0.35, 0.3, 0.27),
                     clothes=[('cortu_cargo_pants', NEGRO), ('toigo_ankle_boots_male', NEGRO)],
-                    pose={'spine_01': (0, -0.3, 1), 'spine_02': (0, -0.5, 1), 'spine_03': (0, -0.6, 1), 'neck_01': (0, -0.45, 1), 'head': (0, -0.05, 1),
+                    pose={'spine_01': (0, -0.2, 1), 'spine_02': (0, -0.2, 1), 'spine_03': (0, -0.2, 1), 'neck_01': (0, -0.1, 1), 'head': (0, 0.0, 1),   # inclinado desde la cadera, con la espalda recta
                           'thigh_l': (0.1, -1, 0.08), 'calf_l': (0.0, 0.1, -1), 'thigh_r': (-0.08, -0.3, -1), 'calf_r': (0, 1, -0.13), 'foot_r': (0, 0.25, -1),
                           'upperarm_l': (0.12, -0.55, -1), 'lowerarm_l': (-0.3, -1, 0.05), 'upperarm_r': (-0.12, -0.35, -1), 'lowerarm_r': (0.12, -1, -0.3)}),
     'ibarra': dict(macro=dict(age=0.6, muscle=0.6, weight=0.58), skin='middleage_caucasian_male', hair='short01', hair_tint=(0.4, 0.33, 0.28),
@@ -115,7 +115,7 @@ def export_anim(name, P, arm):
         zr = min((o.matrix_world @ v.co).z for o in meshes for v in o.data.vertices); stand_off = Vector((0, 0, -zr)); arm.location = stand_off
         st = P['stand']; low_ = {k: v for k, v in base.items() if k.startswith(('spine', 'neck', 'head'))}; low_.update(P['sneak_arms'])
         bake('idle', breathe(base), shift=off - stand_off); bake('stand', breathe(st)); bake('walk', cyc(base=st, swing=True))
-        low_.update({'spine_01': (0, -0.45, 1), 'spine_02': (0, -0.75, 1), 'spine_03': (0, -0.95, 1), 'neck_01': (0, -0.5, 1), 'head': (0, -0.12, 1)})
+        low_.update({'spine_01': (0, -0.22, 1), 'spine_02': (0, -0.22, 1), 'spine_03': (0, -0.22, 1), 'neck_01': (0, -0.1, 1), 'head': (0, 0.05, 1)})
         bake('sneak', cyc(base=low_, A=0.3, th0=0.5, k0=0.85, k1=0.4, swing=False))
     else:
         bake('idle', breathe(base), shift=(0, 0, 0))
