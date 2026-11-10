@@ -12,6 +12,8 @@ SAMPLES = int(os.environ.get('LH_SAMPLES', '64'))
 CAMS = os.environ.get('LH_CAMS', 'patio,aerea,torreta').split(',')
 os.makedirs(OUT, exist_ok=True)
 random.seed(1983)
+GLB = os.environ.get('LH_GLB')   # si se da una ruta, en vez de renderizar se exporta la escena para el visor en tiempo real
+LIGHTS = []
 
 src = open(os.path.join(R, 'src', '10-zones.js'), encoding='utf-8').read()
 MAP = re.findall(r'"([^"]+)"', re.search(r'const MAPSRC_BASE=\[(.*?)\];', src, re.S).group(1))
@@ -167,6 +169,9 @@ def build_materials():
     if has_tex('rusty_metal_02'): MAT['hierro'] = m_tex('hierro_tex', 'rusty_metal_02', 1.4, (0.5, 0.5, 0.5), 0.8, metal=0.6)
     if has_tex('green_metal_rust'): MAT['oliva'] = m_tex('pintura_oliva_tex', 'green_metal_rust', 2.2, (0.32, 0.4, 0.2), 0.7, obj=True, bumpk=0.25)
     if has_tex('corrugated_iron_02'): MAT['tejado'] = m_tex('uralita_tex', 'corrugated_iron_02', 2.0, (0.35, 0.35, 0.36), 0.8, metal=0.5)
+    if GLB:   # para el visor: materiales lisos con nombre; las texturas y el mojado los pone el visor
+        for k in list(MAT):
+            m = bpy.data.materials.new('lh_' + k); m.use_nodes = True; MAT[k] = m
     m, nt, b = new_mat('lluvia'); b.inputs['Base Color'].default_value = (0.8, 0.85, 0.9, 1); b.inputs['Roughness'].default_value = 0.1
     b.inputs['Alpha'].default_value = 0.3; MAT['lluvia'] = m
 
@@ -182,11 +187,18 @@ def box(mat, size, center, rotz=0.0, rot=None):
 def cyl(mat, radius, depth, center, rot=None, seg=16):
     bm = bm_of(mat); r = bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=radius, radius2=radius, depth=depth)
     bmesh.ops.transform(bm, matrix=Matrix.Translation(center) @ (rot if rot is not None else Matrix.Identity(4)), verts=r['verts'])
+def box_uv(me):
+    """UV por proyección en caja, en metros: el visor repite la textura según su tamaño real."""
+    uv = (me.uv_layers[0] if me.uv_layers else me.uv_layers.new(name='UVMap')).data; vs = me.vertices; ls = me.loops
+    for poly in me.polygons:
+        n = poly.normal; ax = 2 if abs(n.z) >= abs(n.x) and abs(n.z) >= abs(n.y) else (0 if abs(n.x) >= abs(n.y) else 1)
+        for li in poly.loop_indices:
+            c = vs[ls[li].vertex_index].co; uv[li].uv = (c.x, c.y) if ax == 2 else ((c.y, c.z) if ax == 0 else (c.x, c.z))
 def flush(prefix='base'):
     for mat, bm in BM.items():
         me = bpy.data.meshes.new(prefix + '_' + mat); bm.to_mesh(me); bm.free(); me.materials.append(MAT[mat])
-        o = bpy.data.objects.new(prefix + '_' + mat, me); col.objects.link(o)
-        if mat not in ('lluvia',):
+        o = bpy.data.objects.new(prefix + '_' + mat, me); col.objects.link(o); box_uv(me)
+        if mat not in ('lluvia',) and not GLB:
             md = o.modifiers.new('bisel', 'BEVEL'); md.width = 0.015; md.segments = 2; md.limit_method = 'ANGLE'
     BM.clear()
 
@@ -250,11 +262,13 @@ def build_world():
     for k in range(3): box('oscuro', (1.6, 0.04, 0.04), a + Vector((0, 0, 10 + k * 1.2)), rotz=k * 1.0)
     flush()
 
-def rain(n=30000):
+CAM_XY = [(3.0, -11.4), (18.4, -18.0), (40.2, -13.4), (49.4, -26.0)]   # posiciones de las cámaras a pie de suelo
+def rain(n=34000):
     # cada gota es una raya: dos planos cruzados muy finos, inclinados por el viento
     V, F = [], []
     for i in range(n):
-        x = random.uniform(-4, COLS * T + 4); y = -random.uniform(-4, ROWS * T + 4); z = random.uniform(0.2, 12); l = random.uniform(0.3, 0.75); w = 0.0018
+        x = random.uniform(-4, COLS * T + 4); y = -random.uniform(-4, ROWS * T + 4); z = random.uniform(0.2, 12); l = random.uniform(0.3, 0.75); w = 0.0013
+        if any((x - cx) ** 2 + (y - cy) ** 2 < 20 for cx, cy in CAM_XY): continue
         for ax, ay in ((w, 0), (0, w)):
             k = len(V); V += [(x - ax, y - ay, z), (x + ax, y + ay, z), (x + ax + l * 0.07, y + ay, z + l), (x - ax + l * 0.07, y - ay, z + l)]; F.append((k, k + 1, k + 2, k + 3))
     me = bpy.data.meshes.new('lluvia'); me.from_pydata(V, [], F); me.materials.append(MAT['lluvia'])
@@ -272,7 +286,8 @@ def proto(name):
     for i, s in enumerate(o.material_slots):
         base = s.material.name.split('.')[0]
         s.material = MAT.get(base, MAT['metal'])
-    md = o.modifiers.new('bisel', 'BEVEL'); md.width = 0.012; md.segments = 2; md.limit_method = 'ANGLE'
+    box_uv(o.data)
+    if not GLB: md = o.modifiers.new('bisel', 'BEVEL'); md.width = 0.012; md.segments = 2; md.limit_method = 'ANGLE'
     for c in list(o.users_collection): c.objects.unlink(o)
     PROTO[name] = o; return o
 def place(name, pos, rotz=0.0, scale=1.0):
@@ -281,7 +296,7 @@ def place(name, pos, rotz=0.0, scale=1.0):
 def lamp(kind, name, pos, color, power, **kw):
     d = bpy.data.lights.new(name, kind); d.color = color; d.energy = power
     for k, v in kw.items(): setattr(d, k, v)
-    o = bpy.data.objects.new(name, d); col.objects.link(o); o.location = pos; return o
+    o = bpy.data.objects.new(name, d); col.objects.link(o); o.location = pos; LIGHTS.append(o); return o
 def aim(o, target):
     o.rotation_euler = (Vector(target) - o.location).to_track_quat('-Z', 'Y').to_euler()
 
@@ -307,33 +322,33 @@ def rcyl(mat, radius, depth, center, axis='Z', r=0.03, seg=28, M0=None, bseg=3):
 def flush_smooth(prefix):
     for mat, bm in SM.items():
         me = bpy.data.meshes.new(prefix + '_' + mat); bm.to_mesh(me); bm.free(); me.materials.append(MAT[mat])
-        me.polygons.foreach_set('use_smooth', [True] * len(me.polygons)); me.set_sharp_from_angle(angle=math.radians(38))
+        me.polygons.foreach_set('use_smooth', [True] * len(me.polygons)); me.set_sharp_from_angle(angle=math.radians(38)); box_uv(me)
         o = bpy.data.objects.new(prefix + '_' + mat, me); col.objects.link(o)
     SM.clear()
 
 def truck(pos, rotz):
     """Camión ligero 4x4 de cabina avanzada con caja de lona. Frente hacia -Y; cabe en el bloque de 4 x 4 m del plano."""
-    M0 = Matrix.Translation(pos) @ Matrix.Rotation(rotz, 4, 'Z'); V = Vector
+    M0 = Matrix.Translation(pos + Vector((0, 0, -0.07))) @ Matrix.Rotation(rotz, 4, 'Z'); V = Vector
     B = lambda mat, size, c, r=0.03, rot=None: rbox(mat, size, V(c), r, 3, rot, M0)
     C = lambda mat, rad, dep, c, axis='Z', r=0.02, seg=28: rcyl(mat, rad, dep, V(c), axis, r, seg, M0)
     for s in (-1, 1):
         B('bajos', (0.14, 3.7, 0.2), (s * 0.42, 0, 0.78))
         for y in (-1.15, 1.05):
-            C('goma', 0.52, 0.34, (s * 1.0, y, 0.52), 'X', 0.09, 40); C('oliva', 0.3, 0.36, (s * 1.0, y, 0.52), 'X', 0.03, 24)
-            C('bajos', 0.11, 0.42, (s * 1.0, y, 0.52), 'X', 0.02, 12)
+            C('goma', 0.45, 0.3, (s * 1.0, y, 0.52), 'X', 0.09, 40); C('oliva', 0.25, 0.32, (s * 1.0, y, 0.52), 'X', 0.03, 24)
+            C('bajos', 0.1, 0.36, (s * 1.0, y, 0.52), 'X', 0.02, 12)
             for k in range(6):
-                a = k * math.pi / 3; C('metal', 0.022, 0.04, (s * 1.19, y + math.cos(a) * 0.2, 0.52 + math.sin(a) * 0.2), 'X', 0, 6)
+                a = k * math.pi / 3; C('metal', 0.022, 0.04, (s * 1.165, y + math.cos(a) * 0.17, 0.52 + math.sin(a) * 0.17), 'X', 0, 6)
         B('goma', (0.46, 0.025, 0.42), (s * 1.0, 1.72, 0.6), 0.005)                      # faldillas
-        B('oliva', (0.52, 1.25, 0.07), (s * 1.0, -1.15, 1.14), 0.03)                       # aleta
-        B('oliva', (0.52, 0.34, 0.07), (s * 1.0, -1.86, 1.02), 0.03, Matrix.Rotation(math.radians(-38), 4, 'X'))
-        B('oliva', (0.52, 0.3, 0.07), (s * 1.0, -0.46, 1.03), 0.03, Matrix.Rotation(math.radians(38), 4, 'X'))
+        B('oliva', (0.52, 1.25, 0.07), (s * 1.0, -1.15, 1.08), 0.03)                       # aleta
+        B('oliva', (0.52, 0.34, 0.07), (s * 1.0, -1.86, 0.96), 0.03, Matrix.Rotation(math.radians(-38), 4, 'X'))
+        B('oliva', (0.52, 0.3, 0.07), (s * 1.0, -0.46, 0.97), 0.03, Matrix.Rotation(math.radians(38), 4, 'X'))
         B('bajos', (0.34, 0.55, 0.05), (s * 1.12, -0.62, 0.74), 0.015)                     # estribo
         C('faro', 0.1, 0.08, (s * 0.6, -1.93, 1.3), 'Y', 0.02, 20); C('oscuro', 0.125, 0.06, (s * 0.6, -1.9, 1.3), 'Y', 0.01, 20)
         B('piloto', (0.1, 0.04, 0.07), (s * 0.95, -1.9, 1.18), 0.01)
         B('oscuro', (0.03, 0.03, 0.34), (s * 1.16, -1.06, 1.95), 0.008); B('oscuro', (0.04, 0.16, 0.26), (s * 1.2, -1.08, 2.12), 0.02)   # retrovisor
         B('cristal', (0.03, 0.58, 0.44), (s * 1.012, -0.6, 2.0), 0.01)                     # ventanilla
         B('metal', (0.03, 0.12, 0.03), (s * 1.06, -0.3, 1.55), 0.01)                       # manilla
-        for k in range(3): B('madera', (0.04, 2.14, 0.17), (s * 1.15, 0.95, 1.2 + k * 0.2), 0.012)      # adrales
+        for k in range(3): B('oliva', (0.04, 2.14, 0.17), (s * 1.15, 0.95, 1.2 + k * 0.2), 0.012)      # adrales
         for y in (0.0, 0.95, 1.9): B('bajos', (0.05, 0.07, 0.7), (s * 1.18, y, 1.4), 0.01)
         B('piloto', (0.14, 0.04, 0.1), (s * 0.95, 2.03, 0.98), 0.01)
     for y in (-1.15, 1.05): C('bajos', 0.07, 2.0, (0, y, 0.52), 'X', 0, 10); B('bajos', (0.42, 0.42, 0.38), (0, y, 0.52), 0.16)
@@ -348,7 +363,7 @@ def truck(pos, rotz):
     B('oscuro', (0.5, 0.02, 0.03), (0.35, -1.07, 1.84), 0.005, Matrix.Rotation(0.5, 4, 'Y'))   # limpiaparabrisas
     C('oliva', 0.23, 0.72, (-0.86, 0.25, 0.8), 'Y', 0.06, 20); B('bajos', (0.42, 0.6, 0.36), (0.86, 0.25, 0.8), 0.03)
     C('oscuro', 0.05, 1.7, (0.92, -0.06, 1.75), 'Z', 0.01, 12); C('oscuro', 0.075, 0.5, (0.92, -0.06, 1.5), 'Z', 0.02, 12)
-    B('bajos', (2.34, 2.16, 0.1), (0, 0.95, 1.08), 0.02); B('madera', (2.3, 0.04, 0.6), (0, 2.02, 1.4), 0.012)
+    B('bajos', (2.34, 2.16, 0.1), (0, 0.95, 1.08), 0.02); B('oliva', (2.3, 0.04, 0.6), (0, 2.02, 1.4), 0.012)
     B('lona', (2.4, 2.2, 1.3), (0, 0.95, 2.02), 0.22)                                      # lona con arcos
     for y in (-0.05, 0.95, 1.95): B('lona', (2.44, 0.07, 1.33), (0, y, 2.02), 0.23)
     for y in (0.45, 1.45):
@@ -372,11 +387,17 @@ def ph(i, only=None):
             for k in range(3): mn[k] = min(mn[k], w[k]); mx[k] = max(mx[k], w[k])
         for s in o.material_slots:                  # mojado por la lluvia: menos rugosidad
             b = s.material.node_tree.nodes.get('Principled BSDF') if s.material and s.material.node_tree else None
-            if b and not s.material.get('lh_wet'):
+            if b and not GLB and not s.material.get('lh_wet'):
                 s.material['lh_wet'] = 1; inp = b.inputs['Roughness']
                 if inp.is_linked:
                     src_ = inp.links[0].from_socket; nt = s.material.node_tree; mm = nt.nodes.new('ShaderNodeMath'); mm.operation = 'MULTIPLY'; mm.inputs[1].default_value = 0.6
                     nt.links.new(src_, mm.inputs[0]); nt.links.new(mm.outputs[0], inp)
+    if GLB:   # para tiempo real: se reduce la malla escaneada
+        total = sum(len(o.data.polygons) for o, _ in mats); budget = {'covered_car': 7000, 'street_lamp_01': 2600, 'wooden_military_crate': 1300, 'wooden_crate_02': 900}.get(i, 1600)
+        if total > budget:
+            for o, _ in mats:
+                md = o.modifiers.new('dec', 'DECIMATE'); md.ratio = budget / total
+                me2 = bpy.data.meshes.new_from_object(o.evaluated_get(bpy.context.evaluated_depsgraph_get())); o.modifiers.clear(); o.data = me2
     off = Matrix.Translation((-(mn.x + mx.x) / 2, -(mn.y + mx.y) / 2, -mn.z))
     for o in new:
         o.parent = None
@@ -487,7 +508,7 @@ if has_ph('street_lamp_01'):
 
 def atmosphere():
     w = bpy.data.worlds.new('noche'); w.use_nodes = True; scene.world = w
-    bg = w.node_tree.nodes['Background']; bg.inputs['Color'].default_value = (0.006, 0.012, 0.03, 1); bg.inputs['Strength'].default_value = 0.6
+    bg = w.node_tree.nodes['Background']; bg.inputs['Color'].default_value = (0.006, 0.012, 0.03, 1); bg.inputs['Strength'].default_value = 0.35
     # niebla: un volumen que cubre la base
     bpy.ops.mesh.primitive_cube_add(size=1, location=(COLS * T / 2, -ROWS * T / 2, 11)); f = bpy.context.object; f.name = 'niebla'; f.scale = (COLS * T + 60, ROWS * T + 60, 24)
     m = bpy.data.materials.new('niebla'); m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
@@ -499,6 +520,19 @@ def camera(name, pos, target, lens):
 
 import time; T0 = time.time()
 build_materials(); build_world(); build_props()
+if GLB:
+    import json
+    for img in bpy.data.images:
+        if img.size[0] > 512: img.scale(512, 512)
+    L_ = []
+    for o in LIGHTS:
+        d = o.matrix_world.to_quaternion() @ Vector((0, 0, -1)); L_.append({'kind': o.data.type, 'name': o.name.split('.')[0], 'pos': [round(v, 3) for v in o.location], 'color': [round(v, 3) for v in o.data.color], 'power': o.data.energy, 'dir': [round(v, 3) for v in d]})
+    json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD)}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
+    for o in bpy.data.objects: o.select_set(o.type == 'MESH' and o.name in col.objects)
+    kw = dict(filepath=GLB, export_format='GLB', use_selection=True, export_yup=True, export_cameras=False, export_lights=False, export_animations=False, export_image_format='JPEG')
+    try: bpy.ops.export_scene.gltf(**kw, export_image_quality=72)
+    except TypeError: bpy.ops.export_scene.gltf(**kw, export_jpeg_quality=72)
+    tr = sum(len(o.data.polygons) for o in col.objects if o.type == 'MESH'); print('GLB', os.path.getsize(GLB) // 1024, 'KB', len([o for o in col.objects if o.type == 'MESH']), 'objetos', tr, 'caras', flush=True); sys.exit(0)
 if not os.environ.get('LH_NORAIN'): rain()
 atmosphere()
 if os.environ.get('LH_NOFOG'): bpy.data.objects.remove(bpy.data.objects['niebla'])

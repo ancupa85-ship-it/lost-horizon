@@ -1,0 +1,19 @@
+<meta charset="utf-8">
+<title>Tarsis: escenario realista</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+:root{--bg:#07080b;--ink:#e8dccb;--dim:#9a8f80;--acc:#ffb060}
+:root[data-theme="dark"],:root:not([data-theme="light"]){--bg:#07080b;--ink:#e8dccb}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;font-family:ui-monospace,Menlo,Consolas,monospace}
+canvas{display:block;touch-action:none}
+#intro{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(ellipse at 50% 60%,rgba(40,24,10,.55),rgba(4,5,8,.92));cursor:default;text-align:center;padding:16px}
+#intro.ok{cursor:pointer}
+#intro[hidden],#hud[hidden]{display:none}
+#intro h1{font-size:clamp(20px,4vw,40px);letter-spacing:.3em;margin:0;font-weight:500;color:var(--acc)}
+#intro p{margin:0;color:var(--dim);font-size:13px;line-height:1.7;max-width:560px}
+#load{margin-top:10px;padding:10px 18px;border:1px solid var(--acc);color:var(--acc);letter-spacing:.2em;font-size:13px}
+#hud{position:fixed;left:12px;bottom:10px;font-size:11px;color:var(--dim);text-shadow:0 1px 2px #000;pointer-events:none}
+</style>
+<div id="intro"><h1>TARSIS</h1><p>Base hispano-americana, marismas del Guadalquivir. Noviembre de 1983, 02:10.<br>Escenario a escala del primer nivel, para recorrerlo a pie.</p>
+<p>W A S D para andar · Mayús para correr · ratón para mirar · 1 a 4 cambian de vista · B resplandor · H oculta el texto · Esc suelta el ratón</p><div id="load">CARGANDO…</div></div>
+<div id="hud"><span id="fps"></span></div>
