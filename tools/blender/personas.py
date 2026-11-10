@@ -15,7 +15,9 @@ DATA = os.path.join(bpy.utils.user_resource('EXTENSIONS'), '.user', 'user_defaul
 OLIVA = (0.34, 0.4, 0.24); NEGRO = (0.16, 0.16, 0.17)
 STAND = {'upperarm_l': (0.1, 0.03, -1), 'lowerarm_l': (0.03, -0.14, -1), 'upperarm_r': (-0.1, 0.03, -1), 'lowerarm_r': (-0.03, -0.14, -1)}
 PEOPLE = {
-    'cuttlas': dict(curl={'_r': 0.7, '_l': 0.25}, dark_suit=0.42, macro=dict(age=0.58, muscle=0.82, weight=0.48), skin='young_caucasian_male_special_suit', hair='short02', hair_tint=(0.35, 0.3, 0.27),
+    'cuttlas': dict(curl={'_r': 0.7, '_l': 0.25}, dark_suit=0.42, player=True,
+                    stand=dict(STAND, upperarm_r=(-0.1, -0.02, -1), lowerarm_r=(-0.02, -0.4, -1)),
+                    sneak_arms={'upperarm_l': (0.14, -0.35, -1), 'lowerarm_l': (-0.15, -1, -0.2), 'upperarm_r': (-0.14, -0.35, -1), 'lowerarm_r': (0.1, -1, -0.25)}, macro=dict(age=0.58, muscle=0.82, weight=0.48), skin='young_caucasian_male_special_suit', hair='short02', hair_tint=(0.35, 0.3, 0.27),
                     clothes=[('cortu_cargo_pants', NEGRO), ('toigo_ankle_boots_male', NEGRO)],
                     pose={'spine_01': (0, -0.3, 1), 'spine_02': (0, -0.5, 1), 'spine_03': (0, -0.6, 1), 'neck_01': (0, -0.45, 1), 'head': (0, -0.05, 1),
                           'thigh_l': (0.1, -1, 0.08), 'calf_l': (0.0, 0.1, -1), 'thigh_r': (-0.08, -0.3, -1), 'calf_r': (0, 1, -0.13), 'foot_r': (0, 0.25, -1),
@@ -52,13 +54,14 @@ def pose(arm, dirs, curl=None):
         W[bn.name] = W0 @ q.to_matrix().to_4x4() if q is not None else W0
     return W
 
-def walk_dirs(P, ph):
-    """Direcciones de los huesos en la fase ph (0..1) del ciclo de andar; el tronco y, si no balancea, los brazos conservan la postura."""
-    d = dict(P['pose']); s2 = math.sin; c2 = math.cos
+def walk_dirs(P, ph, base=None, A=0.42, th0=0.0, k0=0.12, k1=0.95, swing=None):
+    """Direcciones de los huesos en la fase ph (0..1) del ciclo de andar; el tronco y, si no balancea, los brazos conservan la postura.
+    th0 y k0 altos dan el paso agachado (muslo adelantado y rodilla siempre doblada)."""
+    d = dict(P['pose'] if base is None else base); s2 = math.sin; c2 = math.cos; swing = P.get('swing') if swing is None else swing
     for side, f, sx in (('_l', ph, 1), ('_r', ph + 0.5, -1)):
-        th = 0.42 * s2(2 * math.pi * f); k = 0.12 + 0.95 * max(0.0, c2(2 * math.pi * (f - 0.95))) ** 2
+        th = th0 + A * s2(2 * math.pi * f); k = k0 + k1 * max(0.0, c2(2 * math.pi * (f - 0.95))) ** 2
         d['thigh' + side] = (sx * 0.03, -s2(th), -c2(th)); d['calf' + side] = (0, -s2(th - k), -c2(th - k))
-        if P.get('swing'):
+        if swing:
             a = -0.3 * s2(2 * math.pi * f); d['upperarm' + side] = (sx * 0.1, -s2(a), -c2(a)); d['lowerarm' + side] = (sx * 0.03, -s2(a + 0.3), -c2(a + 0.3))
     return d
 
@@ -87,21 +90,34 @@ def export_anim(name, P, arm):
                     lim = 256 if fine or 'low-poly' in mat.name else 512
                     if n.image.size[0] > lim: n.image.scale(lim, lim * n.image.size[1] // n.image.size[0]); n.image.pack()
     arm.location = off; arm.name = name; ad = arm.animation_data_create(); bones = [b_.name for b_ in arm.data.bones]
-    def bake(track, frames):
+    root = arm.pose.bones['Root']; Rinv = arm.data.bones['Root'].matrix_local.to_3x3().inverted(); FEET = ('foot_l', 'foot_r', 'ball_l', 'ball_r')
+    low = lambda W: min(min(W[k].to_translation().z, (W[k] @ Vector((0, arm.data.bones[k].length, 0))).z) for k in FEET)
+    h0 = low({k: arm.data.bones[k].matrix_local for k in FEET})
+    def bake(track, frames, shift=None):
+        """shift: desplazamiento fijo de todo el cuerpo; sin él, cada fotograma se apoya en el pie más bajo (da el vaivén de la cadera)."""
         act = bpy.data.actions.new(track); ad.action = act; prev = {}
         for f, dirs in frames:
             for pb in arm.pose.bones: pb.rotation_mode = 'QUATERNION'; pb.rotation_quaternion = (1, 0, 0, 0)
-            pose(arm, dirs, P.get('curl'))
+            W = pose(arm, dirs, P.get('curl'))
+            root.location = Rinv @ (Vector(shift) if shift is not None else Vector((0, 0, h0 - low(W)))); root.keyframe_insert('location', frame=f)
             for bn in bones:
                 pb = arm.pose.bones[bn]; q = pb.rotation_quaternion.copy()
                 if bn in prev and prev[bn].dot(q) < 0: q.negate()
                 pb.rotation_quaternion = q; prev[bn] = q; pb.keyframe_insert('rotation_quaternion', frame=f)
         ad.action = None; tr = ad.nla_tracks.new(); tr.name = track; tr.strips.new(track, int(frames[0][0]), act)
     base = dict(P['pose']); rest = lambda bn: tuple(arm.data.bones[bn].matrix_local.to_3x3() @ Vector((0, 1, 0)))
-    breath = dict(base); v = Vector(base.get('spine_03', rest('spine_03'))).normalized() + Vector((0, 0.035, 0)); breath['spine_03'] = tuple(v)
-    v = Vector(base.get('head', rest('head'))).normalized() + Vector((0.05, -0.02, 0)); breath['head'] = tuple(v)
-    bake('idle', [(1, base), (49, breath), (97, base)])
-    if P.get('walks'): bake('walk', [(1 + k * 2, walk_dirs(P, k / 15)) for k in range(16)])
+    def breathe(b0):
+        b1 = dict(b0); b1['spine_03'] = tuple(Vector(b0.get('spine_03', rest('spine_03'))).normalized() + Vector((0, 0.035, 0)))
+        b1['head'] = tuple(Vector(b0.get('head', rest('head'))).normalized() + Vector((0.05, -0.02, 0))); return [(1, b0), (49, b1), (97, b0)]
+    cyc = lambda **kw: [(1 + k * 2, walk_dirs(P, k / 15, **kw)) for k in range(16)]
+    if P.get('player'):   # el protagonista: el esqueleto se apoya de pie y la postura de rodilla en tierra lleva su desplazamiento, para que coincida con la escena fija
+        zr = min((o.matrix_world @ v.co).z for o in meshes for v in o.data.vertices); stand_off = Vector((0, 0, -zr)); arm.location = stand_off
+        st = P['stand']; low_ = {k: v for k, v in base.items() if k.startswith(('spine', 'neck', 'head'))}; low_.update(P['sneak_arms'])
+        bake('idle', breathe(base), shift=off - stand_off); bake('stand', breathe(st)); bake('walk', cyc(base=st, swing=True))
+        bake('sneak', cyc(base=low_, A=0.34, th0=0.9, k0=1.35, k1=0.5, swing=False))
+    else:
+        bake('idle', breathe(base), shift=(0, 0, 0))
+        if P.get('walks'): bake('walk', cyc())
     for pb in arm.pose.bones: pb.rotation_quaternion = (1, 0, 0, 0)
     for o in bpy.data.objects: o.select_set(o.type in ('MESH', 'ARMATURE'))
     f = os.path.join(d, 'persona_' + name + '_anim.glb')

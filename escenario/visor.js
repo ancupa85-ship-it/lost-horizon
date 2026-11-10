@@ -108,6 +108,7 @@ function loadPeople(done){ const list=(D.info.people||[]).filter(q=>D.people&&D.
     GEAR.filter(x=>x.who===q.name).forEach(x=>{ const b=root.getObjectByName(x.bone); if(b)b.attach(x.mesh); });
     const p={q,root,mixer,acts,i:0,yaw:q.rz,wps:(q.wps||[]).map(w=>[w[0]*T+T/2,w[1]*T+T/2])};
     if(p.wps.length>1&&acts.walk){ acts.idle.stop(); acts.walk.play(); root.position.set(p.wps[0][0],q.pos[2],p.wps[0][1]); p.i=1; }
+    if(q.name==='cuttlas'&&acts.stand&&acts.sneak){ PL.p=p; PL.yaw=q.rz; P.x=q.pos[0]; P.z=-q.pos[1]; P.yaw=q.rz+Math.PI; P.pitch=-0.12; }
     PEOPLE.push(p); if(!--left)done(); },e=>{ console.error('persona',q.name,e); if(!--left)done(); })); }
 const WALK_V=1.5/1.25;   // metros por ciclo / segundos por ciclo: los pies no patinan
 function peopleTick(dt){ PEOPLE.forEach(p=>{ p.mixer.update(dt); if(p.wps.length<2||!p.acts.walk)return; const w=p.wps[p.i], r=p.root.position; const dx=w[0]-r.x, dz=w[1]-r.z, d=Math.hypot(dx,dz);
@@ -161,11 +162,25 @@ const TOUCH='ontouchstart' in window; const touch={mx:0,mz:0,ids:{}};
 if(TOUCH){ cv.addEventListener('touchstart',e=>{ for(const t of e.changedTouches)touch.ids[t.identifier]={x:t.clientX,y:t.clientY,left:t.clientX<innerWidth/2,ox:t.clientX,oy:t.clientY}; e.preventDefault(); },{passive:false});
   cv.addEventListener('touchmove',e=>{ for(const t of e.changedTouches){ const s=touch.ids[t.identifier]; if(!s)continue; if(s.left){ touch.mx=Math.max(-1,Math.min(1,(t.clientX-s.ox)/60)); touch.mz=Math.max(-1,Math.min(1,(t.clientY-s.oy)/60)); } else { P.yaw-=(t.clientX-s.x)*0.005; P.pitch=Math.max(-1.3,Math.min(1.3,P.pitch-(t.clientY-s.y)*0.005)); } s.x=t.clientX; s.y=t.clientY; } e.preventDefault(); },{passive:false});
   const end=e=>{ for(const t of e.changedTouches){ const s=touch.ids[t.identifier]; if(s&&s.left){ touch.mx=0; touch.mz=0; } delete touch.ids[t.identifier]; } }; cv.addEventListener('touchend',end); cv.addEventListener('touchcancel',end); }
+// Con Cuttlas cargado se le maneja en tercera persona (V alterna con la cámara libre): C se agacha o se levanta, Mayús aprieta el paso.
+const PL={p:null,third:true,crouch:true,act:'idle',yaw:0,dist:3.0};
+function plAct(name){ const p=PL.p; if(!p||PL.act===name||!p.acts[name])return; const a=p.acts[PL.act], b=p.acts[name]; b.reset(); b.play(); if(a)a.crossFadeTo(b,0.22,false); PL.act=name; }
+addEventListener('keydown',e=>{ if(e.code==='KeyV'&&PL.p){ PL.third=!PL.third; } if(e.code==='KeyC'&&PL.p&&PL.third){ PL.crouch=!PL.crouch; } });
 function move(dt){ let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-touch.mz, s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+touch.mx; const l=Math.hypot(f,s); if(l>1){ f/=l; s/=l; }
-  const sp=(keys.ShiftLeft?6.2:2.6)*dt; const sin=Math.sin(P.yaw), cos=Math.cos(P.yaw); const dx=(-sin*f+cos*s)*sp, dz=(-cos*f-sin*s)*sp; const R=0.32;
+  const third=PL.p&&PL.third, fast=keys.ShiftLeft||keys.ShiftRight;
+  const sp=(third?(PL.crouch?0.95:(fast?2.0:1.2)):(fast?6.2:2.6))*dt; const sin=Math.sin(P.yaw), cos=Math.cos(P.yaw); const dx=(-sin*f+cos*s)*sp, dz=(-cos*f-sin*s)*sp; const R=0.32;
   const free=(x,z)=>!solid(Math.floor((x-R)/T),Math.floor((z-R)/T))&&!solid(Math.floor((x+R)/T),Math.floor((z-R)/T))&&!solid(Math.floor((x-R)/T),Math.floor((z+R)/T))&&!solid(Math.floor((x+R)/T),Math.floor((z+R)/T));
-  if(free(P.x+dx,P.z))P.x+=dx; if(free(P.x,P.z+dz))P.z+=dz; if(l>0.05)P.bob+=dt*(keys.ShiftLeft?13:8.5);
-  camera.position.set(P.x,1.66+Math.sin(P.bob)*0.028*Math.min(1,l),P.z); camera.rotation.set(0,0,0); camera.rotation.order='YXZ'; camera.rotation.y=P.yaw; camera.rotation.x=P.pitch; }
+  if(free(P.x+dx,P.z))P.x+=dx; if(free(P.x,P.z+dz))P.z+=dz; if(l>0.05)P.bob+=dt*(fast?13:8.5);
+  camera.rotation.set(0,0,0); camera.rotation.order='YXZ'; camera.rotation.y=P.yaw; camera.rotation.x=P.pitch;
+  if(!third){ camera.position.set(P.x,1.66+Math.sin(P.bob)*0.028*Math.min(1,l),P.z); return; }
+  const p=PL.p, moving=l>0.05; if(moving){ const want=Math.atan2(dx,dz); let da=want-PL.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; PL.yaw+=Math.max(-9*dt,Math.min(9*dt,da)); }
+  plAct(moving?(PL.crouch?'sneak':'walk'):(PL.crouch?'idle':'stand')); if(p.acts.walk)p.acts.walk.timeScale=fast?1.65:1;
+  p.root.position.set(P.x,p.q.pos[2],P.z); p.root.rotation.y=PL.yaw; p.root.visible=PL.dist>0.85;   /* pegado a una pared no se ve a sí mismo */
+  // cámara detrás, por encima del hombro; se acerca si hay una pared entre medias
+  const ty=PL.crouch?1.15:1.55, cp=Math.cos(P.pitch), bx=sin*cp, bz=cos*cp, by=-Math.sin(P.pitch); let d=0.5;
+  while(d<3.0){ const nx=P.x+bx*(d+0.3), nz=P.z+bz*(d+0.3), c=MAP[Math.floor(nz/T)]&&MAP[Math.floor(nz/T)][Math.floor(nx/T)]; if(!c||'#W'.indexOf(c)>=0||(('Tcg'.indexOf(c)>=0)&&ty+by*d<1.7))break; d+=0.2; }
+  PL.dist+=(d-PL.dist)*Math.min(1,dt*(d<PL.dist?14:4)); const D_=PL.dist;
+  camera.position.set(P.x+bx*D_+cos*0.38,Math.max(0.35,ty+by*D_),P.z+bz*D_-sin*0.38); }
 // vista inicial y vistas fijas (teclas 1 a 4) para comparar con los renders de Blender
 const VIEWS=[[3,11.4,-0.95,0.02],[18.4,18.0,0.9,0.04],[40.2,13.4,-1.75,0.03],[25,40,0.5,0.05]];
 addEventListener('keydown',e=>{ const i=['Digit1','Digit2','Digit3','Digit4'].indexOf(e.code); if(i>=0){ const v=VIEWS[i]; P.x=v[0]; P.z=v[1]; P.yaw=v[2]; P.pitch=v[3]; } });
@@ -178,5 +193,5 @@ function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt; m
   fpsT+=dt; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (F/G) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window.__ESC={PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
+window.__ESC={PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
 })();
