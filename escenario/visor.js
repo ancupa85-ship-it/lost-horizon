@@ -223,13 +223,22 @@ const VM=new THREE.Group(); (function(){ scene.add(camera); camera.add(VM);
   const mct=new THREE.CanvasTexture(mc), cap=c=>new THREE.MeshMatcapMaterial({color:c,matcap:mct,fog:false});
   const mG=cap(0x34373e), mS=cap(0x1e2024), mH=cap(0x2b2e36), mT=cap(0x1c2028);
   const add=(g,m,x,y,z,rx)=>{ const o=new THREE.Mesh(g,m); o.position.set(x,y,z); if(rx)o.rotation.x=rx; o.frustumCulled=false; VM.add(o); return o; }, B=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
-  add(B(0.028,0.034,0.2),mG,0,0,-0.1); add(B(0.026,0.022,0.17),mG,0,-0.026,-0.085); add(B(0.027,0.1,0.045),mG,0,-0.075,-0.012,0.22);
-  add(B(0.008,0.006,0.05),mG,0,-0.056,-0.075); add(B(0.008,0.03,0.006),mG,0,-0.045,-0.1); add(B(0.006,0.014,0.01),mG,0,-0.045,-0.07,0.3);
-  add(new THREE.CylinderGeometry(0.0175,0.0175,0.17,14),mS,0,0.002,-0.285,Math.PI/2);
-  add(B(0.006,0.008,0.008),mG,0.0085,0.021,-0.008); add(B(0.006,0.008,0.008),mG,-0.0085,0.021,-0.008); add(B(0.004,0.008,0.008),mG,0,0.021,-0.192);
-  add(B(0.03,0.004,0.06),mS,0,0.0175,-0.11);   // estrías de la corredera
-  add(B(0.078,0.082,0.062),mH,0.003,-0.082,0.0,0.22); add(B(0.074,0.05,0.03),mH,0.0,-0.075,-0.042,0.22); add(B(0.022,0.022,0.07),mH,-0.036,-0.028,-0.03); add(B(0.02,0.02,0.05),mH,0.03,-0.05,-0.085,0.5);
-  const fa=add(new THREE.CylinderGeometry(0.034,0.046,0.42,12),mT,0,0,0); const a=new THREE.Vector3(0.012,-0.11,0.03), b=new THREE.Vector3(0.11,-0.3,0.42); fa.position.copy(a).add(b).multiplyScalar(0.5); fa.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),a.clone().sub(b).normalize());
+  // perfil lateral (x hacia delante, y arriba) extruido a lo ancho y con canto redondeado
+  const ext=(pts,w,bev)=>{ const sh=new THREE.Shape(); pts.forEach((q,k)=>k?sh.lineTo(q[0],q[1]):sh.moveTo(q[0],q[1])); sh.closePath(); const g=new THREE.ExtrudeGeometry(sh,{depth:w-2*bev,bevelEnabled:true,bevelSize:bev,bevelThickness:bev,bevelSegments:3,curveSegments:4}); g.translate(0,0,-(w-2*bev)/2); g.rotateY(Math.PI/2); return g; };
+  const fing=(r,len,m,x,y,z,rx,rz)=>{ const g=new THREE.Group(); const c=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,10),m); g.add(c); for(const sg of [-1,1]){ const e=new THREE.Mesh(new THREE.SphereGeometry(r,10,8),m); e.position.y=sg*len/2; g.add(e); } g.traverse(o=>{ o.frustumCulled=false; }); g.position.set(x,y,z); g.rotation.set(rx||0,0,rz||0); VM.add(g); return g; };
+  add(ext([[0.004,-0.016],[0.2,-0.016],[0.203,-0.008],[0.203,0.01],[0.196,0.017],[0.012,0.017],[0.002,0.008]],0.027,0.003),mG,0,0,0);            // corredera
+  add(ext([[0.012,-0.036],[0.168,-0.036],[0.176,-0.016],[0.006,-0.016]],0.025,0.003),mS,0,0,0);                                                  // armazón
+  add(ext([[0.004,-0.03],[0.05,-0.03],[0.036,-0.128],[-0.018,-0.122]],0.029,0.005),mS,0,0,0);                                                     // empuñadura
+  const tg=add(new THREE.TorusGeometry(0.019,0.003,6,14,Math.PI),mG,0,-0.036,-0.078); tg.rotation.set(Math.PI,Math.PI/2,0);                          // guardamonte
+  add(B(0.005,0.02,0.006),mG,0,-0.044,-0.07,0.3);                                                                                                    // gatillo
+  add(new THREE.CylinderGeometry(0.0172,0.0172,0.17,20),mS,0,0.001,-0.288,Math.PI/2); add(new THREE.CylinderGeometry(0.0182,0.0182,0.012,20),mG,0,0.001,-0.21,Math.PI/2); add(new THREE.CylinderGeometry(0.0182,0.0165,0.01,20),mG,0,0.001,-0.376,Math.PI/2);
+  add(B(0.005,0.007,0.007),mG,0.008,0.0205,-0.012); add(B(0.005,0.007,0.007),mG,-0.008,0.0205,-0.012); add(B(0.0035,0.007,0.007),mG,0,0.0205,-0.194);   // alza y punto de mira
+  for(let k=0;k<6;k++)add(B(0.0285,0.02,0.0025),mS,0,0.002,-0.022-k*0.006);                                                                           // estrías de la corredera
+  // mano enguantada: palma tras la empuñadura, tres dedos que la abrazan, índice al gatillo y pulgar por el costado
+  add(ext([[-0.034,-0.04],[0.01,-0.032],[0.004,-0.128],[-0.042,-0.124]],0.062,0.014),mH,0,0,0);   // dorso y palma
+  for(let k=0;k<3;k++)fing(0.0105,0.036,mH,0.0,-0.066-k*0.021,-0.052+k*0.004,0,Math.PI/2);
+  fing(0.0095,0.05,mH,0.021,-0.04,-0.045,Math.PI/2+0.15,0); fing(0.0088,0.042,mH,-0.0205,-0.022,-0.02,Math.PI/2-0.1,0);
+  const fa=add(new THREE.CylinderGeometry(0.027,0.038,0.42,14),mT,0,0,0); const a=new THREE.Vector3(0.004,-0.1,0.028), b=new THREE.Vector3(0.11,-0.3,0.42); fa.position.copy(a).add(b).multiplyScalar(0.5); fa.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),a.clone().sub(b).normalize());
   VM.visible=false; })();
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousedown',e=>{ if(e.button===2)PL.aiming=true; }); addEventListener('mouseup',e=>{ if(e.button===2)PL.aiming=false; });
@@ -298,7 +307,22 @@ function useKey(){ if(!PL.p||ALERT.caught)return; if(KP.open){ KP.open=false; re
 function dragTick(dt){ const o=PL.drag; if(o){ const r=o.root.position, dx=P.x-r.x, dz=P.z-r.z, d=Math.hypot(dx,dz); o.yaw=Math.atan2(dx,dz); o.root.rotation.y=o.yaw; if(d>0.75){ const k=(d-0.75)/d, nx=r.x+dx*k, nz=r.z+dz*k; if(!solid(Math.floor(nx/T),Math.floor(nz/T))){ r.x=nx; r.z=nz; } else if(d>2.2)PL.drag=null; } }
   const t=el('mun'); if(t){ t.hidden=!PL.p; const mu=!PL.drag&&msUse(true), nb=!PL.drag&&!mu&&nearBody(); t.innerHTML=(PL.rel>0?'RECARGANDO':PL.mag+' <i>/ '+PL.res+'</i>')+(PL.drag?'<u>E soltar el cuerpo</u>':mu?'<u>'+mu+'</u>':nb?'<u>E arrastrar el cuerpo</u>':PL.mag<8&&PL.res>0&&PL.rel<=0?'<u>R recargar</u>':''); } }
 addEventListener('keydown',e=>{ if(e.code==='KeyR')reload(); if(e.code==='KeyE')useKey(); });
-function fxTick(dt){ if(PL.rel>0){ PL.rel-=dt; if(PL.rel<=0){ const n=Math.min(8-PL.mag,PL.res); PL.mag+=n; PL.res-=n; click(700,0.05); } } dragTick(dt); msTick(dt); sndTick(dt); kpTick(dt); PL.cd=Math.max(0,(PL.cd||0)-dt); PL.kick=(PL.kick||0)*Math.max(0,1-dt*9); PL.flashT=(PL.flashT||0)-dt; FX.flash.visible=PL.flashT>0&&VM.visible; FX.hits.forEach(h=>{ if(h.t>0){ h.t-=dt; h.m.scale.setScalar(Math.max(0.05,h.t/0.14)); if(h.t<=0)h.m.visible=false; } }); }
+// ---------- radar: plano girado con la vista, muros, guardias con su cono de visión, cuerpos y el objetivo. Con la alarma se llena de interferencias.
+const RAD={n:0,R:20};
+function radarTick(){ const cvs=el('radar'); if(!cvs)return; cvs.hidden=!PL.p; if(!PL.p||(RAD.n++%3))return; const x=cvs.getContext('2d'), W=cvs.width, c=W/2, k=c/RAD.R; x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,W,W);
+  x.save(); x.beginPath(); x.arc(c,c,c-1,0,7); x.clip(); x.fillStyle='rgba(6,14,10,0.72)'; x.fillRect(0,0,W,W);
+  if(ALERT.level===2){ for(let i=0;i<70;i++){ x.fillStyle='rgba(120,255,160,'+(Math.random()*0.35)+')'; x.fillRect(0,Math.random()*W,W,1+Math.random()*2); } x.fillStyle='#ff4a3a'; x.font='bold 13px monospace'; x.textAlign='center'; x.fillText('INTERFERENCIA',c,c+4); x.restore(); return; }
+  x.translate(c,c); x.rotate(P.yaw); x.scale(k,k); x.translate(-P.x,-P.z);
+  const x0=Math.max(0,Math.floor((P.x-RAD.R)/T)), x1=Math.min(COLS-1,Math.floor((P.x+RAD.R)/T)), y0=Math.max(0,Math.floor((P.z-RAD.R)/T)), y1=Math.min(ROWS-1,Math.floor((P.z+RAD.R)/T));
+  for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){ const ch=MAP[ty][tx]; const col='#W'.indexOf(ch)>=0?'rgba(120,220,150,0.8)':'TcgbLV'.indexOf(ch)>=0?'rgba(120,220,150,0.38)':'_zd'.indexOf(ch)>=0?'rgba(120,220,150,0.1)':null; if(col){ x.fillStyle=col; x.fillRect(tx*T,ty*T,T,T); } }
+  PEOPLE.forEach(o=>{ if(o===PL.p||!o.state)return; const r=o.root.position; if(o.dead){ const b=bodyC(o); x.fillStyle=o.hidden?'rgba(150,150,150,0.5)':'#bdbdbd'; x.fillRect(b[0]-0.35,b[1]-0.35,0.7,0.7); return; }
+    const col=o.state==='chase'?'255,70,50':(o.state==='suspect'||o.state==='search')?'255,210,58':'120,200,255', a=Math.atan2(Math.cos(o.yaw),Math.sin(o.yaw)), rg=PL.crouch?10:16;
+    x.fillStyle='rgba('+col+',0.2)'; x.beginPath(); x.moveTo(r.x,r.z); x.arc(r.x,r.z,rg,a-0.95,a+0.95); x.closePath(); x.fill(); x.fillStyle='rgb('+col+')'; x.beginPath(); x.arc(r.x,r.z,0.6,0,7); x.fill(); });
+  x.restore(); x.save(); x.beginPath(); x.arc(c,c,c-1,0,7); x.strokeStyle='rgba(120,220,150,0.5)'; x.lineWidth=1.5; x.stroke();
+  const tg=!MS.done&&msTarget(); if(tg){ const dx=tg[0]-P.x, dz=tg[1]-P.z, cs=Math.cos(P.yaw), sn=Math.sin(P.yaw); let sx=(dx*cs-dz*sn)*k, sy=(dx*sn+dz*cs)*k; const d=Math.hypot(sx,sy), m=c-7; if(d>m){ sx*=m/d; sy*=m/d; }
+    x.translate(c+sx,c+sy); x.rotate(Math.PI/4); x.fillStyle='#ffb060'; x.fillRect(-3.5,-3.5,7,7); x.setTransform(1,0,0,1,0,0); }
+  x.fillStyle='#fff'; x.beginPath(); x.moveTo(c,c-6); x.lineTo(c+4.5,c+5); x.lineTo(c-4.5,c+5); x.closePath(); x.fill(); x.restore(); }
+function fxTick(dt){ radarTick(); if(PL.rel>0){ PL.rel-=dt; if(PL.rel<=0){ const n=Math.min(8-PL.mag,PL.res); PL.mag+=n; PL.res-=n; click(700,0.05); } } dragTick(dt); msTick(dt); sndTick(dt); kpTick(dt); PL.cd=Math.max(0,(PL.cd||0)-dt); PL.kick=(PL.kick||0)*Math.max(0,1-dt*9); PL.flashT=(PL.flashT||0)-dt; FX.flash.visible=PL.flashT>0&&VM.visible; FX.hits.forEach(h=>{ if(h.t>0){ h.t-=dt; h.m.scale.setScalar(Math.max(0.05,h.t/0.14)); if(h.t<=0)h.m.visible=false; } }); }
 addEventListener('mousedown',e=>{ if(e.button===0&&document.pointerLockElement===renderer.domElement)shoot(); });
 function plAct(name){ const p=PL.p; if(!p||PL.act===name||!p.acts[name])return; const a=p.acts[PL.act], b=p.acts[name]; b.reset(); b.play(); if(a)a.crossFadeTo(b,0.22,false); PL.act=name; }
 addEventListener('keydown',e=>{ if(e.code==='KeyV'&&PL.p){ PL.third=!PL.third; } if(e.code==='KeyC'&&PL.p){ PL.crouch=!PL.crouch; } });
