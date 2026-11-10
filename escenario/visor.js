@@ -186,11 +186,16 @@ function gFire(p,d){ const r=p.root.position, fast=keys.ShiftLeft||keys.ShiftRig
   if(hit&&!ALERT.caught){ PL.hp-=24; PL.hurt=1; PL.hpT=0; sNoise(0.12,300,1,0.3); if(PL.hp<=0){ PL.hp=0; ALERT.caught=3.2; ALERT.info=false; ALERT.msg='ABATIDO'; ALERT.msgT=3.2; PL.drag=null; } } }
 function lightTick(dt){ PL.lk=(PL.lk||0)+1; if(PL.lk%5===0||PL.lit===undefined){ let v=0.08; const inn='_zd'.indexOf((MAP[Math.floor(P.z/T)]||'')[Math.floor(P.x/T)]||'.')>=0;
     for(const s of LIT){ if(!s.on)continue; const d=Math.hypot(s.x-P.x,s.z-P.z); if(d>=s.R)continue; const k=1-d/s.R; if(k>v&&!blocked(s.x,s.z,P.x,P.z,false))v=k; }
-    let spot=false; if(!inn)for(const s of spots){ _a.copy(s.L.target.position).sub(s.p).normalize(); _b.set(P.x-s.p.x,1.0-s.p.y,P.z-s.p.z); const d=_b.length(); if(d<85&&_b.normalize().dot(_a)>Math.cos(0.10)&&!blocked(P.x+(s.p.x-P.x)*0.35,P.z+(s.p.z-P.z)*0.35,P.x,P.z,false)){ spot=true; } /* un muro cercano te da sombra */ }
-    if(spot)v=1; PL.litT=Math.min(1,v*1.25); PL.spot=spot; }
-  PL.lit=(PL.lit===undefined?PL.litT:PL.lit+(PL.litT-PL.lit)*Math.min(1,dt*4)); PL.spotT=PL.spot?(PL.spotT||0)+dt:0; PL.spotCd=Math.max(0,(PL.spotCd||0)-dt);
-  if(PL.p&&PL.spotT>0.7&&!PL.spotCd&&!ALERT.caught){ PL.spotCd=7; ALERT.info=false; ALERT.msg='¡EL FOCO TE HA DESCUBIERTO!'; ALERT.msgT=2.6; sTone(520,0.5,0.07,'square',0,500); PEOPLE.forEach(o=>{ if(o!==PL.p&&o.state&&!o.dead&&o.state!=='chase'&&Math.hypot(o.root.position.x-P.x,o.root.position.z-P.z)<45){ o.seen=[P.x,P.z]; o.meter=Math.max(o.meter,0.5); setState(o,'search'); } }); }
+    // foco de torreta: solo cuenta el círculo brillante del suelo, y un muro, un cobertizo o unas cajas entre el foco y tú te dan sombra (se comprueba con la altura real del rayo)
+    let spot=false; if(!inn)for(const s of spots){ _a.copy(s.L.target.position).sub(s.p).normalize(); _b.set(P.x-s.p.x,1.0-s.p.y,P.z-s.p.z); const d=_b.length(); if(d<70&&_b.normalize().dot(_a)>Math.cos(0.055)&&!shade(s.p)){ spot=true; } }
+    if(spot)v=Math.max(v,0.8); PL.litT=Math.min(1,v*1.25); PL.spot=spot; }
+  PL.lit=(PL.lit===undefined?PL.litT:PL.lit+(PL.litT-PL.lit)*Math.min(1,dt*4)); PL.spotCd=Math.max(0,(PL.spotCd||0)-dt);
+  // el foco no delata al instante: avisa y da tiempo a salir; agachado tarda mucho más. Solo va a mirar el guardia más cercano.
+  if(PL.spot&&!PL.spotCd){ if(!(PL.spotT>0))sTone(880,0.12,0.04,'sine'); PL.spotT=(PL.spotT||0)+dt*(PL.crouch?0.35:1); } else PL.spotT=Math.max(0,(PL.spotT||0)-dt*1.5);
+  if(PL.p&&PL.spotT>2.2&&!PL.spotCd&&!ALERT.caught){ PL.spotCd=18; PL.spotT=0; ALERT.info=false; ALERT.msg='EL FOCO TE HA VISTO'; ALERT.msgT=2.6; sTone(520,0.5,0.07,'square',0,500); let g=null, bd=30; PEOPLE.forEach(o=>{ if(o===PL.p||!o.state||o.dead||o.state!=='patrol')return; const d=Math.hypot(o.root.position.x-P.x,o.root.position.z-P.z); if(d<bd){ bd=d; g=o; } }); if(g){ g.seen=[P.x,P.z]; setState(g,'suspect'); } }
+  else if(PL.p&&PL.spot&&!PL.spotCd&&!ALERT.caught&&!(ALERT.msgT>0)){ ALERT.info=true; ALERT.msg='EL FOCO TE ROZA: SAL DE LA LUZ'; ALERT.msgT=0.4; }
   const e=el('luzT'); if(e)setH(e,PL.spot?'EN EL FOCO':PL.lit>0.6?'A LA VISTA':PL.lit>0.28?'PENUMBRA':'A OSCURAS'); const sb=el('sub'); if(sb){ if(ALERT.subT>0){ ALERT.subT-=dt; setH(sb,ALERT.sub); } else setH(sb,''); } }
+function shade(sp){ const dx=sp.x-P.x, dz=sp.z-P.z, d=Math.hypot(dx,dz), n=Math.ceil(d/0.5); for(let i=1;i<n;i++){ const f=i/n, h=1+(sp.y-1)*f; if(h>INFO.HW+0.5)break; const c=(MAP[Math.floor((P.z+dz*f)/T)]||'')[Math.floor((P.x+dx*f)/T)]; if(!c)continue; const H=c==='#'?INFO.HW:'WLVb_zdD'.indexOf(c)>=0?INFO.HB:c==='c'?1.5:c==='g'?2.2:0; if(H>h)return true; } return false; }
 function lampOff(s){ s.on=false; if(s.L)s.L.intensity=0; s.h.forEach(h=>{ h.visible=false; }); sNoise(0.25,3800,2,0.25,'bandpass'); sNoise(0.4,6000,1,0.12,'highpass'); NOISES.push({x:s.x,z:s.z,r:10}); say('LUZ APAGADA',1.6); PL.lit=undefined; }
 function lampsOn(){ RADIO.q.length=0; RADIO.miss=null; RADIO.t=28; LIT.forEach(s=>{ s.on=true; s.noted=false; if(s.L)s.L.intensity=s.I; s.h.forEach(h=>{ h.visible=true; }); }); }
 function hpTick(dt){ lightTick(dt); radioTick(dt); if(RADIO.cd>0)RADIO.cd-=dt; TR.forEach(o=>{ if(o.t>0){ o.t-=dt; if(o.t<=0)o.l.visible=false; } }); PL.hpT=(PL.hpT||0)+dt; if(PL.hpT>6&&PL.hp<100&&!ALERT.caught)PL.hp=Math.min(100,PL.hp+dt*9); PL.hurt=Math.max(0,(PL.hurt||0)-dt*1.6);
@@ -277,7 +282,7 @@ const VM=new THREE.Group(); (function(){ scene.add(camera); camera.add(VM);
   // materiales con luz propia (matcap): el foco de la torreta no debe quemar el arma a un palmo de la cámara
   const mc=document.createElement('canvas'); mc.width=mc.height=64; const mx=mc.getContext('2d'), gr=mx.createRadialGradient(24,20,2,32,32,34); gr.addColorStop(0,'#fff'); gr.addColorStop(0.25,'#9a9a9a'); gr.addColorStop(0.7,'#4a4a4a'); gr.addColorStop(1,'#1c1c1c'); mx.fillStyle=gr; mx.fillRect(0,0,64,64);
   const mct=new THREE.CanvasTexture(mc), cap=c=>new THREE.MeshMatcapMaterial({color:c,matcap:mct,fog:false});
-  const mG=cap(0x34373e), mS=cap(0x1e2024), mH=cap(0x2b2e36), mT=cap(0x1c2028);
+  const mG=cap(0x3a3d45), mS=cap(0x202226), mH=cap(0x3f2c20), mT=cap(0x39402f);   // acero, polímero, guante de cuero, manga
   const add=(g,m,x,y,z,rx)=>{ const o=new THREE.Mesh(g,m); o.position.set(x,y,z); if(rx)o.rotation.x=rx; o.frustumCulled=false; VM.add(o); return o; }, B=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
   // perfil lateral (x hacia delante, y arriba) extruido a lo ancho y con canto redondeado
   const ext=(pts,w,bev)=>{ const sh=new THREE.Shape(); pts.forEach((q,k)=>k?sh.lineTo(q[0],q[1]):sh.moveTo(q[0],q[1])); sh.closePath(); const g=new THREE.ExtrudeGeometry(sh,{depth:w-2*bev,bevelEnabled:true,bevelSize:bev,bevelThickness:bev,bevelSegments:3,curveSegments:4}); g.translate(0,0,-(w-2*bev)/2); g.rotateY(Math.PI/2); return g; };
@@ -295,6 +300,11 @@ const VM=new THREE.Group(); (function(){ scene.add(camera); camera.add(VM);
   for(let k=0;k<3;k++)fing(0.0105,0.036,mH,0.0,-0.066-k*0.021,-0.052+k*0.004,0,Math.PI/2);
   fing(0.0095,0.05,mH,0.021,-0.04,-0.045,Math.PI/2+0.15,0); fing(0.0088,0.042,mH,-0.0205,-0.022,-0.02,Math.PI/2-0.1,0);
   const fa=add(new THREE.CylinderGeometry(0.027,0.038,0.42,14),mT,0,0,0); const a=new THREE.Vector3(0.004,-0.1,0.028), b=new THREE.Vector3(0.11,-0.3,0.42); fa.position.copy(a).add(b).multiplyScalar(0.5); fa.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),a.clone().sub(b).normalize());
+  // mano de apoyo: la izquierda envuelve a la derecha por delante de la empuñadura, pulgar adelantado bajo la corredera
+  add(ext([[0.052,-0.05],[0.062,-0.118],[-0.01,-0.13],[-0.016,-0.058]],0.026,0.01),mH,-0.027,0,0);
+  for(let k=0;k<4;k++)fing(0.0105,0.05,mH,-0.004,-0.058-k*0.0205,-0.071+k*0.005,0,Math.PI/2);
+  fing(0.0095,0.055,mH,-0.024,-0.03,-0.07,Math.PI/2-0.12,0);
+  { const f2=add(new THREE.CylinderGeometry(0.027,0.038,0.44,14),mT,0,0,0), a2=new THREE.Vector3(-0.03,-0.105,0.0), b2=new THREE.Vector3(-0.27,-0.3,0.3); f2.position.copy(a2).add(b2).multiplyScalar(0.5); f2.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),a2.clone().sub(b2).normalize()); }
   VM.visible=false; })();
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousedown',e=>{ if(e.button===2)PL.aiming=true; }); addEventListener('mouseup',e=>{ if(e.button===2)PL.aiming=false; });
@@ -435,5 +445,5 @@ function frame(now){ const raw=(now-last)/1000, dt=Math.min(0.1,raw); last=now; 
   fpsT+=raw; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (F/G) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window.__ESC={hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
+window.__ESC={shade,hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
 })();
