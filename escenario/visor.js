@@ -110,7 +110,7 @@ function loadPeople(done){ const list=(D.info.people||[]).filter(q=>D.people&&D.
     if(q.name!=='cuttlas'&&p.wps.length>1&&acts.walk){ acts.idle.stop(); acts.walk.play(); root.position.set(p.wps[0][0],q.pos[2],p.wps[0][1]); p.i=1; }
     if(q.name==='cuttlas'&&acts.stand&&acts.sneak){ PL.p=p; PL.yaw=q.rz; P.x=q.pos[0]; P.z=-q.pos[1]; P.yaw=q.rz+Math.PI; P.pitch=-0.12; }
     PEOPLE.push(p); if(!--left)done(); },e=>{ console.error('persona',q.name,e); if(!--left)done(); })); }
-const WALK_V=1.5/1.25;   // metros por ciclo / segundos por ciclo: los pies no patinan
+const WALK_V=1.4/1.25;   // metros por ciclo / segundos por ciclo: los pies no patinan
 // ---------- guardias: ronda, vista (cono y línea de visión por el plano), oído, sospecha, persecución y captura
 const NOISE={x:0,z:0,r:0}, ALERT={level:0,msg:'',msgT:0,caught:0};
 const cellOf=(x,z)=>[Math.floor(x/T),Math.floor(z/T)];
@@ -204,7 +204,7 @@ function plAct(name){ const p=PL.p; if(!p||PL.act===name||!p.acts[name])return; 
 addEventListener('keydown',e=>{ if(e.code==='KeyV'&&PL.p){ PL.third=!PL.third; } if(e.code==='KeyC'&&PL.p&&PL.third){ PL.crouch=!PL.crouch; } });
 function move(dt){ let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-touch.mz, s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+touch.mx; if(PL.p&&PL.third&&ALERT.caught){ f=0; s=0; } const l=Math.hypot(f,s); if(l>1){ f/=l; s/=l; }
   const third=PL.p&&PL.third, fast=keys.ShiftLeft||keys.ShiftRight;
-  const sp=(third?(PL.crouch?0.95:(fast?2.0:1.2)):(fast?6.2:2.6))*dt; const sin=Math.sin(P.yaw), cos=Math.cos(P.yaw); const dx=(-sin*f+cos*s)*sp, dz=(-cos*f-sin*s)*sp; const R=0.32;
+  const sp=(third?(PL.crouch?0.78:(fast?1.85:1.12)):(fast?6.2:2.6))*dt; const sin=Math.sin(P.yaw), cos=Math.cos(P.yaw); const dx=(-sin*f+cos*s)*sp, dz=(-cos*f-sin*s)*sp; const R=0.32;
   const free=(x,z)=>!solid(Math.floor((x-R)/T),Math.floor((z-R)/T))&&!solid(Math.floor((x+R)/T),Math.floor((z-R)/T))&&!solid(Math.floor((x-R)/T),Math.floor((z+R)/T))&&!solid(Math.floor((x+R)/T),Math.floor((z+R)/T));
   if(free(P.x+dx,P.z))P.x+=dx; if(free(P.x,P.z+dz))P.z+=dz; if(l>0.05)P.bob+=dt*(fast?13:8.5);
   camera.rotation.set(0,0,0); camera.rotation.order='YXZ'; camera.rotation.y=P.yaw; camera.rotation.x=P.pitch;

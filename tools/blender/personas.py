@@ -54,12 +54,12 @@ def pose(arm, dirs, curl=None):
         W[bn.name] = W0 @ q.to_matrix().to_4x4() if q is not None else W0
     return W
 
-def walk_dirs(P, ph, base=None, A=0.42, th0=0.0, k0=0.12, k1=0.95, swing=None):
+def walk_dirs(P, ph, base=None, A=0.4, th0=0.0, k0=0.1, k1=0.8, swing=None, kp=1.06):
     """Direcciones de los huesos en la fase ph (0..1) del ciclo de andar; el tronco y, si no balancea, los brazos conservan la postura.
     th0 y k0 altos dan el paso agachado (muslo adelantado y rodilla siempre doblada)."""
     d = dict(P['pose'] if base is None else base); s2 = math.sin; c2 = math.cos; swing = P.get('swing') if swing is None else swing
     for side, f, sx in (('_l', ph, 1), ('_r', ph + 0.5, -1)):
-        th = th0 + A * s2(2 * math.pi * f); k = k0 + k1 * max(0.0, c2(2 * math.pi * (f - 0.95))) ** 2
+        th = th0 + A * s2(2 * math.pi * f); k = k0 + k1 * max(0.0, c2(2 * math.pi * (f - kp))) ** 2   # la rodilla se dobla al pasar la pierna hacia delante, no detrás
         d['thigh' + side] = (sx * 0.03, -s2(th), -c2(th)); d['calf' + side] = (0, -s2(th - k), -c2(th - k))
         if swing:
             a = -0.3 * s2(2 * math.pi * f); d['upperarm' + side] = (sx * 0.1, -s2(a), -c2(a)); d['lowerarm' + side] = (sx * 0.03, -s2(a + 0.3), -c2(a + 0.3))
@@ -109,12 +109,14 @@ def export_anim(name, P, arm):
     def breathe(b0):
         b1 = dict(b0); b1['spine_03'] = tuple(Vector(b0.get('spine_03', rest('spine_03'))).normalized() + Vector((0, 0.035, 0)))
         b1['head'] = tuple(Vector(b0.get('head', rest('head'))).normalized() + Vector((0.05, -0.02, 0))); return [(1, b0), (49, b1), (97, b0)]
-    cyc = lambda **kw: [(1 + k * 2, walk_dirs(P, k / 15, **kw)) for k in range(16)]
+    flat = {k: rest(k) for k in ('foot_l', 'foot_r')}   # los pies conservan su orientación de reposo: pisan planos
+    cyc = lambda **kw: [(1 + k * 2, dict(walk_dirs(P, k / 15, **kw), **flat)) for k in range(16)]
     if P.get('player'):   # el protagonista: el esqueleto se apoya de pie y la postura de rodilla en tierra lleva su desplazamiento, para que coincida con la escena fija
         zr = min((o.matrix_world @ v.co).z for o in meshes for v in o.data.vertices); stand_off = Vector((0, 0, -zr)); arm.location = stand_off
         st = P['stand']; low_ = {k: v for k, v in base.items() if k.startswith(('spine', 'neck', 'head'))}; low_.update(P['sneak_arms'])
         bake('idle', breathe(base), shift=off - stand_off); bake('stand', breathe(st)); bake('walk', cyc(base=st, swing=True))
-        bake('sneak', cyc(base=low_, A=0.34, th0=0.9, k0=1.35, k1=0.5, swing=False))
+        low_.update({'spine_01': (0, -0.45, 1), 'spine_02': (0, -0.75, 1), 'spine_03': (0, -0.95, 1), 'neck_01': (0, -0.5, 1), 'head': (0, -0.12, 1)})
+        bake('sneak', cyc(base=low_, A=0.3, th0=0.5, k0=0.85, k1=0.4, swing=False))
     else:
         bake('idle', breathe(base), shift=(0, 0, 0))
         if P.get('walks'): bake('walk', cyc())
