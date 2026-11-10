@@ -30,7 +30,7 @@ const M={
   bajos:std({color:0x15190f,roughness:0.6,metalness:0.3}), metal:std({color:0x7d858a,roughness:0.42,metalness:0.85}), oscuro:std({color:0x15171a,roughness:0.45,metalness:0.7}),
   lona:std({color:0x4b4a2e,roughness:0.9}), goma:std({color:0x0c0c0d,roughness:0.75}), cristal:std({color:0x06090b,roughness:0.05,metalness:0.2}),
   faro:std({color:0x8a8070,roughness:0.15,emissive:0xff9a40,emissiveIntensity:0.1}), piloto:std({color:0x551010,roughness:0.3,emissive:0xff1408,emissiveIntensity:0.5}),
-  piel:std({color:0xa8785c,roughness:0.6}), pelo:std({color:0x15100b,roughness:0.6}), capote:std({color:0x1c2219,roughness:0.28}), uniforme:std({color:0x49523a,roughness:0.85}),
+  piel:std({color:0xa8785c,roughness:0.6}), pelo:std({color:0x15100b,roughness:0.6}), capote:std({color:0x070906,roughness:0.5}), uniforme:std({color:0x12160d,roughness:0.85}),
   traje:std({color:0x14181f,roughness:0.45}), cuero:std({color:0x2a1c12,roughness:0.5}),
   aviso:std({color:0xa8801a,roughness:0.6}), marisma:std({color:0x05090a,roughness:0.12,metalness:0.2}),
   ventana_on:std({color:0x2a2010,roughness:0.3,emissive:0xffa050,emissiveIntensity:3.2}), ventana_off:std({color:0x05080a,roughness:0.06,metalness:0.3}),
@@ -102,6 +102,7 @@ new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
   g.scene.updateMatrixWorld(true); const groups=new Map(), singles=[];
   g.scene.traverse(o=>{ if(!o.isMesh)return; const n=(o.material.name||'').replace(/\.\d+$/,'');
     if(n.indexOf('lh_')===0&&M[n.slice(3)])o.material=M[n.slice(3)];
+    else if(/^(cuttlas|ibarra|moya|peris)_/.test(n)){ const m=o.material; const tela=/suit|pants|boots/.test(n); m.roughness=tela?0.82:0.62; m.metalness=0; m.envMapIntensity=0.35; if(/casualsuit/.test(n))m.color.setScalar(1.7); if(m.transparent){ m.transparent=false; m.alphaTest=0.35; m.depthWrite=true; } }
     else { const m=o.material; if(m.map)m.map.anisotropy=4; m.roughness=Math.min(1,(m.roughness||1)*0.72); if(m.emissiveMap||m.name.toLowerCase().indexOf('glass')>=0){ } m.envMapIntensity=0.7; }
     o.userData.noShadow=/street_lamp|wall_lamp/i.test(o.material.name||'')||['bombilla','foco','baliza','ventana_on'].indexOf(n.slice(3))>=0;
     const k=o.geometry.uuid+'|'+o.material.uuid; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(o); });

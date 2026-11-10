@@ -2,7 +2,7 @@
 (MAPSRC_BASE en src/10-zones.js: 2 m por casilla). Materiales PBR procedurales, farolas de sodio, focos de torreta,
 niebla volumétrica y lluvia. Renderiza con Cycles y guarda el .blend para abrirlo en Blender.
 Uso: python3 tools/blender/escena_base.py [salida] ; variables: LH_RES=1920x1080 LH_SAMPLES=96 LH_CAMS=patio,aerea,torreta LH_BLEND=1"""
-import bpy, bmesh, os, sys, re, math, random
+import bpy, bmesh, os, sys, re, math, random, json
 from mathutils import Vector, Matrix
 
 R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -521,12 +521,41 @@ def person(pos, rotz, pose='pie', poncho=False, head='', hair=True, gun='', suit
         ha = V(P['ha'][0]); rbox('oscuro', (0.028, 0.19, 0.036), ha + V((0, -0.1, 0.035)), 0.006, 1, None, M0); rbox('oscuro', (0.03, 0.04, 0.1), ha + V((0, -0.02, -0.01)), 0.008, 1, None, M0)
         rcyl('oscuro', 0.017, 0.14, ha + V((0, -0.26, 0.04)), 'Y', 0.004, 10, M0)   # silenciador
 
+def gear(M0, meta, head='', poncho=False, gun='', seed=0.0):
+    """Equipo sobre una persona de MakeHuman (casco o gorra, capote, arma), colocado con las medidas de su esqueleto."""
+    V = Vector; hb, ht, nk = V(meta['head']), V(meta['head_tip']), V(meta['neck_01']); up = (ht - hb).normalized()
+    H = V((0, 0, 1)).rotation_difference(up).to_matrix().to_4x4(); hd = hb + up * 0.105 + V((0, -0.012, 0))
+    if head == 'casco':
+        ell('oliva', hd + H @ V((0, 0.012, 0.035)), (0.112, 0.135, 0.1), M0, H, cut=-0.12); ell('oliva', hd + H @ V((0, 0.008, 0.024)), (0.126, 0.152, 0.02), M0, H)
+        for s in (1, -1): cap('cuero', hd + H @ V((s * 0.088, -0.02, 0.0)), hd + H @ V((s * 0.035, -0.075, -0.125)), 0.007, 0.007, M0)
+    elif head == 'gorra':
+        ell('uniforme', hd + H @ V((0, 0.012, 0.062)), (0.097, 0.115, 0.07), M0, H, cut=-0.5); rbox('uniforme', (0.15, 0.09, 0.012), hd + H @ V((0, -0.135, 0.045)), 0.005, 2, H @ Matrix.Rotation(0.2, 4, 'X'), M0)
+    if poncho:
+        z0 = nk.z + 0.05; cy = nk.y
+        loft('capote', [(z0 + 0.03, 0.07, 0.075, cy), (z0 - 0.02, 0.15, 0.12, cy), (z0 - 0.07, 0.27, 0.17, cy), (z0 - 0.2, 0.32, 0.21, cy), (z0 - 0.45, 0.35, 0.25, cy),
+                        (z0 - 0.7, 0.38, 0.28, cy), (z0 - 0.92, 0.4, 0.3, cy), (z0 - 1.02, 0.41, 0.31, cy)], M0, phase=seed)
+        ell('capote', nk + V((0, 0.085, 0.03)), (0.12, 0.1, 0.06), M0, Matrix.Rotation(0.5, 4, 'X'))   # capucha caída
+    if gun == 'hombro': rifle(M0 @ Matrix.Translation((-0.36 if poncho else -0.25, nk.y + 0.06, 1.2)) @ Matrix.Rotation(0.06, 4, 'X'))
+    elif gun == 'terciado':
+        a, b = V(meta['hand_r_tip']), V(meta['hand_l_tip']); d = (b - a).normalized()
+        rifle(M0 @ Matrix.Translation(a + d * 0.1 + V((0, -0.035, 0.0))) @ V((0, 0, 1)).rotation_difference(d).to_matrix().to_4x4())
+    elif gun == 'pistola':
+        ha = V(meta['hand_r_tip']) + V((0, -0.03, 0.0))
+        rbox('oscuro', (0.028, 0.19, 0.036), ha + V((0, -0.08, 0.04)), 0.006, 1, None, M0); rbox('oscuro', (0.03, 0.04, 0.1), ha + V((0, 0.0, -0.005)), 0.008, 1, None, M0)
+        rcyl('oscuro', 0.017, 0.14, ha + V((0, -0.24, 0.045)), 'Y', 0.004, 10, M0)   # silenciador
+
 def people():
-    """Los personajes del nivel en su sitio: Cuttlas agazapado tras las cajas de la entrada y los tres guardias del patio sur."""
-    person(wpos(4.9, 2.6), math.pi / 2 + 0.25, 'agachado', hair=True, gun='pistola', suit='traje', gloves=True)
-    person(wpos(12.6, 4.2), 0.6, 'pie', poncho=True, head='gorra', gun='hombro', seed=1.3)                # cabo Ibarra
-    person(wpos(20.4, 15.6), -1.9, 'firme', poncho=False, head='casco', gun='terciado', seed=4.0)        # sargento Moya
-    person(wpos(26.4, 6.6), 2.4, 'pie', head='', gun='', seed=2.2)                                        # soldado Peris, en la oficina
+    """Los personajes del nivel en su sitio: Cuttlas agazapado tras las cajas de la entrada y los tres guardias del patio sur.
+    Si están las personas de MakeHuman (tools/blender/personas.py) se usan esas; si no, los maniquíes."""
+    cast = [('cuttlas', wpos(4.9, 2.6), math.pi / 2 + 0.25, dict(gun='pistola'), dict(pose='agachado', gun='pistola', suit='traje', gloves=True)),
+            ('ibarra', wpos(12.6, 4.2), 0.6, dict(poncho=True, head='gorra', gun='hombro', seed=1.3), dict(pose='pie', poncho=True, head='gorra', gun='hombro', seed=1.3)),
+            ('moya', wpos(20.4, 15.6), -1.9, dict(head='casco', gun='terciado'), dict(pose='firme', head='casco', gun='terciado')),
+            ('peris', wpos(26.4, 6.6), 2.4, dict(), dict(pose='pie'))]
+    for name, pos, rz, g, old in cast:
+        i = 'persona_' + name
+        if has_ph(i):
+            put(i, pos, rz); gear(Matrix.Translation(pos) @ Matrix.Rotation(rz, 4, 'Z'), json.load(open(os.path.join(PHDIR, i, 'meta.json'))), **g)
+        else: person(pos, rz, **old)
     flush_smooth('gente')
 
 # ---------------------------------------------------------------- modelos escaneados de Poly Haven (assets/modelos-ph)
@@ -552,7 +581,17 @@ def ph(i, only=None):
                     src_ = inp.links[0].from_socket; nt = s.material.node_tree; mm = nt.nodes.new('ShaderNodeMath'); mm.operation = 'MULTIPLY'; mm.inputs[1].default_value = 0.6
                     nt.links.new(src_, mm.inputs[0]); nt.links.new(mm.outputs[0], inp)
     if GLB:   # para tiempo real: se reduce la malla escaneada
-        total = sum(len(o.data.polygons) for o, _ in mats); budget = {'covered_car': 7000, 'street_lamp_01': 2600, 'wooden_military_crate': 1300, 'wooden_crate_02': 900}.get(i, 1600)
+        if i.startswith('persona_'):   # personas: sin mapas de relieve, y transparencia solo en pelo, cejas y pestañas (texturas pequeñas)
+            for o, _ in mats:
+                for s in o.material_slots:
+                    nt = s.material.node_tree; bs = nt.nodes.get('Principled BSDF'); fine = any(k in s.material.name for k in ('short', 'eyebrow', 'eyelash'))
+                    for inp in ('Normal', 'Alpha') if not fine else ('Normal',):
+                        for l in list(bs.inputs[inp].links): nt.links.remove(l)
+                    if not fine: s.material.blend_method = 'OPAQUE'
+                    for n in list(nt.nodes):
+                        if n.type == 'TEX_IMAGE' and not n.outputs[0].links and not n.outputs[1].links: nt.nodes.remove(n)
+                        elif n.type == 'TEX_IMAGE' and n.image and fine and n.image.size[0] > 256: n.image.scale(256, 256)
+        total = sum(len(o.data.polygons) for o, _ in mats); budget = 5500 if i.startswith('persona_') else {'covered_car': 7000, 'street_lamp_01': 2600, 'wooden_military_crate': 1300, 'wooden_crate_02': 900}.get(i, 1600)
         if total > budget:
             for o, _ in mats:
                 md = o.modifiers.new('dec', 'DECIMATE'); md.ratio = budget / total
