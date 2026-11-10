@@ -38,16 +38,19 @@ const M={
 };
 M.hormigon=M.muro; M.suelo_int=std({map:tex('floor_diff',2,true),color:0x8c8c8c,roughness:0.55}); M.techo_int=std({color:0x6a655c,roughness:0.95});
 // charcos: en el suelo, un ruido en coordenadas del mundo baja la rugosidad, aplana el relieve y oscurece el asfalto
-M.suelo.onBeforeCompile=sh=>{
+const RIP={value:0};
+M.suelo.onBeforeCompile=sh=>{ sh.uniforms.lhT=RIP;
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWPos;').replace('#include <project_vertex>','#include <project_vertex>\nvWPos=(modelMatrix*vec4(transformed,1.0)).xyz;');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
 varying vec3 vWPos;
 float lhH(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float lhN(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(lhH(i),lhH(i+vec2(1,0)),f.x),mix(lhH(i+vec2(0,1)),lhH(i+vec2(1,1)),f.x),f.y); }
+uniform float lhT;
+vec2 lhRip(vec2 p){ vec2 g=vec2(0.0); for(int k=0;k<2;k++){ vec2 q=p*(k==0?1.7:2.6)+float(k)*13.7, i=floor(q), f=fract(q); float h=lhH(i+float(k)*5.0), t=fract(lhT*(0.7+0.5*h)+h*9.0); vec2 c=vec2(0.3+0.4*lhH(i+1.7),0.3+0.4*lhH(i+4.1)), v=f-c; float d=length(v), r=t*0.42; g+=normalize(v+1e-5)*sin((d-r)*46.0)*smoothstep(0.07,0.0,abs(d-r))*(1.0-t); } return g; }
 float lhPuddle(){ vec2 p=vWPos.xz*0.21; float n=lhN(p)*0.55+lhN(p*2.3+7.1)*0.3+lhN(p*5.1+3.3)*0.15; return smoothstep(0.5,0.6,n); }`)
    .replace('#include <map_fragment>','#include <map_fragment>\nfloat lhP=lhPuddle(); diffuseColor.rgb*=mix(1.0,0.22,lhP);')
    .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor*0.62,0.03,lhP);')
-   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=normalize(mix(normal,normalize(vNormal),lhP*0.97));');
+   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=normalize(mix(normal,normalize(vNormal),lhP*0.97)); if(lhP>0.02){ vec2 rg=lhRip(vWPos.xz)*lhP*0.35; normal=normalize(normal+(viewMatrix*vec4(rg.x,0.0,rg.y,0.0)).xyz); }   /* ondas de las gotas */');
 };
 
 // ---------- reflejos: un entorno pequeño (cielo oscuro y un halo de sodio en el horizonte) para que el suelo mojado tenga qué reflejar
@@ -99,7 +102,7 @@ void main(){ float up=max(d.y,0.0); vec2 q=d.xz/(up+0.22)*1.4+vec2(time*0.012,ti
   vec3 col=mix(fogc,hi,smoothstep(0.0,0.3,up));
   float near=exp(-6.0*distance(d.xz,fp)); col+=vec3(0.55,0.62,0.8)*flash*(0.25+1.6*near)*(0.4+0.8*c)*smoothstep(-0.05,0.25,d.y);
   gl_FragColor=vec4(col,1.0); }`}); const o=new THREE.Mesh(g,m); o.frustumCulled=false; o.renderOrder=-10; scene.add(o); SKY.m=o; })();
-function skyTick(dt,t){ const u=SKY.m.material.uniforms; SKY.m.position.copy(camera.position); u.time.value=t; SKY.t-=dt;
+function skyTick(dt,t){ RIP.value=t; const u=SKY.m.material.uniforms; SKY.m.position.copy(camera.position); u.time.value=t; SKY.t-=dt;
   if(SKY.t<=0){ SKY.t=22+Math.random()*34; SKY.seq=[[0,1],[0.07,0.15],[0.13,0.8],[0.3,0.25],[0.36,0.6],[0.9,0]]; SKY.k=0; const a=Math.random()*6.28; u.fp.value.set(Math.cos(a)*0.7,Math.sin(a)*0.7); SKY.th=0.8+Math.random()*2.2; SKY.thG=0.25+Math.random()*0.3; }
   if(SKY.seq){ SKY.k+=dt; const q=SKY.seq; let v=0; for(let i=0;i<q.length-1;i++)if(SKY.k>=q[i][0]&&SKY.k<q[i+1][0]){ const f=(SKY.k-q[i][0])/(q[i+1][0]-q[i][0]); v=q[i][1]+(q[i+1][1]-q[i][1])*f; } if(SKY.k>=q[q.length-1][0]){ SKY.seq=null; v=0; } SKY.f=v; } else SKY.f=0;
   if(SKY.th>0){ SKY.th-=dt; if(SKY.th<=0){ sNoise(3.2,70,0.4,SKY.thG*1.6); sNoise(1.6,160,0.5,SKY.thG*0.7); } }
@@ -263,6 +266,35 @@ new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
 },e=>{ el('load').textContent='No se pudo cargar la escena: '+(e&&e.message||e); });
 
 // ---------- resplandor
+// ---------- interiores vestidos sin gastar tamaño: todo se dibuja en lienzos. Zócalo pintado en cada pared, carteles, plano de la base, tablón, cuadro de turnos y pantallas en las bombillas.
+function deco(){ const cv=(w,h,fn)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d'); fn(x,w,h); const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=4; return t; };
+  const grime=(x,w,h,n,a)=>{ for(let i=0;i<n;i++){ x.fillStyle='rgba('+(20+Math.random()*30|0)+','+(16+Math.random()*20|0)+',10,'+(Math.random()*a)+')'; const r=4+Math.random()*26; x.beginPath(); x.ellipse(Math.random()*w,Math.random()*h,r,r*(0.4+Math.random()),Math.random()*3,0,6.3); x.fill(); } };
+  const paper=(x,w,h,col)=>{ x.fillStyle=col||'#cfc3a0'; x.fillRect(0,0,w,h); grime(x,w,h,26,0.12); x.strokeStyle='rgba(60,40,20,0.35)'; x.lineWidth=2; x.strokeRect(1,1,w-2,h-2); };
+  const lines=(x,x0,y0,w,n,gap)=>{ x.fillStyle='rgba(30,26,20,0.75)'; for(let i=0;i<n;i++)x.fillRect(x0,y0+i*gap,w*(0.55+0.45*Math.random()),2); };
+  const T_=[
+   cv(256,352,(x,w,h)=>{ paper(x,w,h,'#c9b98c'); x.fillStyle='#8a1a12'; x.fillRect(0,0,w,74); x.fillStyle='#efe6c8'; x.font='bold 30px sans-serif'; x.textAlign='center'; x.fillText('ZONA',w/2,34); x.fillText('RESTRINGIDA',w/2,64); x.fillStyle='#1c1814'; x.font='bold 22px sans-serif'; x.fillText('DESTACAMENTO',w/2,120); x.font='bold 46px serif'; x.fillText('TARSIS',w/2,168); x.strokeStyle='#1c1814'; x.lineWidth=5; x.beginPath(); x.arc(w/2,236,40,0,6.3); x.moveTo(w/2-28,236+28); x.lineTo(w/2+28,236-28); x.stroke(); x.font='15px sans-serif'; x.fillText('Prohibido el paso sin',w/2,304); x.fillText('autorización escrita',w/2,324); }),
+   cv(384,288,(x,w,h)=>{ x.fillStyle='#1d3350'; x.fillRect(0,0,w,h); grime(x,w,h,18,0.1); x.strokeStyle='rgba(190,215,240,0.25)'; x.lineWidth=1; for(let i=0;i<w;i+=24){ x.beginPath(); x.moveTo(i,0); x.lineTo(i,h); x.stroke(); } for(let i=0;i<h;i+=24){ x.beginPath(); x.moveTo(0,i); x.lineTo(w,i); x.stroke(); }
+     const k=Math.min((w-40)/COLS,(h-64)/ROWS), ox=(w-COLS*k)/2, oy=40; for(let y=0;y<ROWS;y++)for(let c=0;c<COLS;c++){ const ch=MAP[y][c]; if('#WLV'.indexOf(ch)>=0){ x.fillStyle='rgba(215,232,250,0.9)'; x.fillRect(ox+c*k,oy+y*k,k+0.5,k+0.5); } else if(ch==='T'){ x.fillStyle='rgba(240,190,90,0.9)'; x.fillRect(ox+c*k,oy+y*k,k,k); } else if('_z'.indexOf(ch)>=0){ x.fillStyle='rgba(215,232,250,0.16)'; x.fillRect(ox+c*k,oy+y*k,k+0.5,k+0.5); } }
+     x.fillStyle='#dfeaf6'; x.font='bold 17px monospace'; x.fillText('DESTACAMENTO TARSIS · PLANTA GENERAL',16,26); x.font='11px monospace'; x.fillText('E 1:400 · USO INTERNO',16,h-8); }),
+   cv(384,256,(x,w,h)=>{ x.fillStyle='#5a3d22'; x.fillRect(0,0,w,h); x.fillStyle='#9a7648'; x.fillRect(10,10,w-20,h-20); for(let i=0;i<900;i++){ x.fillStyle='rgba(60,36,14,'+Math.random()*0.35+')'; x.fillRect(10+Math.random()*(w-20),10+Math.random()*(h-20),2,2); }
+     [[26,24,96,128,'#d8cfae'],[136,30,110,78,'#e2dcc6'],[262,22,96,138,'#cdbf96'],[140,124,104,108,'#d9d2b8'],[30,166,92,66,'#e6dfc0'],[266,172,90,58,'#c9b88c']].forEach((q,i)=>{ x.save(); x.translate(q[0]+q[2]/2,q[1]+q[3]/2); x.rotate((i%3-1)*0.035); x.fillStyle='rgba(0,0,0,0.3)'; x.fillRect(-q[2]/2+3,-q[3]/2+3,q[2],q[3]); x.fillStyle=q[4]; x.fillRect(-q[2]/2,-q[3]/2,q[2],q[3]); lines(x,-q[2]/2+8,-q[3]/2+14,q[2]-16,Math.floor(q[3]/11)-2,10); x.fillStyle=i%2?'#a02018':'#28466e'; x.beginPath(); x.arc(0,-q[3]/2+6,4,0,6.3); x.fill(); x.restore(); }); }),
+   cv(320,256,(x,w,h)=>{ paper(x,w,h,'#d6cca8'); x.fillStyle='#1c1814'; x.font='bold 19px sans-serif'; x.fillText('SERVICIO DE GUARDIA',14,28); x.font='12px monospace'; ['TURNO','PUESTO','NOMBRE'].forEach((t,i)=>x.fillText(t,14+i*100,52)); x.strokeStyle='rgba(30,26,20,0.7)'; x.lineWidth=1; for(let i=0;i<8;i++){ x.beginPath(); x.moveTo(10,60+i*24); x.lineTo(w-10,60+i*24); x.stroke(); } [110,210].forEach(v=>{ x.beginPath(); x.moveTo(v,40); x.lineTo(v,228); x.stroke(); });
+     [['22-02','PATIO N','IBARRA'],['22-02','PATIO S','MOYA'],['22-02','PORTÓN','VEGA'],['22-02','BARRACÓN','RAMOS'],['02-06','RETÉN','PERIS'],['02-06','TORRE','—'],['02-06','ARCHIVO','—']].forEach((r,i)=>r.forEach((t,j)=>x.fillText(t,14+j*100,78+i*24))); x.fillStyle='#8a1a12'; x.font='bold 13px sans-serif'; x.fillText('NOVEDADES A CONTROL CADA MEDIA HORA',14,248); }),
+   cv(256,256,(x,w,h)=>{ x.clearRect(0,0,w,h); x.fillStyle='#22201c'; x.beginPath(); x.arc(128,128,122,0,6.3); x.fill(); x.fillStyle='#d9d2bc'; x.beginPath(); x.arc(128,128,108,0,6.3); x.fill(); x.fillStyle='#1c1814'; for(let i=0;i<12;i++){ const a=i*Math.PI/6; x.save(); x.translate(128+Math.sin(a)*92,128-Math.cos(a)*92); x.rotate(a); x.fillRect(-3,-9,6,18); x.restore(); } x.lineCap='round'; x.strokeStyle='#1c1814'; x.lineWidth=8; x.beginPath(); x.moveTo(128,128); x.lineTo(128-50,128-28); x.stroke(); x.lineWidth=5; x.beginPath(); x.moveTo(128,128); x.lineTo(128+34,128-74); x.stroke(); x.fillStyle='#8a1a12'; x.beginPath(); x.arc(128,128,7,0,6.3); x.fill(); })];
+  const SZ=[[0.62,0.85],[1.25,0.94],[1.3,0.87],[0.95,0.76],[0.42,0.42]];
+  const mats=T_.map((t,i)=>new THREE.MeshStandardMaterial({map:t,color:0xa8a8a8,roughness:0.92,metalness:0,transparent:i===4,alphaTest:i===4?0.5:0}));
+  // zócalo: media pared pintada de verde cuartel con su cenefa y roña cerca del suelo
+  const zt=cv(256,256,(x,w,h)=>{ x.clearRect(0,0,w,h); x.fillStyle='rgba(58,70,52,0.93)'; x.fillRect(0,14,w,h-14); x.fillStyle='rgba(24,28,22,0.95)'; x.fillRect(0,8,w,7); x.fillStyle='rgba(18,16,12,0.9)'; x.fillRect(0,h-22,w,22); const g=x.createLinearGradient(0,h-110,0,h); g.addColorStop(0,'rgba(20,16,10,0)'); g.addColorStop(1,'rgba(20,16,10,0.6)'); x.fillStyle=g; x.fillRect(0,h-110,w,110); grime(x,w,h,40,0.16); for(let i=0;i<14;i++){ x.fillStyle='rgba(150,150,130,'+(0.05+Math.random()*0.1)+')'; x.fillRect(Math.random()*w,30+Math.random()*(h-70),1+Math.random()*2,6+Math.random()*30); } x.clearRect(0,0,w,8); });
+  zt.wrapS=THREE.RepeatWrapping; const zm=new THREE.MeshStandardMaterial({map:zt,roughness:0.6,metalness:0,transparent:true,polygonOffset:true,polygonOffsetFactor:-2});
+  const faces=[]; for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){ if('_z'.indexOf(MAP[y][x])<0)continue; for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){ const n=(MAP[y+d[1]]||'')[x+d[0]]; if(n==='W'||n==='#')faces.push([x,y,d[0],d[1]]); } }
+  const im=new THREE.InstancedMesh(new THREE.PlaneGeometry(T,1.25),zm,faces.length), o=new THREE.Object3D(); faces.forEach((f,i)=>{ o.position.set(f[0]*T+T/2+f[2]*(T/2-0.012),0.625,f[1]*T+T/2+f[3]*(T/2-0.012)); o.rotation.set(0,Math.atan2(-f[2],-f[3]),0); o.updateMatrix(); im.setMatrixAt(i,o.matrix); }); im.receiveShadow=true; im.frustumCulled=false; scene.add(im);
+  // carteles: uno de cada cinco paños de pared, lejos de puertas y sin mueble alto delante; el tipo sale de la casilla, así que siempre están en el mismo sitio
+  const hh=(a,b,c)=>{ const v=Math.sin(a*127.1+b*311.7+c*74.7)*43758.5453; return v-Math.floor(v); }; let cnt=0;
+  faces.forEach(f=>{ const [x,y,dx,dy]=f; if(hh(x,y,dx*2+dy)>0.24)return; for(const d of [[1,0],[-1,0],[0,1],[0,-1],[0,0]]){ const n=(MAP[y+d[1]]||'')[x+d[0]]; if('DLVdb'.indexOf(n)>=0)return; } const px=x*T+T/2+dx*(T/2-0.02), pz=y*T+T/2+dy*(T/2-0.02); if(gObst(px-dx*0.35,pz-dy*0.35))return;
+    const k=Math.floor(hh(x,y,7)*5), m=new THREE.Mesh(new THREE.PlaneGeometry(SZ[k][0],SZ[k][1]),mats[k]); m.position.set(px,k===4?2.45:1.95,pz); m.rotation.y=Math.atan2(-dx,-dy); m.rotation.z=(hh(x,y,3)-0.5)*0.03; m.receiveShadow=true; scene.add(m); cnt++; });
+  // pantalla de chapa sobre cada bombilla
+  const sm=new THREE.MeshStandardMaterial({color:0x2c3a2e,roughness:0.5,metalness:0.6,side:THREE.DoubleSide}); LIT.forEach(s=>{ if(s.R!==7.5)return; const c=new THREE.Mesh(new THREE.ConeGeometry(0.24,0.16,18,1,true),sm); c.position.set(s.x,s.y+0.1,s.z); scene.add(c); });
+  stats.deco=cnt; }
 let composer=null, bloom=null, useBloom=!LOW;
 // El compositor trabaja en lineal y con margen (medio flotante); la última pasada hace el revelado: exposición, curva ACES, viñeta y grano.
 const FINAL={uniforms:{tDiffuse:{value:null},exposure:{value:0.8},time:{value:0},tS:{value:new THREE.Vector3(1,1,1)},tH:{value:new THREE.Vector3(1,1,1)},sat:{value:1},con:{value:1}},vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
@@ -284,7 +316,7 @@ function mkComposer(){ const pr=renderer.getPixelRatio(); const rt=new THREE.Web
 if(THREE.EffectComposer&&THREE.UnrealBloomPass)mkComposer(); else useBloom=false; setPal(palI,true);
 
 // ---------- recorrido a pie: WASD y ratón, con las paredes del plano
-const OBST=(INFO.obst||[]).filter(o=>o[3]>0.15&&o[4]>0.15);
+const OBST=(INFO.obst||[]).filter(o=>o[3]>0.15&&o[4]>0.15); deco();
 const solid=(x,y)=>{ if(x<0||y<0||x>=COLS||y>=ROWS)return true; return '#WTcgLVb'.indexOf(MAP[y][x])>=0; };
 const P={x:0,z:0,yaw:0,pitch:0,vy:0,bob:0}; (function(){ let sx=2,sy=2; MAP.forEach((r,y)=>{ const i=r.indexOf('P'); if(i>=0){ sx=i; sy=y; } }); P.x=sx*T+T/2; P.z=sy*T+T/2; P.yaw=-2.2; })();
 const keys={}; addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='KeyB'&&composer){ useBloom=!useBloom; } if(e.code==='KeyH'){ el('hud').hidden=!el('hud').hidden; }
