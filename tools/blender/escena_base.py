@@ -329,49 +329,85 @@ def flush_smooth(prefix):
         o = bpy.data.objects.new(prefix + '_' + mat, me); col.objects.link(o)
     SM.clear()
 
+def rprofile(mat, pts, width, center=(0, 0, 0), r=0.03, seg=2, M0=None, along='X'):
+    """Extruye un perfil 2D. along='X': puntos (y, z) extruidos a lo ancho; along='Y': puntos (x, z) extruidos a lo largo."""
+    bm = bmesh.new(); f = bm.faces.new([bm.verts.new((-width / 2, a, b)) for a, b in pts])
+    ext = bmesh.ops.extrude_face_region(bm, geom=[f]); bmesh.ops.translate(bm, vec=(width, 0, 0), verts=[e for e in ext['geom'] if isinstance(e, bmesh.types.BMVert)])
+    if r > 0: bmesh.ops.bevel(bm, geom=list(bm.edges), offset=r, segments=seg, affect='EDGES', profile=0.5, clamp_overlap=True)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+    M = Matrix.Translation(center) @ (Matrix(((0, 1, 0, 0), (1, 0, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))) if along == 'Y' else Matrix.Identity(4))
+    bmesh.ops.transform(bm, matrix=(M0 @ M) if M0 is not None else M, verts=bm.verts); bmesh.ops.recalc_face_normals(bm, faces=bm.faces); _append(mat, bm)
+
 def truck(pos, rotz):
-    """Camión ligero 4x4 de cabina avanzada con caja de lona. Frente hacia -Y; cabe en el bloque de 4 x 4 m del plano."""
-    M0 = Matrix.Translation(pos + Vector((0, 0, -0.07))) @ Matrix.Rotation(rotz, 4, 'Z'); V = Vector
-    B = lambda mat, size, c, r=0.03, rot=None: rbox(mat, size, V(c), r, 3, rot, M0)
-    C = lambda mat, rad, dep, c, axis='Z', r=0.02, seg=28: rcyl(mat, rad, dep, V(c), axis, r, seg, M0)
+    """Camión ligero 4x4 de cabina corta y ruedas grandes (del estilo de los Unimog de la época), con caja de lona.
+    Frente hacia -Y; mide 4 x 2,1 m y cabe en el bloque de 4 x 4 m del plano."""
+    M0 = Matrix.Translation(pos) @ Matrix.Rotation(rotz, 4, 'Z'); V = Vector; rad = math.radians
+    B = lambda mat, size, c, r=0.02, rot=None: rbox(mat, size, V(c), r, 2, rot, M0)
+    C = lambda mat, ra, dep, c, axis='Z', r=0.02, seg=24: rcyl(mat, ra, dep, V(c), axis, r, seg, M0)
+    Pr = lambda mat, pts, w, c=(0, 0, 0), r=0.03, along='X': rprofile(mat, pts, w, V(c), r, 2, M0, along)
+    arc = lambda y0, z0, R, th, a0=18, a1=162, n=10: [(y0 + R * math.cos(rad(a0 + (a1 - a0) * k / n)), z0 + R * math.sin(rad(a0 + (a1 - a0) * k / n))) for k in range(n + 1)] + [(y0 + (R - th) * math.cos(rad(a1 - (a1 - a0) * k / n)), z0 + (R - th) * math.sin(rad(a1 - (a1 - a0) * k / n))) for k in range(n + 1)]
+    RW, ZW = 0.5, 0.5; AX = (-1.12, 1.18)
+    # ruedas con taco, llanta de disco y tuercas
     for s in (-1, 1):
-        B('bajos', (0.14, 3.7, 0.2), (s * 0.42, 0, 0.78))
-        for y in (-1.15, 1.05):
-            C('goma', 0.45, 0.3, (s * 1.0, y, 0.52), 'X', 0.09, 40); C('oliva', 0.25, 0.32, (s * 1.0, y, 0.52), 'X', 0.03, 24)
-            C('bajos', 0.1, 0.36, (s * 1.0, y, 0.52), 'X', 0.02, 12)
+        for y in AX:
+            x = s * 0.86
+            C('goma', RW - 0.025, 0.3, (x, y, ZW), 'X', 0.07, 40)
+            for k in range(26):
+                a = k * 2 * math.pi / 26; side = 1 if k % 2 else -1
+                rbox('goma', (0.15, 0.085, 0.05), V((x + side * 0.07, y + math.cos(a) * (RW - 0.012), ZW + math.sin(a) * (RW - 0.012))), 0.008, 1, Matrix.Rotation(a - math.pi / 2, 4, 'X') @ Matrix.Rotation(side * 0.35, 4, 'Z'), M0)
+            C('goma', 0.41, 0.33, (x, y, ZW), 'X', 0.05, 40)                                   # flanco
+            C('oliva', 0.31, 0.2, (x + s * 0.075, y, ZW), 'X', 0.03, 32); C('bajos', 0.25, 0.2, (x + s * 0.079, y, ZW), 'X', 0.04, 28); C('oliva', 0.2, 0.2, (x + s * 0.086, y, ZW), 'X', 0.03, 24)
+            C('oliva', 0.09, 0.14, (x + s * 0.15, y, ZW), 'X', 0.03, 16)
             for k in range(6):
-                a = k * math.pi / 3; C('metal', 0.022, 0.04, (s * 1.165, y + math.cos(a) * 0.17, 0.52 + math.sin(a) * 0.17), 'X', 0, 6)
-        B('goma', (0.46, 0.025, 0.42), (s * 1.0, 1.72, 0.6), 0.005)                      # faldillas
-        B('oliva', (0.52, 1.25, 0.07), (s * 1.0, -1.15, 1.08), 0.03)                       # aleta
-        B('oliva', (0.52, 0.34, 0.07), (s * 1.0, -1.86, 0.96), 0.03, Matrix.Rotation(math.radians(-38), 4, 'X'))
-        B('oliva', (0.52, 0.3, 0.07), (s * 1.0, -0.46, 0.97), 0.03, Matrix.Rotation(math.radians(38), 4, 'X'))
-        B('bajos', (0.34, 0.55, 0.05), (s * 1.12, -0.62, 0.74), 0.015)                     # estribo
-        C('faro', 0.1, 0.08, (s * 0.6, -1.93, 1.3), 'Y', 0.02, 20); C('oscuro', 0.125, 0.06, (s * 0.6, -1.9, 1.3), 'Y', 0.01, 20)
-        B('piloto', (0.1, 0.04, 0.07), (s * 0.95, -1.9, 1.18), 0.01)
-        B('oscuro', (0.03, 0.03, 0.34), (s * 1.16, -1.06, 1.95), 0.008); B('oscuro', (0.04, 0.16, 0.26), (s * 1.2, -1.08, 2.12), 0.02)   # retrovisor
-        B('cristal', (0.03, 0.58, 0.44), (s * 1.012, -0.6, 2.0), 0.01)                     # ventanilla
-        B('metal', (0.03, 0.12, 0.03), (s * 1.06, -0.3, 1.55), 0.01)                       # manilla
-        for k in range(3): B('oliva', (0.04, 2.14, 0.17), (s * 1.15, 0.95, 1.2 + k * 0.2), 0.012)      # adrales
-        for y in (0.0, 0.95, 1.9): B('bajos', (0.05, 0.07, 0.7), (s * 1.18, y, 1.4), 0.01)
-        B('piloto', (0.14, 0.04, 0.1), (s * 0.95, 2.03, 0.98), 0.01)
-    for y in (-1.15, 1.05): C('bajos', 0.07, 2.0, (0, y, 0.52), 'X', 0, 10); B('bajos', (0.42, 0.42, 0.38), (0, y, 0.52), 0.16)
-    C('bajos', 0.05, 2.2, (0, -0.05, 0.58), 'Y', 0, 8)                                      # transmisión
-    B('bajos', (2.34, 0.14, 0.24), (0, -1.96, 0.76), 0.03); B('bajos', (2.2, 0.1, 0.16), (0, 2.02, 0.8), 0.02)   # parachoques
-    B('metal', (0.42, 0.02, 0.12), (0, -2.04, 0.76), 0.004)                               # matrícula
-    B('oliva', (1.52, 0.86, 0.6), (0, -1.5, 1.32), 0.09); B('oscuro', (1.1, 0.05, 0.42), (0, -1.935, 1.3), 0.01)
-    for k in range(7): B('oliva', (0.035, 0.04, 0.42), (-0.45 + k * 0.15, -1.955, 1.3), 0.008)
-    B('oliva', (2.12, 1.02, 0.8), (0, -0.62, 1.32), 0.07); B('oliva', (2.02, 0.92, 0.74), (0, -0.58, 2.0), 0.12)
-    B('lona', (2.06, 0.96, 0.1), (0, -0.58, 2.36), 0.04)
-    for s in (-1, 1): B('cristal', (0.8, 0.03, 0.46), (s * 0.44, -1.045, 2.02), 0.01)
-    B('oscuro', (0.5, 0.02, 0.03), (0.35, -1.07, 1.84), 0.005, Matrix.Rotation(0.5, 4, 'Y'))   # limpiaparabrisas
-    C('oliva', 0.23, 0.72, (-0.86, 0.25, 0.8), 'Y', 0.06, 20); B('bajos', (0.42, 0.6, 0.36), (0.86, 0.25, 0.8), 0.03)
-    C('oscuro', 0.05, 1.7, (0.92, -0.06, 1.75), 'Z', 0.01, 12); C('oscuro', 0.075, 0.5, (0.92, -0.06, 1.5), 'Z', 0.02, 12)
-    B('bajos', (2.34, 2.16, 0.1), (0, 0.95, 1.08), 0.02); B('oliva', (2.3, 0.04, 0.6), (0, 2.02, 1.4), 0.012)
-    B('lona', (2.4, 2.2, 1.3), (0, 0.95, 2.02), 0.22)                                      # lona con arcos
-    for y in (-0.05, 0.95, 1.95): B('lona', (2.44, 0.07, 1.33), (0, y, 2.02), 0.23)
-    for y in (0.45, 1.45):
-        for s in (-1, 1): B('oscuro', (0.015, 0.05, 0.5), (s * 1.205, y, 1.62), 0.004)
-    B('lona', (2.2, 0.03, 1.0), (0, 2.045, 1.95), 0.01)
+                a = k * math.pi / 3; C('metal', 0.02, 0.03, (x + s * 0.186, y + math.cos(a) * 0.15, ZW + math.sin(a) * 0.15), 'X', 0.004, 6)
+            # ballestas y guardabarros
+            for k in range(4): B('bajos', (0.07, 1.0 - k * 0.16, 0.022), (s * 0.5, y, ZW + 0.2 + k * 0.024), 0.004)
+        Pr('oliva', arc(AX[0], ZW, 0.66, 0.035), 0.44, (s * 0.86, 0, 0), 0.01)
+        Pr('bajos', arc(AX[1], ZW, 0.64, 0.03, 30, 150), 0.4, (s * 0.86, 0, 0), 0.008)
+        B('goma', (0.4, 0.02, 0.36), (s * 0.86, AX[1] + 0.6, 0.52), 0.004)
+        B('bajos', (0.12, 3.75, 0.2), (s * 0.4, 0.02, 0.86), 0.02)                               # largueros
+        B('bajos', (0.3, 0.6, 0.05), (s * 1.0, -0.62, 0.72), 0.012); B('bajos', (0.04, 0.04, 0.3), (s * 0.95, -0.4, 0.86), 0.008); B('bajos', (0.04, 0.04, 0.3), (s * 0.95, -0.84, 0.86), 0.008)   # estribo
+        # faros con aro, intermitentes, retrovisores, puertas
+        C('oscuro', 0.125, 0.07, (s * 0.72, -1.93, 1.22), 'Y', 0.015, 24); C('faro', 0.1, 0.06, (s * 0.72, -1.955, 1.22), 'Y', 0.02, 24); C('metal', 0.112, 0.02, (s * 0.72, -1.962, 1.22), 'Y', 0.006, 24)
+        B('piloto', (0.09, 0.035, 0.06), (s * 0.72, -1.95, 1.4), 0.01)
+        B('oscuro', (0.025, 0.025, 0.42), (s * 1.06, -1.2, 1.95), 0.006, Matrix.Rotation(s * -0.25, 4, 'Y')); B('oscuro', (0.035, 0.15, 0.24), (s * 1.12, -1.22, 2.12), 0.015)
+        B('cristal', (0.02, 0.62, 0.4), (s * 1.004, -0.64, 1.98), 0.006)
+        for yy in (-1.02, -0.22): B('bajos', (0.012, 0.014, 0.72), (s * 1.006, yy, 1.36), 0)   # juntas de la puerta
+        B('bajos', (0.012, 0.8, 0.014), (s * 1.006, -0.62, 1.0), 0); B('metal', (0.025, 0.11, 0.025), (s * 1.02, -0.32, 1.62), 0.008)
+        # adrales de chapa con nervios, pilotos traseros
+        B('oliva', (0.035, 1.98, 0.42), (s * 1.03, 1.0, 1.31), 0.008); B('oliva', (0.05, 1.98, 0.04), (s * 1.035, 1.0, 1.52), 0.01)
+        for yy in (0.1, 0.55, 1.0, 1.45, 1.9): B('oliva', (0.05, 0.06, 0.4), (s * 1.045, yy, 1.3), 0.01)
+        for yy in (0.4, 1.0, 1.6): B('metal', (0.03, 0.05, 0.03), (s * 1.07, yy, 1.42), 0.006); B('oscuro', (0.012, 0.03, 0.34), (s * 1.075, yy, 1.6), 0.003)   # ganchos y correas de la lona
+        B('piloto', (0.12, 0.03, 0.08), (s * 0.88, 2.0, 1.0), 0.01); B('faro', (0.06, 0.03, 0.06), (s * 0.72, 2.0, 1.0), 0.008)
+        B('bajos', (0.05, 0.16, 0.08), (s * 0.5, -1.99, 0.84), 0.015)                           # ganchos de remolque
+    for y in AX:
+        C('bajos', 0.065, 1.6, (0, y, ZW), 'X', 0, 12); B('bajos', (0.34, 0.36, 0.34), (0.12, y, ZW), 0.13)
+    C('bajos', 0.045, 2.2, (0.12, 0.03, 0.6), 'Y', 0, 8)
+    B('bajos', (2.0, 0.1, 0.2), (0, -1.93, 0.82), 0.03); B('bajos', (1.9, 0.08, 0.14), (0, 1.97, 0.84), 0.02); B('metal', (0.4, 0.015, 0.11), (0.0, -1.985, 0.82), 0.003)
+    # cabina: perfil con morro corto inclinado y parabrisas tendido
+    Pr('oliva', [(-1.9, 0.95), (-1.9, 1.5), (-1.82, 1.6), (-1.38, 1.72), (-1.12, 2.3), (-0.2, 2.3), (-0.12, 2.22), (-0.12, 0.95)], 2.0, r=0.045)
+    Pr('lona', [(-1.1, 2.3), (-1.06, 2.36), (-0.24, 2.36), (-0.2, 2.3)], 1.9, r=0.012)
+    ws = Matrix.Rotation(math.atan2(0.58, 0.26), 4, 'X')
+    for s in (-1, 1): B('cristal', (0.82, 0.5, 0.02), (s * 0.44, -1.262, 2.005), 0.004, ws)
+    B('oliva', (0.05, 0.56, 0.03), (0, -1.265, 2.006), 0.006, ws); B('bajos', (1.84, 0.025, 0.03), (0, -1.395, 1.735), 0.006)
+    for s in (-1, 1): B('oscuro', (0.4, 0.014, 0.014), (s * 0.4, -1.375, 1.82), 0.003, Matrix.Rotation(s * 0.5, 4, 'Y') @ ws)
+    B('oscuro', (1.24, 0.03, 0.42), (0, -1.905, 1.22), 0.01)
+    for k in range(5): B('oliva', (1.2, 0.03, 0.035), (0, -1.925, 1.06 + k * 0.08), 0.008)
+    B('oliva', (0.05, 0.05, 0.06), (0, -1.8, 1.64), 0.012)
+    C('oscuro', 0.006, 1.7, (-0.9, -0.2, 3.1), 'Z', 0, 5); C('oscuro', 0.03, 0.12, (-0.9, -0.2, 2.3), 'Z', 0.008, 8)    # antena
+    C('oscuro', 0.045, 1.5, (0.94, -0.06, 1.75), 'Z', 0.01, 12); C('metal', 0.07, 0.42, (0.94, -0.06, 1.35), 'Z', 0.02, 12)   # escape
+    C('oliva', 0.21, 0.6, (-0.82, 0.3, 0.8), 'Y', 0.05, 20); C('metal', 0.04, 0.04, (-0.82, 0.3, 1.02), 'Z', 0.008, 10)        # depósito
+    B('bajos', (0.36, 0.56, 0.34), (0.84, 0.3, 0.8), 0.025)
+    # caja y lona con arcos
+    B('bajos', (2.06, 1.98, 0.1), (0, 1.0, 1.06), 0.015); B('oliva', (2.06, 0.035, 0.42), (0, 1.975, 1.31), 0.008); B('oliva', (2.06, 0.035, 0.42), (0, 0.025, 1.31), 0.008)
+    lona = [(-1.05, 1.5), (-1.05, 2.12), (-0.96, 2.32), (-0.72, 2.45), (-0.3, 2.5), (0.3, 2.5), (0.72, 2.45), (0.96, 2.32), (1.05, 2.12), (1.05, 1.5)]
+    Pr('lona', lona, 1.94, (0, 1.0, 0), 0.03, 'Y')
+    for yy in (0.06, 0.68, 1.32, 1.94): Pr('lona', [(x * 1.014, 1.5 + (z - 1.5) * 1.012) for x, z in lona], 0.05, (0, yy, 0), 0.012, 'Y')
+    B('oscuro', (1.7, 0.012, 0.9), (0, 1.975, 1.98), 0.004)                                 # trasera abierta en sombra
+    for s in (-1, 1): Pr('lona', [(-0.12, 1.5), (-0.12, 2.3), (0.12, 2.42), (0.12, 1.5)], 0.03, (s * 0.92, 1.985, 0), 0.008, 'Y')
+    C('lona', 0.07, 1.8, (0, 1.99, 2.42), 'X', 0.02, 12)                                    # lona trasera enrollada
+    if has_ph('metal_jerrycan_green'):
+        for k in (0, 1): put('metal_jerrycan_green', M0 @ V((1.0 if not k else -1.0, -0.62 + 0.0, 0.745)), rotz + math.pi / 2)
 
 # ---------------------------------------------------------------- modelos escaneados de Poly Haven (assets/modelos-ph)
 PHDIR = os.path.join(R, 'assets', 'modelos-ph'); PH = {}
