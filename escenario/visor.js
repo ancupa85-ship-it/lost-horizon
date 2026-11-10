@@ -105,7 +105,7 @@ void main(){ float up=max(d.y,0.0); vec2 q=d.xz/(up+0.22)*1.4+vec2(time*0.012,ti
   vec3 col=mix(fogc,hi,smoothstep(0.0,0.3,up));
   float near=exp(-6.0*distance(d.xz,fp)); col+=vec3(0.55,0.62,0.8)*flash*(0.25+1.6*near)*(0.4+0.8*c)*smoothstep(-0.05,0.25,d.y);
   gl_FragColor=vec4(col,1.0); }`}); const o=new THREE.Mesh(g,m); o.frustumCulled=false; o.renderOrder=-10; scene.add(o); SKY.m=o; })();
-function skyTick(dt,t){ RIP.value=t; const u=SKY.m.material.uniforms; SKY.m.position.copy(camera.position); u.time.value=t; SKY.t-=dt;
+function skyTick(dt,t){ RIP.value=t; patioTick(dt,t); const u=SKY.m.material.uniforms; SKY.m.position.copy(camera.position); u.time.value=t; SKY.t-=dt;
   if(SKY.t<=0){ SKY.t=22+Math.random()*34; SKY.seq=[[0,1],[0.07,0.15],[0.13,0.8],[0.3,0.25],[0.36,0.6],[0.9,0]]; SKY.k=0; const a=Math.random()*6.28; u.fp.value.set(Math.cos(a)*0.7,Math.sin(a)*0.7); SKY.th=0.8+Math.random()*2.2; SKY.thG=0.25+Math.random()*0.3; }
   if(SKY.seq){ SKY.k+=dt; const q=SKY.seq; let v=0; for(let i=0;i<q.length-1;i++)if(SKY.k>=q[i][0]&&SKY.k<q[i+1][0]){ const f=(SKY.k-q[i][0])/(q[i+1][0]-q[i][0]); v=q[i][1]+(q[i+1][1]-q[i][1])*f; } if(SKY.k>=q[q.length-1][0]){ SKY.seq=null; v=0; } SKY.f=v; } else SKY.f=0;
   if(SKY.th>0){ SKY.th-=dt; if(SKY.th<=0){ sNoise(2.2,75,0.4,SKY.thG*1.8); } }
@@ -299,6 +299,41 @@ function deco(){ const cv=(w,h,fn)=>{ const c=document.createElement('canvas'); 
   const sm=new THREE.MeshStandardMaterial({color:0x2c3a2e,roughness:0.5,metalness:0.6,side:THREE.DoubleSide}); LIT.forEach(s=>{ if(s.R!==7.5)return; const c=new THREE.Mesh(new THREE.ConeGeometry(0.24,0.16,18,1,true),sm); c.position.set(s.x,s.y+0.1,s.z); scene.add(c); });
   if(renderer.initTexture)T_.concat([zt]).forEach(t=>{ try{ renderer.initTexture(t); }catch(e){} });   // subir las texturas ya, no al entrar en la habitación
   stats.deco=cnt; }
+// ---------- patio vestido, todo dibujado en lienzos y en mallas instanciadas (pocas llamadas de dibujo): hierbajos al pie de los muros, manchas y grietas, tapas de alcantarilla con vapor y hojas que arrastra el viento
+const STEAM=[];
+function patio(){ const hh=(a,b,c)=>{ const v=Math.sin(a*127.1+b*311.7+c*74.7)*43758.5453; return v-Math.floor(v); }, out=(x,y)=>'.sl'.indexOf((MAP[y]||'')[x]||'#')>=0, o=new THREE.Object3D();
+  const cv=(w,h,fn)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d'); fn(x,w,h); const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=4; if(renderer.initTexture)try{ renderer.initTexture(t); }catch(e){} return t; };
+  // hierbajos: mata de briznas en dos planos cruzados
+  const gt=cv(128,128,(x,w,h)=>{ for(let i=0;i<46;i++){ const bx=14+Math.random()*(w-28), ht=30+Math.random()*86, lean=(Math.random()-0.5)*46, g=60+Math.random()*60|0; x.strokeStyle='rgb('+(g*0.62|0)+','+g+','+(g*0.35|0)+')'; x.lineWidth=1.5+Math.random()*2.2; x.beginPath(); x.moveTo(bx,h); x.quadraticCurveTo(bx+lean*0.3,h-ht*0.6,bx+lean,h-ht); x.stroke(); } for(let i=0;i<5;i++){ x.fillStyle='rgb(150,140,70)'; x.fillRect(20+Math.random()*88,20+Math.random()*50,3,3); } });
+  const gg=new THREE.BufferGeometry(), P_=[],U_=[],N_=[],I_=[]; [0,Math.PI/2].forEach((a,k)=>{ const c=Math.cos(a)*0.5, sn=Math.sin(a)*0.5; P_.push(-c,0,-sn, c,0,sn, c,1,sn, -c,1,-sn); U_.push(0,0,1,0,1,1,0,1); for(let i=0;i<4;i++)N_.push(0,1,0); I_.push(k*4,k*4+1,k*4+2,k*4,k*4+2,k*4+3); });
+  gg.setAttribute('position',new THREE.Float32BufferAttribute(P_,3)); gg.setAttribute('uv',new THREE.Float32BufferAttribute(U_,2)); gg.setAttribute('normal',new THREE.Float32BufferAttribute(N_,3)); gg.setIndex(I_);
+  const spots=[]; for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){ if(!out(x,y))continue; for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){ const n=(MAP[y+d[1]]||'')[x+d[0]]; if(n!=='W'&&n!=='#')continue; const k=Math.floor(hh(x,y,d[0]*3+d[1])*4); for(let i=0;i<k;i++){ const u=hh(x,y,i*7+d[0])-0.5, px=x*T+T/2+d[0]*(T/2-0.12-hh(x,i,2)*0.2)+(d[0]?0:u*T), pz=y*T+T/2+d[1]*(T/2-0.12-hh(y,i,3)*0.2)+(d[1]?0:u*T); spots.push([px,pz,0.28+hh(x+i,y,5)*0.42]); } }
+    if(hh(x,y,31)<0.1)for(let i=0;i<3;i++)spots.push([x*T+hh(x,y,40+i)*T,y*T+hh(x,y,50+i)*T,0.16+hh(x,y,60+i)*0.2]); }
+  const gm=new THREE.MeshStandardMaterial({map:gt,alphaTest:0.4,side:THREE.DoubleSide,roughness:0.9,metalness:0,color:0x6f7a62}), gi=new THREE.InstancedMesh(gg,gm,spots.length); spots.forEach((q,i)=>{ o.position.set(q[0],0,q[1]); o.rotation.set(0,hh(q[0],q[1],1)*3,0); o.scale.set(q[2]*1.5,q[2],q[2]*1.5); o.updateMatrix(); gi.setMatrixAt(i,o.matrix); }); gi.frustumCulled=false; gi.receiveShadow=true; scene.add(gi);
+  // manchas, grietas y rodadas: calcomanías planas sobre el asfalto
+  const blob=(x,w,h,col,n)=>{ for(let i=0;i<n;i++){ const r=10+Math.random()*44, g=x.createRadialGradient(0,0,0,0,0,r); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); x.save(); x.translate(w/2+(Math.random()-0.5)*w*0.5,h/2+(Math.random()-0.5)*h*0.5); x.scale(1,0.5+Math.random()*0.8); x.fillStyle=g; x.beginPath(); x.arc(0,0,r,0,6.3); x.fill(); x.restore(); } };
+  const DT=[cv(256,256,(x,w,h)=>{ blob(x,w,h,'rgba(6,5,4,0.85)',14); }),
+    cv(256,256,(x,w,h)=>{ x.strokeStyle='rgba(8,7,6,0.9)'; for(let k=0;k<3;k++){ let px=30+Math.random()*40, py=30+Math.random()*190; x.lineWidth=2.4; x.beginPath(); x.moveTo(px,py); for(let i=0;i<14;i++){ px+=10+Math.random()*10; py+=(Math.random()-0.5)*26; x.lineTo(px,py); if(i%5===2){ x.lineTo(px+12,py+(Math.random()-0.5)*50); x.moveTo(px,py); } } x.stroke(); } }),
+    cv(128,512,(x,w,h)=>{ for(const u of [22,86]){ for(let i=0;i<h;i+=7){ x.fillStyle='rgba(8,7,6,'+(0.25+Math.random()*0.4)+')'; x.fillRect(u+Math.sin(i*0.02)*4,i,20,4); } } const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,'rgba(0,0,0,1)'); g.addColorStop(0.2,'rgba(0,0,0,0)'); g.addColorStop(0.8,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,1)'); x.globalCompositeOperation='destination-out'; x.fillStyle=g; x.fillRect(0,0,w,h); }),
+    cv(128,128,(x,w,h)=>{ x.fillStyle='#1b1a18'; x.beginPath(); x.arc(64,64,62,0,6.3); x.fill(); x.fillStyle='#3a3833'; x.beginPath(); x.arc(64,64,54,0,6.3); x.fill(); x.strokeStyle='#161514'; x.lineWidth=5; for(let i=-3;i<=3;i++){ x.beginPath(); x.moveTo(64+i*15,18); x.lineTo(64+i*15,110); x.stroke(); } x.lineWidth=3; x.beginPath(); x.arc(64,64,40,0,6.3); x.stroke(); })];
+  const DS=[[2.6,2.6],[3.2,3.2],[1.7,6.5],[0.9,0.9]], lists=[[],[],[],[]];
+  for(let y=1;y<ROWS-1;y++)for(let x=1;x<COLS-1;x++){ if(!out(x,y))continue; const r=hh(x,y,90); if(r<0.1)lists[0].push([x,y]); else if(r<0.2)lists[1].push([x,y]); else if(r<0.235&&out(x,y+1)&&out(x,y-1))lists[2].push([x,y]); }
+  // alcantarillas: pocas, en casillas despejadas y separadas entre sí
+  for(let y=2;y<ROWS-2&&lists[3].length<5;y++)for(let x=2;x<COLS-2;x++){ if(hh(x,y,123)>0.035)continue; let ok=true; for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)if(MAP[y+b][x+a]!=='.')ok=false; if(ok&&lists[3].every(q=>Math.abs(q[0]-x)+Math.abs(q[1]-y)>9))lists[3].push([x,y]); }
+  lists.forEach((L,k)=>{ if(!L.length)return; const m=new THREE.MeshStandardMaterial({map:DT[k],transparent:true,depthWrite:false,roughness:k===0?0.12:0.8,metalness:k===3?0.5:0,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3}), g=new THREE.PlaneGeometry(DS[k][0],DS[k][1]); g.rotateX(-Math.PI/2); const im=new THREE.InstancedMesh(g,m,L.length);
+    L.forEach((q,i)=>{ o.position.set(q[0]*T+T/2+(k===3?0:(hh(q[0],q[1],4)-0.5)),0.02+k*0.004,q[1]*T+T/2+(k===3?0:(hh(q[0],q[1],6)-0.5))); o.rotation.set(0,k===2?(hh(q[0],q[1],8)-0.5)*0.2:hh(q[0],q[1],8)*6.28,0); o.scale.set(1,1,1); o.updateMatrix(); im.setMatrixAt(i,o.matrix); }); im.frustumCulled=false; im.receiveShadow=true; im.renderOrder=1; scene.add(im); });
+  // vapor: unas pocas volutas por alcantarilla y junto al generador, que suben, se ensanchan y se deshacen
+  const st=cv(64,64,(x,w,h)=>{ const g=x.createRadialGradient(32,32,2,32,32,31); g.addColorStop(0,'rgba(255,255,255,0.55)'); g.addColorStop(0.5,'rgba(255,255,255,0.2)'); g.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=g; x.fillRect(0,0,w,h); });
+  const src=lists[3].map(q=>[q[0]*T+T/2,q[1]*T+T/2]); for(let y=0;y<ROWS;y++){ const i=MAP[y].indexOf('g'); if(i>=0)src.push([i*T+T/2+0.9,y*T+T/2+0.6]); }
+  src.forEach((q,k)=>{ for(let i=0;i<5;i++){ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:st,color:0xb9b2a6,transparent:true,depthWrite:false,opacity:0})); sp.position.set(q[0],0.1,q[1]); scene.add(sp); STEAM.push({sp,x:q[0],z:q[1],ph:i/5+k*0.13}); } });
+  // hojas y papeles: puntos que el viento arrastra a ras de suelo alrededor de la cámara
+  const NL=LOW?40:90, lp=new Float32Array(NL*3), ls=new Float32Array(NL); for(let i=0;i<NL;i++){ lp[i*3]=Math.random()*40; lp[i*3+1]=Math.random(); lp[i*3+2]=Math.random()*40; ls[i]=Math.random(); }
+  const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.BufferAttribute(lp,3)); lg.setAttribute('seed',new THREE.BufferAttribute(ls,1));
+  const lm=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{time:RIP,cam:{value:new THREE.Vector3()},fogD:{value:0.034}},
+    vertexShader:'uniform float time; uniform vec3 cam; attribute float seed; varying float vS; varying float vD; void main(){ vS=seed; float sp=1.6+seed*2.4; vec3 p=position; p.x=mod(p.x+time*sp+sin(time*0.7+seed*30.0)*1.5-cam.x,40.0)-20.0+cam.x; p.z=mod(p.z+time*sp*0.35+cos(time*0.5+seed*17.0)*1.2-cam.z,40.0)-20.0+cam.z; float gust=max(0.0,sin(time*0.6+seed*12.0)); p.y=0.04+gust*gust*(0.25+seed*0.9)*abs(sin(time*2.0+seed*40.0)); vec4 mv=modelViewMatrix*vec4(p,1.0); vD=-mv.z; gl_Position=projectionMatrix*mv; gl_PointSize=min(26.0,(2.6+seed*3.2)*(22.0/max(2.0,vD))); }',
+    fragmentShader:'uniform float time; uniform float fogD; varying float vS; varying float vD; void main(){ vec2 c=gl_PointCoord-0.5; float a=time*(2.0+vS*5.0)+vS*20.0; c=mat2(cos(a),-sin(a),sin(a),cos(a))*c; if(abs(c.x)>0.45||abs(c.y)>0.16+0.2*step(0.85,vS))discard; vec3 col=vS>0.85?vec3(0.34,0.32,0.27):mix(vec3(0.16,0.1,0.04),vec3(0.3,0.2,0.07),fract(vS*7.0)); float f=exp(-fogD*fogD*vD*vD); gl_FragColor=vec4(col*0.55*f,f*0.95); }'});
+  const pts=new THREE.Points(lg,lm); pts.frustumCulled=false; scene.add(pts); STEAM.leaf=lm; stats.patio=spots.length; }
+function patioTick(dt,t){ if(STEAM.leaf)STEAM.leaf.uniforms.cam.value.copy(camera.position); for(const s of STEAM){ const k=(t*0.16+s.ph)%1, sc=0.5+k*2.4; s.sp.position.set(s.x+Math.sin(t*0.5+s.ph*9)*0.25*k+k*0.7,0.15+k*3.0,s.z+k*0.25); s.sp.scale.set(sc,sc,1); s.sp.material.opacity=Math.sin(Math.min(1,k*1.3)*Math.PI)*0.2; } }
 let composer=null, bloom=null, useBloom=!LOW;
 // El compositor trabaja en lineal y con margen (medio flotante); la última pasada hace el revelado: exposición, curva ACES, viñeta y grano.
 const FINAL={uniforms:{tDiffuse:{value:null},exposure:{value:0.8},time:{value:0},tS:{value:new THREE.Vector3(1,1,1)},tH:{value:new THREE.Vector3(1,1,1)},sat:{value:1},con:{value:1}},vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
@@ -320,7 +355,7 @@ function mkComposer(){ const pr=renderer.getPixelRatio(); const rt=new THREE.Web
 if(THREE.EffectComposer&&THREE.UnrealBloomPass)mkComposer(); else useBloom=false; setPal(palI,true);
 
 // ---------- recorrido a pie: WASD y ratón, con las paredes del plano
-const OBST=(INFO.obst||[]).filter(o=>o[3]>0.15&&o[4]>0.15); deco();
+const OBST=(INFO.obst||[]).filter(o=>o[3]>0.15&&o[4]>0.15); deco(); patio();
 const solid=(x,y)=>{ if(x<0||y<0||x>=COLS||y>=ROWS)return true; return '#WLVb'.indexOf(MAP[y][x])>=0; };   // cajas, camiones y generador ya no tapan la casilla entera: chocan con su huella real (OBST)
 const P={x:0,z:0,yaw:0,pitch:0,vy:0,bob:0}; (function(){ let sx=2,sy=2; MAP.forEach((r,y)=>{ const i=r.indexOf('P'); if(i>=0){ sx=i; sy=y; } }); P.x=sx*T+T/2; P.z=sy*T+T/2; P.yaw=-2.2; })();
 const keys={}; addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='KeyB'&&composer){ useBloom=!useBloom; } if(e.code==='KeyH'){ el('hud').hidden=!el('hud').hidden; }
@@ -505,5 +540,5 @@ function frame(now){ const raw=(now-last)/1000, dt=Math.min(0.1,raw); last=now; 
   fpsT+=raw; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (F/G) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window.__ESC={SKY,skyTick,setPal,PALS,shade,hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
+window.__ESC={STEAM,SKY,skyTick,setPal,PALS,shade,hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
 })();
