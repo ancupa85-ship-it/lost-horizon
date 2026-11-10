@@ -18,11 +18,17 @@ for f in srcs:
             if os.path.exists(mp):
                 t=t.replace("'assets/music/"+k+".mp3'","'data:audio/mpeg;base64,"+base64.b64encode(open(mp,'rb').read()).decode()+"'")
     js.append('// ===== '+f+'\n'+t)
+# modelos de Blender: si hay alguno empaquetado (assets/models/pack.js), se incrusta junto con el cargador glTF
+pack=open(os.path.join(R,'assets','models','pack.js'),encoding='utf-8').read() if os.path.exists(os.path.join(R,'assets','models','pack.js')) else ''
+models=''
+if 'LH_MODELS={}' not in pack and 'LH_MODELS=' in pack:
+    models='<script>\n'+open(os.path.join(R,'vendor','GLTFLoader.js'),encoding='utf-8').read()+'\n</script>\n<script>\n'+pack+'</script>\n'
 body=re.search(r'<body>\n(.*?)\n<script src="vendor/three.min.js">',html,re.S).group(1)
 out=('<title>Lost Horizon: De Profundis</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n'
  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">\n'
  '<style>\n'+css+'</style>\n'+body+'\n'
  '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n'
+ +models+
  "<script>\n(function(){\n'use strict';\n"+'\n'.join(js)+'\n})();\n</script>\n')
 os.makedirs(os.path.join(R,'dist'),exist_ok=True)
 p=os.path.join(R,'dist','lost-horizon-fps.html'); open(p,'w',encoding='utf-8').write(out); print('escrito',p,len(out),'bytes')
