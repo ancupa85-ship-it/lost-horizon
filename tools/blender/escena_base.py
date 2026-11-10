@@ -248,13 +248,6 @@ def build_world():
         for sx in (-1, 1): box('metal', (0.03, 0.72, 0.03), a + Vector((sx * 0.3, 0, z)), rot=Matrix.Rotation(s * sx * 0.95, 4, 'X'))
     cyl('baliza', 0.12, 0.25, a + Vector((0, 0, 14.2)), seg=10)
     for k in range(3): box('oscuro', (1.6, 0.04, 0.04), a + Vector((0, 0, 10 + k * 1.2)), rotz=k * 1.0)
-    # bidones y sacos terreros en los rincones de sombra (no tapan el paso en el juego: son ambientación)
-    for y in range(ROWS):
-        for x in range(COLS):
-            if cell(x, y) == 's' and rnd(x, y, 11) < 0.35:
-                p = wpos(x, y)
-                for i in range(2 + int(rnd(x, y, 12) * 2)):
-                    cyl('oliva' if i % 2 else 'hierro', 0.29, 0.88, p + Vector((-0.55 + i * 0.62, 0.55 - 0.2 * (i % 2), 0.44)), seg=20)
     flush()
 
 def rain(n=30000):
@@ -292,30 +285,188 @@ def lamp(kind, name, pos, color, power, **kw):
 def aim(o, target):
     o.rotation_euler = (Vector(target) - o.location).to_track_quat('-Z', 'Y').to_euler()
 
+# ---------------------------------------------------------------- piezas redondeadas (sombreado suave) para vehículos
+SM = {}
+def _append(mat, bm):
+    me = bpy.data.meshes.new('tmp'); bm.to_mesh(me); bm.free()
+    if mat not in SM: SM[mat] = bmesh.new()
+    SM[mat].from_mesh(me); bpy.data.meshes.remove(me)
+def rbox(mat, size, center, r=0.04, seg=3, rot=None, M0=None):
+    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0); bmesh.ops.scale(bm, vec=size, verts=bm.verts)
+    if r > 0: bmesh.ops.bevel(bm, geom=list(bm.edges), offset=min(r, min(size) * 0.45), segments=seg, affect='EDGES', profile=0.5)
+    M = Matrix.Translation(center) @ (rot if rot is not None else Matrix.Identity(4))
+    bmesh.ops.transform(bm, matrix=(M0 @ M) if M0 is not None else M, verts=bm.verts); _append(mat, bm)
+def rcyl(mat, radius, depth, center, axis='Z', r=0.03, seg=28, M0=None, bseg=3):
+    bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=radius, radius2=radius, depth=depth)
+    if r > 0:
+        rim = [e for e in bm.edges if abs(e.verts[0].co.z - e.verts[1].co.z) < 1e-6 and abs(abs(e.verts[0].co.z) - depth / 2) < 1e-6]
+        bmesh.ops.bevel(bm, geom=rim, offset=min(r, depth * 0.45, radius * 0.45), segments=bseg, affect='EDGES', profile=0.5)
+    rot = {'Z': Matrix.Identity(4), 'X': Matrix.Rotation(math.pi / 2, 4, 'Y'), 'Y': Matrix.Rotation(math.pi / 2, 4, 'X')}[axis]
+    M = Matrix.Translation(center) @ rot
+    bmesh.ops.transform(bm, matrix=(M0 @ M) if M0 is not None else M, verts=bm.verts); _append(mat, bm)
+def flush_smooth(prefix):
+    for mat, bm in SM.items():
+        me = bpy.data.meshes.new(prefix + '_' + mat); bm.to_mesh(me); bm.free(); me.materials.append(MAT[mat])
+        me.polygons.foreach_set('use_smooth', [True] * len(me.polygons)); me.set_sharp_from_angle(angle=math.radians(38))
+        o = bpy.data.objects.new(prefix + '_' + mat, me); col.objects.link(o)
+    SM.clear()
+
+def truck(pos, rotz):
+    """Camión ligero 4x4 de cabina avanzada con caja de lona. Frente hacia -Y; cabe en el bloque de 4 x 4 m del plano."""
+    M0 = Matrix.Translation(pos) @ Matrix.Rotation(rotz, 4, 'Z'); V = Vector
+    B = lambda mat, size, c, r=0.03, rot=None: rbox(mat, size, V(c), r, 3, rot, M0)
+    C = lambda mat, rad, dep, c, axis='Z', r=0.02, seg=28: rcyl(mat, rad, dep, V(c), axis, r, seg, M0)
+    for s in (-1, 1):
+        B('bajos', (0.14, 3.7, 0.2), (s * 0.42, 0, 0.78))
+        for y in (-1.15, 1.05):
+            C('goma', 0.52, 0.34, (s * 1.0, y, 0.52), 'X', 0.09, 40); C('oliva', 0.3, 0.36, (s * 1.0, y, 0.52), 'X', 0.03, 24)
+            C('bajos', 0.11, 0.42, (s * 1.0, y, 0.52), 'X', 0.02, 12)
+            for k in range(6):
+                a = k * math.pi / 3; C('metal', 0.022, 0.04, (s * 1.19, y + math.cos(a) * 0.2, 0.52 + math.sin(a) * 0.2), 'X', 0, 6)
+        B('goma', (0.46, 0.025, 0.42), (s * 1.0, 1.72, 0.6), 0.005)                      # faldillas
+        B('oliva', (0.52, 1.25, 0.07), (s * 1.0, -1.15, 1.14), 0.03)                       # aleta
+        B('oliva', (0.52, 0.34, 0.07), (s * 1.0, -1.86, 1.02), 0.03, Matrix.Rotation(math.radians(-38), 4, 'X'))
+        B('oliva', (0.52, 0.3, 0.07), (s * 1.0, -0.46, 1.03), 0.03, Matrix.Rotation(math.radians(38), 4, 'X'))
+        B('bajos', (0.34, 0.55, 0.05), (s * 1.12, -0.62, 0.74), 0.015)                     # estribo
+        C('faro', 0.1, 0.08, (s * 0.6, -1.93, 1.3), 'Y', 0.02, 20); C('oscuro', 0.125, 0.06, (s * 0.6, -1.9, 1.3), 'Y', 0.01, 20)
+        B('piloto', (0.1, 0.04, 0.07), (s * 0.95, -1.9, 1.18), 0.01)
+        B('oscuro', (0.03, 0.03, 0.34), (s * 1.16, -1.06, 1.95), 0.008); B('oscuro', (0.04, 0.16, 0.26), (s * 1.2, -1.08, 2.12), 0.02)   # retrovisor
+        B('cristal', (0.03, 0.58, 0.44), (s * 1.012, -0.6, 2.0), 0.01)                     # ventanilla
+        B('metal', (0.03, 0.12, 0.03), (s * 1.06, -0.3, 1.55), 0.01)                       # manilla
+        for k in range(3): B('madera', (0.04, 2.14, 0.17), (s * 1.15, 0.95, 1.2 + k * 0.2), 0.012)      # adrales
+        for y in (0.0, 0.95, 1.9): B('bajos', (0.05, 0.07, 0.7), (s * 1.18, y, 1.4), 0.01)
+        B('piloto', (0.14, 0.04, 0.1), (s * 0.95, 2.03, 0.98), 0.01)
+    for y in (-1.15, 1.05): C('bajos', 0.07, 2.0, (0, y, 0.52), 'X', 0, 10); B('bajos', (0.42, 0.42, 0.38), (0, y, 0.52), 0.16)
+    C('bajos', 0.05, 2.2, (0, -0.05, 0.58), 'Y', 0, 8)                                      # transmisión
+    B('bajos', (2.34, 0.14, 0.24), (0, -1.96, 0.76), 0.03); B('bajos', (2.2, 0.1, 0.16), (0, 2.02, 0.8), 0.02)   # parachoques
+    B('metal', (0.42, 0.02, 0.12), (0, -2.04, 0.76), 0.004)                               # matrícula
+    B('oliva', (1.52, 0.86, 0.6), (0, -1.5, 1.32), 0.09); B('oscuro', (1.1, 0.05, 0.42), (0, -1.935, 1.3), 0.01)
+    for k in range(7): B('oliva', (0.035, 0.04, 0.42), (-0.45 + k * 0.15, -1.955, 1.3), 0.008)
+    B('oliva', (2.12, 1.02, 0.8), (0, -0.62, 1.32), 0.07); B('oliva', (2.02, 0.92, 0.74), (0, -0.58, 2.0), 0.12)
+    B('lona', (2.06, 0.96, 0.1), (0, -0.58, 2.36), 0.04)
+    for s in (-1, 1): B('cristal', (0.8, 0.03, 0.46), (s * 0.44, -1.045, 2.02), 0.01)
+    B('oscuro', (0.5, 0.02, 0.03), (0.35, -1.07, 1.84), 0.005, Matrix.Rotation(0.5, 4, 'Y'))   # limpiaparabrisas
+    C('oliva', 0.23, 0.72, (-0.86, 0.25, 0.8), 'Y', 0.06, 20); B('bajos', (0.42, 0.6, 0.36), (0.86, 0.25, 0.8), 0.03)
+    C('oscuro', 0.05, 1.7, (0.92, -0.06, 1.75), 'Z', 0.01, 12); C('oscuro', 0.075, 0.5, (0.92, -0.06, 1.5), 'Z', 0.02, 12)
+    B('bajos', (2.34, 2.16, 0.1), (0, 0.95, 1.08), 0.02); B('madera', (2.3, 0.04, 0.6), (0, 2.02, 1.4), 0.012)
+    B('lona', (2.4, 2.2, 1.3), (0, 0.95, 2.02), 0.22)                                      # lona con arcos
+    for y in (-0.05, 0.95, 1.95): B('lona', (2.44, 0.07, 1.33), (0, y, 2.02), 0.23)
+    for y in (0.45, 1.45):
+        for s in (-1, 1): B('oscuro', (0.015, 0.05, 0.5), (s * 1.205, y, 1.62), 0.004)
+    B('lona', (2.2, 0.03, 1.0), (0, 2.045, 1.95), 0.01)
+
+# ---------------------------------------------------------------- modelos escaneados de Poly Haven (assets/modelos-ph)
+PHDIR = os.path.join(R, 'assets', 'modelos-ph'); PH = {}
+def has_ph(i): return os.path.exists(os.path.join(PHDIR, i, i + '.gltf')) and not os.environ.get('LH_NOPH')
+def ph(i, only=None):
+    key = (i, only)
+    if key in PH: return PH[key]
+    before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=os.path.join(PHDIR, i, i + '.gltf'))
+    new = [o for o in bpy.data.objects if o not in before]; bpy.context.view_layer.update()
+    keep = [o for o in new if o.type == 'MESH' and (only is None or o.name.split('.')[0] in only or (callable(only) and only(o.name)))]
+    mats = [(o, o.matrix_world.copy()) for o in keep]
+    mn = Vector((1e9,) * 3); mx = Vector((-1e9,) * 3)
+    for o, mw in mats:
+        for c in o.bound_box:
+            w = mw @ Vector(c)
+            for k in range(3): mn[k] = min(mn[k], w[k]); mx[k] = max(mx[k], w[k])
+        for s in o.material_slots:                  # mojado por la lluvia: menos rugosidad
+            b = s.material.node_tree.nodes.get('Principled BSDF') if s.material and s.material.node_tree else None
+            if b and not s.material.get('lh_wet'):
+                s.material['lh_wet'] = 1; inp = b.inputs['Roughness']
+                if inp.is_linked:
+                    src_ = inp.links[0].from_socket; nt = s.material.node_tree; mm = nt.nodes.new('ShaderNodeMath'); mm.operation = 'MULTIPLY'; mm.inputs[1].default_value = 0.6
+                    nt.links.new(src_, mm.inputs[0]); nt.links.new(mm.outputs[0], inp)
+    off = Matrix.Translation((-(mn.x + mx.x) / 2, -(mn.y + mx.y) / 2, -mn.z))
+    for o in new:
+        o.parent = None
+        for c in list(o.users_collection): c.objects.unlink(o)
+    PH[key] = ([(o, off @ mw) for o, mw in mats], mx - mn); return PH[key]
+def put(i, pos, rotz=0.0, scale=1.0, only=None, rot=None):
+    parts, dim = ph(i, only); M = Matrix.Translation(pos) @ (rot if rot is not None else Matrix.Rotation(rotz, 4, 'Z')) @ Matrix.Scale(scale, 4)
+    for o, mw in parts:
+        c = o.copy(); col.objects.link(c); c.matrix_world = M @ mw
+    return dim
+
+def crate_stack(p, x, y):
+    """Pila de cajas militares que ocupa la casilla (1,8 x 1,8 m) y tapa la vista (1,4 m)."""
+    turn = int(rnd(x, y, 1) * 2) * math.pi / 2; kind = rnd(x, y, 8)
+    if kind < 0.7 and has_ph('wooden_military_crate'):
+        for layer in range(3):
+            a = turn + (math.pi / 2 if layer % 2 else 0)
+            for k in (-1, 0, 1):
+                if layer == 2 and rnd(x, y, 20 + k) < 0.22: continue
+                d = Vector((math.cos(a + math.pi / 2), math.sin(a + math.pi / 2), 0)) * (k * 0.55)
+                put('wooden_military_crate', p + d + Vector(((rnd(x, y, 30 + k + layer * 3) - 0.5) * 0.06, (rnd(x, y, 40 + k + layer * 3) - 0.5) * 0.06, layer * 0.462)), a + (rnd(x, y, 50 + k + layer * 3) - 0.5) * 0.07)
+    elif has_ph('wooden_crate_02'):
+        for layer in range(3):
+            a = turn + (math.pi / 2 if layer % 2 else 0)
+            for k in (-1, 0, 1):
+                d = Vector((math.cos(a), math.sin(a), 0)) * (k * 0.56)
+                put('wooden_crate_02', p + d + Vector((0, 0, layer * 0.455)), a + (rnd(x, y, 50 + k + layer * 3) - 0.5) * 0.06, 1.0)
+    else:
+        place('caja', p, turn)
+
 def build_props():
-    seen = set()
+    seen = set(); ntruck = 0
     for y in range(ROWS):
         for x in range(COLS):
             c = cell(x, y); p = wpos(x, y)
-            if c == 'c':
-                r = int(rnd(x, y, 1) * 4) * math.pi / 2 + (rnd(x, y, 2) - 0.5) * 0.14
-                place('caja', p, r, 0.97 + rnd(x, y, 3) * 0.06)
-                if rnd(x, y, 4) < 0.3: place('caja', p + Vector((0.1, -0.05, 1.3 * 0.99)), r + 0.5, 0.55)
+            if c == 'c': crate_stack(p, x, y)
             elif c == 'T' and (x, y) not in seen:
-                seen.update({(x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1)})
-                place('camion', p + Vector((T / 2, -T / 2, 0)), (math.pi if rnd(x, y, 1) < 0.5 else 0) + (rnd(x, y, 2) - 0.5) * 0.1)
-            elif c == 'g': place('generador', p, 0)
+                seen.update({(x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1)}); ntruck += 1; q = p + Vector((T / 2, -T / 2, 0))
+                if ntruck == 3 and has_ph('covered_car'): put('covered_car', q + Vector((-0.6, 0, 0)), 0.08); put('concrete_road_barrier', q + Vector((1.2, 0.3, 0)), math.pi / 2 + 0.05)
+                else: truck(q, (math.pi if rnd(x, y, 1) < 0.5 else 0) + (rnd(x, y, 2) - 0.5) * 0.1)
+            elif c == 'g':
+                place('generador', p, 0)
+                if has_ph('metal_jerrycan_green'): put('metal_jerrycan_green', p + Vector((1.3, -0.5, 0)), 0.4); put('metal_jerrycan_green', p + Vector((1.35, -0.1, 0)), 1.9)
             elif c == 'l' and not building(x, y):
-                place('farola', p); cyl('bombilla', 0.07, 0.12, p + Vector((0, 0, 3.17)), seg=10)
-                lamp('POINT', 'farola', p + Vector((0, 0, 3.05)), (1.0, 0.55, 0.2), 1500, shadow_soft_size=0.08)
-    flush('luces')
+                if has_ph('street_lamp_01'):
+                    a = (x * 3 + y) % 4 * math.pi / 2; put('street_lamp_01', p, a)
+                    h = Matrix.Rotation(a, 4, 'Z') @ LAMP_HEAD; cyl('bombilla', 0.05, 0.04, p + h + Vector((0, 0, -0.03)), seg=10)
+                    lamp('POINT', 'farola', p + h + Vector((0, 0, -0.16)), (1.0, 0.55, 0.2), 1500, shadow_soft_size=0.07)
+                else:
+                    place('farola', p); cyl('bombilla', 0.07, 0.12, p + Vector((0, 0, 3.17)), seg=10); lamp('POINT', 'farola', p + Vector((0, 0, 3.05)), (1.0, 0.55, 0.2), 1500, shadow_soft_size=0.08)
+            elif c == 's' and rnd(x, y, 11) < 0.4 and has_ph('Barrel_01'):
+                n = 2 + int(rnd(x, y, 12) * 3)
+                for i in range(n):
+                    put(('Barrel_01', 'Barrel_02', 'barrel_03')[int(rnd(x, y, 60 + i) * 3)], p + Vector((-0.6 + (i % 3) * 0.6, 0.55 - (i // 3) * 0.6 - 0.1 * (i % 2), 0)), rnd(x, y, 70 + i) * 6)
+                if rnd(x, y, 13) < 0.5 and has_ph('old_tyre'): put('old_tyre', p + Vector((0.5, -0.6, 0.08)), rnd(x, y, 14) * 3, rot=Matrix.Rotation(math.pi / 2, 4, 'X'))
+            # trastos pequeños junto a las cajas: no ocupan casilla
+            if c == 'c' and cell(x + 1, y) == '.' and rnd(x, y, 15) < 0.45:
+                q = p + Vector((1.25, (rnd(x, y, 16) - 0.5) * 1.0, 0)); k = rnd(x, y, 17)
+                if k < 0.35 and has_ph('ammo_box'): put('ammo_box', q, k * 9); put('ammo_box', q + Vector((0.05, 0.3, 0)), k * 5)
+                elif k < 0.6 and has_ph('metal_jerrycan_green'): put('metal_jerrycan_green', q, k * 9)
+                elif k < 0.8 and has_ph('trashbag'): put('trashbag', q, k * 9)
+                elif has_ph('wooden_crate_01'): put('wooden_crate_01', q, k * 9)
+            # paredes: luminaria sobre las puertas, cajas eléctricas, aire acondicionado y bajantes
+            if c in 'DLV':
+                horiz = cell(x - 1, y) in 'W#' and cell(x + 1, y) in 'W#'
+                for sgn in (-1, 1):
+                    nx, ny = (x, y + sgn) if horiz else (x + sgn, y)
+                    if cell(nx, ny) in '.sl' and has_ph('industrial_wall_lamp'):
+                        n = Vector((0, -sgn, 0)) if horiz else Vector((sgn, 0, 0)); q = p + n * 0.33 + Vector((0, 0, 2.55))
+                        put('industrial_wall_lamp', q, math.atan2(n.y, n.x) + math.pi / 2)
+                        lamp('POINT', 'aplique', q + n * 0.12 + Vector((0, 0, -0.12)), (1.0, 0.72, 0.42), 55, shadow_soft_size=0.05)
+            if c == 'W':
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    if cell(x + dx, y + dy) not in '.sl': continue
+                    n = Vector((dx, -dy, 0)); ang = math.atan2(n.y, n.x) + math.pi / 2; k = rnd(x, y, 80 + dx * 2 + dy)
+                    side = Vector((-n.y, n.x, 0))
+                    if k < 0.1 and has_ph('exterior_aircon_unit'): put('exterior_aircon_unit', p + n * 1.2 + Vector((0, 0, 2.6)), ang, only=('exterior_aircon_unit',))
+                    elif k < 0.18 and has_ph('utility_box_01'): put('utility_box_01', p + n * 1.22 + side * 0.5, ang)
+                    elif k < 0.3:                                                             # bajante con abrazaderas
+                        q = p + n * 1.07 + side * 0.8; cyl('metal', 0.05, HB + 0.1, q + Vector((0, 0, HB / 2)), seg=10)
+                        for z in (0.5, 1.8, 3.1): box('oscuro', (0.14, 0.14, 0.03), q + Vector((0, 0, z)))
+                    box('metal', (T if dy else 0.12, 0.12 if dy else T, 0.1), p + n * 1.07 + Vector((0, 0, HB + 0.02)))   # canalón
+    flush('luces'); flush_smooth('camiones')
     # luces interiores del plano (despacho, archivo, calabozo...): se ven por las puertas y calientan las ventanas
     for m in re.finditer(r'\[([\d.]+),([\d.]+),0x([0-9a-f]{6}),([\d.]+)\]', re.search(r"ZONES\.base=.*?lights:\[(.*?)\]\],", src, re.S).group(1) + ']'):
         x, y, hx, k = float(m.group(1)), float(m.group(2)), m.group(3), float(m.group(4))
         lamp('POINT', 'interior', Vector((x * T, -y * T, 2.8)), tuple(int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4)), 120 * k, shadow_soft_size=0.15)
     # torretas con foco: [x, y, hacia x, hacia y, ...]
     for sx, sy, tx, ty in ((18, 0, 9, 14), (35, 27, 25, 20)):
-        p = wpos(sx, sy); place('torreta', p + Vector((0, -0.9 if sy == 0 else 0.9, 0)) if False else p)
+        p = wpos(sx, sy); place('torreta', p)
         head = p + Vector((0, 0, 7.25)); t = wpos(tx, ty)
         s = lamp('SPOT', 'foco_torreta', head, (0.8, 0.9, 1.0), 90000, spot_size=math.radians(13), spot_blend=0.25, shadow_soft_size=0.12); aim(s, t)
         d = (t - head).normalized()
@@ -324,8 +475,15 @@ def build_props():
     flush('focos')
     for o in bpy.data.objects:
         if o.name.startswith('focos_foco'): o.visible_shadow = False
-    # luna: relleno frío muy tenue
     s = lamp('SUN', 'luna', (0, 0, 30), (0.55, 0.7, 1.0), 0.035, angle=math.radians(2)); s.rotation_euler = (math.radians(52), 0, math.radians(140))
+
+# posición de la cabeza de la farola escaneada respecto a su base
+LAMP_HEAD = Vector((0, 0, 3.6))
+if has_ph('street_lamp_01'):
+    parts, dim = ph('street_lamp_01'); o, mw = parts[0]
+    top = [mw @ v.co for v in o.data.vertices]; zmax = max(v.z for v in top); hi = [v for v in top if v.z > zmax - 0.45]
+    far = max(hi, key=lambda v: v.x * v.x + v.y * v.y); zs = [v.z for v in hi if (v - far).length < 0.3]
+    LAMP_HEAD = Vector((far.x * 0.8, far.y * 0.8, min(zs))); print('FAROLA', tuple(round(v, 2) for v in LAMP_HEAD), tuple(round(v, 2) for v in dim), flush=True)
 
 def atmosphere():
     w = bpy.data.worlds.new('noche'); w.use_nodes = True; scene.world = w
@@ -333,7 +491,7 @@ def atmosphere():
     # niebla: un volumen que cubre la base
     bpy.ops.mesh.primitive_cube_add(size=1, location=(COLS * T / 2, -ROWS * T / 2, 11)); f = bpy.context.object; f.name = 'niebla'; f.scale = (COLS * T + 60, ROWS * T + 60, 24)
     m = bpy.data.materials.new('niebla'); m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
-    out = nt.nodes.new('ShaderNodeOutputMaterial'); v = nt.nodes.new('ShaderNodeVolumeScatter'); v.inputs['Density'].default_value = float(os.environ.get('LH_FOG', '0.014')); v.inputs['Anisotropy'].default_value = 0.55
+    out = nt.nodes.new('ShaderNodeOutputMaterial'); v = nt.nodes.new('ShaderNodeVolumeScatter'); v.inputs['Density'].default_value = float(os.environ.get('LH_FOG', '0.011')); v.inputs['Anisotropy'].default_value = 0.55
     nt.links.new(v.outputs[0], out.inputs['Volume']); f.data.materials.append(m)
 
 def camera(name, pos, target, lens):
@@ -352,10 +510,11 @@ CAMERAS = {
     'patio': camera('patio', wpos(1.0, 5.2, 1.6), wpos(9.5, 6.0, 1.9), 22),
     'aerea': camera('aerea', Vector((-16, -ROWS * T - 14, 24)), wpos(17, 13, 0), 26),
     'torreta': camera('torreta', wpos(24.2, 12.5, 1.4), wpos(19.3, 2.0, 4.4), 20),
+    'camion': camera('camion', wpos(8.7, 8.5, 1.25), wpos(5.6, 7.4, 1.45), 26),
     'oficinas': camera('oficinas', wpos(19.6, 6.2, 1.5), wpos(26.5, 7.6, 1.9), 24),
 }
 
-scene.render.engine = 'CYCLES'; cy = scene.cycles; cy.device = 'CPU'; cy.samples = SAMPLES; cy.use_adaptive_sampling = True; cy.adaptive_threshold = 0.03
+scene.render.engine = 'CYCLES'; cy = scene.cycles; cy.device = 'CPU'; cy.samples = SAMPLES; cy.use_adaptive_sampling = True; cy.adaptive_threshold = 0.02
 cy.use_denoising = True; cy.max_bounces = 5; cy.volume_bounces = 0; cy.volume_step_rate = 4; cy.sample_clamp_indirect = 6; cy.caustics_reflective = False; cy.caustics_refractive = False
 scene.render.resolution_x, scene.render.resolution_y = RES; scene.render.threads_mode = 'AUTO'
 try: scene.view_settings.view_transform = 'AgX'; scene.view_settings.look = 'AgX - Medium High Contrast'
