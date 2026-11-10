@@ -29,7 +29,7 @@ PEOPLE = {
                  curl={'_l': 0.7, '_r': 0.7}, walks=True,
                  pose={'upperarm_r': (-0.22, 0.1, -1), 'lowerarm_r': (0.55, -0.75, -0.4), 'upperarm_l': (0.2, -0.3, -1), 'lowerarm_l': (-0.5, -0.65, 0.5)}),
     'peris': dict(macro=dict(age=0.42, muscle=0.5, weight=0.42), skin='young_caucasian_male2', hair='short03', hair_tint=(0.75, 0.6, 0.5),
-                  clothes=[('male_casualsuit01', (0.37, 0.43, 0.26)), ('toigo_ankle_boots_male', NEGRO)], pose=dict(STAND, head=(-0.2, -0.12, 1), spine_03=(0.02, 0.03, 1))),
+                  clothes=[('male_casualsuit01', (0.37, 0.43, 0.26)), ('toigo_ankle_boots_male', NEGRO)], pose=dict(STAND, head=(-0.2, -0.12, 1), spine_03=(0.02, 0.03, 1)), walks=True, swing=True),
 }
 
 def tint(obj, colour):

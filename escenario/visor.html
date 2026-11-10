@@ -13,7 +13,15 @@ canvas{display:block;touch-action:none}
 #intro p{margin:0;color:var(--dim);font-size:13px;line-height:1.7;max-width:560px}
 #load{margin-top:10px;padding:10px 18px;border:1px solid var(--acc);color:var(--acc);letter-spacing:.2em;font-size:13px}
 #hud{position:fixed;left:12px;bottom:10px;font-size:11px;color:var(--dim);text-shadow:0 1px 2px #000;pointer-events:none}
+#estado{position:fixed;top:14px;left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:.18em;color:#9fd6a8;text-shadow:0 1px 2px #000;pointer-events:none;text-align:center}
+#estado[hidden]{display:none}
+#estado i{display:block;width:150px;height:3px;margin:6px auto 0;background:rgba(255,255,255,.14)}
+#estado b{display:block;height:100%;width:0;background:currentColor}
+#estado.sos{color:#ffd23a}#estado.ale{color:#ff4a3a}
+#aviso{position:fixed;top:30%;left:0;right:0;text-align:center;font-size:22px;letter-spacing:.2em;color:#ff4a3a;text-shadow:0 2px 6px #000;pointer-events:none}
+#aviso.cap{font-size:40px}
 </style>
 <div id="intro"><h1>TARSIS</h1><p>Base hispano-americana, marismas del Guadalquivir. Noviembre de 1983, 02:10.<br>Escenario a escala del primer nivel, para recorrerlo a pie.</p>
 <p>W A S D mueven a Cuttlas · C agacharse o levantarse · Mayús paso ligero · ratón para mirar · V cámara libre · 1 a 4 cambian de vista · F y G niebla · J y K exposición · B resplandor · H oculta el texto · Esc suelta el ratón</p><div id="load">CARGANDO…</div></div>
+<div id="estado" class="ok" hidden><span id="estadoT">SIGILO</span><i><b id="estadoB"></b></i></div><div id="aviso"></div>
 <div id="hud"><span id="fps"></span></div>
