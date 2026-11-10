@@ -99,7 +99,7 @@ def export_anim(name, P, arm):
         for f, dirs in frames:
             for pb in arm.pose.bones: pb.rotation_mode = 'QUATERNION'; pb.rotation_quaternion = (1, 0, 0, 0)
             W = pose(arm, dirs, P.get('curl'))
-            root.location = Rinv @ (Vector(shift) if shift is not None else Vector((0, 0, h0 - low(W)))); root.keyframe_insert('location', frame=f)
+            root.location = Rinv @ (shift(W, f) if callable(shift) else Vector(shift) if shift is not None else Vector((0, 0, h0 - low(W)))); root.keyframe_insert('location', frame=f)
             for bn in bones:
                 pb = arm.pose.bones[bn]; q = pb.rotation_quaternion.copy()
                 if bn in prev and prev[bn].dot(q) < 0: q.negate()
@@ -120,6 +120,17 @@ def export_anim(name, P, arm):
     else:
         bake('idle', breathe(base), shift=(0, 0, 0))
         if P.get('walks'): bake('walk', cyc())
+        # abatido: se dobla, cae de espaldas y queda tendido boca arriba; el cuerpo se apoya en su punto más bajo
+        lim = {'upperarm_l': (1, 0.25, -0.05), 'lowerarm_l': (0.7, -0.7, 0), 'upperarm_r': (-1, 0.1, -0.05), 'lowerarm_r': (-0.9, 0.45, 0)}
+        hit = dict(base, pelvis=(0, 0.15, 1), spine_01=(0, 0.3, 1), spine_02=(0, 0.4, 1), spine_03=(0, 0.45, 1), neck_01=(0, 0.6, 1), head=(0, 0.8, 1), thigh_l=(0.06, -0.35, -1), calf_l=(0, 0.25, -1), thigh_r=(-0.06, -0.2, -1), calf_r=(0, 0.35, -1))
+        mid = dict(lim, pelvis=(0, 0.8, 0.6), spine_01=(0, 1, 0.5), spine_02=(0, 1, 0.45), spine_03=(0, 1, 0.4), neck_01=(0, 1, 0.5), head=(0, 1, 0.6), thigh_l=(0.1, -1, 0.1), calf_l=(0.05, 0.1, -1), thigh_r=(-0.1, -0.9, -0.2), calf_r=(-0.05, 0.3, -1),
+                   upperarm_l=(0.8, 0.3, -0.5), upperarm_r=(-0.8, 0.2, -0.6))
+        flo = dict(lim, pelvis=(0, 1, 0.02), spine_01=(0, 1, 0.02), spine_02=(0, 1, 0.0), spine_03=(0, 1, -0.02), neck_01=(0, 1, 0.05), head=(0.25, 1, 0.1), thigh_l=(0.16, -1, 0.02), calf_l=(0.2, -1, -0.04), thigh_r=(-0.1, -1, 0.3), calf_r=(-0.12, -0.75, -0.6),
+                   foot_l=(0.5, -0.5, 0.7), foot_r=(-0.3, -0.9, 0.1))
+        allb = [b_.name for b_ in arm.data.bones if b_.name != 'Root']; yk = {1: 0, 5: 0.06, 11: 0.38, 16: 0.52, 22: 0.52}; pk = {1: 0, 5: 0, 11: 0.06, 16: 0.1, 22: 0.1}
+        lowall = lambda W: min(min(W[k].to_translation().z, (W[k] @ Vector((0, arm.data.bones[k].length, 0))).z) for k in allb)
+        ground = lambda W, f: Vector((0, yk[f], h0 - low(W))) if f <= 5 else Vector((0, yk[f], h0 - 0.05 + pk[f] - lowall(W)))
+        bake('down', [(1, base), (5, hit), (11, mid), (16, flo), (22, flo)], shift=ground)
     for pb in arm.pose.bones: pb.rotation_quaternion = (1, 0, 0, 0)
     for o in bpy.data.objects: o.select_set(o.type in ('MESH', 'ARMATURE'))
     f = os.path.join(d, 'persona_' + name + '_anim.glb')
