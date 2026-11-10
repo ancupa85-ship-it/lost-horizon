@@ -73,7 +73,7 @@ INFO.lights.forEach(l=>{ const p=B(l.pos), col=new THREE.Color(l.color[0],l.colo
     if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(1024,1024); L.shadow.camera.near=0.25; L.shadow.camera.far=34; L.shadow.bias=-0.003; L.shadow.normalBias=0.05; L.shadow.autoUpdate=false; } /* la escena no se mueve: la sombra se calcula una vez */ LIT.push({x:p.x,y:p.y,z:p.z,R:12,on:true,L,I:110,h:[halo(p,0xffa24a,2.6,0.95),halo(p,0xff9038,12,0.26)]}); }
   else if(l.kind==='POINT'&&l.name==='aplique'){ let L=null; if(!LOW){ L=new THREE.PointLight(col,7,9,2); L.position.copy(p); scene.add(L); } LIT.push({x:p.x,y:p.y,z:p.z,R:5.5,on:true,L,I:7,h:[halo(p,0xffb870,1.3,0.9),halo(p,0xffa860,5,0.3)]}); }
   else if(l.kind==='POINT'&&l.name==='interior'){ const L=new THREE.PointLight(col,l.power/120*24,9.5,1.6); L.position.copy(p); scene.add(L); LIT.push({x:p.x,y:p.y,z:p.z,R:7.5,on:true,L,I:L.intensity,h:[halo(p.clone().add(new THREE.Vector3(0,0.18,0)),0xffd9a0,0.9,0.9)]}); }
-  else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,2600,110,A*1.9,0.9,1.4); L.position.copy(p); scene.add(L); scene.add(L.target);
+  else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,280,110,A*1.5,0.7,1.4)   /* 2600 quemaba en blanco las fachadas enteras */; L.position.copy(p); scene.add(L); scene.add(L.target);
     if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(2048,2048); L.shadow.camera.near=2; L.shadow.camera.far=110; L.shadow.bias=-0.0006; L.shadow.normalBias=0.03; L.shadow.autoUpdate=false; SPOTS.push(L); }   /* la sombra del foco se rehace cada pocos fotogramas, no en todos */
     const h1=halo(p,0xdde8ff,4.5,1), h2=halo(p,0xbfd4ff,16,0.4);
     // haz del foco en la niebla: varias capas anchas y tenues, sin borde, que se apagan con la distancia
@@ -84,8 +84,26 @@ INFO.lights.forEach(l=>{ const p=B(l.pos), col=new THREE.Color(l.color[0],l.colo
       cone.add(m); beams.push(m.material); });
     scene.add(cone); spots.push({L,cone,p,d,len,phase:spots.length*2.1}); }
 });
-scene.add(new THREE.HemisphereLight(0x27344f,0x0b0906,0.36));
+const hemi=new THREE.HemisphereLight(0x27344f,0x0b0906,0.36); scene.add(hemi);
 const moon=new THREE.DirectionalLight(0x8fa8d8,0.22); moon.position.set(-30,50,20); scene.add(moon);
+// cielo de tormenta: cúpula con nubes que se mueven; en el horizonte tiene el color de la niebla para que la base se funda con él. Cada tanto, un relámpago ilumina nubes y patio, y el trueno llega después.
+const SKY={m:null,f:0,t:14+Math.random()*10,seq:null,th:0};
+(function(){ const g=new THREE.SphereGeometry(320,32,16), m=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{time:{value:0},flash:{value:0},fogc:{value:FOGC.clone()},fp:{value:new THREE.Vector2(0.3,0.5)}},
+  vertexShader:'varying vec3 d; void main(){ d=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader:`uniform float time; uniform float flash; uniform vec3 fogc; uniform vec2 fp; varying vec3 d;
+float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
+float fbm(vec2 p){ float a=0.5, v=0.0; for(int i=0;i<3;i++){ v+=a*n(p); p=p*2.03+vec2(7.1,3.3); a*=0.5; } return v; }
+void main(){ float up=max(d.y,0.0); vec2 q=d.xz/(up+0.22)*1.4+vec2(time*0.012,time*0.007); float c=fbm(q), c2=fbm(q*2.1+vec2(-time*0.02,4.0));
+  vec3 hi=mix(vec3(0.016,0.02,0.034),vec3(0.07,0.062,0.07),smoothstep(0.35,0.8,c)); hi+=vec3(0.05,0.03,0.015)*smoothstep(0.5,0.9,c2)*(1.0-up);   /* panzas de nube teñidas por el sodio de la base */
+  vec3 col=mix(fogc,hi,smoothstep(0.0,0.3,up));
+  float near=exp(-6.0*distance(d.xz,fp)); col+=vec3(0.55,0.62,0.8)*flash*(0.25+1.6*near)*(0.4+0.8*c)*smoothstep(-0.05,0.25,d.y);
+  gl_FragColor=vec4(col,1.0); }`}); const o=new THREE.Mesh(g,m); o.frustumCulled=false; o.renderOrder=-10; scene.add(o); SKY.m=o; })();
+function skyTick(dt,t){ const u=SKY.m.material.uniforms; SKY.m.position.copy(camera.position); u.time.value=t; SKY.t-=dt;
+  if(SKY.t<=0){ SKY.t=22+Math.random()*34; SKY.seq=[[0,1],[0.07,0.15],[0.13,0.8],[0.3,0.25],[0.36,0.6],[0.9,0]]; SKY.k=0; const a=Math.random()*6.28; u.fp.value.set(Math.cos(a)*0.7,Math.sin(a)*0.7); SKY.th=0.8+Math.random()*2.2; SKY.thG=0.25+Math.random()*0.3; }
+  if(SKY.seq){ SKY.k+=dt; const q=SKY.seq; let v=0; for(let i=0;i<q.length-1;i++)if(SKY.k>=q[i][0]&&SKY.k<q[i+1][0]){ const f=(SKY.k-q[i][0])/(q[i+1][0]-q[i][0]); v=q[i][1]+(q[i+1][1]-q[i][1])*f; } if(SKY.k>=q[q.length-1][0]){ SKY.seq=null; v=0; } SKY.f=v; } else SKY.f=0;
+  if(SKY.th>0){ SKY.th-=dt; if(SKY.th<=0){ sNoise(3.2,70,0.4,SKY.thG*1.6); sNoise(1.6,160,0.5,SKY.thG*0.7); } }
+  u.flash.value=SKY.f; hemi.intensity=0.36+SKY.f*2.2; moon.intensity=0.22+SKY.f*1.6; }
 const balizaHalo=[];
 
 // ---------- lluvia: rayas que caen alrededor de la cámara
@@ -247,17 +265,23 @@ new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
 // ---------- resplandor
 let composer=null, bloom=null, useBloom=!LOW;
 // El compositor trabaja en lineal y con margen (medio flotante); la última pasada hace el revelado: exposición, curva ACES, viñeta y grano.
-const FINAL={uniforms:{tDiffuse:{value:null},exposure:{value:0.8},time:{value:0}},vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-  fragmentShader:`uniform sampler2D tDiffuse; uniform float exposure; uniform float time; varying vec2 vUv;
+const FINAL={uniforms:{tDiffuse:{value:null},exposure:{value:0.8},time:{value:0},tS:{value:new THREE.Vector3(1,1,1)},tH:{value:new THREE.Vector3(1,1,1)},sat:{value:1},con:{value:1}},vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader:`uniform sampler2D tDiffuse; uniform float exposure; uniform float time; uniform vec3 tS; uniform vec3 tH; uniform float sat; uniform float con; varying vec2 vUv;
 vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }
-void main(){ vec3 c=texture2D(tDiffuse,vUv).rgb*exposure; c=aces(c); c=pow(c,vec3(1.0/2.2));
+void main(){ vec2 o=(vUv-0.5); float r2=dot(o,o); vec2 k=o*r2*0.012; vec3 c=vec3(texture2D(tDiffuse,vUv+k).r,texture2D(tDiffuse,vUv).g,texture2D(tDiffuse,vUv-k).b)*exposure; c=aces(c); c=pow(c,vec3(1.0/2.2));
+  { float l=dot(c,vec3(0.299,0.587,0.114)); c=mix(vec3(l),c,sat); c*=mix(tS,tH,smoothstep(0.05,0.75,l)); c=(c-0.5)*con+0.5; }   /* paleta: saturación, tinte de sombras y de luces, contraste */
   float d=distance(vUv,vec2(0.5)); c*=1.0-0.55*smoothstep(0.35,0.95,d);
   float g=fract(sin(dot(vUv*vec2(1920.0,1080.0)+time*60.0,vec2(12.9898,78.233)))*43758.5453); c+=(g-0.5)*0.022; gl_FragColor=vec4(c,1.0); }`};
 let finalPass=null;
+// paletas (tecla P): no cambian la escena, solo el revelado final, así que el cambio es instantáneo y no cuesta rendimiento
+const PALS=[['TARSIS',[1,1,1],[1,1,1],1,1],['NOCHE FRÍA',[0.78,0.98,1.12],[1.08,1.0,0.9],1.08,1.06],['SODIO',[1.05,0.95,0.82],[1.1,0.98,0.8],0.8,1.04],['ACERO',[0.88,0.96,1.08],[0.98,1.0,1.04],0.5,1.1],['VERDE TÁCTICO',[0.8,1.06,0.86],[0.94,1.08,0.9],0.55,1.08],['CINE NEGRO',[0.97,0.99,1.03],[1.03,1.0,0.96],0.04,1.18],['TECHNICOLOR',[0.95,0.95,1.05],[1.05,1.0,0.95],1.45,1.1]];
+let palI=0; try{ palI=(+localStorage.getItem('lh-paleta')||0)%PALS.length; }catch(e){}
+function setPal(i,quiet){ palI=((i%PALS.length)+PALS.length)%PALS.length; const q=PALS[palI]; if(finalPass){ const u=finalPass.uniforms; u.tS.value.fromArray(q[1]); u.tH.value.fromArray(q[2]); u.sat.value=q[3]; u.con.value=q[4]; } try{ localStorage.setItem('lh-paleta',palI); }catch(e){} if(!quiet){ ALERT.info=true; ALERT.msg='PALETA: '+q[0]; ALERT.msgT=1.8; const m=el('aviso'); if(m&&el('estado').hidden){ m.textContent=ALERT.msg; m.className='ok'; clearTimeout(setPal.t); setPal.t=setTimeout(()=>{ if(el('estado').hidden)m.textContent=''; },1800); } } }
+addEventListener('keydown',e=>{ if(e.code==='KeyP')setPal(palI+(e.shiftKey?-1:1)); });
 function mkComposer(){ const pr=renderer.getPixelRatio(); const rt=new THREE.WebGLRenderTarget(innerWidth*pr,innerHeight*pr,{type:THREE.HalfFloatType,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat});
   composer=new THREE.EffectComposer(renderer,rt); composer.addPass(new THREE.RenderPass(scene,camera)); bloom=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.7,0.8,1.0); composer.addPass(bloom);
   finalPass=new THREE.ShaderPass(FINAL); composer.addPass(finalPass); }
-if(THREE.EffectComposer&&THREE.UnrealBloomPass)mkComposer(); else useBloom=false;
+if(THREE.EffectComposer&&THREE.UnrealBloomPass)mkComposer(); else useBloom=false; setPal(palI,true);
 
 // ---------- recorrido a pie: WASD y ratón, con las paredes del plano
 const OBST=(INFO.obst||[]).filter(o=>o[3]>0.15&&o[4]>0.15);
@@ -282,7 +306,7 @@ const VM=new THREE.Group(); (function(){ scene.add(camera); camera.add(VM);
   // materiales con luz propia (matcap): el foco de la torreta no debe quemar el arma a un palmo de la cámara
   const mc=document.createElement('canvas'); mc.width=mc.height=64; const mx=mc.getContext('2d'), gr=mx.createRadialGradient(24,20,2,32,32,34); gr.addColorStop(0,'#fff'); gr.addColorStop(0.25,'#9a9a9a'); gr.addColorStop(0.7,'#4a4a4a'); gr.addColorStop(1,'#1c1c1c'); mx.fillStyle=gr; mx.fillRect(0,0,64,64);
   const mct=new THREE.CanvasTexture(mc), cap=c=>new THREE.MeshMatcapMaterial({color:c,matcap:mct,fog:false});
-  const mG=cap(0x3a3d45), mS=cap(0x202226), mH=cap(0x3f2c20), mT=cap(0x39402f);   // acero, polímero, guante de cuero, manga
+  const mG=cap(0x3a3d45), mS=cap(0x202226), mH=cap(0x3f2c20), mT=cap(0x262b21);   // acero, polímero, guante de cuero, manga
   const add=(g,m,x,y,z,rx)=>{ const o=new THREE.Mesh(g,m); o.position.set(x,y,z); if(rx)o.rotation.x=rx; o.frustumCulled=false; VM.add(o); return o; }, B=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
   // perfil lateral (x hacia delante, y arriba) extruido a lo ancho y con canto redondeado
   const ext=(pts,w,bev)=>{ const sh=new THREE.Shape(); pts.forEach((q,k)=>k?sh.lineTo(q[0],q[1]):sh.moveTo(q[0],q[1])); sh.closePath(); const g=new THREE.ExtrudeGeometry(sh,{depth:w-2*bev,bevelEnabled:true,bevelSize:bev,bevelThickness:bev,bevelSegments:3,curveSegments:4}); g.translate(0,0,-(w-2*bev)/2); g.rotateY(Math.PI/2); return g; };
@@ -440,10 +464,10 @@ function perfTick(raw){ PERF.k++; SPOTS.forEach((L,i)=>{ if(L.castShadow&&(PERF.
   if(PERF.step===1){ SPOTS.forEach(L=>{ L.castShadow=false; }); scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.needsUpdate=true; }); } }); }
   else if(PERF.step===2){ useBloom=false; }
   else { const pr=PERF.step===3?1:0.75; renderer.setPixelRatio(pr); renderer.setSize(innerWidth,innerHeight); if(composer){ if(composer.setPixelRatio)composer.setPixelRatio(pr); composer.setSize(innerWidth,innerHeight); } if(PERF.step===4)rainGeo.setDrawRange(0,RAIN_N); } }
-function frame(now){ const raw=(now-last)/1000, dt=Math.min(0.1,raw); last=now; perfTick(raw); t+=dt; move(dt); fxTick(dt); rainTick(dt); spotTick(t); peopleTick(dt);
+function frame(now){ const raw=(now-last)/1000, dt=Math.min(0.1,raw); last=now; perfTick(raw); t+=dt; move(dt); fxTick(dt); rainTick(dt); spotTick(t); skyTick(dt,t); peopleTick(dt);
   if(finalPass)finalPass.uniforms.time.value=t; if(composer){ bloom.enabled=useBloom; composer.render(); } else renderer.render(scene,camera);
   fpsT+=raw; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (F/G) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window.__ESC={shade,hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
+window.__ESC={SKY,skyTick,setPal,PALS,shade,hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
 })();
