@@ -151,6 +151,12 @@ def build_materials():
     MAT['lona'] = m_simple('lona', (0.1, 0.1, 0.06), 0.75, grime=0.5, bumpk=0.5, scale=40)
     MAT['goma'] = m_simple('goma', (0.012, 0.012, 0.013), 0.7, bumpk=0.4, scale=30)
     MAT['cristal'] = m_simple('cristal', (0.01, 0.015, 0.018), 0.04)
+    MAT['piel'] = m_simple('piel', (0.36, 0.22, 0.16), 0.5)
+    MAT['pelo'] = m_simple('pelo', (0.02, 0.014, 0.01), 0.55, bumpk=0.6, scale=90)
+    MAT['capote'] = m_simple('capote_mojado', (0.016, 0.021, 0.015), 0.22, grime=0.3, bumpk=0.25, scale=14)
+    MAT['uniforme'] = m_simple('uniforme', (0.07, 0.085, 0.05), 0.8, grime=0.4, bumpk=0.5, scale=60)
+    MAT['traje'] = m_simple('traje_infiltracion', (0.016, 0.02, 0.028), 0.42, bumpk=0.3, scale=70)
+    MAT['cuero'] = m_simple('cuero', (0.03, 0.02, 0.012), 0.45, bumpk=0.3, scale=50)
     MAT['faro'] = m_simple('faro_apagado', (0.5, 0.45, 0.35), 0.1, emit=(1, 0.6, 0.3), strength=0.15)
     MAT['piloto'] = m_simple('piloto', (0.3, 0.02, 0.02), 0.2, emit=(1, 0.05, 0.03), strength=0.08)
     MAT['aviso'] = m_simple('aviso', (0.5, 0.36, 0.03), 0.5, grime=0.5)
@@ -409,6 +415,120 @@ def truck(pos, rotz):
     if has_ph('metal_jerrycan_green'):
         for k in (0, 1): put('metal_jerrycan_green', M0 @ V((1.0 if not k else -1.0, -0.62 + 0.0, 0.745)), rotz + math.pi / 2)
 
+# ---------------------------------------------------------------- personas (formas orgánicas hechas de cápsulas, elipsoides y un capote de lluvia)
+def ell(mat, c, rad, M0, rot=None, cut=None, seg=14):
+    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=seg, v_segments=seg // 2 + 2, radius=1.0)
+    if cut is not None:
+        g = bmesh.ops.bisect_plane(bm, geom=list(bm.verts) + list(bm.edges) + list(bm.faces), plane_co=(0, 0, cut), plane_no=(0, 0, -1), clear_outer=True)
+        bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary])
+    bmesh.ops.scale(bm, vec=rad, verts=bm.verts)
+    M = Matrix.Translation(c) @ (rot if rot is not None else Matrix.Identity(4))
+    bmesh.ops.transform(bm, matrix=M0 @ M, verts=bm.verts); _append(mat, bm)
+def cap(mat, a, b, r0, r1, M0, sx=1.0, sy=1.0, seg=12):
+    a = Vector(a); b = Vector(b); d = b - a; L = max(d.length, 1e-4)
+    bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=False, segments=seg, radius1=r0, radius2=r1, depth=L)
+    bmesh.ops.translate(bm, vec=(0, 0, L / 2), verts=bm.verts)
+    for z, r in ((0, r0), (L, r1)):
+        t = bmesh.new(); bmesh.ops.create_uvsphere(t, u_segments=seg, v_segments=6, radius=r); bmesh.ops.translate(t, vec=(0, 0, z), verts=t.verts)
+        me = bpy.data.meshes.new('t'); t.to_mesh(me); t.free(); bm.from_mesh(me); bpy.data.meshes.remove(me)
+    bmesh.ops.scale(bm, vec=(sx, sy, 1), verts=bm.verts)
+    M = Matrix.Translation(a) @ Vector((0, 0, 1)).rotation_difference(d.normalized()).to_matrix().to_4x4()
+    bmesh.ops.transform(bm, matrix=M0 @ M, verts=bm.verts); _append(mat, bm)
+def loft(mat, rings, M0, seg=32, folds=7, amp=0.07, phase=0.0):
+    """rings: (z, rx, ry, cy). Los pliegues crecen hacia el bajo."""
+    bm = bmesh.new(); rows = []; n = len(rings)
+    for i, (z, rx, ry, cy) in enumerate(rings):
+        k = (i / (n - 1)) ** 1.6 * amp; row = []
+        for j in range(seg):
+            t = 2 * math.pi * j / seg; f = 1 + k * math.sin(folds * t + phase) + k * 0.5 * math.sin((folds * 2 + 1) * t + phase * 2)
+            row.append(bm.verts.new((rx * f * math.cos(t), cy + ry * f * math.sin(t), z + k * 0.25 * math.sin(3 * t + phase))))
+        rows.append(row)
+    for i in range(n - 1):
+        for j in range(seg): bm.faces.new((rows[i][j], rows[i][(j + 1) % seg], rows[i + 1][(j + 1) % seg], rows[i + 1][j]))
+    bm.faces.new(rows[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces); bmesh.ops.transform(bm, matrix=M0, verts=bm.verts); _append(mat, bm)
+def rifle(M):
+    """Fusil de asalto de la época; boca hacia +Z local, cargador hacia -Y."""
+    B = lambda mat, size, c, r=0.006, rot=None: rbox(mat, size, Vector(c), r, 1, rot, M)
+    B('oscuro', (0.045, 0.07, 0.36), (0, 0, 0)); B('veta', (0.04, 0.085, 0.3), (0, 0.012, -0.32), 0.012, Matrix.Rotation(0.07, 4, 'X'))
+    B('veta', (0.05, 0.05, 0.26), (0, 0.005, 0.3), 0.014); rcyl('oscuro', 0.011, 0.34, Vector((0, 0.012, 0.58)), 'Z', 0, 8, M); rcyl('oscuro', 0.016, 0.07, Vector((0, 0.012, 0.74)), 'Z', 0.004, 8, M)
+    B('oscuro', (0.03, 0.06, 0.2), (0, -0.1, 0.06), 0.008, Matrix.Rotation(-0.25, 4, 'X')); B('oscuro', (0.032, 0.04, 0.1), (0, -0.07, -0.12), 0.008, Matrix.Rotation(0.3, 4, 'X'))
+    B('oscuro', (0.012, 0.03, 0.03), (0, 0.05, 0.4), 0.002)
+
+POSES = {
+    'pie': dict(pel=(0, 0, 0.95), che=(0, -0.01, 1.3), nk=(0, -0.01, 1.5), hd=(0, -0.025, 1.655),
+                sh=(0.22, 0, 1.45), el=((0.25, 0.03, 1.17), (-0.25, 0.03, 1.17)), ha=((0.235, -0.07, 0.92), (-0.235, -0.07, 0.92)),
+                hip=0.095, kn=((0.11, -0.03, 0.5), (-0.11, -0.02, 0.5)), an=((0.125, 0.03, 0.1), (-0.125, 0.02, 0.1)), toe=((0.15, -0.2, 0.05), (-0.15, -0.2, 0.05))),
+    'firme': dict(pel=(0.02, 0, 0.95), che=(0.01, 0.0, 1.3), nk=(0, 0, 1.5), hd=(0, -0.02, 1.655),
+                sh=(0.22, 0, 1.45), el=((0.27, 0.1, 1.2), (-0.26, -0.1, 1.2)), ha=((0.12, 0.2, 1.02), (-0.08, -0.25, 1.12)),
+                hip=0.095, kn=((0.14, -0.02, 0.5), (-0.12, -0.04, 0.5)), an=((0.17, 0.04, 0.1), (-0.14, 0.0, 0.1)), toe=((0.22, -0.18, 0.05), (-0.17, -0.22, 0.05))),
+    'agachado': dict(pel=(0, 0.14, 0.5), che=(0, -0.1, 0.82), nk=(0, -0.2, 0.98), hd=(0, -0.27, 1.11),
+                sh=(0.22, -0.16, 0.95), el=((0.27, -0.1, 0.68), (-0.27, -0.26, 0.72)), ha=((0.2, -0.38, 0.6), (-0.15, -0.4, 0.57)),
+                hip=0.1, kn=((0.13, -0.1, 0.075), (-0.14, -0.3, 0.52)), an=((0.13, 0.4, 0.1), (-0.14, -0.3, 0.1)), toe=((0.13, 0.5, 0.045), (-0.15, -0.53, 0.05))),
+}
+def person(pos, rotz, pose='pie', poncho=False, head='', hair=True, gun='', suit='uniforme', gloves=False, seed=0.0):
+    M0 = Matrix.Translation(pos) @ Matrix.Rotation(rotz, 4, 'Z'); V = Vector; P = POSES[pose]
+    pel, che, nk, hd = V(P['pel']), V(P['che']), V(P['nk']), V(P['hd']); up = (nk - che).normalized()
+    lean = V((0, 0, 1)).rotation_difference((che - pel).normalized()).to_matrix().to_4x4()
+    # tronco
+    cap(suit, pel, pel.lerp(che, 0.55), 0.16, 0.155, M0, 1.15, 0.8); cap(suit, pel.lerp(che, 0.5), che + up * 0.07, 0.16, 0.175, M0, 1.28, 0.74)
+    cap(suit, che + up * 0.1, nk, 0.1, 0.06, M0, 1.5, 0.8); cap('piel', nk - up * 0.03, hd - up * 0.04, 0.052, 0.05, M0)
+    ell(suit, pel - V((0, 0, 0.03)), (0.175, 0.125, 0.12), M0, lean)
+    rbox('cuero', (0.34, 0.24, 0.05), pel.lerp(che, 0.22), 0.02, 2, lean, M0); rbox('metal', (0.045, 0.02, 0.04), pel.lerp(che, 0.22) + lean @ V((0, -0.125, 0)), 0.005, 1, lean, M0)
+    for k, s in enumerate((1, -1)):
+        hipp = pel + V((s * P['hip'], 0, -0.04)); kn, an, toe = V(P['kn'][k]), V(P['an'][k]), V(P['toe'][k])
+        cap(suit, hipp, kn, 0.102, 0.07, M0); cap(suit, kn, an.lerp(kn, 0.35), 0.068, 0.062, M0)
+        cap('goma', an.lerp(kn, 0.42), an, 0.06, 0.052, M0); cap('goma', an + V((0, 0, -0.03)), toe, 0.052, 0.045, M0, 1.0, 1.0)
+        ell('goma', (an + toe) / 2 + V((0, 0, -0.035)), (0.055, 0.15, 0.03), M0, V((0, 1, 0)).rotation_difference((toe - an).normalized()).to_matrix().to_4x4())
+        sh = che + lean @ V((s * P['sh'][0], 0, 0.15)); el, ha = V(P['el'][k]), V(P['ha'][k])
+        ell(suit, sh, (0.08, 0.078, 0.072), M0)
+        if not poncho or pose == 'firme':
+            cap(suit, sh, el, 0.066, 0.052, M0); cap(suit, el, ha.lerp(el, 0.12), 0.05, 0.04, M0)
+            ell('goma' if gloves else 'piel', ha, (0.04, 0.05, 0.055), M0, V((0, 0, 1)).rotation_difference((ha - el).normalized()).to_matrix().to_4x4())
+        if suit == 'traje':   # rodilleras, coderas y correaje
+            ell('goma', kn + V((0, -0.035, 0.0)), (0.062, 0.05, 0.075), M0); ell('goma', el, (0.052, 0.052, 0.06), M0)
+            cap('cuero', che + lean @ V((s * 0.13, -0.115, 0.17)), pel.lerp(che, 0.25) + lean @ V((s * 0.1, -0.12, 0)), 0.018, 0.018, M0, 1.0, 0.4)
+            cap('cuero', che + lean @ V((s * 0.13, 0.115, 0.17)), pel.lerp(che, 0.25) + lean @ V((s * 0.1, 0.12, 0)), 0.018, 0.018, M0, 1.0, 0.4)
+    if suit == 'traje':
+        hipp = pel + V((P['hip'], 0, -0.04)); th = hipp.lerp(V(P['kn'][0]), 0.4)
+        rbox('cuero', (0.05, 0.11, 0.17), th + V((0.085, 0, 0)), 0.012, 2, V((0, 0, 1)).rotation_difference((hipp - V(P['kn'][0])).normalized()).to_matrix().to_4x4(), M0)
+        rbox('goma', (0.2, 0.09, 0.14), pel.lerp(che, 0.3) + lean @ V((0, 0.14, 0)), 0.03, 2, lean, M0)   # riñonera
+    else:
+        for s in (1, -1): rbox('cuero', (0.09, 0.05, 0.11), pel.lerp(che, 0.2) + lean @ V((s * 0.12, -0.13, -0.02)), 0.015, 2, lean, M0)   # cartucheras
+    # cabeza
+    H = V((0, 0, 1)).rotation_difference(V((0, -0.12, 1)).normalized() if pose != 'agachado' else V((0, 0.1, 1)).normalized()).to_matrix().to_4x4()
+    ell('piel', hd, (0.082, 0.1, 0.112), M0, H); ell('piel', hd + H @ V((0, -0.03, -0.055)), (0.068, 0.075, 0.07), M0, H)
+    rbox('piel', (0.026, 0.035, 0.05), hd + H @ V((0, -0.1, -0.012)), 0.01, 2, H @ Matrix.Rotation(-0.25, 4, 'X'), M0)
+    ell('piel', hd + H @ V((0, -0.082, 0.028)), (0.066, 0.03, 0.016), M0, H)                       # cejas
+    for s in (1, -1): ell('piel', hd + H @ V((s * 0.082, 0.005, -0.01)), (0.012, 0.022, 0.032), M0, H)
+    if hair: ell('pelo', hd + H @ V((0, 0.014, 0.022)), (0.088, 0.105, 0.105), M0, H @ Matrix.Rotation(-0.3, 4, 'X')); ell('pelo', hd + H @ V((0, 0.03, -0.03)), (0.084, 0.085, 0.08), M0, H)
+    if head == 'casco':
+        ell('oliva', hd + H @ V((0, 0.005, 0.03)), (0.118, 0.14, 0.105), M0, H, cut=-0.12); ell('oliva', hd + H @ V((0, 0.0, 0.02)), (0.132, 0.158, 0.02), M0, H)
+        cap('cuero', hd + H @ V((0.09, -0.02, 0.0)), hd + H @ V((0.03, -0.07, -0.115)), 0.007, 0.007, M0); cap('cuero', hd + H @ V((-0.09, -0.02, 0.0)), hd + H @ V((-0.03, -0.07, -0.115)), 0.007, 0.007, M0)
+    elif head == 'gorra':
+        ell('uniforme', hd + H @ V((0, 0.005, 0.07)), (0.095, 0.11, 0.07), M0, H, cut=-0.5); rbox('uniforme', (0.15, 0.09, 0.012), hd + H @ V((0, -0.13, 0.05)), 0.005, 2, H @ Matrix.Rotation(0.2, 4, 'X'), M0)
+    if poncho:
+        z0 = nk.z
+        loft('capote', [(z0 + 0.03, 0.075, 0.08, 0.0), (z0 - 0.02, 0.15, 0.115, 0.0), (z0 - 0.07, 0.25, 0.15, 0.0), (z0 - 0.2, 0.3, 0.19, 0.0), (z0 - 0.45, 0.33, 0.23, 0.01),
+                        (z0 - 0.7, 0.36, 0.27, 0.01), (z0 - 0.92, 0.39, 0.3, 0.02), (z0 - 1.02, 0.4, 0.31, 0.02)], M0, phase=seed)
+        ell('capote', nk + V((0, 0.07, 0.0)), (0.12, 0.1, 0.06), M0, Matrix.Rotation(0.5, 4, 'X'))   # capucha caída
+    if gun == 'espalda': rifle(M0 @ Matrix.Translation((0.06, 0.2 if not poncho else 0.25, 1.22)) @ Matrix.Rotation(0.5, 4, 'Y'))
+    elif gun == 'hombro': rifle(M0 @ Matrix.Translation((0.3 if not poncho else 0.34, 0.08, 1.2)) @ Matrix.Rotation(0.06, 4, 'X'))
+    elif gun == 'terciado':
+        a, b = V(P['ha'][0]), V(P['ha'][1]); d = (b - a).normalized()
+        rifle(M0 @ Matrix.Translation(a.lerp(b, 0.42) + V((0, -0.05, 0.0))) @ V((0, 0, 1)).rotation_difference(d).to_matrix().to_4x4())
+    elif gun == 'pistola':
+        ha = V(P['ha'][0]); rbox('oscuro', (0.028, 0.19, 0.036), ha + V((0, -0.1, 0.035)), 0.006, 1, None, M0); rbox('oscuro', (0.03, 0.04, 0.1), ha + V((0, -0.02, -0.01)), 0.008, 1, None, M0)
+        rcyl('oscuro', 0.017, 0.14, ha + V((0, -0.26, 0.04)), 'Y', 0.004, 10, M0)   # silenciador
+
+def people():
+    """Los personajes del nivel en su sitio: Cuttlas agazapado tras las cajas de la entrada y los tres guardias del patio sur."""
+    person(wpos(4.9, 2.6), math.pi / 2 + 0.25, 'agachado', hair=True, gun='pistola', suit='traje', gloves=True)
+    person(wpos(12.6, 4.2), 0.6, 'pie', poncho=True, head='gorra', gun='hombro', seed=1.3)                # cabo Ibarra
+    person(wpos(20.4, 15.6), -1.9, 'firme', poncho=False, head='casco', gun='terciado', seed=4.0)        # sargento Moya
+    person(wpos(26.4, 6.6), 2.4, 'pie', head='', gun='', seed=2.2)                                        # soldado Peris, en la oficina
+    flush_smooth('gente')
+
 # ---------------------------------------------------------------- modelos escaneados de Poly Haven (assets/modelos-ph)
 PHDIR = os.path.join(R, 'assets', 'modelos-ph'); PH = {}
 def has_ph(i): return os.path.exists(os.path.join(PHDIR, i, i + '.gltf')) and not os.environ.get('LH_NOPH')
@@ -534,6 +654,7 @@ def build_props():
     F('metal_office_desk', 9, 11, 0, 0.4); F('vintage_radio_transceiver', 9, 11, -0.3, 0.45, 0.2, 0.79); F('SchoolChair_01', 9, 11, 0.2, -0.45, 0.2)
     F('painted_wooden_bench', 30, 14, 0, 0.6); F('metal_tool_chest', 7, 8, 0, 0, 0.5); F('ammo_box', 29, 21, 0, 0, 0.8)
     flush('luces'); flush_smooth('camiones')
+    people()
     # luces interiores del plano (despacho, archivo, calabozo...): se ven por las puertas y calientan las ventanas
     for m in re.finditer(r'\[([\d.]+),([\d.]+),0x([0-9a-f]{6}),([\d.]+)\]', re.search(r"ZONES\.base=.*?lights:\[(.*?)\]\],", src, re.S).group(1) + ']'):
         x, y, hx, k = float(m.group(1)), float(m.group(2)), m.group(3), float(m.group(4))
@@ -595,6 +716,9 @@ if os.environ.get('LH_NOBEVEL'):
         for md in list(o.modifiers): o.modifiers.remove(md)
 print('ESCENA', round(time.time() - T0, 1), 's', flush=True)
 CAMERAS = {
+    'gente': camera('gente', wpos(10.2, 6.4, 1.5), wpos(12.6, 4.2, 1.25), 35),
+    'cuttlas': camera('cuttlas', wpos(3.4, 5.0, 1.0), wpos(4.9, 2.6, 0.75), 35),
+    'moya': camera('moya', wpos(18.9, 18.2, 1.5), wpos(20.4, 15.6, 1.25), 35),
     'patio': camera('patio', wpos(1.0, 5.2, 1.6), wpos(9.5, 6.0, 1.9), 22),
     'aerea': camera('aerea', Vector((-16, -ROWS * T - 14, 24)), wpos(17, 13, 0), 26),
     'torreta': camera('torreta', wpos(24.2, 12.5, 1.4), wpos(19.3, 2.0, 4.4), 20),
