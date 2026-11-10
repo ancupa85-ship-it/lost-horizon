@@ -131,6 +131,10 @@ def export_anim(name, P, arm):
         lowall = lambda W: min(min(W[k].to_translation().z, (W[k] @ Vector((0, arm.data.bones[k].length, 0))).z) for k in allb)
         ground = lambda W, f: Vector((0, yk[f], h0 - low(W))) if f <= 5 else Vector((0, yk[f], h0 - 0.05 + pk[f] - lowall(W)))
         bake('down', [(1, base), (5, hit), (11, mid), (16, flo), (22, flo)], shift=ground)
+        # apuntando: fusil al hombro derecho, la mano izquierda adelantada; el visor tiende el arma de una mano a la otra
+        aim = dict(base, spine_03=(0.03, -0.12, 1), neck_01=(-0.04, -0.2, 1), head=(-0.12, -0.12, 1), upperarm_r=(-0.4, -0.25, -0.9), lowerarm_r=(0.3, -0.9, 0.4), upperarm_l=(0.12, -1, -0.3), lowerarm_l=(-0.3, -1, 0.12),
+                   thigh_l=(0.1, -0.28, -1), calf_l=(0.02, 0.06, -1), thigh_r=(-0.1, 0.16, -1), calf_r=(0, 0.28, -1))
+        bake('aim', [(1, aim), (3, aim)])
     for pb in arm.pose.bones: pb.rotation_quaternion = (1, 0, 0, 0)
     for o in bpy.data.objects: o.select_set(o.type in ('MESH', 'ARMATURE'))
     f = os.path.join(d, 'persona_' + name + '_anim.glb')
