@@ -16,6 +16,35 @@ C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · G orden a 
 Tab cuaderno · R radio (Control 141.12, Roig 140.85 y una frecuencia que no figura en el manual) · H guía · Esc pausa y opciones.
 El menú de inicio tiene "Cómo se juega", "Controles", "Opciones" y, si hay partida guardada, CONTINUAR.
 
+## Nivel «La Torre» (`nivel/`)
+
+Un nivel nuevo, autocontenido y completo de entrada a salida, que saca lo mejor de De Profundis (cel-shading,
+códec, detección por distancias, letal/no letal, la banda sonora) en un solo mapa con alturas. Es el bloque 4
+del GDD: patio, torre de vigilancia y centro de comunicaciones. Se abre `nivel/index.html` (o `npm start` y
+`/nivel/`). Tercera persona, ratón capturado.
+
+- **Entrada**: el embarcadero sur. Al patio se entra por el portón (centinela bajo una farola) o por el agujero de
+  la valla del este, entre juncos (agachado entre juncos casi no se te ve).
+- **Alturas**: suelo (0 m) → cajas (1-2 m) → tejado del anexo (2,4 m) → balcón y archivo (4 m) → torre de vigilancia
+  (7 m) → azotea (8,3 m). Los guardias usan la escalera exterior pero **no las escaleras de mano**: por arriba se
+  esquiva a casi todos. Caer encima de un guardia lo derriba; caer de más de 4,6 m duele.
+- **Sigilo**: conos de visión con medidor (¿? / !), luz y sombra (farolas), ruido al correr, cuerpos que otros
+  descubren, dormidos que despiertan, cargadores vacíos para distraer (G), cargar cuerpos (R). El reflector de la torre
+  barre el patio; si duermes o matas al vigía, se apaga.
+- **Acción**: Q cambia entre letal (balas, ruidosas; cuchillo) y no letal (dardos, silenciosos; estrangular). Con
+  alarma los guardias convergen y disparan; se apaga a los 14 s sin verte y queda la base en sospecha.
+- **Puzle**: la caja fuerte del archivo. La nota de Halloran dice «pregúntale al profeta de qué huía»; la Biblia del
+  vigía, en la torre, está abierta por Jonás 1,3. Clave **0103**. Tres fallos hacen sonar un zumbador.
+- **Trama**: el expediente ALEPH-07 es la lista de sujetos de Lost Horizon; LH-07 es Cuttlas, «recuperación
+  programada: hoy». Si has matado, aparece un tirador en la azotea al coger el expediente.
+- **Salida**: tirolina desde la azotea por encima de la muralla norte, o de vuelta al bote. El final cambia según la
+  vía (recuerdo del programa o de Elena), la salida y las alarmas (Laura Sorolla en 2026).
+- Puntos de control al entrar en la base y al coger el expediente (ÚLTIMO PUNTO al morir).
+
+Pruebas: `npm run test:nivel` (teclado real en tiempo real + dos partidas completas con un bot que usa la física
+y la IA reales a paso fijo: no letal sin alarmas saliendo por la tirolina, y letal saliendo en bote).
+`node tests/nivel-shots.js` hace capturas. `python3 tools/build-nivel.py` genera `dist/la-torre.html` para el Artifact.
+
 ## Estructura
 
 ```
