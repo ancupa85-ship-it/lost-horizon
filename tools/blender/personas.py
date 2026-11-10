@@ -93,12 +93,12 @@ def export_anim(name, P, arm):
     root = arm.pose.bones['Root']; Rinv = arm.data.bones['Root'].matrix_local.to_3x3().inverted(); FEET = ('foot_l', 'foot_r', 'ball_l', 'ball_r')
     low = lambda W: min(min(W[k].to_translation().z, (W[k] @ Vector((0, arm.data.bones[k].length, 0))).z) for k in FEET)
     h0 = low({k: arm.data.bones[k].matrix_local for k in FEET})
-    def bake(track, frames, shift=None):
+    def bake(track, frames, shift=None, curl=None):
         """shift: desplazamiento fijo de todo el cuerpo; sin él, cada fotograma se apoya en el pie más bajo (da el vaivén de la cadera)."""
         act = bpy.data.actions.new(track); ad.action = act; prev = {}
         for f, dirs in frames:
             for pb in arm.pose.bones: pb.rotation_mode = 'QUATERNION'; pb.rotation_quaternion = (1, 0, 0, 0)
-            W = pose(arm, dirs, P.get('curl'))
+            W = pose(arm, dirs, curl or P.get('curl') or {'_l': 0.45, '_r': 0.45})   # sin dato, mano relajada a medio cerrar (abierta del todo parece una garra)
             root.location = Rinv @ (shift(W, f) if callable(shift) else Vector(shift) if shift is not None else Vector((0, 0, h0 - low(W)))); root.keyframe_insert('location', frame=f)
             for bn in bones:
                 pb = arm.pose.bones[bn]; q = pb.rotation_quaternion.copy()
@@ -132,9 +132,11 @@ def export_anim(name, P, arm):
         ground = lambda W, f: Vector((0, yk[f], h0 - low(W))) if f <= 5 else Vector((0, yk[f], h0 - 0.05 + pk[f] - lowall(W)))
         bake('down', [(1, base), (5, hit), (11, mid), (16, flo), (22, flo)], shift=ground)
         # apuntando: fusil al hombro derecho, la mano izquierda adelantada; el visor tiende el arma de una mano a la otra
-        aim = dict(base, spine_03=(0.03, -0.12, 1), neck_01=(-0.04, -0.2, 1), head=(-0.12, -0.12, 1), upperarm_r=(-0.4, -0.25, -0.9), lowerarm_r=(0.3, -0.9, 0.4), upperarm_l=(0.12, -1, -0.3), lowerarm_l=(-0.3, -1, 0.12),
+        aim = dict(base, spine_03=(0.02, -0.1, 1), neck_01=(-0.05, -0.2, 1), head=(-0.16, -0.16, 1),
+                   upperarm_r=(-0.35, -0.45, -0.8), lowerarm_r=(0.68, -0.42, 0.61), hand_r=(0.5, -0.8, 0.25),      # mano derecha ante el pecho, a la altura del hombro
+                   upperarm_l=(-0.25, -0.9, -0.25), lowerarm_l=(-0.75, -0.65, 0.12), hand_l=(-0.6, -0.75, 0.1),    # la izquierda adelantada, sobre la misma línea
                    thigh_l=(0.1, -0.28, -1), calf_l=(0.02, 0.06, -1), thigh_r=(-0.1, 0.16, -1), calf_r=(0, 0.28, -1))
-        bake('aim', [(1, aim), (3, aim)])
+        bake('aim', [(1, aim), (3, aim)], curl={'_l': 1.15, '_r': 1.25})   # puños cerrados sobre el fusil
     for pb in arm.pose.bones: pb.rotation_quaternion = (1, 0, 0, 0)
     for o in bpy.data.objects: o.select_set(o.type in ('MESH', 'ARMATURE'))
     f = os.path.join(d, 'persona_' + name + '_anim.glb')
