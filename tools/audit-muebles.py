@@ -15,6 +15,8 @@ doors = []
 for ty, row in enumerate(MAP):
     for tx, c in enumerate(row):
         if c in 'DLVb': doors.append((c, tx, ty, row[tx - 1] in 'W#' and row[tx + 1] in 'W#'))
+EXT = ('pila', 'camion', 'generador', 'covered_car', 'concrete_road_barrier', 'Barrel_01', 'Barrel_02', 'barrel_03', 'wooden_crate_01')   # bultos del patio: van en su casilla y pueden tocarse
+d['obst'] = [o for o in d['obst'] if o[0] not in EXT]
 for o in d['obst']:
     P = list(pts(o)); cs = {cell(x, z) for x, z in P} & set('#WTcgDLVb')
     if cs: bad += 1; print('PISA', ''.join(sorted(cs)), o)

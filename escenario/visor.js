@@ -46,11 +46,11 @@ varying vec3 vWPos;
 float lhH(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float lhN(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(lhH(i),lhH(i+vec2(1,0)),f.x),mix(lhH(i+vec2(0,1)),lhH(i+vec2(1,1)),f.x),f.y); }
 uniform float lhT;
-vec2 lhRip(vec2 p){ vec2 g=vec2(0.0); for(int k=0;k<2;k++){ vec2 q=p*(k==0?1.7:2.6)+float(k)*13.7, i=floor(q), f=fract(q); float h=lhH(i+float(k)*5.0), t=fract(lhT*(0.7+0.5*h)+h*9.0); vec2 c=vec2(0.3+0.4*lhH(i+1.7),0.3+0.4*lhH(i+4.1)), v=f-c; float d=length(v), r=t*0.42; g+=normalize(v+1e-5)*sin((d-r)*46.0)*smoothstep(0.07,0.0,abs(d-r))*(1.0-t); } return g; }
+vec2 lhRip(vec2 p){ vec2 g=vec2(0.0); { vec2 q=p*2.1, i=floor(q), f=fract(q); float h=lhH(i), t=fract(lhT*(0.7+0.5*h)+h*9.0); vec2 c=vec2(0.3+0.4*lhH(i+1.7),0.3+0.4*lhH(i+4.1)), v=f-c; float d=length(v), r=t*0.42; g+=normalize(v+1e-5)*sin((d-r)*46.0)*smoothstep(0.07,0.0,abs(d-r))*(1.0-t); } return g; }
 float lhPuddle(){ vec2 p=vWPos.xz*0.21; float n=lhN(p)*0.55+lhN(p*2.3+7.1)*0.3+lhN(p*5.1+3.3)*0.15; return smoothstep(0.5,0.6,n); }`)
    .replace('#include <map_fragment>','#include <map_fragment>\nfloat lhP=lhPuddle(); diffuseColor.rgb*=mix(1.0,0.22,lhP);')
    .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor*0.62,0.03,lhP);')
-   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=normalize(mix(normal,normalize(vNormal),lhP*0.97)); if(lhP>0.02){ vec2 rg=lhRip(vWPos.xz)*lhP*0.35; normal=normalize(normal+(viewMatrix*vec4(rg.x,0.0,rg.y,0.0)).xyz); }   /* ondas de las gotas */');
+   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=normalize(mix(normal,normalize(vNormal),lhP*0.97)); if(lhP>0.02&&vViewPosition.z<22.0){ vec2 rg=lhRip(vWPos.xz)*lhP*0.35; normal=normalize(normal+(viewMatrix*vec4(rg.x,0.0,rg.y,0.0)).xyz); }   /* ondas de las gotas */');
 };
 
 // ---------- reflejos: un entorno pequeño (cielo oscuro y un halo de sodio en el horizonte) para que el suelo mojado tenga qué reflejar
@@ -77,7 +77,7 @@ INFO.lights.forEach(l=>{ const p=B(l.pos), col=new THREE.Color(l.color[0],l.colo
   else if(l.kind==='POINT'&&l.name==='aplique'){ let L=null; if(!LOW){ L=new THREE.PointLight(col,7,9,2); L.position.copy(p); scene.add(L); } LIT.push({x:p.x,y:p.y,z:p.z,R:5.5,on:true,L,I:7,h:[halo(p,0xffb870,1.3,0.9),halo(p,0xffa860,5,0.3)]}); }
   else if(l.kind==='POINT'&&l.name==='interior'){ const L=new THREE.PointLight(col,l.power/120*24,9.5,1.6); L.position.copy(p); scene.add(L); LIT.push({x:p.x,y:p.y,z:p.z,R:7.5,on:true,L,I:L.intensity,h:[halo(p.clone().add(new THREE.Vector3(0,0.18,0)),0xffd9a0,0.9,0.9)]}); }
   else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,280,110,A*1.5,0.7,1.4)   /* 2600 quemaba en blanco las fachadas enteras */; L.position.copy(p); scene.add(L); scene.add(L.target);
-    if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(2048,2048); L.shadow.camera.near=2; L.shadow.camera.far=110; L.shadow.bias=-0.0006; L.shadow.normalBias=0.03; L.shadow.autoUpdate=false; SPOTS.push(L); }   /* la sombra del foco se rehace cada pocos fotogramas, no en todos */
+    if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(1024,1024); L.shadow.camera.near=2; L.shadow.camera.far=110; L.shadow.bias=-0.0006; L.shadow.normalBias=0.03; L.shadow.autoUpdate=false; SPOTS.push(L); }   /* la sombra del foco se rehace cada pocos fotogramas, no en todos */
     const h1=halo(p,0xdde8ff,4.5,1), h2=halo(p,0xbfd4ff,16,0.4);
     // haz del foco en la niebla: varias capas anchas y tenues, sin borde, que se apagan con la distancia
     const len=70, cone=new THREE.Group();
@@ -91,12 +91,15 @@ const hemi=new THREE.HemisphereLight(0x27344f,0x0b0906,0.36); scene.add(hemi);
 const moon=new THREE.DirectionalLight(0x8fa8d8,0.22); moon.position.set(-30,50,20); scene.add(moon);
 // cielo de tormenta: cúpula con nubes que se mueven; en el horizonte tiene el color de la niebla para que la base se funda con él. Cada tanto, un relámpago ilumina nubes y patio, y el trueno llega después.
 const SKY={m:null,f:0,t:14+Math.random()*10,seq:null,th:0};
-(function(){ const g=new THREE.SphereGeometry(320,32,16), m=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{time:{value:0},flash:{value:0},fogc:{value:FOGC.clone()},fp:{value:new THREE.Vector2(0.3,0.5)}},
+function skyNoise(){ const N=128, c=document.createElement('canvas'); c.width=c.height=N; const x=c.getContext('2d'), im=x.createImageData(N,N), hh=(a,b,p)=>{ a=((a%p)+p)%p; b=((b%p)+p)%p; const v=Math.sin(a*127.1+b*311.7+p*17.3)*43758.5453; return v-Math.floor(v); };
+  const vn=(u,v,p)=>{ const i=Math.floor(u), j=Math.floor(v); let f=u-i, g=v-j; f=f*f*(3-2*f); g=g*g*(3-2*g); return (hh(i,j,p)*(1-f)+hh(i+1,j,p)*f)*(1-g)+(hh(i,j+1,p)*(1-f)+hh(i+1,j+1,p)*f)*g; };
+  for(let y=0;y<N;y++)for(let k=0;k<N;k++){ let v=0, a=0.5; for(const p of [4,8,16,32]){ v+=a*vn(k/N*p,y/N*p,p); a*=0.5; } const q=(y*N+k)*4; im.data[q]=im.data[q+1]=im.data[q+2]=Math.min(255,v/0.94*255); im.data[q+3]=255; } x.putImageData(im,0,0);
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.minFilter=THREE.LinearFilter; t.generateMipmaps=false; return t; }
+(function(){ const g=new THREE.SphereGeometry(320,24,12), m=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{time:{value:0},flash:{value:0},fogc:{value:FOGC.clone()},fp:{value:new THREE.Vector2(0.3,0.5)},nz:{value:skyNoise()}},
   vertexShader:'varying vec3 d; void main(){ d=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader:`uniform float time; uniform float flash; uniform vec3 fogc; uniform vec2 fp; varying vec3 d;
-float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
-float fbm(vec2 p){ float a=0.5, v=0.0; for(int i=0;i<3;i++){ v+=a*n(p); p=p*2.03+vec2(7.1,3.3); a*=0.5; } return v; }
+uniform sampler2D nz;
+float fbm(vec2 p){ return texture2D(nz,p*0.11).r; }
 void main(){ float up=max(d.y,0.0); vec2 q=d.xz/(up+0.22)*1.4+vec2(time*0.012,time*0.007); float c=fbm(q), c2=fbm(q*2.1+vec2(-time*0.02,4.0));
   vec3 hi=mix(vec3(0.016,0.02,0.034),vec3(0.07,0.062,0.07),smoothstep(0.35,0.8,c)); hi+=vec3(0.05,0.03,0.015)*smoothstep(0.5,0.9,c2)*(1.0-up);   /* panzas de nube teñidas por el sodio de la base */
   vec3 col=mix(fogc,hi,smoothstep(0.0,0.3,up));
@@ -105,7 +108,7 @@ void main(){ float up=max(d.y,0.0); vec2 q=d.xz/(up+0.22)*1.4+vec2(time*0.012,ti
 function skyTick(dt,t){ RIP.value=t; const u=SKY.m.material.uniforms; SKY.m.position.copy(camera.position); u.time.value=t; SKY.t-=dt;
   if(SKY.t<=0){ SKY.t=22+Math.random()*34; SKY.seq=[[0,1],[0.07,0.15],[0.13,0.8],[0.3,0.25],[0.36,0.6],[0.9,0]]; SKY.k=0; const a=Math.random()*6.28; u.fp.value.set(Math.cos(a)*0.7,Math.sin(a)*0.7); SKY.th=0.8+Math.random()*2.2; SKY.thG=0.25+Math.random()*0.3; }
   if(SKY.seq){ SKY.k+=dt; const q=SKY.seq; let v=0; for(let i=0;i<q.length-1;i++)if(SKY.k>=q[i][0]&&SKY.k<q[i+1][0]){ const f=(SKY.k-q[i][0])/(q[i+1][0]-q[i][0]); v=q[i][1]+(q[i+1][1]-q[i][1])*f; } if(SKY.k>=q[q.length-1][0]){ SKY.seq=null; v=0; } SKY.f=v; } else SKY.f=0;
-  if(SKY.th>0){ SKY.th-=dt; if(SKY.th<=0){ sNoise(3.2,70,0.4,SKY.thG*1.6); sNoise(1.6,160,0.5,SKY.thG*0.7); } }
+  if(SKY.th>0){ SKY.th-=dt; if(SKY.th<=0){ sNoise(2.2,75,0.4,SKY.thG*1.8); } }
   u.flash.value=SKY.f; hemi.intensity=0.36+SKY.f*2.2; moon.intensity=0.22+SKY.f*1.6; }
 const balizaHalo=[];
 
@@ -284,8 +287,8 @@ function deco(){ const cv=(w,h,fn)=>{ const c=document.createElement('canvas'); 
   const SZ=[[0.62,0.85],[1.25,0.94],[1.3,0.87],[0.95,0.76],[0.42,0.42]];
   const mats=T_.map((t,i)=>new THREE.MeshStandardMaterial({map:t,color:0xa8a8a8,roughness:0.92,metalness:0,transparent:i===4,alphaTest:i===4?0.5:0}));
   // zócalo: media pared pintada de verde cuartel con su cenefa y roña cerca del suelo
-  const zt=cv(256,256,(x,w,h)=>{ x.clearRect(0,0,w,h); x.fillStyle='rgba(58,70,52,0.93)'; x.fillRect(0,14,w,h-14); x.fillStyle='rgba(24,28,22,0.95)'; x.fillRect(0,8,w,7); x.fillStyle='rgba(18,16,12,0.9)'; x.fillRect(0,h-22,w,22); const g=x.createLinearGradient(0,h-110,0,h); g.addColorStop(0,'rgba(20,16,10,0)'); g.addColorStop(1,'rgba(20,16,10,0.6)'); x.fillStyle=g; x.fillRect(0,h-110,w,110); grime(x,w,h,40,0.16); for(let i=0;i<14;i++){ x.fillStyle='rgba(150,150,130,'+(0.05+Math.random()*0.1)+')'; x.fillRect(Math.random()*w,30+Math.random()*(h-70),1+Math.random()*2,6+Math.random()*30); } x.clearRect(0,0,w,8); });
-  zt.wrapS=THREE.RepeatWrapping; const zm=new THREE.MeshStandardMaterial({map:zt,roughness:0.6,metalness:0,transparent:true,polygonOffset:true,polygonOffsetFactor:-2});
+  const zt=cv(256,256,(x,w,h)=>{ x.clearRect(0,0,w,h); x.fillStyle='rgb(58,70,52)'; x.fillRect(0,14,w,h-14); x.fillStyle='rgba(24,28,22,0.95)'; x.fillRect(0,8,w,7); x.fillStyle='rgba(18,16,12,0.9)'; x.fillRect(0,h-22,w,22); const g=x.createLinearGradient(0,h-110,0,h); g.addColorStop(0,'rgba(20,16,10,0)'); g.addColorStop(1,'rgba(20,16,10,0.6)'); x.fillStyle=g; x.fillRect(0,h-110,w,110); grime(x,w,h,40,0.16); for(let i=0;i<14;i++){ x.fillStyle='rgba(150,150,130,'+(0.05+Math.random()*0.1)+')'; x.fillRect(Math.random()*w,30+Math.random()*(h-70),1+Math.random()*2,6+Math.random()*30); } x.clearRect(0,0,w,8); });
+  zt.wrapS=THREE.RepeatWrapping; const zm=new THREE.MeshStandardMaterial({map:zt,roughness:0.6,metalness:0,alphaTest:0.5,polygonOffset:true,polygonOffsetFactor:-2});
   const faces=[]; for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){ if('_z'.indexOf(MAP[y][x])<0)continue; for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){ const n=(MAP[y+d[1]]||'')[x+d[0]]; if(n==='W'||n==='#')faces.push([x,y,d[0],d[1]]); } }
   const im=new THREE.InstancedMesh(new THREE.PlaneGeometry(T,1.25),zm,faces.length), o=new THREE.Object3D(); faces.forEach((f,i)=>{ o.position.set(f[0]*T+T/2+f[2]*(T/2-0.012),0.625,f[1]*T+T/2+f[3]*(T/2-0.012)); o.rotation.set(0,Math.atan2(-f[2],-f[3]),0); o.updateMatrix(); im.setMatrixAt(i,o.matrix); }); im.receiveShadow=true; im.frustumCulled=false; scene.add(im);
   // carteles: uno de cada cinco paños de pared, lejos de puertas y sin mueble alto delante; el tipo sale de la casilla, así que siempre están en el mismo sitio
@@ -294,6 +297,7 @@ function deco(){ const cv=(w,h,fn)=>{ const c=document.createElement('canvas'); 
     const k=Math.floor(hh(x,y,7)*5), m=new THREE.Mesh(new THREE.PlaneGeometry(SZ[k][0],SZ[k][1]),mats[k]); m.position.set(px,k===4?2.45:1.95,pz); m.rotation.y=Math.atan2(-dx,-dy); m.rotation.z=(hh(x,y,3)-0.5)*0.03; m.receiveShadow=true; scene.add(m); cnt++; });
   // pantalla de chapa sobre cada bombilla
   const sm=new THREE.MeshStandardMaterial({color:0x2c3a2e,roughness:0.5,metalness:0.6,side:THREE.DoubleSide}); LIT.forEach(s=>{ if(s.R!==7.5)return; const c=new THREE.Mesh(new THREE.ConeGeometry(0.24,0.16,18,1,true),sm); c.position.set(s.x,s.y+0.1,s.z); scene.add(c); });
+  if(renderer.initTexture)T_.concat([zt]).forEach(t=>{ try{ renderer.initTexture(t); }catch(e){} });   // subir las texturas ya, no al entrar en la habitación
   stats.deco=cnt; }
 let composer=null, bloom=null, useBloom=!LOW;
 // El compositor trabaja en lineal y con margen (medio flotante); la última pasada hace el revelado: exposición, curva ACES, viñeta y grano.
@@ -317,7 +321,7 @@ if(THREE.EffectComposer&&THREE.UnrealBloomPass)mkComposer(); else useBloom=false
 
 // ---------- recorrido a pie: WASD y ratón, con las paredes del plano
 const OBST=(INFO.obst||[]).filter(o=>o[3]>0.15&&o[4]>0.15); deco();
-const solid=(x,y)=>{ if(x<0||y<0||x>=COLS||y>=ROWS)return true; return '#WTcgLVb'.indexOf(MAP[y][x])>=0; };
+const solid=(x,y)=>{ if(x<0||y<0||x>=COLS||y>=ROWS)return true; return '#WLVb'.indexOf(MAP[y][x])>=0; };   // cajas, camiones y generador ya no tapan la casilla entera: chocan con su huella real (OBST)
 const P={x:0,z:0,yaw:0,pitch:0,vy:0,bob:0}; (function(){ let sx=2,sy=2; MAP.forEach((r,y)=>{ const i=r.indexOf('P'); if(i>=0){ sx=i; sy=y; } }); P.x=sx*T+T/2; P.z=sy*T+T/2; P.yaw=-2.2; })();
 const keys={}; addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='KeyB'&&composer){ useBloom=!useBloom; } if(e.code==='KeyH'){ el('hud').hidden=!el('hud').hidden; }
   if(e.code==='KeyF')scene.fog.density=Math.max(0.004,scene.fog.density-0.003); if(e.code==='KeyG')scene.fog.density=Math.min(0.09,scene.fog.density+0.003);
@@ -467,7 +471,7 @@ function move(dt){ let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDow
   const sp=(third?(PL.drag?0.7:PL.crouch?0.78:(fast?1.85:1.12)):(PL.drag?1.05:PL.crouch?1.3:(fast?6.2:2.6))*(1-0.5*A))*dt; const sin=Math.sin(P.yaw), cos=Math.cos(P.yaw); const dx=(-sin*f+cos*s)*sp, dz=(-cos*f-sin*s)*sp; const R=0.32;
   const inObst=(x,z)=>OBST.some(o=>{ const dx=x-o[1], dz=z+o[2], c=Math.cos(o[5]), sn=Math.sin(o[5]), u=dx*c-dz*sn, v=-dx*sn-dz*c; return Math.abs(u)<o[3]+0.24&&Math.abs(v)<o[4]+0.24; });
   const free0=(x,z)=>!solid(Math.floor((x-R)/T),Math.floor((z-R)/T))&&!solid(Math.floor((x+R)/T),Math.floor((z-R)/T))&&!solid(Math.floor((x-R)/T),Math.floor((z+R)/T))&&!solid(Math.floor((x+R)/T),Math.floor((z+R)/T));
-  const free=(x,z)=>free0(x,z)&&(!inObst(x,z)||inObst(P.x,P.z));   // los muebles estorban; si ya estás dentro de uno, te deja salir
+  const free=(x,z)=>free0(x,z)&&(!inObst(x,z)||inObst(P.x,P.z)); window.__ESC&&(window.__ESC.canStand=(x,z)=>free0(x,z)&&!inObst(x,z));   // los muebles estorban; si ya estás dentro de uno, te deja salir
   if(free(P.x+dx,P.z))P.x+=dx; if(free(P.x,P.z+dz))P.z+=dz; if(l>0.05)P.bob+=dt*(fast?13:8.5); sStep(l>0.05,fast);
   camera.rotation.set(0,0,0); camera.rotation.order='YXZ'; camera.rotation.y=P.yaw; camera.rotation.x=P.pitch;
   VM.visible=!third&&!!PL.p; const mira=el('mira'); if(mira)mira.hidden=!(A>0.6);
@@ -492,7 +496,7 @@ addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.upd
 let last=performance.now(), fpsT=0, fpsN=0, t=0;
 // vigilancia de fluidez: si va por debajo de 27 fps baja la calidad por pasos (sombras del foco, resplandor, resolución, lluvia)
 const PERF={t:0,n:0,bad:0,step:0,wait:5,k:0};
-function perfTick(raw){ PERF.k++; SPOTS.forEach((L,i)=>{ if(L.castShadow&&(PERF.k+i*2)%4===0)L.shadow.needsUpdate=true; }); if(LOW||!locked)return; if(PERF.wait>0){ PERF.wait-=raw; return; } PERF.t+=raw; PERF.n++; if(PERF.t<2)return; const f=PERF.n/PERF.t; PERF.t=0; PERF.n=0; PERF.bad=f<27?PERF.bad+1:0; if(PERF.bad<2||PERF.step>=4)return; PERF.bad=0; PERF.step++; PERF.wait=3;
+function perfTick(raw){ PERF.k++; SPOTS.forEach((L,i)=>{ if(L.castShadow&&(PERF.k+i*5)%10===0)L.shadow.needsUpdate=true; }); if(LOW||!locked)return; if(PERF.wait>0){ PERF.wait-=raw; return; } PERF.t+=raw; PERF.n++; if(PERF.t<2)return; const f=PERF.n/PERF.t; PERF.t=0; PERF.n=0; PERF.bad=f<27?PERF.bad+1:0; if(PERF.bad<2||PERF.step>=4)return; PERF.bad=0; PERF.step++; PERF.wait=3;
   if(PERF.step===1){ SPOTS.forEach(L=>{ L.castShadow=false; }); scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.needsUpdate=true; }); } }); }
   else if(PERF.step===2){ useBloom=false; }
   else { const pr=PERF.step===3?1:0.75; renderer.setPixelRatio(pr); renderer.setSize(innerWidth,innerHeight); if(composer){ if(composer.setPixelRatio)composer.setPixelRatio(pr); composer.setSize(innerWidth,innerHeight); } if(PERF.step===4)rainGeo.setDrawRange(0,RAIN_N); } }

@@ -709,15 +709,17 @@ def crate_stack(p, x, y):
             for k in (-1, 0, 1):
                 if layer == 2 and rnd(x, y, 20 + k) < 0.22: continue
                 d = Vector((math.cos(a + math.pi / 2), math.sin(a + math.pi / 2), 0)) * (k * 0.55)
-                put('wooden_military_crate', p + d + Vector(((rnd(x, y, 30 + k + layer * 3) - 0.5) * 0.06, (rnd(x, y, 40 + k + layer * 3) - 0.5) * 0.06, layer * 0.462)), a + (rnd(x, y, 50 + k + layer * 3) - 0.5) * 0.07)
+                dim = put('wooden_military_crate', p + d + Vector(((rnd(x, y, 30 + k + layer * 3) - 0.5) * 0.06, (rnd(x, y, 40 + k + layer * 3) - 0.5) * 0.06, layer * 0.462)), a + (rnd(x, y, 50 + k + layer * 3) - 0.5) * 0.07)
+        if dim: m = max(dim[0] / 2, 0.55 + dim[1] / 2) + 0.03; obst('pila', p, m, m, turn)
     elif has_ph('wooden_crate_02'):
         for layer in range(3):
             a = turn + (math.pi / 2 if layer % 2 else 0)
             for k in (-1, 0, 1):
                 d = Vector((math.cos(a), math.sin(a), 0)) * (k * 0.56)
-                put('wooden_crate_02', p + d + Vector((0, 0, layer * 0.455)), a + (rnd(x, y, 50 + k + layer * 3) - 0.5) * 0.06, 1.0)
+                dim = put('wooden_crate_02', p + d + Vector((0, 0, layer * 0.455)), a + (rnd(x, y, 50 + k + layer * 3) - 0.5) * 0.06, 1.0)
+        if dim: m = max(0.56 + dim[0] / 2, dim[1] / 2) + 0.03; obst('pila', p, m, m, turn)
     else:
-        place('caja', p, turn)
+        place('caja', p, turn); obst('pila', p, 0.9, 0.9, turn)
 
 def pick_lamps(min_d=17.0):
     """De las farolas del plano se queda con las que distan al menos min_d metros entre sí, empezando por las más céntricas."""
@@ -734,10 +736,10 @@ def build_props():
             if c == 'c': crate_stack(p, x, y)
             elif c == 'T' and (x, y) not in seen:
                 seen.update({(x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1)}); ntruck += 1; q = p + Vector((T / 2, -T / 2, 0))
-                if ntruck == 3 and has_ph('covered_car'): put('covered_car', q + Vector((-0.6, 0, 0)), 0.08); put('concrete_road_barrier', q + Vector((1.2, 0.3, 0)), math.pi / 2 + 0.05)
-                else: truck(q, (math.pi if rnd(x, y, 1) < 0.5 else 0) + (rnd(x, y, 2) - 0.5) * 0.1)
+                if ntruck == 3 and has_ph('covered_car'): putf('covered_car', q + Vector((-0.6, 0, 0)), 0.08); putf('concrete_road_barrier', q + Vector((1.2, 0.3, 0)), math.pi / 2 + 0.05)
+                else: ta = (math.pi if rnd(x, y, 1) < 0.5 else 0) + (rnd(x, y, 2) - 0.5) * 0.1; truck(q, ta); obst('camion', q, 1.08, 2.02, ta)
             elif c == 'g':
-                place('generador', p, 0)
+                g_ = place('generador', p, 0); bb = [Vector(c_) for c_ in g_.bound_box]; obst('generador', p + Vector(((max(b.x for b in bb) + min(b.x for b in bb)) / 2, (max(b.y for b in bb) + min(b.y for b in bb)) / 2, 0)), (max(b.x for b in bb) - min(b.x for b in bb)) / 2, (max(b.y for b in bb) - min(b.y for b in bb)) / 2, 0)
                 if has_ph('metal_jerrycan_green'): put('metal_jerrycan_green', p + Vector((1.3, -0.5, 0)), 0.4); put('metal_jerrycan_green', p + Vector((1.35, -0.1, 0)), 1.9)
             elif c == 'l' and (x, y) in LAMPS:
                 if has_ph('street_lamp_01'):
@@ -749,7 +751,7 @@ def build_props():
             elif c == 's' and rnd(x, y, 11) < 0.4 and has_ph('Barrel_01'):
                 n = 2 + int(rnd(x, y, 12) * 3)
                 for i in range(n):
-                    put(('Barrel_01', 'Barrel_02', 'barrel_03')[int(rnd(x, y, 60 + i) * 3)], p + Vector((-0.6 + (i % 3) * 0.6, 0.55 - (i // 3) * 0.6 - 0.1 * (i % 2), 0)), rnd(x, y, 70 + i) * 6)
+                    putf(('Barrel_01', 'Barrel_02', 'barrel_03')[int(rnd(x, y, 60 + i) * 3)], p + Vector((-0.6 + (i % 3) * 0.6, 0.55 - (i // 3) * 0.6 - 0.1 * (i % 2), 0)), rnd(x, y, 70 + i) * 6)
                 if rnd(x, y, 13) < 0.5 and has_ph('old_tyre'): put('old_tyre', p + Vector((0.5, -0.6, 0.08)), rnd(x, y, 14) * 3, rot=Matrix.Rotation(math.pi / 2, 4, 'X'))
             # trastos pequeños junto a las cajas: no ocupan casilla
             if c == 'c' and cell(x + 1, y) == '.' and rnd(x, y, 15) < 0.45:
@@ -757,7 +759,7 @@ def build_props():
                 if k < 0.35 and has_ph('ammo_box'): put('ammo_box', q, k * 9); put('ammo_box', q + Vector((0.05, 0.3, 0)), k * 5)
                 elif k < 0.6 and has_ph('metal_jerrycan_green'): put('metal_jerrycan_green', q, k * 9)
                 elif k < 0.8 and has_ph('trashbag'): put('trashbag', q, k * 9)
-                elif has_ph('wooden_crate_01'): put('wooden_crate_01', q, k * 9)
+                elif has_ph('wooden_crate_01'): putf('wooden_crate_01', q, k * 9)
             # paredes: luminaria sobre las puertas, cajas eléctricas, aire acondicionado y bajantes
             if c in 'DLV':
                 horiz = cell(x - 1, y) in 'W#' and cell(x + 1, y) in 'W#'
