@@ -34,7 +34,7 @@ const M={
   ventana_on:std({color:0x2a2010,roughness:0.3,emissive:0xffa050,emissiveIntensity:3.2}), ventana_off:std({color:0x05080a,roughness:0.06,metalness:0.3}),
   bombilla:std({color:0x000000,emissive:0xff9a38,emissiveIntensity:9}), baliza:std({color:0x000000,emissive:0xff1408,emissiveIntensity:8}), foco:std({color:0x000000,emissive:0xcfe2ff,emissiveIntensity:12}),
 };
-M.hormigon=M.muro;
+M.hormigon=M.muro; M.suelo_int=std({map:tex('floor_diff',2,true),color:0x8c8c8c,roughness:0.55}); M.techo_int=std({color:0x6a655c,roughness:0.95});
 // charcos: en el suelo, un ruido en coordenadas del mundo baja la rugosidad, aplana el relieve y oscurece el asfalto
 M.suelo.onBeforeCompile=sh=>{
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWPos;').replace('#include <project_vertex>','#include <project_vertex>\nvWPos=(modelMatrix*vec4(transformed,1.0)).xyz;');
@@ -68,6 +68,7 @@ function spotTick(t){ spots.forEach(s=>{ const d=s.d.clone().applyAxisAngle(UP,M
 INFO.lights.forEach(l=>{ const p=B(l.pos), col=new THREE.Color(l.color[0],l.color[1],l.color[2]);
   if(l.kind==='POINT'&&l.name==='farola'){ const L=new THREE.PointLight(col,110,34,2); L.position.copy(p); scene.add(L); lamps.push(L); halo(p,0xffa24a,2.6,0.95); halo(p,0xff9038,12,0.26); }
   else if(l.kind==='POINT'&&l.name==='aplique'){ if(!LOW){ const L=new THREE.PointLight(col,7,9,2); L.position.copy(p); scene.add(L); } halo(p,0xffb870,1.3,0.9); halo(p,0xffa860,5,0.3); }
+  else if(l.kind==='POINT'&&l.name==='interior'){ const L=new THREE.PointLight(col,l.power/120*14,11,2); L.position.copy(p); scene.add(L); halo(p.clone().add(new THREE.Vector3(0,0.18,0)),0xffd9a0,0.9,0.9); }
   else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,3200,110,A,0.35,1.4); L.position.copy(p); scene.add(L); scene.add(L.target);
     if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(2048,2048); L.shadow.camera.near=2; L.shadow.camera.far=110; L.shadow.bias=-0.0006; L.shadow.normalBias=0.03; }
     const h1=halo(p,0xdde8ff,4.5,1), h2=halo(p,0xbfd4ff,16,0.4);

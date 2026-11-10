@@ -5,7 +5,8 @@ R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 IDS = ['wooden_military_crate', 'old_military_crate', 'wooden_crate_02', 'Barrel_01', 'Barrel_02', 'street_lamp_01', 'street_lamp_02', 'security_light',
        'industrial_wall_lamp', 'concrete_road_barrier', 'covered_car', 'ammo_box', 'power_box_01', 'utility_box_01', 'metal_jerrycan_green',
        'old_military_compressor', 'portable_generator', 'exterior_aircon_unit', 'old_tyre', 'rollershutter_door', 'modular_chainlink_fence',
-       'modular_metal_gutter', 'portable_searchlight', 'modular_electricity_poles', 'trashbag', 'wooden_crate_01', 'barrel_03']
+       'modular_metal_gutter', 'portable_searchlight', 'modular_electricity_poles', 'trashbag', 'wooden_crate_01', 'barrel_03',
+       'metal_office_desk', 'worn_metal_rack', 'drawer_cabinet', 'vintage_radio_transceiver', 'SchoolChair_01', 'caged_hanging_light', 'metal_tool_chest', 'painted_wooden_bench']
 def get(url): return urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'lost-horizon-build'}), timeout=180).read()
 def fetch(res='1k'):
     for i in IDS:

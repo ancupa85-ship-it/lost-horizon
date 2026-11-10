@@ -10,7 +10,7 @@ def tex(f, size, q=80):
 T = {'asphalt_diff': ('asphalt_02_diff.jpg', 1024), 'asphalt_nor': ('asphalt_02_nor.jpg', 1024), 'asphalt_rough': ('asphalt_02_rough.jpg', 512),
      'concrete_diff': ('concrete_wall_008_diff.jpg', 1024), 'concrete_nor': ('concrete_wall_008_nor.jpg', 512), 'plaster_diff': ('painted_plaster_wall_diff.jpg', 1024),
      'plaster_nor': ('painted_plaster_wall_nor.jpg', 512), 'wood_diff': ('wood_planks_dirt_diff.jpg', 512), 'rust_diff': ('rusty_metal_02_diff.jpg', 512),
-     'green_diff': ('green_metal_rust_diff.jpg', 512), 'roof_diff': ('corrugated_iron_02_diff.jpg', 512), 'roof_nor': ('corrugated_iron_02_nor.jpg', 512)}
+     'green_diff': ('green_metal_rust_diff.jpg', 512), 'roof_diff': ('corrugated_iron_02_diff.jpg', 512), 'roof_nor': ('corrugated_iron_02_nor.jpg', 512), 'floor_diff': ('concrete_floor_worn_001_diff.jpg', 512)}
 data = {'info': json.load(open(os.path.join(V, 'base.json'))), 'glb': base64.b64encode(open(os.path.join(V, 'base.glb'), 'rb').read()).decode(), 'tex': {k: tex(*v) for k, v in T.items()}}
 post = '\n'.join(rd('vendor', 'post', f + '.js') for f in ('CopyShader', 'LuminosityHighPassShader', 'EffectComposer', 'RenderPass', 'ShaderPass', 'UnrealBloomPass'))
 out = (rd('escenario', 'visor.html') + '<script>\n' + rd('vendor', 'three.min.js') + '\n</script>\n<script>\n' + rd('vendor', 'GLTFLoader.js') + '\n' + post + '\n</script>\n'

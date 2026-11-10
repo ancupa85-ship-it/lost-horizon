@@ -169,6 +169,8 @@ def build_materials():
     if has_tex('rusty_metal_02'): MAT['hierro'] = m_tex('hierro_tex', 'rusty_metal_02', 1.4, (0.5, 0.5, 0.5), 0.8, metal=0.6)
     if has_tex('green_metal_rust'): MAT['oliva'] = m_tex('pintura_oliva_tex', 'green_metal_rust', 2.2, (0.32, 0.4, 0.2), 0.7, obj=True, bumpk=0.25)
     if has_tex('corrugated_iron_02'): MAT['tejado'] = m_tex('uralita_tex', 'corrugated_iron_02', 2.0, (0.35, 0.35, 0.36), 0.8, metal=0.5)
+    MAT['suelo_int'] = m_tex('suelo_interior_tex', 'concrete_floor_worn_001', 2.0, (0.55, 0.55, 0.55), 0.9) if has_tex('concrete_floor_worn_001') else m_simple('suelo_interior', (0.12, 0.12, 0.115), 0.6, grime=0.4)
+    MAT['techo_int'] = m_simple('techo_interior', (0.3, 0.29, 0.26), 0.9, grime=0.3)
     if GLB:   # para el visor: materiales lisos con nombre; las texturas y el mojado los pone el visor
         for k in list(MAT):
             m = bpy.data.materials.new('lh_' + k); m.use_nodes = True; MAT[k] = m
@@ -241,6 +243,7 @@ def build_world():
                     box('hierro', (0.07, 1.3, 2.2), p + Vector((0, 0, 1.1))); box('oscuro', (0.12, 0.05, 0.2), p + Vector((0, 0.45, 1.05)))
             if building(x, y) or c in 'LVbB' or (c == 'D' and (roomy(x - 1, y) or roomy(x + 1, y) or roomy(x, y - 1) or roomy(x, y + 1))):
                 box('tejado', (T + 0.02, T + 0.02, 0.22), p + Vector((0, 0, HB + 0.11)))
+                if c != 'W': box('suelo_int', (T, T, 0.03), p + Vector((0, 0, 0.012))); box('techo_int', (T, T, 0.04), p + Vector((0, 0, HB - 0.02)))
                 if c == 'W': box('pared', (T + 0.14, T + 0.14, 0.3), p + Vector((0, 0, HB + 0.33)))   # peto
                 elif rnd(x, y, 5) < 0.06: box('metal', (1.1, 0.8, 0.7), p + Vector((0, 0, HB + 0.57)), rotz=rnd(x, y, 6))
                 elif rnd(x, y, 7) < 0.04: cyl('metal', 0.18, 1.1, p + Vector((0, 0, HB + 0.75)))
@@ -487,11 +490,19 @@ def build_props():
                         q = p + n * 1.07 + side * 0.8; cyl('metal', 0.05, HB + 0.1, q + Vector((0, 0, HB / 2)), seg=10)
                         for z in (0.5, 1.8, 3.1): box('oscuro', (0.14, 0.14, 0.03), q + Vector((0, 0, z)))
                     box('metal', (T if dy else 0.12, 0.12 if dy else T, 0.1), p + n * 1.07 + Vector((0, 0, HB + 0.02)))   # canalón
+    # mobiliario de los interiores, en las casillas donde el juego tiene sus muebles
+    F = lambda i, x, y, dx=0.0, dy=0.0, r=0.0, z=0.0: has_ph(i) and put(i, wpos(x, y) + Vector((dx, dy, z)), r)
+    F('drawer_cabinet', 1, 12, -0.55, 0, math.pi / 2)
+    F('metal_office_desk', 3, 17); F('SchoolChair_01', 3, 17, 0, 0.85, math.pi); F('metal_tool_chest', 3, 17, 1.5, -0.3, 0.3)
+    for x, y in ((8, 17), (9, 18), (7, 18)): F('worn_metal_rack', x, y, 0, -0.5)
+    F('metal_office_desk', 9, 11, 0, 0.4); F('vintage_radio_transceiver', 9, 11, -0.3, 0.45, 0.2, 0.79); F('SchoolChair_01', 9, 11, 0.2, -0.45, 0.2)
+    F('painted_wooden_bench', 30, 14, 0, 0.6); F('metal_tool_chest', 7, 8, 0, 0, 0.5); F('ammo_box', 29, 21, 0, 0, 0.8)
     flush('luces'); flush_smooth('camiones')
     # luces interiores del plano (despacho, archivo, calabozo...): se ven por las puertas y calientan las ventanas
     for m in re.finditer(r'\[([\d.]+),([\d.]+),0x([0-9a-f]{6}),([\d.]+)\]', re.search(r"ZONES\.base=.*?lights:\[(.*?)\]\],", src, re.S).group(1) + ']'):
         x, y, hx, k = float(m.group(1)), float(m.group(2)), m.group(3), float(m.group(4))
-        lamp('POINT', 'interior', Vector((x * T, -y * T, 2.8)), tuple(int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4)), 120 * k, shadow_soft_size=0.15)
+        q = Vector((x * T, -y * T, 0)); cyl('oscuro', 0.012, HB - 2.78, q + Vector((0, 0, (HB + 2.78) / 2)), seg=6); cyl('bombilla', 0.045, 0.1, q + Vector((0, 0, 2.73)), seg=10)
+        lamp('POINT', 'interior', Vector((x * T, -y * T, 2.55)), tuple(int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4)), 120 * k, shadow_soft_size=0.15)
     # torretas con foco: [x, y, hacia x, hacia y, ...]
     for sx, sy, tx, ty in ((18, 0, 7, 25), (35, 27, 13, 7)):   # apuntan lejos, casi horizontales, cruzando el patio
         p = wpos(sx, sy); place('torreta', p)
