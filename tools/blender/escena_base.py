@@ -219,12 +219,14 @@ def bars(p, horiz):
     box('oscuro', (0.16, 0.09, 0.22) if horiz else (0.09, 0.16, 0.22), p + (Vector((0.5, 0, 1.05)) if horiz else Vector((0, 0.5, 1.05))))
 
 # ---------------------------------------------------------------- mobiliario sencillo de cuartel (piezas propias, materiales del lote)
+OBST = []   # huellas de los muebles (centro, medias dimensiones, giro): el visor choca con ellas y tools/audit-muebles.py comprueba que no tapan puertas
+def obst(name, p, hx, hy, rz=0.0): OBST.append([name, round(p[0], 3), round(p[1], 3), round(hx, 3), round(hy, 3), round(rz, 4)])
 def _fb(p, rz):
     R_ = Matrix.Rotation(rz, 4, 'Z')
     return lambda mat, size, off, extra=0.0: box(mat, size, p + R_ @ Vector(off), rotz=rz + extra)
 def bunk(p, rz=0.0, top=True):
     """Litera de tubo (1,95 x 0,85): somier, colchoneta, manta doblada y almohada."""
-    b = _fb(p, rz)
+    b = _fb(p, rz); obst('litera', p, 0.98, 0.43, rz)
     for sx in (-0.95, 0.95):
         for sy in (-0.4, 0.4): b('hierro', (0.045, 0.045, 1.75 if top else 0.75), (sx, sy, 0.875 if top else 0.375))
         b('hierro', (0.035, 0.8, 0.035), (sx, 0, 0.7)); b('hierro', (0.035, 0.8, 0.035), (sx, 0, 1.7)) if top else None
@@ -232,13 +234,14 @@ def bunk(p, rz=0.0, top=True):
         b('hierro', (1.9, 0.82, 0.04), (0, 0, z)); b('lona', (1.86, 0.78, 0.11), (0, 0, z + 0.075)); b('uniforme', (0.9, 0.74, 0.05), (0.42, 0, z + 0.155)); b('techo_int', (0.42, 0.56, 0.08), (-0.68, 0, z + 0.17))
 def lockers(p, rz=0.0, n=4):
     """Fila de taquillas de chapa contra la pared (0,45 de ancho cada una)."""
-    b = _fb(p, rz)
+    b = _fb(p, rz); obst('taquillas', p, n * 0.23, 0.25, rz)
     for k in range(n):
         x = (k - (n - 1) / 2) * 0.46
         b('oliva', (0.45, 0.48, 1.85), (x, 0, 0.925)); b('bajos', (0.012, 0.01, 1.8), (x + 0.225, -0.243, 0.925)); b('metal', (0.03, 0.02, 0.1), (x + 0.16, -0.25, 1.0))
         for z in (1.6, 1.66, 1.72): b('bajos', (0.26, 0.01, 0.018), (x, -0.243, z))
 def table(p, rz=0.0, stools=4):
-    b = _fb(p, rz); b('madera', (1.5, 0.8, 0.045), (0, 0, 0.76))
+    b = _fb(p, rz); b('madera', (1.5, 0.8, 0.045), (0, 0, 0.76)); obst('mesa', p, 0.75, 0.9 if stools > 2 else 0.4, rz)
+    if stools == 2: obst('taburetes', p + Matrix.Rotation(rz, 4, 'Z') @ Vector((0, -0.72, 0)), 0.6, 0.2, rz)
     for sx in (-0.68, 0.68):
         for sy in (-0.33, 0.33): b('hierro', (0.04, 0.04, 0.74), (sx, sy, 0.37))
     for k in range(stools):
@@ -252,23 +255,23 @@ def board(p, rz=0.0, w=1.5):
     b('techo_int', (0.22, 0.008, 0.3), (w * 0.3, -0.02, -0.18), 0.0); b('piloto', (0.03, 0.012, 0.03), (-w * 0.3, -0.026, 0.2)); b('piloto', (0.03, 0.012, 0.03), (-w * 0.05, -0.026, -0.1))
 def furnish():
     """Barracón, despacho, archivo, cuerpo de guardia y calabozo, con lo que tendría una base de 1983."""
-    P_ = lambda x, y, dx=0.0, dy=0.0, z=0.0: wpos(x, y) + Vector((dx, dy, z)); F = lambda i, x, y, dx=0.0, dy=0.0, r=0.0, z=0.0: has_ph(i) and put(i, P_(x, y, dx, dy, z), r)
+    P_ = lambda x, y, dx=0.0, dy=0.0, z=0.0: wpos(x, y) + Vector((dx, dy, z)); F = lambda i, x, y, dx=0.0, dy=0.0, r=0.0, z=0.0: has_ph(i) and putf(i, P_(x, y, dx, dy, z), r)
     # barracón (comunicaciones al fondo): taquillas en la pared norte, literas al sur, mesa en medio
     lockers(P_(1, 11, 0.0, 0.72), 0, 4); lockers(P_(2, 11, 0.25, 0.72), 0, 4)
-    bunk(P_(1.5, 14, -0.9, -0.52)); bunk(P_(3, 14, 0.25, -0.52)); bunk(P_(5, 14, -0.6, -0.52))
-    table(P_(5, 12, 0.6, 0.3)); board(P_(9, 11, 0.0, 0.97, 1.75)); F('ammo_box', 6, 14, 0.5, -0.6, 0.4); F('old_military_crate', 10, 14, 0.3, -0.4, 0.2)
+    bunk(P_(1.5, 14, -0.9, -0.52)); bunk(P_(2.5, 14, -0.25, -0.52)); bunk(P_(5, 14, 0.3, -0.52))   # dejan libre la puerta del despacho
+    table(P_(5, 12, 0.6, 0.3)); board(P_(9, 11, 0.0, 0.97, 1.75)); F('ammo_box', 6, 14, 0.5, -0.6, 0.4); F('old_military_crate', 10, 14, -0.45, -0.1, 0.2)
     # despacho: archivadores, tablón, alfombra bajo la mesa, perchero
     F('drawer_cabinet', 1, 19, -0.55, -0.3, math.pi / 2); F('drawer_cabinet', 1, 18, -0.55, 0.1, math.pi / 2); board(P_(3, 19, 0.0, -0.97, 1.7), math.pi, 1.8)
     box('lona', (2.6, 1.9, 0.012), P_(3, 17, 0, 0.2, 0.034)); cyl('oscuro', 0.02, 1.75, P_(5, 16, 0.6, 0.6, 0.875), seg=8); cyl('oscuro', 0.16, 0.03, P_(5, 16, 0.6, 0.6, 0.015), seg=12)
     box('capote', (0.34, 0.1, 0.8), P_(5, 16, 0.6, 0.52, 1.3)); F('SchoolChair_01', 4, 18, 0.3, -0.2, 2.6)
     # archivo: más estantes y cajas de expedientes por el suelo
-    F('worn_metal_rack', 10, 17, 0.35, 0, math.pi / 2); F('old_military_crate', 7, 16, -0.3, 0.4, 0.3); F('wooden_crate_02', 10, 19, 0.2, -0.3, 0.5); F('ammo_box', 8, 19, 0, -0.5, 1.1)
+    F('worn_metal_rack', 10, 16, 0.35, 0, math.pi / 2); F('old_military_crate', 7, 16, 0.4, -0.15, 0.3); F('wooden_crate_02', 10, 19, 0.2, -0.3, 0.5); F('ammo_box', 8, 19, 0, -0.5, 1.1)
     # cuerpo de guardia: mesa, taquillas, mesa del cabo; al sur, las literas del retén
     table(P_(29, 6, 0.9, -0.6), 0.08); lockers(P_(31, 6, 0.3, 0.72), 0, 4); lockers(P_(33, 6, -0.4, 0.72), 0, 3)
-    F('metal_office_desk', 33, 7, -0.1, -0.2, -math.pi / 2); F('SchoolChair_01', 32, 7, 0.1, -0.2, math.pi / 2); board(P_(28, 6, 0.0, 0.97, 1.75), 0, 1.6)
-    bunk(P_(27, 9, -0.9, -0.52)); bunk(P_(28, 9, 0.9, -0.52)); F('ammo_box', 26, 8, -0.5, 0.2, 0.2)
+    F('metal_office_desk', 33, 7, -0.1, 1.0, -math.pi / 2); F('SchoolChair_01', 32, 7, 1.0, 1.0, math.pi / 2); board(P_(28, 6, 0.0, 0.97, 1.75), 0, 1.6)
+    bunk(P_(27, 9, -0.9, -0.52)); bunk(P_(28, 9, 0.9, -0.52)); F('ammo_box', 26, 7, -0.5, 0.5, 0.2)
     # pasillo y sala del calabozo
-    F('worn_metal_rack', 33, 11, 0.45, 0, math.pi / 2); F('old_military_crate', 26, 11, -0.3, 0.3, 0.4); F('wooden_crate_02', 33, 10, 0.3, 0.2, 0.2); table(P_(28, 11, 0.4, 0.2), 0, 2)
+    F('worn_metal_rack', 33, 11, 0.45, 0, math.pi / 2); F('old_military_crate', 26, 11, 0.55, -0.1, 0.4); F('wooden_crate_02', 33, 10, 0.3, 0.2, 0.2); table(P_(28, 11, 0.4, 0.2), 0, 2)
     bunk(P_(32, 13, 0.52, -0.9), math.pi / 2, top=False); cyl('metal', 0.14, 0.28, P_(30, 13, -0.6, 0.55, 0.14), seg=12); box('techo_int', (0.5, 0.008, 0.36), P_(30, 14, -0.98, 0.2, 1.5), rotz=math.pi / 2)
 
 def build_world():
@@ -691,6 +694,12 @@ def put(i, pos, rotz=0.0, scale=1.0, only=None, rot=None):
         c = o.copy(); col.objects.link(c); c.matrix_world = M @ mw
     return dim
 
+def putf(i, pos, rotz=0.0):
+    """Mueble de interior: lo coloca y apunta su huella (lo que va subido a una mesa no cuenta)."""
+    dim = put(i, pos, rotz)
+    if pos[2] < 0.3 and dim: obst(i, pos, dim[0] / 2, dim[1] / 2, rotz)
+    return dim
+
 def crate_stack(p, x, y):
     """Pila de cajas militares que ocupa la casilla (1,8 x 1,8 m) y tapa la vista (1,4 m)."""
     turn = int(rnd(x, y, 1) * 2) * math.pi / 2; kind = rnd(x, y, 8)
@@ -770,7 +779,7 @@ def build_props():
                         for z in (0.5, 1.8, 3.1): box('oscuro', (0.14, 0.14, 0.03), q + Vector((0, 0, z)))
                     box('metal', (T if dy else 0.12, 0.12 if dy else T, 0.1), p + n * 1.07 + Vector((0, 0, HB + 0.02)))   # canalón
     # mobiliario de los interiores, en las casillas donde el juego tiene sus muebles
-    F = lambda i, x, y, dx=0.0, dy=0.0, r=0.0, z=0.0: has_ph(i) and put(i, wpos(x, y) + Vector((dx, dy, z)), r)
+    F = lambda i, x, y, dx=0.0, dy=0.0, r=0.0, z=0.0: has_ph(i) and putf(i, wpos(x, y) + Vector((dx, dy, z)), r)
     F('drawer_cabinet', 1, 12, -0.55, 0, math.pi / 2)
     F('metal_office_desk', 3, 17); F('SchoolChair_01', 3, 17, 0, 0.85, math.pi); F('metal_tool_chest', 3, 17, 1.5, -0.3, 0.3)
     for x, y in ((8, 17), (9, 18), (7, 18)): F('worn_metal_rack', x, y, 0, -0.5)
@@ -827,7 +836,7 @@ if GLB:
     L_ = []
     for o in LIGHTS:
         d = o.rotation_euler.to_quaternion() @ Vector((0, 0, -1)); L_.append({'kind': o.data.type, 'name': o.name.split('.')[0], 'pos': [round(v, 3) for v in o.location], 'color': [round(v, 3) for v in o.data.color], 'power': o.data.energy, 'dir': [round(v, 3) for v in d]})
-    json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD), 'people': PEOPLE_OUT}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
+    json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD), 'people': PEOPLE_OUT, 'obst': OBST}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
     for o in bpy.data.objects: o.select_set(o.type == 'MESH' and o.name in col.objects)
     kw = dict(filepath=GLB, export_format='GLB', use_selection=True, export_yup=True, export_cameras=False, export_lights=False, export_animations=False, export_image_format='JPEG')
     try: bpy.ops.export_scene.gltf(**kw, export_image_quality=72)
