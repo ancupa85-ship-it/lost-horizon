@@ -21,13 +21,17 @@ canvas{display:block;touch-action:none}
 #aviso{position:fixed;top:30%;left:0;right:0;text-align:center;font-size:22px;letter-spacing:.2em;color:#ff4a3a;text-shadow:0 2px 6px #000;pointer-events:none}
 #aviso.cap{font-size:40px}#aviso.ok{color:#9fd6a8}
 #mira{position:fixed;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 3px #000;pointer-events:none}
-#mira[hidden],#mun[hidden],#obj[hidden]{display:none}
+#mira[hidden],#mun[hidden],#obj[hidden],#tec[hidden]{display:none}
+#tec{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:18px 26px;background:rgba(8,10,12,.88);border:1px solid #3a4038;text-align:center;pointer-events:none}
+#tec b{display:block;font-size:10px;letter-spacing:.24em;color:var(--dim);font-weight:400}
+#tecD{font-size:34px;letter-spacing:.2em;color:#9fd6a8;margin:12px 0}#tecD.err{color:#ff4a3a}
+#tecP{font-size:11px;color:var(--acc);max-width:300px}#tec small{display:block;margin-top:10px;font-size:10px;color:var(--dim)}
 #obj{position:fixed;left:16px;top:14px;max-width:min(360px,60vw);font-size:12px;line-height:1.5;letter-spacing:.06em;color:var(--acc);text-shadow:0 1px 3px #000;pointer-events:none}
 #obj:before{content:'OBJETIVO';display:block;font-size:10px;letter-spacing:.2em;color:var(--dim)}
 #mun{position:fixed;right:18px;bottom:14px;font-size:22px;letter-spacing:.08em;color:var(--ink);text-shadow:0 1px 3px #000;pointer-events:none;text-align:right}
 #mun i{font-style:normal;font-size:13px;color:var(--dim)}#mun u{display:block;text-decoration:none;font-size:11px;letter-spacing:.14em;color:var(--acc);margin-top:4px}
 </style>
 <div id="intro"><h1>TARSIS</h1><p>Base hispano-americana, marismas del Guadalquivir. Noviembre de 1983, 02:10.<br>Escenario a escala del primer nivel, para recorrerlo a pie.</p>
-<p>W A S D para moverse · ratón para mirar · botón derecho apunta · botón izquierdo dispara · R recarga · E usar o arrastrar un cuerpo · C agacharse · Mayús correr · V tercera persona · 1 a 4 cambian de vista · F y G niebla · J y K exposición · B resplandor · H oculta el texto · Esc suelta el ratón</p><div id="load">CARGANDO…</div></div>
-<div id="estado" class="ok" hidden><span id="estadoT">SIGILO</span><i><b id="estadoB"></b></i></div><div id="aviso"></div><div id="mira" hidden></div><div id="mun" hidden></div><div id="obj" hidden></div>
+<p>W A S D para moverse · ratón para mirar · botón derecho apunta · botón izquierdo dispara · R recarga · E usar o arrastrar un cuerpo · C agacharse · Mayús correr · V tercera persona · 1 a 4 cambian de vista · F y G niebla · J y K exposición · B resplandor · H oculta el texto · M silencia el sonido · Esc suelta el ratón</p><div id="load">CARGANDO…</div></div>
+<div id="estado" class="ok" hidden><span id="estadoT">SIGILO</span><i><b id="estadoB"></b></i></div><div id="aviso"></div><div id="mira" hidden></div><div id="mun" hidden></div><div id="obj" hidden></div><div id="tec" hidden><b>ARCHIVO · CLAVE DE ACCESO</b><div id="tecD"></div><div id="tecP"></div><small>Teclea los cuatro números · Retroceso borra · E cierra</small></div>
 <div id="hud"><span id="fps"></span></div>
