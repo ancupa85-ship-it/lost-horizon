@@ -131,7 +131,64 @@ def camion():
     cyl('rueda_repuesto', 0.46, 0.26, (0, -0.14, 1.72), goma, rot=(math.pi / 2, 0, 0), verts=12)
     return finish('camion')
 
-MODELOS = {'caja': caja, 'camion': camion}
+# ---------- grupo electrógeno: 1,8 x 1,4 x 1,4 m, tubo de escape hasta 2,9. Panel de mando al frente (-Y).
+def generador():
+    clear()
+    metal, oscuro, bajos = mat('metal', '#5b6468'), mat('oscuro', '#2a2e31'), mat('bajos', '#2f3824')
+    oliva, piloto, aviso = mat('oliva', '#4f5a3c'), mat('piloto', '#40ff60', emit='#40ff60'), mat('aviso', '#c9a227')
+    for s in (-1, 1): box('patin', (1.8, 0.14, 0.12), (0, s * 0.5, 0.06), bajos)
+    box('carcasa', (1.7, 1.3, 1.0), (0, 0, 0.62), oliva)
+    taper(box('tapa', (1.7, 1.3, 0.22), (0, 0, 1.23), oliva), 0.96, 0.8)
+    box('deposito', (0.5, 1.36, 0.4), (-0.6, 0, 0.5), metal)
+    for i in range(5): box('lama', (0.7, 0.03, 0.05), (0.38, -0.66, 0.5 + i * 0.12), oscuro)  # rejilla de ventilación
+    for i in range(5): box('lama', (0.7, 0.03, 0.05), (0.38, 0.66, 0.5 + i * 0.12), oscuro)
+    box('panel', (0.6, 0.05, 0.45), (-0.45, -0.67, 0.92), oscuro)
+    box('piloto', (0.08, 0.03, 0.08), (-0.62, -0.7, 1.04), piloto)
+    box('palanca', (0.06, 0.1, 0.2), (-0.3, -0.72, 0.9), aviso)
+    box('franja', (1.72, 1.32, 0.06), (0, 0, 0.2), aviso)
+    cyl('escape', 0.09, 1.5, (0.6, 0, 2.1), oscuro, verts=8)
+    cyl('silenciador', 0.16, 0.5, (0.6, 0, 1.7), metal, verts=8)
+    box('sombrerete', (0.26, 0.26, 0.04), (0.6, 0, 2.88), oscuro)
+    cyl('tapon', 0.1, 0.06, (-0.3, 0.2, 1.37), metal, verts=8)
+    return finish('generador')
+
+# ---------- farola: poste de 3,3 m; la bombilla la pone el juego a 3,25 m en el eje
+def farola():
+    clear()
+    oscuro, metal = mat('oscuro', '#2a2e31'), mat('metal', '#5b6468')
+    cyl('base', 0.15, 0.3, (0, 0, 0.15), metal, verts=8)
+    cyl('zocalo', 0.1, 0.5, (0, 0, 0.55), oscuro, verts=8)
+    cyl('poste', 0.055, 2.5, (0, 0, 1.95), oscuro, verts=6)
+    cyl('anilla', 0.08, 0.06, (0, 0, 2.3), metal, verts=6)
+    for s in (-1, 1): box('brazo', (0.02, 0.02, 0.2), (s * 0.12, 0, 3.17), oscuro)  # la bombilla queda a la vista entre los brazos
+    taper(box('pantalla', (0.3, 0.3, 0.05), (0, 0, 3.275), metal), 0.5, 0.5)
+    return finish('farola')
+
+# ---------- torreta del foco: celosía de 1,2 x 1,2 m y 7 m de alto; el foco lo pone el juego arriba, en el eje
+def torreta():
+    clear()
+    metal, oscuro, hormigon, madera = mat('metal', '#5b6468'), mat('oscuro', '#2a2e31'), mat('hormigon', '#7a7f7c'), mat('madera', '#8c5e2c')
+    box('zapata', (1.2, 1.2, 0.3), (0, 0, 0.15), hormigon)
+    h = 0.52  # media anchura entre patas
+    for sx in (-1, 1):
+        for sy in (-1, 1): box('pata', (0.1, 0.1, 6.0), (sx * h, sy * h, 3.3), metal)
+    tramos = [0.3, 1.8, 3.3, 4.8, 6.3]
+    for i, z in enumerate(tramos):
+        for s in (-1, 1):
+            box('travesano', (2 * h, 0.06, 0.06), (0, s * h, z), metal); box('travesano', (0.06, 2 * h, 0.06), (s * h, 0, z), metal)
+        if i < len(tramos) - 1:
+            dz = tramos[i + 1] - z; L = math.hypot(2 * h, dz); a = math.atan2(dz, 2 * h) * (1 if i % 2 == 0 else -1)
+            for s in (-1, 1):
+                box('diagonal', (L, 0.04, 0.05), (0, s * h, z + dz / 2), oscuro, rot=(0, -a * s, 0))
+                box('diagonal', (0.04, L, 0.05), (s * h, 0, z + dz / 2), oscuro, rot=(a * s, 0, 0))
+    box('plataforma', (1.2, 1.2, 0.08), (0, 0, 6.36), madera)
+    for s in (-1, 1):
+        box('baranda', (1.2, 0.04, 0.04), (0, s * 0.58, 6.96), metal); box('baranda', (0.04, 1.2, 0.04), (s * 0.58, 0, 6.96), metal)
+        for t in (-1, 1): box('montante', (0.04, 0.04, 0.6), (s * 0.58, t * 0.58, 6.68), metal)
+    for i in range(12): box('peldano', (0.4, 0.03, 0.03), (0, -0.58, 0.6 + i * 0.5), oscuro)  # escalera de mano en el frente
+    return finish('torreta')
+
+MODELOS = {'caja': caja, 'camion': camion, 'generador': generador, 'farola': farola, 'torreta': torreta}
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if a in MODELOS] or list(MODELOS)
     for n in args: MODELOS[n]()
