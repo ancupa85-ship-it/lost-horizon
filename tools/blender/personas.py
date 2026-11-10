@@ -15,8 +15,8 @@ DATA = os.path.join(bpy.utils.user_resource('EXTENSIONS'), '.user', 'user_defaul
 OLIVA = (0.34, 0.4, 0.24); NEGRO = (0.16, 0.16, 0.17)
 STAND = {'upperarm_l': (0.1, 0.03, -1), 'lowerarm_l': (0.03, -0.14, -1), 'upperarm_r': (-0.1, 0.03, -1), 'lowerarm_r': (-0.03, -0.14, -1)}
 PEOPLE = {
-    'cuttlas': dict(curl={'_r': 0.7, '_l': 0.25}, dark_suit=0.42, player=True,
-                    stand=dict(STAND, upperarm_r=(-0.1, -0.02, -1), lowerarm_r=(-0.02, -0.4, -1)),
+    'cuttlas': dict(curl={'_r': 0.8, '_l': 0.7}, dark_suit=0.42, player=True,
+                    stand=dict(STAND, upperarm_r=(-0.16, -0.3, -1), lowerarm_r=(0.5, -0.8, -0.38), upperarm_l=(0.16, -0.34, -1), lowerarm_l=(-0.5, -0.8, -0.3), head=(0, -0.06, 1)),   # guardia baja: pistola a dos manos ante el vientre
                     sneak_arms={'upperarm_l': (0.14, -0.35, -1), 'lowerarm_l': (-0.15, -1, -0.2), 'upperarm_r': (-0.14, -0.35, -1), 'lowerarm_r': (0.1, -1, -0.25)}, macro=dict(age=0.58, muscle=0.82, weight=0.48), skin='young_caucasian_male_special_suit', hair='short02', hair_tint=(0.35, 0.3, 0.27),
                     clothes=[('cortu_cargo_pants', NEGRO), ('toigo_ankle_boots_male', NEGRO)],
                     pose={'spine_01': (0, -0.2, 1), 'spine_02': (0, -0.2, 1), 'spine_03': (0, -0.2, 1), 'neck_01': (0, -0.1, 1), 'head': (0, 0.0, 1),   # inclinado desde la cadera, con la espalda recta
@@ -114,7 +114,7 @@ def export_anim(name, P, arm):
     if P.get('player'):   # el protagonista: el esqueleto se apoya de pie y la postura de rodilla en tierra lleva su desplazamiento, para que coincida con la escena fija
         zr = min((o.matrix_world @ v.co).z for o in meshes for v in o.data.vertices); stand_off = Vector((0, 0, -zr)); arm.location = stand_off
         st = P['stand']; low_ = {k: v for k, v in base.items() if k.startswith(('spine', 'neck', 'head'))}; low_.update(P['sneak_arms'])
-        bake('idle', breathe(base), shift=off - stand_off); bake('stand', breathe(st)); bake('walk', cyc(base=st, swing=True))
+        bake('idle', breathe(base), shift=off - stand_off); bake('stand', breathe(st)); bake('walk', cyc(base=st, swing=False))   # los brazos sostienen el arma: no balancean
         low_.update({'spine_01': (0, -0.22, 1), 'spine_02': (0, -0.22, 1), 'spine_03': (0, -0.22, 1), 'neck_01': (0, -0.1, 1), 'head': (0, 0.05, 1)})
         bake('sneak', cyc(base=low_, A=0.3, th0=0.5, k0=0.85, k1=0.4, swing=False))
     else:

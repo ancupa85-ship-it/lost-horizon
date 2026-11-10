@@ -255,7 +255,7 @@ new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
   g.scene.updateMatrixWorld(true); const groups=new Map(), singles=[];
   g.scene.traverse(o=>{ if(!o.isMesh)return; const n=(o.material.name||'').replace(/\.\d+$/,'');
     const gm=/^gear_([a-z]+)_(head|spine_03|hand_r|pelvis)_/.exec(o.name||'');
-    if(gm){ const c=new THREE.Mesh(o.geometry,M[n.slice(3)]||o.material); c.applyMatrix4(o.matrixWorld); c.castShadow=true; c.receiveShadow=true; scene.add(c); GEAR.push({who:gm[1],bone:gm[2],mesh:c,m0:c.matrix.clone(),mat:n.slice(3)}); stats.meshes++; return; }
+    if(gm){ if(!M.arma)M.arma=new THREE.MeshStandardMaterial({color:0x4a4e58,roughness:0.32,metalness:0.85,envMapIntensity:1.6}); const c=new THREE.Mesh(o.geometry,gm[1]==='cuttlas'&&gm[2]==='hand_r'?M.arma:(M[n.slice(3)]||o.material));   /* la pistola de Cuttlas, de acero pavonado: se distingue del traje negro */ c.applyMatrix4(o.matrixWorld); c.castShadow=true; c.receiveShadow=true; scene.add(c); GEAR.push({who:gm[1],bone:gm[2],mesh:c,m0:c.matrix.clone(),mat:n.slice(3)}); stats.meshes++; return; }
     if(n.indexOf('lh_')===0&&M[n.slice(3)])o.material=M[n.slice(3)];
     else if(/^(cuttlas|ibarra|moya|peris)_/.test(n))fixPersona(o.material,n);
     else { const m=o.material; if(m.map)m.map.anisotropy=4; m.roughness=Math.min(1,(m.roughness||1)*0.72); if(m.emissiveMap||m.name.toLowerCase().indexOf('glass')>=0){ } m.envMapIntensity=0.7; }
