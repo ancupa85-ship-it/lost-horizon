@@ -9,7 +9,7 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-per
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,LOW?1:1.5)); renderer.setSize(innerWidth,innerHeight);
 renderer.outputEncoding=THREE.sRGBEncoding; if(!LOW){ renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; } renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0; renderer.physicallyCorrectLights=true;
 document.body.appendChild(renderer.domElement);
-const scene=new THREE.Scene(); const FOGC=new THREE.Color(0x120d0b); scene.background=FOGC; scene.fog=new THREE.FogExp2(FOGC.getHex(),0.024);
+const scene=new THREE.Scene(); const FOGC=new THREE.Color(0x0f0b09); scene.background=FOGC; scene.fog=new THREE.FogExp2(FOGC.getHex(),0.034);
 const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,0.08,400);
 // Blender (x, y, z arriba) → three (x, z arriba → y, -y → z)
 const B=(p)=>new THREE.Vector3(p[0],p[2],-p[1]);
@@ -61,25 +61,27 @@ const haloTex=(function(){ const c=document.createElement('canvas'); c.width=c.h
 function halo(pos,color,size,op){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:haloTex,color,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:op,fog:false})); s.position.copy(pos); s.scale.set(size,size,1); scene.add(s); return s; }
 
 // ---------- luces del plano de Blender
-const lamps=[], spots=[];
+const lamps=[], spots=[], beams=[];
 // los focos de las torres barren despacio a un lado y a otro
 const UP=new THREE.Vector3(0,1,0), DOWN=new THREE.Vector3(0,-1,0);
-function spotTick(t){ spots.forEach(s=>{ const d=s.d.clone().applyAxisAngle(UP,Math.sin(t*0.16+s.phase)*0.42); s.L.target.position.copy(s.p).add(d.clone().multiplyScalar(40)); s.L.target.updateMatrixWorld(); s.cone.position.copy(s.p).add(d.clone().multiplyScalar(s.len/2)); s.cone.quaternion.setFromUnitVectors(DOWN,d); }); }
+function spotTick(t){ spots.forEach(s=>{ const d=s.d.clone().applyAxisAngle(UP,Math.sin(t*0.16+s.phase)*0.42); s.L.target.position.copy(s.p).add(d.clone().multiplyScalar(40)); s.L.target.updateMatrixWorld(); s.cone.position.copy(s.p).add(d.clone().multiplyScalar(s.len/2)); s.cone.quaternion.setFromUnitVectors(DOWN,d); }); beams.forEach(b=>{ b.uniforms.time.value=t; }); }
 INFO.lights.forEach(l=>{ const p=B(l.pos), col=new THREE.Color(l.color[0],l.color[1],l.color[2]);
   if(l.kind==='POINT'&&l.name==='farola'){ const L=new THREE.PointLight(col,110,34,2); L.position.copy(p); scene.add(L); lamps.push(L);
     if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(1024,1024); L.shadow.camera.near=0.25; L.shadow.camera.far=34; L.shadow.bias=-0.003; L.shadow.normalBias=0.05; L.shadow.autoUpdate=false; } /* la escena no se mueve: la sombra se calcula una vez */ halo(p,0xffa24a,2.6,0.95); halo(p,0xff9038,12,0.26); }
   else if(l.kind==='POINT'&&l.name==='aplique'){ if(!LOW){ const L=new THREE.PointLight(col,7,9,2); L.position.copy(p); scene.add(L); } halo(p,0xffb870,1.3,0.9); halo(p,0xffa860,5,0.3); }
   else if(l.kind==='POINT'&&l.name==='interior'){ const L=new THREE.PointLight(col,l.power/120*16,6.5,2); L.position.copy(p); scene.add(L); halo(p.clone().add(new THREE.Vector3(0,0.18,0)),0xffd9a0,0.9,0.9); }
-  else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,3200,110,A,0.35,1.4); L.position.copy(p); scene.add(L); scene.add(L.target);
+  else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,2600,110,A*1.9,0.9,1.4); L.position.copy(p); scene.add(L); scene.add(L.target);
     if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(2048,2048); L.shadow.camera.near=2; L.shadow.camera.far=110; L.shadow.bias=-0.0006; L.shadow.normalBias=0.03; }
     const h1=halo(p,0xdde8ff,4.5,1), h2=halo(p,0xbfd4ff,16,0.4);
-    // haz del foco en la niebla
-    const len=75, cone=new THREE.Mesh(new THREE.ConeGeometry(Math.tan(A)*len,len,28,1,true),new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
-      uniforms:{c:{value:new THREE.Color(0x9fb8e6)}},vertexShader:'varying float h; varying vec3 n; varying vec3 v; void main(){ h=uv.y; n=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); v=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }',
-      fragmentShader:'uniform vec3 c; varying float h; varying vec3 n; varying vec3 v; void main(){ float e=pow(abs(dot(normalize(n),normalize(v))),1.6); gl_FragColor=vec4(c*e*pow(h,1.6)*0.3,1.0); }'}));
+    // haz del foco en la niebla: varias capas anchas y tenues, sin borde, que se apagan con la distancia
+    const len=70, cone=new THREE.Group();
+    [[0.55,0.5],[1.0,0.3],[1.7,0.16],[2.6,0.09]].forEach(([w,k])=>{ const m=new THREE.Mesh(new THREE.ConeGeometry(Math.tan(A*w)*len,len,40,24,true),new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
+      uniforms:{c:{value:new THREE.Color(0x9fb8e6)},k:{value:k},time:{value:0}},vertexShader:'varying float h; varying vec3 n; varying vec3 v; varying vec3 wp; void main(){ h=uv.y; n=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); v=normalize(-mv.xyz); wp=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*mv; }',
+      fragmentShader:'uniform vec3 c; uniform float k; uniform float time; varying float h; varying vec3 n; varying vec3 v; varying vec3 wp; void main(){ float e=pow(abs(dot(normalize(n),normalize(v))),3.2); float f=pow(h,2.6)*smoothstep(0.0,0.12,h)*smoothstep(1.0,0.985,h); float s=0.8+0.2*sin(wp.x*0.7+time*0.6)*sin(wp.z*0.5-time*0.4+wp.y); gl_FragColor=vec4(c*e*f*k*s*0.42,1.0); }'}));
+      cone.add(m); beams.push(m.material); });
     scene.add(cone); spots.push({L,cone,p,d,len,phase:spots.length*2.1}); }
 });
-scene.add(new THREE.HemisphereLight(0x27344f,0x0b0906,0.55));
+scene.add(new THREE.HemisphereLight(0x27344f,0x0b0906,0.36));
 const moon=new THREE.DirectionalLight(0x8fa8d8,0.22); moon.position.set(-30,50,20); scene.add(moon);
 const balizaHalo=[];
 
@@ -111,7 +113,7 @@ new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
 // ---------- resplandor
 let composer=null, bloom=null, useBloom=!LOW;
 // El compositor trabaja en lineal y con margen (medio flotante); la última pasada hace el revelado: exposición, curva ACES, viñeta y grano.
-const FINAL={uniforms:{tDiffuse:{value:null},exposure:{value:1.0},time:{value:0}},vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+const FINAL={uniforms:{tDiffuse:{value:null},exposure:{value:0.8},time:{value:0}},vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader:`uniform sampler2D tDiffuse; uniform float exposure; uniform float time; varying vec2 vUv;
 vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }
 void main(){ vec3 c=texture2D(tDiffuse,vUv).rgb*exposure; c=aces(c); c=pow(c,vec3(1.0/2.2));
@@ -126,7 +128,9 @@ if(THREE.EffectComposer&&THREE.UnrealBloomPass)mkComposer(); else useBloom=false
 // ---------- recorrido a pie: WASD y ratón, con las paredes del plano
 const solid=(x,y)=>{ if(x<0||y<0||x>=COLS||y>=ROWS)return true; return '#WTcg'.indexOf(MAP[y][x])>=0; };
 const P={x:0,z:0,yaw:0,pitch:0,vy:0,bob:0}; (function(){ let sx=2,sy=2; MAP.forEach((r,y)=>{ const i=r.indexOf('P'); if(i>=0){ sx=i; sy=y; } }); P.x=sx*T+T/2; P.z=sy*T+T/2; P.yaw=-2.2; })();
-const keys={}; addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='KeyB'&&composer){ useBloom=!useBloom; } if(e.code==='KeyH'){ el('hud').hidden=!el('hud').hidden; } }); addEventListener('keyup',e=>{ keys[e.code]=false; });
+const keys={}; addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='KeyB'&&composer){ useBloom=!useBloom; } if(e.code==='KeyH'){ el('hud').hidden=!el('hud').hidden; }
+  if(e.code==='KeyF')scene.fog.density=Math.max(0.004,scene.fog.density-0.003); if(e.code==='KeyG')scene.fog.density=Math.min(0.09,scene.fog.density+0.003);
+  if(finalPass){ const u=finalPass.uniforms.exposure; if(e.code==='KeyJ')u.value=Math.max(0.3,u.value-0.05); if(e.code==='KeyK')u.value=Math.min(2,u.value+0.05); } }); addEventListener('keyup',e=>{ keys[e.code]=false; });
 let locked=false; const cv=renderer.domElement;
 el('intro').addEventListener('click',()=>{ if(!ready)return; if(cv.requestPointerLock)cv.requestPointerLock(); el('intro').hidden=true; locked=true; });
 document.addEventListener('pointerlockchange',()=>{ locked=document.pointerLockElement===cv; if(!locked&&!TOUCH){ el('intro').hidden=false; } });
@@ -150,7 +154,7 @@ addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.upd
 let last=performance.now(), fpsT=0, fpsN=0, t=0;
 function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt; move(dt); rainTick(dt); spotTick(t);
   if(finalPass)finalPass.uniforms.time.value=t; if(composer){ bloom.enabled=useBloom; composer.render(); } else renderer.render(scene,camera);
-  fpsT+=dt; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · resplandor '+(useBloom?'sí':'no'); fpsT=0; fpsN=0; }
+  fpsT+=dt; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (F/G) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
 window.__ESC={scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
