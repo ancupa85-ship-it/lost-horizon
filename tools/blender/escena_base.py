@@ -428,8 +428,15 @@ def crate_stack(p, x, y):
     else:
         place('caja', p, turn)
 
+def pick_lamps(min_d=17.0):
+    """De las farolas del plano se queda con las que distan al menos min_d metros entre sí, empezando por las más céntricas."""
+    cells = [(x, y) for y in range(ROWS) for x in range(COLS) if cell(x, y) == 'l' and not building(x, y)]
+    cells.sort(key=lambda c: abs(c[0] - COLS / 2) + abs(c[1] - ROWS / 2)); keep = []
+    for c in cells:
+        if all(math.hypot((c[0] - k[0]) * T, (c[1] - k[1]) * T) >= min_d for k in keep): keep.append(c)
+    print('FAROLAS', len(keep), 'de', len(cells), keep, flush=True); return set(keep)
 def build_props():
-    seen = set(); ntruck = 0
+    seen = set(); ntruck = 0; LAMPS = pick_lamps()
     for y in range(ROWS):
         for x in range(COLS):
             c = cell(x, y); p = wpos(x, y)
@@ -441,11 +448,11 @@ def build_props():
             elif c == 'g':
                 place('generador', p, 0)
                 if has_ph('metal_jerrycan_green'): put('metal_jerrycan_green', p + Vector((1.3, -0.5, 0)), 0.4); put('metal_jerrycan_green', p + Vector((1.35, -0.1, 0)), 1.9)
-            elif c == 'l' and not building(x, y):
+            elif c == 'l' and (x, y) in LAMPS:
                 if has_ph('street_lamp_01'):
                     a = (x * 3 + y) % 4 * math.pi / 2; put('street_lamp_01', p, a)
                     h = Matrix.Rotation(a, 4, 'Z') @ LAMP_HEAD; cyl('bombilla', 0.05, 0.04, p + h + Vector((0, 0, -0.03)), seg=10)
-                    lamp('POINT', 'farola', p + h + Vector((0, 0, -0.16)), (1.0, 0.55, 0.2), 1500, shadow_soft_size=0.07)
+                    lamp('POINT', 'farola', p + h + Vector((0, 0, -0.16)), (1.0, 0.55, 0.2), 2200, shadow_soft_size=0.07)
                 else:
                     place('farola', p); cyl('bombilla', 0.07, 0.12, p + Vector((0, 0, 3.17)), seg=10); lamp('POINT', 'farola', p + Vector((0, 0, 3.05)), (1.0, 0.55, 0.2), 1500, shadow_soft_size=0.08)
             elif c == 's' and rnd(x, y, 11) < 0.4 and has_ph('Barrel_01'):
@@ -465,7 +472,7 @@ def build_props():
                 horiz = cell(x - 1, y) in 'W#' and cell(x + 1, y) in 'W#'
                 for sgn in (-1, 1):
                     nx, ny = (x, y + sgn) if horiz else (x + sgn, y)
-                    if cell(nx, ny) in '.sl' and has_ph('industrial_wall_lamp'):
+                    if cell(nx, ny) in '.sl' and has_ph('industrial_wall_lamp') and rnd(x, y, 90 + sgn) < 0.5:
                         n = Vector((0, -sgn, 0)) if horiz else Vector((sgn, 0, 0)); q = p + n * 0.33 + Vector((0, 0, 2.55))
                         put('industrial_wall_lamp', q, math.atan2(n.y, n.x) + math.pi / 2)
                         lamp('POINT', 'aplique', q + n * 0.12 + Vector((0, 0, -0.12)), (1.0, 0.72, 0.42), 55, shadow_soft_size=0.05)
@@ -486,9 +493,9 @@ def build_props():
         x, y, hx, k = float(m.group(1)), float(m.group(2)), m.group(3), float(m.group(4))
         lamp('POINT', 'interior', Vector((x * T, -y * T, 2.8)), tuple(int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4)), 120 * k, shadow_soft_size=0.15)
     # torretas con foco: [x, y, hacia x, hacia y, ...]
-    for sx, sy, tx, ty in ((18, 0, 9, 14), (35, 27, 25, 20)):
+    for sx, sy, tx, ty in ((18, 0, 7, 25), (35, 27, 13, 7)):   # apuntan lejos, casi horizontales, cruzando el patio
         p = wpos(sx, sy); place('torreta', p)
-        head = p + Vector((0, 0, 7.25)); t = wpos(tx, ty)
+        head = p + Vector((0, 0, 7.25)); t = wpos(tx, ty, 1.2)
         s = lamp('SPOT', 'foco_torreta', head, (0.8, 0.9, 1.0), 90000, spot_size=math.radians(13), spot_blend=0.25, shadow_soft_size=0.12); aim(s, t)
         d = (t - head).normalized()
         cyl('oscuro', 0.26, 0.5, head - d * 0.15, rot=d.to_track_quat('Z', 'Y').to_matrix().to_4x4(), seg=16)
@@ -526,7 +533,7 @@ if GLB:
         if img.size[0] > 512: img.scale(512, 512)
     L_ = []
     for o in LIGHTS:
-        d = o.matrix_world.to_quaternion() @ Vector((0, 0, -1)); L_.append({'kind': o.data.type, 'name': o.name.split('.')[0], 'pos': [round(v, 3) for v in o.location], 'color': [round(v, 3) for v in o.data.color], 'power': o.data.energy, 'dir': [round(v, 3) for v in d]})
+        d = o.rotation_euler.to_quaternion() @ Vector((0, 0, -1)); L_.append({'kind': o.data.type, 'name': o.name.split('.')[0], 'pos': [round(v, 3) for v in o.location], 'color': [round(v, 3) for v in o.data.color], 'power': o.data.energy, 'dir': [round(v, 3) for v in d]})
     json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD)}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
     for o in bpy.data.objects: o.select_set(o.type == 'MESH' and o.name in col.objects)
     kw = dict(filepath=GLB, export_format='GLB', use_selection=True, export_yup=True, export_cameras=False, export_lights=False, export_animations=False, export_image_format='JPEG')

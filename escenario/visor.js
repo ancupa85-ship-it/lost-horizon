@@ -7,7 +7,7 @@ const Q=new URLSearchParams(location.search); const LOW=Q.get('q')==='low';
 const el=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,LOW?1:1.5)); renderer.setSize(innerWidth,innerHeight);
-renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0; renderer.physicallyCorrectLights=true;
+renderer.outputEncoding=THREE.sRGBEncoding; if(!LOW){ renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; } renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0; renderer.physicallyCorrectLights=true;
 document.body.appendChild(renderer.domElement);
 const scene=new THREE.Scene(); const FOGC=new THREE.Color(0x120d0b); scene.background=FOGC; scene.fog=new THREE.FogExp2(FOGC.getHex(),0.024);
 const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,0.08,400);
@@ -61,17 +61,21 @@ const haloTex=(function(){ const c=document.createElement('canvas'); c.width=c.h
 function halo(pos,color,size,op){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:haloTex,color,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:op,fog:false})); s.position.copy(pos); s.scale.set(size,size,1); scene.add(s); return s; }
 
 // ---------- luces del plano de Blender
-const lamps=[];
+const lamps=[], spots=[];
+// los focos de las torres barren despacio a un lado y a otro
+const UP=new THREE.Vector3(0,1,0), DOWN=new THREE.Vector3(0,-1,0);
+function spotTick(t){ spots.forEach(s=>{ const d=s.d.clone().applyAxisAngle(UP,Math.sin(t*0.16+s.phase)*0.42); s.L.target.position.copy(s.p).add(d.clone().multiplyScalar(40)); s.L.target.updateMatrixWorld(); s.cone.position.copy(s.p).add(d.clone().multiplyScalar(s.len/2)); s.cone.quaternion.setFromUnitVectors(DOWN,d); }); }
 INFO.lights.forEach(l=>{ const p=B(l.pos), col=new THREE.Color(l.color[0],l.color[1],l.color[2]);
-  if(l.kind==='POINT'&&l.name==='farola'){ const L=new THREE.PointLight(col,75,28,2); L.position.copy(p); scene.add(L); lamps.push(L); halo(p,0xffa24a,2.6,0.95); halo(p,0xff9038,13,0.5); }
+  if(l.kind==='POINT'&&l.name==='farola'){ const L=new THREE.PointLight(col,110,34,2); L.position.copy(p); scene.add(L); lamps.push(L); halo(p,0xffa24a,2.6,0.95); halo(p,0xff9038,12,0.26); }
   else if(l.kind==='POINT'&&l.name==='aplique'){ if(!LOW){ const L=new THREE.PointLight(col,7,9,2); L.position.copy(p); scene.add(L); } halo(p,0xffb870,1.3,0.9); halo(p,0xffa860,5,0.3); }
-  else if(l.kind==='SPOT'){ const d=B(l.dir); const L=new THREE.SpotLight(0xcfe0ff,2600,90,THREE.MathUtils.degToRad(7.5),0.35,1.6); L.position.copy(p); L.target.position.copy(p.clone().add(d)); scene.add(L); scene.add(L.target);
-    halo(p,0xdde8ff,4.5,1); halo(p,0xbfd4ff,18,0.45);
+  else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,3200,110,A,0.35,1.4); L.position.copy(p); scene.add(L); scene.add(L.target);
+    if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(2048,2048); L.shadow.camera.near=2; L.shadow.camera.far=110; L.shadow.bias=-0.0006; L.shadow.normalBias=0.03; }
+    const h1=halo(p,0xdde8ff,4.5,1), h2=halo(p,0xbfd4ff,16,0.4);
     // haz del foco en la niebla
-    const len=62, cone=new THREE.Mesh(new THREE.ConeGeometry(Math.tan(THREE.MathUtils.degToRad(7.5))*len,len,28,1,true),new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
+    const len=75, cone=new THREE.Mesh(new THREE.ConeGeometry(Math.tan(A)*len,len,28,1,true),new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
       uniforms:{c:{value:new THREE.Color(0x9fb8e6)}},vertexShader:'varying float h; varying vec3 n; varying vec3 v; void main(){ h=uv.y; n=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); v=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }',
-      fragmentShader:'uniform vec3 c; varying float h; varying vec3 n; varying vec3 v; void main(){ float e=pow(abs(dot(normalize(n),normalize(v))),1.6); gl_FragColor=vec4(c*e*pow(h,2.2)*0.2,1.0); }'}));
-    cone.position.copy(p.clone().add(d.clone().multiplyScalar(len/2))); cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),d); scene.add(cone); }
+      fragmentShader:'uniform vec3 c; varying float h; varying vec3 n; varying vec3 v; void main(){ float e=pow(abs(dot(normalize(n),normalize(v))),1.6); gl_FragColor=vec4(c*e*pow(h,1.6)*0.3,1.0); }'}));
+    scene.add(cone); spots.push({L,cone,p,d,len,phase:spots.length*2.1}); }
 });
 scene.add(new THREE.HemisphereLight(0x27344f,0x0b0906,0.55));
 const moon=new THREE.DirectionalLight(0x8fa8d8,0.22); moon.position.set(-30,50,20); scene.add(moon);
@@ -82,7 +86,8 @@ const RAIN_N=LOW?2000:4500, RAIN_R=22, RAIN_H=16; const rainGeo=new THREE.Buffer
 for(let i=0;i<RAIN_N;i++){ const x=(Math.random()*2-1)*RAIN_R, z=(Math.random()*2-1)*RAIN_R, y=Math.random()*RAIN_H; rs[i]=17+Math.random()*9; rp.set([x,y,z,x+0.05,y+0.55,z],i*6); }
 rainGeo.setAttribute('position',new THREE.BufferAttribute(rp,3));
 const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:0xc8d4e0,transparent:true,opacity:0.075,depthWrite:false,fog:true})); rain.frustumCulled=false; scene.add(rain);
-function rainTick(dt){ for(let i=0;i<RAIN_N;i++){ const d=rs[i]*dt; let y=rp[i*6+1]-d; if(y<0){ y+=RAIN_H; } rp[i*6+1]=y; rp[i*6+4]=y+0.55; } rainGeo.attributes.position.needsUpdate=true; rain.position.set(camera.position.x,0,camera.position.z); }
+function rainTick(dt){ for(let i=0;i<RAIN_N;i++){ const d=rs[i]*dt; let y=rp[i*6+1]-d; if(y<0){ y+=RAIN_H; } rp[i*6+1]=y; rp[i*6+4]=y+0.55; } rainGeo.attributes.position.needsUpdate=true; rain.position.set(camera.position.x,0,camera.position.z);
+  const c=(MAP[Math.floor(camera.position.z/T)]||'')[Math.floor(camera.position.x/T)]; rain.visible='_zLV'.indexOf(c||'.')<0; }   // bajo techo no llueve
 
 // ---------- escena de Blender
 const b64=s=>{ const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return u.buffer; };
@@ -94,8 +99,8 @@ new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
     else { const m=o.material; if(m.map)m.map.anisotropy=4; m.roughness=Math.min(1,(m.roughness||1)*0.72); if(m.emissiveMap||m.name.toLowerCase().indexOf('glass')>=0){ } m.envMapIntensity=0.7; }
     const k=o.geometry.uuid+'|'+o.material.uuid; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(o); });
   groups.forEach(list=>{ const o=list[0]; stats.tris+=(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3*list.length;
-    if(list.length<3){ list.forEach(m=>{ const c=new THREE.Mesh(m.geometry,m.material); c.applyMatrix4(m.matrixWorld); scene.add(c); stats.meshes++; }); return; }
-    const im=new THREE.InstancedMesh(o.geometry,o.material,list.length); list.forEach((m,i)=>im.setMatrixAt(i,m.matrixWorld)); im.instanceMatrix.needsUpdate=true; im.frustumCulled=false; scene.add(im); stats.meshes++; stats.inst+=list.length; });
+    if(list.length<3){ list.forEach(m=>{ const c=new THREE.Mesh(m.geometry,m.material); c.applyMatrix4(m.matrixWorld); c.castShadow=c.receiveShadow=true; scene.add(c); stats.meshes++; }); return; }
+    const im=new THREE.InstancedMesh(o.geometry,o.material,list.length); list.forEach((m,i)=>im.setMatrixAt(i,m.matrixWorld)); im.instanceMatrix.needsUpdate=true; im.frustumCulled=false; im.castShadow=im.receiveShadow=true; scene.add(im); stats.meshes++; stats.inst+=list.length; });
   ready=true; el('load').textContent='CLIC PARA ENTRAR'; el('intro').classList.add('ok');
 },e=>{ el('load').textContent='No se pudo cargar la escena: '+(e&&e.message||e); });
 
@@ -139,10 +144,10 @@ if(Q.get('v')){ const v=VIEWS[(+Q.get('v')||1)-1]; P.x=v[0]; P.z=v[1]; P.yaw=v[2
 
 addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); if(composer)composer.setSize(innerWidth,innerHeight); });
 let last=performance.now(), fpsT=0, fpsN=0, t=0;
-function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt; move(dt); rainTick(dt);
+function frame(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; t+=dt; move(dt); rainTick(dt); spotTick(t);
   if(finalPass)finalPass.uniforms.time.value=t; if(composer){ bloom.enabled=useBloom; composer.render(); } else renderer.render(scene,camera);
   fpsT+=dt; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · resplandor '+(useBloom?'sí':'no'); fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window.__ESC={scene,camera,renderer,P,stats,M,isReady:()=>ready,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
+window.__ESC={scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
 })();
