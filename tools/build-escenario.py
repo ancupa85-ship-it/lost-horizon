@@ -7,8 +7,8 @@ R = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); V = os.path.joi
 def rd(*p): return open(os.path.join(R, *p), encoding='utf-8').read()
 def tex(f, size, q=72):
     im = Image.open(os.path.join(TX, f)).convert('RGB').resize((size, size), Image.LANCZOS); b = io.BytesIO(); im.save(b, 'JPEG', quality=q); return 'data:image/jpeg;base64,' + base64.b64encode(b.getvalue()).decode()
-T = {'asphalt_diff': ('asphalt_02_diff.jpg', 1024), 'asphalt_nor': ('asphalt_02_nor.jpg', 1024), 'asphalt_rough': ('asphalt_02_rough.jpg', 512),
-     'concrete_diff': ('concrete_wall_008_diff.jpg', 1024), 'concrete_nor': ('concrete_wall_008_nor.jpg', 512), 'plaster_diff': ('painted_plaster_wall_diff.jpg', 1024),
+T = {'asphalt_diff': ('asphalt_02_diff.jpg', 1024), 'asphalt_nor': ('asphalt_02_nor.jpg', 512), 'asphalt_rough': ('asphalt_02_rough.jpg', 512),
+     'concrete_diff': ('concrete_wall_008_diff.jpg', 1024), 'concrete_nor': ('concrete_wall_008_nor.jpg', 512), 'plaster_diff': ('painted_plaster_wall_diff.jpg', 512),
      'plaster_nor': ('painted_plaster_wall_nor.jpg', 512), 'wood_diff': ('wood_planks_dirt_diff.jpg', 512), 'rust_diff': ('rusty_metal_02_diff.jpg', 512),
      'green_diff': ('green_metal_rust_diff.jpg', 512), 'roof_diff': ('corrugated_iron_02_diff.jpg', 512), 'roof_nor': ('corrugated_iron_02_nor.jpg', 512), 'floor_diff': ('concrete_floor_worn_001_diff.jpg', 512)}
 info = json.load(open(os.path.join(V, 'base.json')))

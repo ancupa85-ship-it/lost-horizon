@@ -211,6 +211,66 @@ def flush(prefix='base'):
     BM.clear()
 
 HW, HB = 4.6, 3.6   # altura del muro perimetral y de los edificios
+def bars(p, horiz):
+    """Reja del calabozo: barrotes y dos pletinas, con la cerradura a un lado."""
+    for k in range(9):
+        d = -0.6 + k * 0.15; cyl('hierro', 0.016, 2.2, p + (Vector((d, 0, 1.1)) if horiz else Vector((0, d, 1.1))), seg=8)
+    for z in (0.35, 1.9): box('hierro', (1.3, 0.05, 0.05) if horiz else (0.05, 1.3, 0.05), p + Vector((0, 0, z)))
+    box('oscuro', (0.16, 0.09, 0.22) if horiz else (0.09, 0.16, 0.22), p + (Vector((0.5, 0, 1.05)) if horiz else Vector((0, 0.5, 1.05))))
+
+# ---------------------------------------------------------------- mobiliario sencillo de cuartel (piezas propias, materiales del lote)
+def _fb(p, rz):
+    R_ = Matrix.Rotation(rz, 4, 'Z')
+    return lambda mat, size, off, extra=0.0: box(mat, size, p + R_ @ Vector(off), rotz=rz + extra)
+def bunk(p, rz=0.0, top=True):
+    """Litera de tubo (1,95 x 0,85): somier, colchoneta, manta doblada y almohada."""
+    b = _fb(p, rz)
+    for sx in (-0.95, 0.95):
+        for sy in (-0.4, 0.4): b('hierro', (0.045, 0.045, 1.75 if top else 0.75), (sx, sy, 0.875 if top else 0.375))
+        b('hierro', (0.035, 0.8, 0.035), (sx, 0, 0.7)); b('hierro', (0.035, 0.8, 0.035), (sx, 0, 1.7)) if top else None
+    for z in ((0.42, 1.38) if top else (0.42,)):
+        b('hierro', (1.9, 0.82, 0.04), (0, 0, z)); b('lona', (1.86, 0.78, 0.11), (0, 0, z + 0.075)); b('uniforme', (0.9, 0.74, 0.05), (0.42, 0, z + 0.155)); b('techo_int', (0.42, 0.56, 0.08), (-0.68, 0, z + 0.17))
+def lockers(p, rz=0.0, n=4):
+    """Fila de taquillas de chapa contra la pared (0,45 de ancho cada una)."""
+    b = _fb(p, rz)
+    for k in range(n):
+        x = (k - (n - 1) / 2) * 0.46
+        b('oliva', (0.45, 0.48, 1.85), (x, 0, 0.925)); b('bajos', (0.012, 0.01, 1.8), (x + 0.225, -0.243, 0.925)); b('metal', (0.03, 0.02, 0.1), (x + 0.16, -0.25, 1.0))
+        for z in (1.6, 1.66, 1.72): b('bajos', (0.26, 0.01, 0.018), (x, -0.243, z))
+def table(p, rz=0.0, stools=4):
+    b = _fb(p, rz); b('madera', (1.5, 0.8, 0.045), (0, 0, 0.76))
+    for sx in (-0.68, 0.68):
+        for sy in (-0.33, 0.33): b('hierro', (0.04, 0.04, 0.74), (sx, sy, 0.37))
+    for k in range(stools):
+        sx, sy = ((-0.4, -0.72), (0.4, -0.72), (-0.4, 0.72), (0.4, 0.72))[k]; b('madera', (0.34, 0.34, 0.035), (sx, sy, 0.46), 0.3 * k)
+        for dx in (-0.13, 0.13):
+            for dy in (-0.13, 0.13): b('hierro', (0.025, 0.025, 0.45), (sx + dx, sy + dy, 0.225))
+    b('metal', (0.1, 0.1, 0.11), (0.3, 0.1, 0.84)); b('metal', (0.1, 0.1, 0.11), (-0.2, -0.15, 0.84)); b('techo_int', (0.3, 0.21, 0.004), (-0.35, 0.18, 0.786), 0.3)   # jarrillos y un parte
+def board(p, rz=0.0, w=1.5):
+    """Tablón en la pared (p es el punto de la pared, a la altura de los ojos): plano, partes y cuadrante."""
+    b = _fb(p, rz); b('veta', (w, 0.03, 0.95), (0, 0, 0)); b('techo_int', (w * 0.5, 0.008, 0.62), (-w * 0.2, -0.02, 0.05)); b('aviso', (0.24, 0.008, 0.3), (w * 0.28, -0.02, 0.2))
+    b('techo_int', (0.22, 0.008, 0.3), (w * 0.3, -0.02, -0.18), 0.0); b('piloto', (0.03, 0.012, 0.03), (-w * 0.3, -0.026, 0.2)); b('piloto', (0.03, 0.012, 0.03), (-w * 0.05, -0.026, -0.1))
+def furnish():
+    """Barracón, despacho, archivo, cuerpo de guardia y calabozo, con lo que tendría una base de 1983."""
+    P_ = lambda x, y, dx=0.0, dy=0.0, z=0.0: wpos(x, y) + Vector((dx, dy, z)); F = lambda i, x, y, dx=0.0, dy=0.0, r=0.0, z=0.0: has_ph(i) and put(i, P_(x, y, dx, dy, z), r)
+    # barracón (comunicaciones al fondo): taquillas en la pared norte, literas al sur, mesa en medio
+    lockers(P_(1, 11, 0.0, 0.72), 0, 4); lockers(P_(2, 11, 0.25, 0.72), 0, 4)
+    bunk(P_(1.5, 14, -0.9, -0.52)); bunk(P_(3, 14, 0.25, -0.52)); bunk(P_(5, 14, -0.6, -0.52))
+    table(P_(5, 12, 0.6, 0.3)); board(P_(9, 11, 0.0, 0.97, 1.75)); F('ammo_box', 6, 14, 0.5, -0.6, 0.4); F('old_military_crate', 10, 14, 0.3, -0.4, 0.2)
+    # despacho: archivadores, tablón, alfombra bajo la mesa, perchero
+    F('drawer_cabinet', 1, 19, -0.55, -0.3, math.pi / 2); F('drawer_cabinet', 1, 18, -0.55, 0.1, math.pi / 2); board(P_(3, 19, 0.0, -0.97, 1.7), math.pi, 1.8)
+    box('lona', (2.6, 1.9, 0.012), P_(3, 17, 0, 0.2, 0.034)); cyl('oscuro', 0.02, 1.75, P_(5, 16, 0.6, 0.6, 0.875), seg=8); cyl('oscuro', 0.16, 0.03, P_(5, 16, 0.6, 0.6, 0.015), seg=12)
+    box('capote', (0.34, 0.1, 0.8), P_(5, 16, 0.6, 0.52, 1.3)); F('SchoolChair_01', 4, 18, 0.3, -0.2, 2.6)
+    # archivo: más estantes y cajas de expedientes por el suelo
+    F('worn_metal_rack', 10, 17, 0.35, 0, math.pi / 2); F('old_military_crate', 7, 16, -0.3, 0.4, 0.3); F('wooden_crate_02', 10, 19, 0.2, -0.3, 0.5); F('ammo_box', 8, 19, 0, -0.5, 1.1)
+    # cuerpo de guardia: mesa, taquillas, mesa del cabo; al sur, las literas del retén
+    table(P_(29, 6, 0.9, -0.6), 0.08); lockers(P_(31, 6, 0.3, 0.72), 0, 4); lockers(P_(33, 6, -0.4, 0.72), 0, 3)
+    F('metal_office_desk', 33, 7, -0.1, -0.2, -math.pi / 2); F('SchoolChair_01', 32, 7, 0.1, -0.2, math.pi / 2); board(P_(28, 6, 0.0, 0.97, 1.75), 0, 1.6)
+    bunk(P_(27, 9, -0.9, -0.52)); bunk(P_(28, 9, 0.9, -0.52)); F('ammo_box', 26, 8, -0.5, 0.2, 0.2)
+    # pasillo y sala del calabozo
+    F('worn_metal_rack', 33, 11, 0.45, 0, math.pi / 2); F('old_military_crate', 26, 11, -0.3, 0.3, 0.4); F('wooden_crate_02', 33, 10, 0.3, 0.2, 0.2); table(P_(28, 11, 0.4, 0.2), 0, 2)
+    bunk(P_(32, 13, 0.52, -0.9), math.pi / 2, top=False); cyl('metal', 0.14, 0.28, P_(30, 13, -0.6, 0.55, 0.14), seg=12); box('techo_int', (0.5, 0.008, 0.36), P_(30, 14, -0.98, 0.2, 1.5), rotz=math.pi / 2)
+
 def build_world():
     # suelo de la base y marisma alrededor
     box('suelo', (COLS * T, ROWS * T, 0.4), (COLS * T / 2, -ROWS * T / 2, -0.2))
@@ -242,11 +302,15 @@ def build_world():
                 if horiz:
                     box(mat, (T, 0.5, top - 2.2), p + Vector((0, 0, 2.2 + (top - 2.2) / 2)))
                     for s in (-1, 1): box(mat, (0.35, 0.5, 2.2), p + Vector((s * 0.825, 0, 1.1)))
-                    box('hierro', (1.3, 0.07, 2.2), p + Vector((0, 0, 1.1))); box('oscuro', (0.05, 0.12, 0.2), p + Vector((0.45, 0, 1.05)))
+                    if c == 'b': bars(p, True)
+                    elif c == 'D': box('hierro', (0.07, 1.3, 2.2), p + Vector((-0.62, 0.72, 1.1)), rotz=-0.12); box('oscuro', (0.12, 0.05, 0.2), p + Vector((-0.55, 1.2, 1.05)))   # hoja abierta
+                    else: box('hierro', (1.3, 0.07, 2.2), p + Vector((0, 0, 1.1))); box('oscuro', (0.05, 0.12, 0.2), p + Vector((0.45, 0, 1.05)))
                 else:
                     box(mat, (0.5, T, top - 2.2), p + Vector((0, 0, 2.2 + (top - 2.2) / 2)))
                     for s in (-1, 1): box(mat, (0.5, 0.35, 2.2), p + Vector((0, s * 0.825, 1.1)))
-                    box('hierro', (0.07, 1.3, 2.2), p + Vector((0, 0, 1.1))); box('oscuro', (0.12, 0.05, 0.2), p + Vector((0, 0.45, 1.05)))
+                    if c == 'b': bars(p, False)
+                    elif c == 'D': box('hierro', (1.3, 0.07, 2.2), p + Vector((0.72, 0.62, 1.1)), rotz=-0.12); box('oscuro', (0.05, 0.12, 0.2), p + Vector((1.2, 0.55, 1.05)))
+                    else: box('hierro', (0.07, 1.3, 2.2), p + Vector((0, 0, 1.1))); box('oscuro', (0.12, 0.05, 0.2), p + Vector((0, 0.45, 1.05)))
             if building(x, y) or c in 'LVbB' or (c == 'D' and (roomy(x - 1, y) or roomy(x + 1, y) or roomy(x, y - 1) or roomy(x, y + 1))):
                 box('tejado', (T + 0.02, T + 0.02, 0.22), p + Vector((0, 0, HB + 0.11)))
                 if c != 'W': box('suelo_int', (T, T, 0.03), p + Vector((0, 0, 0.012))); box('techo_int', (T, T, 0.04), p + Vector((0, 0, HB - 0.02)))
@@ -521,10 +585,16 @@ def person(pos, rotz, pose='pie', poncho=False, head='', hair=True, gun='', suit
         ha = V(P['ha'][0]); rbox('oscuro', (0.028, 0.19, 0.036), ha + V((0, -0.1, 0.035)), 0.006, 1, None, M0); rbox('oscuro', (0.03, 0.04, 0.1), ha + V((0, -0.02, -0.01)), 0.008, 1, None, M0)
         rcyl('oscuro', 0.017, 0.14, ha + V((0, -0.26, 0.04)), 'Y', 0.004, 10, M0)   # silenciador
 
-def gear(M0, meta, head='', poncho=False, gun='', seed=0.0, part=None):
+def gear(M0, meta, head='', poncho=False, gun='', seed=0.0, part=None, belt=False):
     """Equipo sobre una persona de MakeHuman (casco o gorra, capote, arma), colocado con las medidas de su esqueleto."""
     V = Vector; hb, ht, nk = V(meta['head']), V(meta['head_tip']), V(meta['neck_01']); up = (ht - hb).normalized()
     H = V((0, 0, 1)).rotation_difference(up).to_matrix().to_4x4(); hd = hb + up * 0.105 + V((0, -0.012, 0))
+    if part in (None, 'pelvis') and belt:   # correaje: cinturón de lona, cartucheras y cantimplora
+        pv = V(meta['pelvis']); z = pv.z + 0.11; cy = pv.y + 0.01
+        loft('cuero', [(z - 0.03, 0.172, 0.128, cy), (z + 0.03, 0.172, 0.128, cy)], M0, seg=24, amp=0.0)
+        for sx in (-0.11, 0.11): rbox('cuero', (0.085, 0.045, 0.11), V((sx, cy - 0.135, z - 0.01)), 0.012, 2, None, M0)
+        rbox('metal', (0.045, 0.02, 0.04), V((0, cy - 0.13, z)), 0.005, 1, None, M0); rcyl('oliva', 0.055, 0.15, V((-0.15, cy + 0.1, z - 0.07)), 'Z', 0.03, 12, M0)
+    if part == 'pelvis': return
     if part not in (None, 'head'): head = ''
     if part not in (None, 'spine_03'): poncho = False; gun = '' if gun == 'hombro' else gun
     if part not in (None, 'hand_r'): gun = gun if gun == 'hombro' else ''
@@ -552,9 +622,9 @@ def people():
     """Los personajes del nivel en su sitio: Cuttlas agazapado tras las cajas de la entrada y los tres guardias del patio sur.
     Si están las personas de MakeHuman (tools/blender/personas.py) se usan esas; si no, los maniquíes."""
     cast = [('cuttlas', wpos(4.9, 2.6), math.pi / 2 + 0.25, dict(gun='pistola'), dict(pose='agachado', gun='pistola', suit='traje', gloves=True)),
-            ('ibarra', wpos(12.6, 4.2), 0.6, dict(poncho=True, head='gorra', gun='hombro', seed=1.3), dict(pose='pie', poncho=True, head='gorra', gun='hombro', seed=1.3)),
-            ('moya', wpos(20.4, 15.6), -1.9, dict(head='casco', gun='terciado'), dict(pose='firme', head='casco', gun='terciado')),
-            ('peris', wpos(26.4, 6.6), 2.4, dict(), dict(pose='pie'))]
+            ('ibarra', wpos(12.6, 4.2), 0.6, dict(poncho=True, head='gorra', gun='hombro', seed=1.3, belt=True), dict(pose='pie', poncho=True, head='gorra', gun='hombro', seed=1.3)),
+            ('moya', wpos(20.4, 15.6), -1.9, dict(head='casco', gun='terciado', belt=True), dict(pose='firme', head='casco', gun='terciado')),
+            ('peris', wpos(26.4, 6.6), 2.4, dict(belt=True), dict(pose='pie'))]
     walk = {'ibarra': [[13, 4], [13, 9], [9, 9], [9, 4]], 'moya': [[20, 19], [33, 19], [33, 20], [20, 20]]}   # rondas del visor, por casillas libres
     for name, pos, rz, g, old in cast:
         i = 'persona_' + name; M0 = Matrix.Translation(pos) @ Matrix.Rotation(rz, 4, 'Z')
@@ -566,7 +636,7 @@ def people():
                         cx, cy = round(a[0] + (b[0] - a[0]) * k / 20), round(a[1] + (b[1] - a[1]) * k / 20)
                         if cell(cx, cy) not in '.PGg': print('AVISO ronda de', name, 'pisa', cx, cy, cell(cx, cy), flush=True)
                 PEOPLE_OUT.append({'name': name, 'pos': [round(v, 3) for v in pos], 'rz': rz, 'wps': walk.get(name, [])})
-                for part in ('head', 'spine_03', 'hand_r'):
+                for part in ('head', 'spine_03', 'hand_r', 'pelvis'):
                     gear(M0, meta, part=part, **g); flush_smooth('gear_%s_%s' % (name, part))
             else: put(i, pos, rz); gear(M0, meta, **g)
         else: person(pos, rz, **old)
@@ -706,6 +776,7 @@ def build_props():
     for x, y in ((8, 17), (9, 18), (7, 18)): F('worn_metal_rack', x, y, 0, -0.5)
     F('metal_office_desk', 9, 11, 0, 0.4); F('vintage_radio_transceiver', 9, 11, -0.3, 0.45, 0.2, 0.79); F('SchoolChair_01', 9, 11, 0.2, -0.45, 0.2)
     F('painted_wooden_bench', 30, 14, 0, 0.6); F('metal_tool_chest', 7, 8, 0, 0, 0.5); F('ammo_box', 29, 21, 0, 0, 0.8)
+    furnish()
     flush('luces'); flush_smooth('camiones')
     people()
     # luces interiores del plano (despacho, archivo, calabozo...): se ven por las puertas y calientan las ventanas

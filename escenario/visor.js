@@ -114,9 +114,9 @@ const WALK_V=1.5/1.25;   // metros por ciclo / segundos por ciclo: los pies no p
 // ---------- guardias: ronda, vista (cono y línea de visión por el plano), oído, sospecha, persecución y captura
 const NOISE={x:0,z:0,r:0}, ALERT={level:0,msg:'',msgT:0,caught:0};
 const cellOf=(x,z)=>[Math.floor(x/T),Math.floor(z/T)];
-function blocked(x0,z0,x1,z1,low){ const d=Math.hypot(x1-x0,z1-z0), n=Math.ceil(d/0.35); for(let i=1;i<n;i++){ const x=x0+(x1-x0)*i/n, z=z0+(z1-z0)*i/n; const r=MAP[Math.floor(z/T)], c=r&&r[Math.floor(x/T)]; if(!c||'#WT'.indexOf(c)>=0||(low&&'cg'.indexOf(c)>=0))return true; } return false; }
+function blocked(x0,z0,x1,z1,low){ const d=Math.hypot(x1-x0,z1-z0), n=Math.ceil(d/0.35); for(let i=1;i<n;i++){ const x=x0+(x1-x0)*i/n, z=z0+(z1-z0)*i/n; const r=MAP[Math.floor(z/T)], c=r&&r[Math.floor(x/T)]; if(!c||'#WTLV'.indexOf(c)>=0||(low&&'cg'.indexOf(c)>=0))return true; } return false; }
 function bfs(a,b){ const key=(x,y)=>y*COLS+x, prev=new Map([[key(a[0],a[1]),-1]]), q=[a]; let hit=false;
-  while(q.length){ const c=q.shift(); if(c[0]===b[0]&&c[1]===b[1]){ hit=true; break; } for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){ const x=c[0]+d[0], y=c[1]+d[1]; if(x<0||y<0||x>=COLS||y>=ROWS||prev.has(key(x,y))||'#WTcgs'.indexOf(MAP[y][x])>=0)continue; prev.set(key(x,y),key(c[0],c[1])); q.push([x,y]); } }
+  while(q.length){ const c=q.shift(); if(c[0]===b[0]&&c[1]===b[1]){ hit=true; break; } for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){ const x=c[0]+d[0], y=c[1]+d[1]; if(x<0||y<0||x>=COLS||y>=ROWS||prev.has(key(x,y))||'#WTcgsLVb'.indexOf(MAP[y][x])>=0)continue; prev.set(key(x,y),key(c[0],c[1])); q.push([x,y]); } }
   if(!hit)return null; const out=[]; let k=key(b[0],b[1]); while(k!==-1){ out.unshift([k%COLS,Math.floor(k/COLS)]); k=prev.get(k); } return out; }
 function mark(ch,col){ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); x.font='bold 56px sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.lineWidth=6; x.strokeStyle='#000'; x.strokeText(ch,32,34); x.fillStyle=col; x.fillText(ch,32,34);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true,fog:false})); sp.scale.set(0.5,0.5,1); sp.position.y=2.25; sp.visible=false; sp.renderOrder=10; return sp; }
@@ -154,7 +154,7 @@ function peopleTick(dt){ const live=PL.p&&PL.third&&!ALERT.caught; let top=0;
 new THREE.GLTFLoader().parse(b64(D.glb),'',g=>{
   g.scene.updateMatrixWorld(true); const groups=new Map(), singles=[];
   g.scene.traverse(o=>{ if(!o.isMesh)return; const n=(o.material.name||'').replace(/\.\d+$/,'');
-    const gm=/^gear_([a-z]+)_(head|spine_03|hand_r)_/.exec(o.name||'');
+    const gm=/^gear_([a-z]+)_(head|spine_03|hand_r|pelvis)_/.exec(o.name||'');
     if(gm){ const c=new THREE.Mesh(o.geometry,M[n.slice(3)]||o.material); c.applyMatrix4(o.matrixWorld); c.castShadow=true; c.receiveShadow=true; scene.add(c); GEAR.push({who:gm[1],bone:gm[2],mesh:c}); stats.meshes++; return; }
     if(n.indexOf('lh_')===0&&M[n.slice(3)])o.material=M[n.slice(3)];
     else if(/^(cuttlas|ibarra|moya|peris)_/.test(n))fixPersona(o.material,n);
@@ -184,7 +184,7 @@ function mkComposer(){ const pr=renderer.getPixelRatio(); const rt=new THREE.Web
 if(THREE.EffectComposer&&THREE.UnrealBloomPass)mkComposer(); else useBloom=false;
 
 // ---------- recorrido a pie: WASD y ratón, con las paredes del plano
-const solid=(x,y)=>{ if(x<0||y<0||x>=COLS||y>=ROWS)return true; return '#WTcg'.indexOf(MAP[y][x])>=0; };
+const solid=(x,y)=>{ if(x<0||y<0||x>=COLS||y>=ROWS)return true; return '#WTcgLVb'.indexOf(MAP[y][x])>=0; };
 const P={x:0,z:0,yaw:0,pitch:0,vy:0,bob:0}; (function(){ let sx=2,sy=2; MAP.forEach((r,y)=>{ const i=r.indexOf('P'); if(i>=0){ sx=i; sy=y; } }); P.x=sx*T+T/2; P.z=sy*T+T/2; P.yaw=-2.2; })();
 const keys={}; addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='KeyB'&&composer){ useBloom=!useBloom; } if(e.code==='KeyH'){ el('hud').hidden=!el('hud').hidden; }
   if(e.code==='KeyF')scene.fog.density=Math.max(0.004,scene.fog.density-0.003); if(e.code==='KeyG')scene.fog.density=Math.min(0.09,scene.fog.density+0.003);
