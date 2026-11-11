@@ -17,6 +17,8 @@ LIGHTS = []
 
 src = open(os.path.join(R, 'src', '10-zones.js'), encoding='utf-8').read()
 MAP = re.findall(r'"([^"]+)"', re.search(r'const MAPSRC_BASE=\[(.*?)\];', src, re.S).group(1))
+if os.environ.get('LH_GLB'):   # en el visor realista el archivo solo se abre desde la jefatura: la puerta blindada pasa del patio al tabique entre las dos salas
+    assert MAP[17][11] == 'V' and MAP[17][6] == 'W'; MAP[17] = MAP[17][:6] + 'V' + MAP[17][7:11] + 'W' + MAP[17][12:]
 ROWS, COLS, T = len(MAP), len(MAP[0]), 2.0
 def cell(x, y): return MAP[y][x] if 0 <= x < COLS and 0 <= y < ROWS else '#'
 def wpos(x, y, z=0.0): return Vector((x * T + T / 2, -(y * T + T / 2), z))   # casilla → metros (norte = +Y)
