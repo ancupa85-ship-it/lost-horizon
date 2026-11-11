@@ -14,6 +14,8 @@ T = {'asphalt_diff': ('asphalt_02_diff.jpg', 1024), 'asphalt_nor': ('asphalt_02_
 info = json.load(open(os.path.join(V, 'base.json')))
 people = {q['name']: base64.b64encode(open(os.path.join(R, 'assets', 'modelos-ph', 'persona_' + q['name'], 'persona_' + q['name'] + '_anim.glb'), 'rb').read()).decode() for q in info.get('people', [])}
 data = {'info': info, 'people': people, 'glb': base64.b64encode(open(os.path.join(V, 'base.glb'), 'rb').read()).decode(), 'tex': {k: tex(*v) for k, v in T.items()}}
+dog = os.path.join(R, 'assets', 'modelos-ph', 'perro', 'perro.glb')   # tools/blender/perro.py
+if os.path.exists(dog): data['dog'] = base64.b64encode(open(dog, 'rb').read()).decode()
 post = '\n'.join(rd('vendor', 'post', f + '.js') for f in ('CopyShader', 'LuminosityHighPassShader', 'EffectComposer', 'RenderPass', 'ShaderPass', 'UnrealBloomPass'))
 out = (rd('escenario', 'visor.html') + '<script>\n' + rd('vendor', 'three.min.js') + '\n</script>\n<script>\n' + rd('vendor', 'GLTFLoader.js') + '\n' + post + '\n</script>\n'
        '<script>window.LH_ESC=' + json.dumps(data, separators=(',', ':')) + ';</script>\n<script>\n' + rd('escenario', 'visor.js') + '</script>\n')
