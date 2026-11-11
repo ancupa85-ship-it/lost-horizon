@@ -800,7 +800,9 @@ def build_props():
         lamp('POINT', 'interior', Vector((x * T, -y * T, 2.55)), tuple(int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4)), 120 * k, shadow_soft_size=0.15)
     # torretas con foco: [x, y, hacia x, hacia y, ...]
     for sx, sy, tx, ty in ((18, 0, 7, 25), (35, 27, 13, 7)):   # apuntan lejos, casi horizontales, cruzando el patio
-        p = wpos(sx, sy); place('torreta', p)
+        p = wpos(sx, sy)
+        if GLB: lamp('SPOT', 'foco_torreta', p + Vector((0, 0, 6.3)), (0.8, 0.9, 1.0), 90000, spot_size=math.radians(13)); continue   # en el visor el foco cuelga de la torre de madera y lo mueve su centinela
+        place('torreta', p)
         head = p + Vector((0, 0, 7.25)); t = wpos(tx, ty, 1.2)
         s = lamp('SPOT', 'foco_torreta', head, (0.8, 0.9, 1.0), 90000, spot_size=math.radians(13), spot_blend=0.25, shadow_soft_size=0.12); aim(s, t)
         d = (t - head).normalized()
