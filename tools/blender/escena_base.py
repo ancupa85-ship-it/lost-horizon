@@ -305,13 +305,13 @@ def build_world():
                 if horiz:
                     box(mat, (T, 0.5, top - 2.2), p + Vector((0, 0, 2.2 + (top - 2.2) / 2)))
                     for s in (-1, 1): box(mat, (0.35, 0.5, 2.2), p + Vector((s * 0.825, 0, 1.1)))
-                    if c == 'b': bars(p, True)
+                    if c == 'b': GLB or bars(p, True)   # en el visor la reja es una pieza aparte, para poder abrirla
                     elif c == 'D': box('hierro', (0.07, 1.3, 2.2), p + Vector((-0.62, 0.72, 1.1)), rotz=-0.12); box('oscuro', (0.12, 0.05, 0.2), p + Vector((-0.55, 1.2, 1.05)))   # hoja abierta
                     elif not (GLB and c in 'LV'): box('hierro', (1.3, 0.07, 2.2), p + Vector((0, 0, 1.1))); box('oscuro', (0.05, 0.12, 0.2), p + Vector((0.45, 0, 1.05)))   # en el visor esas dos hojas son piezas aparte, para poder abrirlas
                 else:
                     box(mat, (0.5, T, top - 2.2), p + Vector((0, 0, 2.2 + (top - 2.2) / 2)))
                     for s in (-1, 1): box(mat, (0.5, 0.35, 2.2), p + Vector((0, s * 0.825, 1.1)))
-                    if c == 'b': bars(p, False)
+                    if c == 'b': GLB or bars(p, False)
                     elif c == 'D': box('hierro', (1.3, 0.07, 2.2), p + Vector((0.72, 0.62, 1.1)), rotz=-0.12); box('oscuro', (0.05, 0.12, 0.2), p + Vector((1.2, 0.55, 1.05)))
                     elif not (GLB and c in 'LV'): box('hierro', (0.07, 1.3, 2.2), p + Vector((0, 0, 1.1))); box('oscuro', (0.12, 0.05, 0.2), p + Vector((0, 0.45, 1.05)))
             if building(x, y) or c in 'LVbB' or (c == 'D' and (roomy(x - 1, y) or roomy(x + 1, y) or roomy(x, y - 1) or roomy(x, y + 1))):
