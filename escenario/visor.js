@@ -43,19 +43,22 @@ const M={
 };
 M.hormigon=M.muro; M.suelo_int=std({map:tex('floor_diff',2,true),color:0x8c8c8c,roughness:0.55}); M.techo_int=std({color:0x6a655c,roughness:0.95});
 // charcos: en el suelo, un ruido en coordenadas del mundo baja la rugosidad, aplana el relieve y oscurece el asfalto
-const RIP={value:0};
-M.suelo.onBeforeCompile=sh=>{ sh.uniforms.lhT=RIP;
+const RIP={value:0}, LHENV={value:new THREE.Vector3(1,0,1)};   // LHENV: cuánto de mojado, de nevado y de lluvia cayendo hay (lo fija el clima)
+function snowTop(m){ m.onBeforeCompile=sh=>{ sh.uniforms.lhE=LHENV; sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform vec3 lhE;').replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n{ float lhS=lhE.y*smoothstep(0.35,0.75,dot(normal,(viewMatrix*vec4(0.0,1.0,0.0,0.0)).xyz)); diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.8,0.84,0.9),lhS); roughnessFactor=mix(roughnessFactor,0.85,lhS); metalnessFactor*=1.0-lhS; }'); }; }   // nieve posada en lo que mira hacia arriba
+snowTop(M.tejado); snowTop(M.lona);
+M.suelo.onBeforeCompile=sh=>{ sh.uniforms.lhT=RIP; sh.uniforms.lhE=LHENV;
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWPos;').replace('#include <project_vertex>','#include <project_vertex>\nvWPos=(modelMatrix*vec4(transformed,1.0)).xyz;');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
 varying vec3 vWPos;
 float lhH(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float lhN(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(lhH(i),lhH(i+vec2(1,0)),f.x),mix(lhH(i+vec2(0,1)),lhH(i+vec2(1,1)),f.x),f.y); }
-uniform float lhT;
+uniform float lhT; uniform vec3 lhE;
+float lhSnow(){ vec2 p=vWPos.xz*0.33; float n=lhN(p+13.7)*0.6+lhN(p*3.1+2.2)*0.4; return lhE.y*smoothstep(0.2,0.42,n); }
 vec2 lhRip(vec2 p){ vec2 g=vec2(0.0); { vec2 q=p*2.1, i=floor(q), f=fract(q); float h=lhH(i), t=fract(lhT*(0.7+0.5*h)+h*9.0); vec2 c=vec2(0.3+0.4*lhH(i+1.7),0.3+0.4*lhH(i+4.1)), v=f-c; float d=length(v), r=t*0.42; g+=normalize(v+1e-5)*sin((d-r)*46.0)*smoothstep(0.07,0.0,abs(d-r))*(1.0-t); } return g; }
 float lhPuddle(){ vec2 p=vWPos.xz*0.21; float n=lhN(p)*0.55+lhN(p*2.3+7.1)*0.3+lhN(p*5.1+3.3)*0.15; return smoothstep(0.5,0.6,n); }`)
-   .replace('#include <map_fragment>','#include <map_fragment>\nfloat lhP=lhPuddle(); diffuseColor.rgb*=mix(1.0,0.22,lhP);')
-   .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor*0.62,0.03,lhP);')
-   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=normalize(mix(normal,normalize(vNormal),lhP*0.97)); if(lhP>0.02&&vViewPosition.z<22.0){ vec2 rg=lhRip(vWPos.xz)*lhP*0.35; normal=normalize(normal+(viewMatrix*vec4(rg.x,0.0,rg.y,0.0)).xyz); }   /* ondas de las gotas */');
+   .replace('#include <map_fragment>','#include <map_fragment>\nfloat lhP=lhPuddle()*lhE.x, lhS=lhSnow()*(1.0-lhP); diffuseColor.rgb*=mix(1.0,0.22,lhP); diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.8,0.84,0.9),lhS);')
+   .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(mix(min(1.0,roughnessFactor*mix(1.6,0.62,lhE.x)),0.03,lhP),0.85,lhS);   /* en seco el asfalto no brilla */')
+   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=normalize(mix(normal,normalize(vNormal),max(lhP*0.97,lhS*0.85))); if(lhE.z>0.5&&lhP>0.02&&vViewPosition.z<22.0){ vec2 rg=lhRip(vWPos.xz)*lhP*0.35; normal=normalize(normal+(viewMatrix*vec4(rg.x,0.0,rg.y,0.0)).xyz); }   /* ondas de las gotas */');
 };
 
 // ---------- reflejos: un entorno pequeño (cielo oscuro y un halo de sodio en el horizonte) para que el suelo mojado tenga qué reflejar
@@ -76,12 +79,12 @@ const lamps=[], spots=[], beams=[];
 const UP=new THREE.Vector3(0,1,0), DOWN=new THREE.Vector3(0,-1,0);
 // cada foco cuelga bajo el tejadillo de una torre y lo mueve su centinela: alumbra donde él mira; sin centinela se queda quieto y no delata, y desde arriba se puede apagar (E)
 function spotTick(t){ spots.forEach((s,i)=>{ const tw=TOWERS[i], g=PEOPLE.find(o=>o.q.tower===i), man=!g||!g.dead; s.man=man; if(tw){ s.p.set(tw.cx-0.25,TWH+2.05,tw.cz); if(g&&man)s.yaw=g.yaw; else if(s.yaw===undefined)s.yaw=tw.yaw; s.drop+=((man?0:0.5)-s.drop)*0.04; const ph=0.27+s.drop, c=Math.cos(ph); s.dir.set(Math.sin(s.yaw)*c,-Math.sin(ph),Math.cos(s.yaw)*c); } else s.dir.copy(s.d).applyAxisAngle(UP,Math.sin(t*0.16+s.phase)*0.42);
-    const d=s.dir; s.L.position.copy(s.p); s.L.intensity=s.on?280:0; s.L.target.position.copy(s.p).addScaledVector(d,40); s.L.target.updateMatrixWorld(); s.cone.visible=s.on; s.cone.position.copy(s.p).addScaledVector(d,s.len/2); s.cone.quaternion.setFromUnitVectors(DOWN,d); s.head.position.copy(s.p); s.head.quaternion.setFromUnitVectors(UP,d); s.lens.material=s.on?M.foco:M.hierro; s.h.forEach(h=>{ h.visible=s.on; h.position.copy(s.p).addScaledVector(d,0.3); }); }); beams.forEach(b=>{ b.uniforms.time.value=t; }); }
+    const d=s.dir, on=s.on&&!ENV.day; s.L.position.copy(s.p); s.L.intensity=on?280:0; s.L.target.position.copy(s.p).addScaledVector(d,40); s.L.target.updateMatrixWorld(); s.cone.visible=on; s.cone.position.copy(s.p).addScaledVector(d,s.len/2); s.cone.quaternion.setFromUnitVectors(DOWN,d); s.head.position.copy(s.p); s.head.quaternion.setFromUnitVectors(UP,d); s.lens.material=on?M.foco:M.hierro; s.h.forEach(h=>{ h.visible=on; h.position.copy(s.p).addScaledVector(d,0.3); }); }); beams.forEach(b=>{ b.uniforms.time.value=t; }); }
 const SPOTS=[], LIT=[];   // LIT: fuentes de luz que cuentan para el sigilo (y que se pueden apagar de un tiro)
 INFO.lights.forEach(l=>{ const p=B(l.pos), col=new THREE.Color(l.color[0],l.color[1],l.color[2]);
   if(l.kind==='POINT'&&l.name==='farola'){ const L=new THREE.PointLight(col,110,34,2); L.position.copy(p); scene.add(L); lamps.push(L);
-    if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(1024,1024); L.shadow.camera.near=0.25; L.shadow.camera.far=34; L.shadow.bias=-0.003; L.shadow.normalBias=0.05; L.shadow.autoUpdate=false; } /* la escena no se mueve: la sombra se calcula una vez */ LIT.push({x:p.x,y:p.y,z:p.z,R:12,on:true,L,I:110,h:[halo(p,0xffa24a,2.6,0.95),halo(p,0xff9038,12,0.26)]}); }
-  else if(l.kind==='POINT'&&l.name==='aplique'){ let L=null; if(!LOW){ L=new THREE.PointLight(col,7,9,2); L.position.copy(p); scene.add(L); } LIT.push({x:p.x,y:p.y,z:p.z,R:5.5,on:true,L,I:7,h:[halo(p,0xffb870,1.3,0.9),halo(p,0xffa860,5,0.3)]}); }
+    if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(1024,1024); L.shadow.camera.near=0.25; L.shadow.camera.far=34; L.shadow.bias=-0.003; L.shadow.normalBias=0.05; L.shadow.autoUpdate=false; } /* la escena no se mueve: la sombra se calcula una vez */ LIT.push({x:p.x,y:p.y,z:p.z,R:12,on:true,ext:true,L,I:110,h:[halo(p,0xffa24a,2.6,0.95),halo(p,0xff9038,12,0.26)]}); }
+  else if(l.kind==='POINT'&&l.name==='aplique'){ let L=null; if(!LOW){ L=new THREE.PointLight(col,7,9,2); L.position.copy(p); scene.add(L); } LIT.push({x:p.x,y:p.y,z:p.z,R:5.5,on:true,ext:true,L,I:7,h:[halo(p,0xffb870,1.3,0.9),halo(p,0xffa860,5,0.3)]}); }
   else if(l.kind==='POINT'&&l.name==='interior'){ const L=new THREE.PointLight(col,l.power/120*24,9.5,1.6); L.position.copy(p); scene.add(L); LIT.push({x:p.x,y:p.y,z:p.z,R:7.5,on:true,L,I:L.intensity,h:[halo(p.clone().add(new THREE.Vector3(0,0.18,0)),0xffd9a0,0.9,0.9)]}); }
   else if(l.kind==='SPOT'){ const d=B(l.dir).normalize(); const A=THREE.MathUtils.degToRad(6.5); const L=new THREE.SpotLight(0xcfe0ff,280,110,A*1.5,0.7,1.4)   /* 2600 quemaba en blanco las fachadas enteras */; L.position.copy(p); scene.add(L); scene.add(L.target);
     if(!LOW){ L.castShadow=true; L.shadow.mapSize.set(1024,1024); L.shadow.camera.near=2; L.shadow.camera.far=110; L.shadow.bias=-0.0006; L.shadow.normalBias=0.03; L.shadow.autoUpdate=false; SPOTS.push(L); }   /* la sombra del foco se rehace cada pocos fotogramas, no en todos */
@@ -102,21 +105,30 @@ function skyNoise(){ const N=128, c=document.createElement('canvas'); c.width=c.
   const vn=(u,v,p)=>{ const i=Math.floor(u), j=Math.floor(v); let f=u-i, g=v-j; f=f*f*(3-2*f); g=g*g*(3-2*g); return (hh(i,j,p)*(1-f)+hh(i+1,j,p)*f)*(1-g)+(hh(i,j+1,p)*(1-f)+hh(i+1,j+1,p)*f)*g; };
   for(let y=0;y<N;y++)for(let k=0;k<N;k++){ let v=0, a=0.5; for(const p of [4,8,16,32]){ v+=a*vn(k/N*p,y/N*p,p); a*=0.5; } const q=(y*N+k)*4; im.data[q]=im.data[q+1]=im.data[q+2]=Math.min(255,v/0.94*255); im.data[q+3]=255; } x.putImageData(im,0,0);
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.minFilter=THREE.LinearFilter; t.generateMipmaps=false; return t; }
-(function(){ const g=new THREE.SphereGeometry(320,24,12), m=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{time:{value:0},flash:{value:0},fogc:{value:FOGC.clone()},fp:{value:new THREE.Vector2(0.3,0.5)},nz:{value:skyNoise()}},
+(function(){ const g=new THREE.SphereGeometry(320,24,12), m=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{time:{value:0},flash:{value:0},fogc:{value:FOGC.clone()},fp:{value:new THREE.Vector2(0.3,0.5)},nz:{value:skyNoise()},day:{value:0},cov:{value:1},sd:{value:new THREE.Vector3(-36,60,24).normalize()}},
   vertexShader:'varying vec3 d; void main(){ d=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-  fragmentShader:`uniform float time; uniform float flash; uniform vec3 fogc; uniform vec2 fp; varying vec3 d;
+  fragmentShader:`uniform float time; uniform float flash; uniform vec3 fogc; uniform vec2 fp; uniform float day; uniform float cov; uniform vec3 sd; varying vec3 d;
 uniform sampler2D nz;
 float fbm(vec2 p){ return texture2D(nz,p*0.11).r; }
+float hs(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
 void main(){ float up=max(d.y,0.0); vec2 q=d.xz/(up+0.22)*1.4+vec2(time*0.012,time*0.007); float c=fbm(q), c2=fbm(q*2.1+vec2(-time*0.02,4.0));
-  vec3 hi=mix(vec3(0.016,0.02,0.034),vec3(0.07,0.062,0.07),smoothstep(0.35,0.8,c)); hi+=vec3(0.05,0.03,0.015)*smoothstep(0.5,0.9,c2)*(1.0-up);   /* panzas de nube teñidas por el sodio de la base */
+  float lo=mix(0.6,0.35,cov), cl=smoothstep(lo,lo+0.45,c)*mix(0.8,1.0,cov), open=(1.0-cl)*(1.0-cov);   /* cov: cuánto cielo tapan las nubes */
+  vec3 base=mix(mix(vec3(0.008,0.013,0.03),vec3(0.016,0.02,0.034),cov),mix(mix(vec3(0.36,0.52,0.82),vec3(0.1,0.24,0.6),smoothstep(0.0,0.8,up)),fogc*0.9,cov),day);
+  vec3 cc=mix(vec3(0.07,0.062,0.07)*mix(0.55,1.0,cov),mix(vec3(0.92,0.93,0.96),fogc*mix(0.72,1.12,c2),cov),day);
+  vec3 hi=mix(base,cc,cl); hi+=vec3(0.05,0.03,0.015)*smoothstep(0.5,0.9,c2)*(1.0-up)*(1.0-day)*mix(0.35,1.0,cov);   /* panzas de nube teñidas por el sodio de la base */
+  vec3 sp=d*220.0; float sh=hs(floor(sp)), st=step(0.99,sh)*smoothstep(0.32,0.0,length(fract(sp)-0.5))*(0.55+0.45*sin(time*1.7+sh*90.0))*(sh-0.99)*100.0;
+  hi+=vec3(0.75,0.82,1.0)*st*open*(1.0-day)*smoothstep(0.03,0.28,up)*1.3;   /* estrellas, solo con el cielo abierto */
+  float sdot=max(dot(normalize(d),sd),0.0);
+  hi+=mix(vec3(0.75,0.82,1.0)*(smoothstep(0.99988,0.99995,sdot)*1.6+pow(sdot,900.0)*0.12),vec3(1.0,0.93,0.76)*(smoothstep(0.9996,0.9998,sdot)*7.0+pow(sdot,260.0)*0.6+pow(sdot,9.0)*0.1),day)*open;   /* luna o sol */
   vec3 col=mix(fogc,hi,smoothstep(0.0,0.3,up));
   float near=exp(-6.0*distance(d.xz,fp)); col+=vec3(0.55,0.62,0.8)*flash*(0.25+1.6*near)*(0.4+0.8*c)*smoothstep(-0.05,0.25,d.y);
   gl_FragColor=vec4(col,1.0); }`}); const o=new THREE.Mesh(g,m); o.frustumCulled=false; o.renderOrder=-10; scene.add(o); SKY.m=o; })();
 function skyTick(dt,t){ RIP.value=t; patioTick(dt,t); const u=SKY.m.material.uniforms; SKY.m.position.copy(camera.position); u.time.value=t; SKY.t-=dt;
+  if(SKY.t<=0&&ENV.w!=='lluvia')SKY.t=6;   /* solo truena cuando llueve */
   if(SKY.t<=0){ SKY.t=22+Math.random()*34; SKY.seq=[[0,1],[0.07,0.15],[0.13,0.8],[0.3,0.25],[0.36,0.6],[0.9,0]]; SKY.k=0; const a=Math.random()*6.28; u.fp.value.set(Math.cos(a)*0.7,Math.sin(a)*0.7); SKY.th=0.8+Math.random()*2.2; SKY.thG=0.25+Math.random()*0.3; }
   if(SKY.seq){ SKY.k+=dt; const q=SKY.seq; let v=0; for(let i=0;i<q.length-1;i++)if(SKY.k>=q[i][0]&&SKY.k<q[i+1][0]){ const f=(SKY.k-q[i][0])/(q[i+1][0]-q[i][0]); v=q[i][1]+(q[i+1][1]-q[i][1])*f; } if(SKY.k>=q[q.length-1][0]){ SKY.seq=null; v=0; } SKY.f=v; } else SKY.f=0;
   if(SKY.th>0){ SKY.th-=dt; if(SKY.th<=0){ sNoise(2.2,75,0.4,SKY.thG*1.8); } }
-  u.flash.value=SKY.f; hemi.intensity=0.36+SKY.f*2.2; moon.intensity=0.22+SKY.f*1.6; }
+  u.flash.value=SKY.f; hemi.intensity=ENV.hemi+SKY.f*2.2; moon.intensity=ENV.moon+SKY.f*1.6; envTick(dt,t); }
 const balizaHalo=[];
 
 // ---------- lluvia: rayas que caen alrededor de la cámara
@@ -124,7 +136,41 @@ const RAIN_N=LOW?2000:4500, RAIN_R=22, RAIN_H=16; const rainGeo=new THREE.Buffer
 for(let i=0;i<RAIN_N;i++){ const x=(Math.random()*2-1)*RAIN_R, z=(Math.random()*2-1)*RAIN_R, y=Math.random()*RAIN_H; rs[i]=17+Math.random()*9; rp.set([x,y,z,x+0.05,y+0.55,z],i*6); }
 rainGeo.setAttribute('position',new THREE.BufferAttribute(rp,3));
 const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:0xc8d4e0,transparent:true,opacity:0.075,depthWrite:false,fog:true})); rain.frustumCulled=false; scene.add(rain);
-function rainTick(dt){ const cx=camera.position.x, cz=camera.position.z; for(let i=0;i<RAIN_N;i++){ const d=rs[i]*dt; let y=rp[i*6+1]-d; if(y<0){ y+=RAIN_H; } rp[i*6+1]=y; const c=(MAP[Math.floor((cz+rp[i*6+2])/T)]||'')[Math.floor((cx+rp[i*6])/T)]; rp[i*6+4]=y+((y<INFO.HB+0.2&&'_zLVWDbd'.indexOf(c||'.')>=0)||(c==='m'&&y<2.7)?0:0.55); } rainGeo.attributes.position.needsUpdate=true; rain.position.set(cx,0,cz); }   // bajo techo no llueve: la gota que cae sobre un edificio se queda sin trazo
+function rainTick(dt){ if(!rain.visible)return; const cx=camera.position.x, cz=camera.position.z; for(let i=0;i<RAIN_N;i++){ const d=rs[i]*dt; let y=rp[i*6+1]-d; if(y<0){ y+=RAIN_H; } rp[i*6+1]=y; const c=(MAP[Math.floor((cz+rp[i*6+2])/T)]||'')[Math.floor((cx+rp[i*6])/T)]; rp[i*6+4]=y+((y<INFO.HB+0.2&&'_zLVWDbd'.indexOf(c||'.')>=0)||(c==='m'&&y<2.7)?0:0.55); } rainGeo.attributes.position.needsUpdate=true; rain.position.set(cx,0,cz); }   // bajo techo no llueve: la gota que cae sobre un edificio se queda sin trazo
+// ---------- clima y hora: lluvia, nieve o despejado, de noche o de día. Se elige en la pantalla de entrada (o con Y y F) y se recuerda. Cambia el cielo, la niebla, la luz, el suelo (charcos, nieve o seco) y el sonido; de día no hay farolas ni focos y en el patio se te ve desde más lejos.
+const ENV={w:'lluvia',day:false,hemi:0.36,moon:0.22,k:0,sun:false};
+try{ const s=(localStorage.getItem('lh-clima')||'').split('|'); if(['lluvia','nieve','nada'].indexOf(s[0])>=0){ ENV.w=s[0]; ENV.day=s[1]==='1'; } }catch(e){}
+//            niebla    dens.  cielo     suelo     hemi  sol/luna  int.  nubes mojado nieve
+const ENVT={n_lluvia:[0x0f0b09,0.034,0x27344f,0x0b0906,0.36,0x8fa8d8,0.22,1,1,0],n_nada:[0x070a12,0.015,0x2a3a5c,0x0a0a0c,0.5,0xa9c0f0,0.6,0.22,0,0],n_nieve:[0x15181e,0.04,0x3a4660,0x20232a,0.62,0x9fb4dc,0.28,1,0.12,1],
+  d_lluvia:[0x3a4048,0.024,0x8c96a6,0x3a362e,0.8,0xdfe6f0,0.5,1,1,0],d_nada:[0x5878a8,0.006,0x90a8d0,0x5a5040,0.7,0xfff0d8,2.4,0.2,0,0],d_nieve:[0x70767e,0.034,0xa8b0bc,0x6c6e74,0.9,0xe8ecf4,0.4,1,0.1,1]};
+const envMaps=(function(){ const mk=(lo,hi,glow)=>{ const s=new THREE.Scene(), g=new THREE.SphereGeometry(50,32,16), c=[], p=g.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i)/50, h=Math.exp(-Math.pow((y-0.04)/0.16,2)), k=Math.max(0,y); c.push(lo[0]+(hi[0]-lo[0])*k+glow[0]*h,lo[1]+(hi[1]-lo[1])*k+glow[1]*h,lo[2]+(hi[2]-lo[2])*k+glow[2]*h); }
+    g.setAttribute('color',new THREE.Float32BufferAttribute(c,3)); s.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide}))); const pm=new THREE.PMREMGenerator(renderer), t=pm.fromScene(s,0.02).texture; pm.dispose(); return t; };
+  return {n:scene.environment,d:mk([0.3,0.32,0.34],[0.2,0.32,0.6],[0.12,0.1,0.08]),g:mk([0.22,0.24,0.26],[0.28,0.3,0.33],[0.04,0.04,0.04])}; })();
+// nieve: copos alrededor de la cámara, lentos y con vaivén; bajo techo no se dibujan
+const SNOW_N=LOW?1400:3600, SNOW_R=17, SNOW_H=11, snowP=new Float32Array(SNOW_N*3), snowY=new Float32Array(SNOW_N), snowV=new Float32Array(SNOW_N);
+for(let i=0;i<SNOW_N;i++){ snowP[i*3]=(Math.random()*2-1)*SNOW_R; snowP[i*3+2]=(Math.random()*2-1)*SNOW_R; snowY[i]=Math.random()*SNOW_H; snowV[i]=0.9+Math.random()*1.3; }
+const snowGeo=new THREE.BufferGeometry(); snowGeo.setAttribute('position',new THREE.BufferAttribute(snowP,3));
+const snow=new THREE.Points(snowGeo,new THREE.PointsMaterial({color:0xffffff,size:0.11,map:haloTex,transparent:true,opacity:0.9,depthWrite:false,sizeAttenuation:true})); snow.frustumCulled=false; snow.visible=false; scene.add(snow);
+function snowTick(dt,t){ const cx=camera.position.x, cz=camera.position.z; for(let i=0;i<SNOW_N;i++){ let y=snowY[i]-snowV[i]*dt; if(y<0)y+=SNOW_H; snowY[i]=y; const x=snowP[i*3]+Math.sin(t*0.6+i)*0.35*dt, z=snowP[i*3+2]+Math.cos(t*0.45+i*1.7)*0.3*dt; snowP[i*3]=x>SNOW_R?x-2*SNOW_R:x<-SNOW_R?x+2*SNOW_R:x; snowP[i*3+2]=z>SNOW_R?z-2*SNOW_R:z<-SNOW_R?z+2*SNOW_R:z;
+    const c=(MAP[Math.floor((cz+snowP[i*3+2])/T)]||'')[Math.floor((cx+snowP[i*3])/T)]; snowP[i*3+1]=(y<INFO.HB+0.2&&'_zLVWDbd'.indexOf(c||'.')>=0)||(c==='m'&&y<2.7)?-60:y; } snowGeo.attributes.position.needsUpdate=true; snow.position.set(cx,0,cz); }
+function applyEnv(tell){ const q=ENVT[(ENV.day?'d_':'n_')+ENV.w], u=SKY.m.material.uniforms; FOGC.setHex(q[0]); scene.fog.color.copy(FOGC); scene.fog.density=q[1]; u.fogc.value.copy(FOGC); u.day.value=ENV.day?1:0; u.cov.value=q[7];
+  hemi.color.setHex(q[2]); hemi.groundColor.setHex(q[3]); ENV.hemi=q[4]; moon.color.setHex(q[5]); ENV.moon=q[6]; LHENV.value.set(q[8],q[9],ENV.w==='lluvia'?1:0); rain.visible=ENV.w==='lluvia'; snow.visible=ENV.w==='nieve';
+  scene.environment=ENV.day?(q[7]>0.5?envMaps.g:envMaps.d):envMaps.n;
+  SKY.m.material.uniforms.sd.value.copy(moon.position).sub(moon.target.position).normalize(); envText();
+  const sun=ENV.day&&!LOW&&!ENV.noSun; if(sun!==ENV.sun){ ENV.sun=sun; moon.castShadow=sun; moon.shadow.needsUpdate=true; scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.needsUpdate=true; }); } }); }
+  if(!ENV.day)LIT.forEach(s=>{ if(!s.ext)return; if(s.L)s.L.intensity=s.on?s.I:0; s.h.forEach(h=>{ h.visible=s.on; }); }); if(PL)PL.lit=undefined;
+  try{ localStorage.setItem('lh-clima',ENV.w+'|'+(ENV.day?1:0)); }catch(e){}
+  const o=el('opc'); if(o)o.querySelectorAll('button').forEach(b=>{ b.className=(b.dataset.w?b.dataset.w===ENV.w:(b.dataset.d==='1')===ENV.day)?'on':''; });
+  if(tell)say((ENV.w==='lluvia'?'LLUVIA':ENV.w==='nieve'?'NIEVE':'DESPEJADO')+' · '+(ENV.day?'DÍA':'NOCHE'),2); }
+function envTick(dt,t){ if(snow.visible)snowTick(dt,t); if(ENV.day)LIT.forEach(s=>{ if(!s.ext)return; if(s.L)s.L.intensity=0; s.h.forEach(h=>{ h.visible=false; }); });   /* de día las farolas están apagadas, digan lo que digan el generador o un disparo */
+  if(moon.castShadow&&(ENV.k++&7)===0)moon.shadow.needsUpdate=true; }
+moon.target.position.set(36,0,28); moon.position.set(36-36,60,28+24); scene.add(moon.target); moon.shadow.mapSize.set(2048,2048); moon.shadow.camera.left=-50; moon.shadow.camera.right=50; moon.shadow.camera.top=50; moon.shadow.camera.bottom=-50; moon.shadow.camera.near=5; moon.shadow.camera.far=160; moon.shadow.bias=-0.0008; moon.shadow.normalBias=0.08; moon.shadow.autoUpdate=false;
+addEventListener('keydown',e=>{ if(KP.open||e.altKey||e.ctrlKey||e.metaKey)return; if(e.code==='KeyY'){ ENV.w=ENV.w==='lluvia'?'nieve':ENV.w==='nieve'?'nada':'lluvia'; applyEnv(true); } else if(e.code==='KeyF'){ ENV.day=!ENV.day; applyEnv(true); } });
+{ const o=el('opc'); if(o)o.addEventListener('click',e=>{ e.stopPropagation(); const b=e.target.closest&&e.target.closest('button'); if(!b)return; if(b.dataset.w)ENV.w=b.dataset.w; else ENV.day=b.dataset.d==='1'; applyEnv(false); }); }
+// frases que nombran la lluvia o la noche: se ajustan al clima elegido
+const WXS=[['Yo oigo la lluvia',o=>ENV.w==='lluvia'?o:o.replace('la lluvia',ENV.w==='nieve'?'caer la nieve':'el viento')],['con esta lluvia no ve más que lo que alumbra el foco',o=>ENV.day?o.replace('con esta lluvia no ve más que lo que alumbra el foco','de día lo ve todo y aun así se aburre'):ENV.w==='lluvia'?o:o.replace('con esta lluvia',ENV.w==='nieve'?'con esta nevada':'de noche')],['Esta noche, el expediente.',o=>ENV.day?o.replace('Esta noche','Hoy'):o]]; let WXL=null;
+function envText(){ if(!WXL){ WXL=[]; const seen=new Set(), walk=(o,n)=>{ if(!o||typeof o!=='object'||n>5||seen.has(o)||o.isObject3D||o.root)return; seen.add(o); Object.keys(o).forEach(k=>{ const v=o[k]; if(typeof v==='string'){ const w=WXS.find(q=>v.indexOf(q[0])>=0); if(w)WXL.push([o,k,v,w[1]]); } else walk(v,n+1); }); }; walk(CODEC,0); walk(CHATS,0); }
+  WXL.forEach(q=>{ q[0][q[1]]=q[3](q[2]); }); }
 
 // ---------- escena de Blender
 const b64=s=>{ const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return u.buffer; };
@@ -167,7 +213,7 @@ function gWall(x,z){ const c=(MAP[Math.floor(z/T)]||'')[Math.floor(x/T)]; return
 function goTo(p,tx,tz,v,dt){ const r=p.root.position, a=cellOf(r.x,r.z), b=cellOf(tx,tz); if((a[0]===b[0]&&a[1]===b[1])||!blocked(r.x,r.z,tx,tz,true,true))return stepTo(p,tx,tz,v,dt);
   p.pathT=(p.pathT||0)-dt; if(!p.path||p.pathT<=0||p.pathK!==b[0]+','+b[1]){ p.path=bfs(a,b); p.pathT=0.5; p.pathK=b[0]+','+b[1]; } if(!p.path||p.path.length<2){ gAct(p,'idle'); return true; }
   let n=p.path[1]; if(p.path.length>2&&n[0]===a[0]&&n[1]===a[1])n=p.path[2]; stepTo(p,n[0]*T+T/2,n[1]*T+T/2,v,dt); return false; }
-function sees(p){ if(CELL.on)return 0; const r=p.root.position, dx=P.x-r.x, dz=P.z-r.z, d=Math.hypot(dx,dz), lit=PL.lit===undefined?1:PL.lit, range=(PL.crouch?7:13)*(0.45+0.55*lit); if(d>range)return 0;
+function sees(p){ if(CELL.on||window.__ESC_BLIND)return 0; const r=p.root.position, dx=P.x-r.x, dz=P.z-r.z, d=Math.hypot(dx,dz), lit=PL.lit===undefined?1:PL.lit, range=(PL.crouch?7:13)*(0.45+0.55*lit); if(d>range)return 0;
   let da=Math.atan2(dx,dz)-p.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; if(Math.abs(da)>(p.state==='chase'?1.3:0.85)&&d>1.6)return 0;
   if(blocked(r.x,r.z,P.x,P.z,PL.crouch))return 0; return (0.3+1.5*(1-d/range))*(PL.crouch?0.6:1)*(0.55+0.45*lit)*(p.wary>0?1.35:1); }
 // ---------- sonido, todo sintetizado: lluvia de fondo (apagada bajo techo), pasos propios y de los guardias cercanos, avisos de sospecha y de alarma. M lo silencia.
@@ -200,7 +246,7 @@ function musTick(){ const ac=SND.ac; if(!ac||ac.state!=='running')return; if(!MU
     else { if(st%16===0)mNote(MHZ(38),t,1.6,0.26,'sine',260); if(st%16===10)mNote(MHZ(38),t,0.5,0.1,'sine',260); if(b&&Math.random()<0.2){ const n=PENT[Math.floor(Math.random()*PENT.length)]; mNote(MHZ(n),t,2.2,0.03,'triangle',1800); mNote(MHZ(n+12),t+0.02,1.4,0.008,'sine',3000); } if(st===24&&Math.random()<0.5)mNote(MHZ(57),t,3.0,0.022,'sawtooth',600); }
     MUS.lv+=(L-MUS.lv)*0.25; if(MUS.pad)MUS.pad.frequency.setTargetAtTime(280+MUS.lv*260,t,0.5); MUS.next+=L===2?0.134:L===1?0.2:0.227; MUS.step++; } }
 addEventListener('keydown',e=>{ if(e.code==='KeyT'){ MUS.on=!MUS.on; try{ localStorage.setItem('lh-musica',MUS.on?'1':'0'); }catch(e2){} say(MUS.on?'MÚSICA ACTIVADA':'MÚSICA APAGADA',1.5); } });
-function sndTick(dt){ if(!SND.rg||!SND.ac)return; musTick(); const inn=sIndoor(), t=SND.ac.currentTime; SND.rf.frequency.setTargetAtTime(inn?650:6500,t,0.25); SND.rg.gain.setTargetAtTime(inn?0.035:0.085,t,0.25);
+function sndTick(dt){ if(!SND.rg||!SND.ac)return; musTick(); const inn=sIndoor(), t=SND.ac.currentTime; SND.rf.frequency.setTargetAtTime(inn?650:ENV.w==='lluvia'?6500:1300,t,0.25); SND.rg.gain.setTargetAtTime((inn?0.035:0.085)*(ENV.w==='lluvia'?1:ENV.w==='nieve'?0.32:0.14),t,0.25);   /* sin lluvia queda un rumor de viento */
   SND.gT-=dt; if(SND.gT<=0){ let bd=15, g=null; PEOPLE.forEach(o=>{ if(o===PL.p||o.dead||o.act!=='walk')return; const d=Math.hypot(o.root.position.x-P.x,o.root.position.z-P.z); if(d<bd){ bd=d; g=o; } });
     if(g){ sNoise(0.1,380,0.9,0.22/(1+bd*0.4)); SND.gT=0.5/((g.acts.walk&&g.acts.walk.timeScale)||1); } else SND.gT=0.2; } }
 addEventListener('keydown',e=>{ if(e.code==='KeyM'){ SND.on=!SND.on; if(SND.ac){ if(SND.on)SND.ac.resume(); else SND.ac.suspend(); } } });
@@ -214,7 +260,7 @@ function gWary(t){ PEOPLE.forEach(o=>{ if(o!==PL.p&&o.state&&!o.dead)o.wary=Math
 const BASE={tier:0,found:0,rel:0,relQ:[],stains:[],tips:{},kn:{}}, STASH=[];
 KONT.forEach((k,i)=>{ const L=k[3], hx=k[2]?1:0, hz=k[2]?0:1, cx=(k[0]+(k[2]?L/2:0.5))*T, cz=(k[1]+(k[2]?0.5:L/2))*T; [-1,1].forEach(s=>{ const x=cx+hx*s*(L*T/2+0.9), z=cz+hz*s*(L*T/2+0.9), c=(MAP[Math.floor(z/T)]||'')[Math.floor(x/T)]; if(c&&'#WTLVbfhmcgsDd'.indexOf(c)<0)STASH.push({x,z,k:i}); }); });   // las puertas de cada contenedor que dan a suelo libre
 const tip=(k,t,s)=>{ if(BASE.tips[k])return false; BASE.tips[k]=true; say(t,s||5); return true; };
-function litAt(x,z){ let v=0.08; for(const s of LIT){ if(!s.on)continue; const d=Math.hypot(s.x-x,s.z-z); if(d>=s.R)continue; const k=1-d/s.R; if(k>v&&!blocked(s.x,s.z,x,z,false))v=k; } return Math.min(1,v*1.25); }
+function litAt(x,z){ let v=ENV.day&&'_zd'.indexOf((MAP[Math.floor(z/T)]||'')[Math.floor(x/T)]||'.')<0?0.6:0.08; for(const s of LIT){ if(!s.on||(s.ext&&ENV.day))continue; const d=Math.hypot(s.x-x,s.z-z); if(d>=s.R)continue; const k=1-d/s.R; if(k>v&&!blocked(s.x,s.z,x,z,false))v=k; } return Math.min(1,v*1.25); }
 function stashAt(){ return STASH.find(s=>near([s.x,s.z],1.7))||null; }
 function dropTxt(){ if(!PL.drag)return ''; const st=stashAt(); if(st)return (BASE.kn[st.k]||0)>=2?'Contenedor lleno: busca otro':'E meter el cuerpo en el contenedor'; const c=bodyC(PL.drag); return coverAt(c[0],c[1])?'E soltarlo aquí: queda oculto':'E soltarlo aquí: queda a la vista'; }
 function stain(x,z,y,o){ if(!BASE.sg){ BASE.sg=new THREE.CircleGeometry(0.5,16); BASE.sg.rotateX(-Math.PI/2); BASE.sm=new THREE.MeshStandardMaterial({color:0x420606,roughness:0.16,metalness:0,transparent:true,opacity:0.9,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}); }
@@ -269,9 +315,10 @@ function gFire(p,d){ const r=p.root.position, fast=keys.ShiftLeft||keys.ShiftRig
   PEOPLE.forEach(o=>{ if(o!==p&&o!==PL.p&&o.state&&!o.dead&&o.state!=='chase'&&Math.hypot(o.root.position.x-r.x,o.root.position.z-r.z)<28){ o.seen=[r.x,r.z]; setState(o,'search'); } });
   if(hit&&!ALERT.caught){ PL.hp-=24; PL.hurt=1; PL.hpT=0; sNoise(0.12,300,1,0.3); if(PL.hp<=0){ PL.hp=0; ALERT.caught=3.2; ALERT.by=null; ALERT.info=false; ALERT.msg='ABATIDO'; ALERT.msgT=3.2; PL.drag=null; } } }
 function lightTick(dt){ PL.lk=(PL.lk||0)+1; if(PL.lk%5===0||PL.lit===undefined){ let v=0.08; const inn='_zd'.indexOf((MAP[Math.floor(P.z/T)]||'')[Math.floor(P.x/T)]||'.')>=0;
-    for(const s of LIT){ if(!s.on)continue; const d=Math.hypot(s.x-P.x,s.z-P.z); if(d>=s.R)continue; const k=1-d/s.R; if(k>v&&!blocked(s.x,s.z,P.x,P.z,false))v=k; }
+    if(ENV.day&&!inn)v=0.6;   /* de día, al aire libre, se te ve */
+    for(const s of LIT){ if(!s.on||(s.ext&&ENV.day))continue; const d=Math.hypot(s.x-P.x,s.z-P.z); if(d>=s.R)continue; const k=1-d/s.R; if(k>v&&!blocked(s.x,s.z,P.x,P.z,false))v=k; }
     // foco de torreta: solo cuenta el círculo brillante del suelo, y un muro, un cobertizo o unas cajas entre el foco y tú te dan sombra (se comprueba con la altura real del rayo)
-    let spot=false; if(!inn)for(const s of spots){ _a.copy(s.L.target.position).sub(s.p).normalize(); _b.set(P.x-s.p.x,1.0-s.p.y,P.z-s.p.z); const d=_b.length(); if(s.on&&s.man&&d<70&&_b.normalize().dot(_a)>Math.cos(0.055)&&!shade(s.p)){ spot=true; } }
+    let spot=false; if(!inn&&!ENV.day)for(const s of spots){ _a.copy(s.L.target.position).sub(s.p).normalize(); _b.set(P.x-s.p.x,1.0-s.p.y,P.z-s.p.z); const d=_b.length(); if(s.on&&s.man&&d<70&&_b.normalize().dot(_a)>Math.cos(0.055)&&!shade(s.p)){ spot=true; } }
     if(spot)v=Math.max(v,0.8); PL.litT=Math.min(1,v*1.25); PL.spot=spot; }
   PL.lit=(PL.lit===undefined?PL.litT:PL.lit+(PL.litT-PL.lit)*Math.min(1,dt*4)); PL.spotCd=Math.max(0,(PL.spotCd||0)-dt);
   // el foco no delata al instante: avisa y da tiempo a salir; agachado tarda mucho más. Solo va a mirar el guardia más cercano.
@@ -358,7 +405,7 @@ function recinto(){ const cvx=(w,h,fn)=>{ const c=document.createElement('canvas
       for(let k=0;k<90;k++){ x.fillStyle='rgba('+(60+Math.random()*50|0)+','+(26+Math.random()*20|0)+',10,'+(0.05+Math.random()*0.17)+')'; x.fillRect(Math.random()*w,Math.random()*h,2+Math.random()*5,8+Math.random()*44); }
       x.fillStyle='rgba(232,226,208,0.8)'; x.font='bold 24px sans-serif'; x.fillText(c[2],236,36); x.font='bold 11px sans-serif'; x.fillText('TARA 2 230 KG · 20 PIES',238,52); })}));
   const kbox=(len)=>{ const g=new THREE.BoxGeometry(len*T-0.12,2.6,T-0.1), u=g.attributes.uv; for(let i=0;i<u.count;i++){ const f=Math.floor(i/4), a=u.getX(i); if(f<2)u.setX(i,0.76+a*0.23); else if(f<4)u.setXY(i,0.752+a*0.004,0.5); else u.setX(i,a*0.75); } return g; };
-  KONT.forEach((k,i)=>{ const put=(col,y,dx,ry)=>{ const m=new THREE.Mesh(kbox(k[3]),km[col%km.length]); m.position.set((k[0]+(k[2]?k[3]/2:0.5))*T+dx,y,(k[1]+(k[2]?0.5:k[3]/2))*T); m.rotation.y=(k[2]?0:Math.PI/2)+ry; m.castShadow=m.receiveShadow=true; scene.add(m); }; put(i,1.3,0,0); if(k[4])put(i+2,3.9,0.12,0.03); }); }
+  km.forEach(snowTop); KONT.forEach((k,i)=>{ const put=(col,y,dx,ry)=>{ const m=new THREE.Mesh(kbox(k[3]),km[col%km.length]); m.position.set((k[0]+(k[2]?k[3]/2:0.5))*T+dx,y,(k[1]+(k[2]?0.5:k[3]/2))*T); m.rotation.y=(k[2]?0:Math.PI/2)+ry; m.castShadow=m.receiveShadow=true; scene.add(m); }; put(i,1.3,0,0); if(k[4])put(i+2,3.9,0.12,0.03); }); }
 function deco(){ const cv=(w,h,fn)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d'); fn(x,w,h); const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=4; return t; };
   const grime=(x,w,h,n,a)=>{ for(let i=0;i<n;i++){ x.fillStyle='rgba('+(20+Math.random()*30|0)+','+(16+Math.random()*20|0)+',10,'+(Math.random()*a)+')'; const r=4+Math.random()*26; x.beginPath(); x.ellipse(Math.random()*w,Math.random()*h,r,r*(0.4+Math.random()),Math.random()*3,0,6.3); x.fill(); } };
   const paper=(x,w,h,col)=>{ x.fillStyle=col||'#cfc3a0'; x.fillRect(0,0,w,h); grime(x,w,h,26,0.12); x.strokeStyle='rgba(60,40,20,0.35)'; x.lineWidth=2; x.strokeRect(1,1,w-2,h-2); };
@@ -634,7 +681,7 @@ CINE.key=new THREE.PointLight(0xc9d8ff,0,11,2); scene.add(CINE.key);   // luz de
 const cineDur=s=>s.d||(s.text&&!s.loc?1.8+s.text.length*0.06:4);
 function cine(shots,done){ if(!shots||!shots.length){ if(done)done(); return; } CINE.q=shots; CINE.i=-1; CINE.T=0; CINE.done=done||null; CINE.fog=scene.fog?scene.fog.density:0; CINE.skip=false; ALERT.msgT=0; PL.aiming=false; PL.bino=false; el('ayuda').hidden=true; document.body.classList.add('cine'); PEOPLE.forEach(p=>{ if(p.q1)p.q1.visible=p.q2.visible=false; }); cineNext(); }
 function cineNext(){ const q=CINE.q; if(!q)return; const o=q[CINE.i]; if(o&&o.off)o.off(CINE.skip); CINE.i++; if(CINE.i>=q.length){ cineEnd(); return; } const s=q[CINE.i]; CINE.t=0; CINE.n=0; CINE.nt=0; if(s.on)s.on(CINE.skip); if(CINE.q!==q||(CINE.skip&&!s.hold))return;
-  if(scene.fog)scene.fog.density=s.fog||CINE.fog; const e=el('cineS'); e.className=s.loc?'loc':''; e.innerHTML=s.text||s.who?(s.who?'<b>'+s.who+'</b>':'')+'<span>'+(s.loc?s.text||'':'')+'</span>':''; CINE.span=s.text&&!s.loc?e.lastChild:null; el('cineK').textContent=s.hold?'':'E SIGUIENTE · INTRO SALTAR'; if(s.key){ CINE.key.position.set(s.key[0],s.key[1],s.key[2]); CINE.key.intensity=s.key[3]; } else CINE.key.intensity=0; }
+  if(scene.fog)scene.fog.density=s.fog?s.fog*CINE.fog/0.034:CINE.fog; const e=el('cineS'); e.className=s.loc?'loc':''; e.innerHTML=s.text||s.who?(s.who?'<b>'+s.who+'</b>':'')+'<span>'+(s.loc?s.text||'':'')+'</span>':''; CINE.span=s.text&&!s.loc?e.lastChild:null; el('cineK').textContent=s.hold?'':'E SIGUIENTE · INTRO SALTAR'; if(s.key){ CINE.key.position.set(s.key[0],s.key[1],s.key[2]); CINE.key.intensity=s.key[3]; } else CINE.key.intensity=0; }
 function cineEnd(){ CINE.q=null; CINE.skip=false; document.body.classList.remove('cine'); if(scene.fog)scene.fog.density=CINE.fog; el('cineS').innerHTML=''; el('cineF').style.opacity=0; CINE.f=0; CINE.key.intensity=0; PEOPLE.forEach(p=>{ p.cine=false; if(p.q1&&!p.dead){ p.q1.visible=p.state==='suspect'||p.state==='search'; p.q2.visible=p.state==='chase'; } }); const d=CINE.done; CINE.done=null; if(d)d(); }
 function cineKey(){ const s=CINE.q&&CINE.q[CINE.i]; if(!s||s.hold)return; if(CINE.span&&CINE.n<s.text.length){ CINE.n=s.text.length; CINE.span.textContent=s.text; return; } cineNext(); }
 function cineSkip(){ let n=0; if(!CINE.q)return; CINE.skip=true; while(CINE.q&&CINE.skip&&n++<99){ cineNext(); const s=CINE.q&&CINE.q[CINE.i]; if(s&&s.hold)CINE.skip=false; } }
@@ -654,7 +701,7 @@ function cineIntro(done){ stageIbarra(); const ib=PEOPLE.find(o=>o.q.name==='iba
   [ib,ra,ro].forEach(g=>{ if(g){ g.cine=true; gAct(g,'idle'); } });
   const ln=(i,o)=>Object.assign({who:L[i].who,text:L[i].text,pit:L[i].who[0]==='C'?150:190,fov:30,me:false},o), aI={a:[x+0.62,1.7,z+2.55],la:[x-0.05,1.58,z]}, aR={a:[x+0.62,1.7,z-1.05],la:[x-0.05,1.58,z+1.5]}, my=Math.atan2(x-P.x,z+0.75-P.z);
   cine([
-    {loc:true,who:'BASE TARSIS',text:'MARISMAS DEL GUADALQUIVIR<br>NOVIEMBRE DE 1983 · 02:10',a:[3,14,1],b:[8,12,4],la:[30,2,22],lb:[32,1,24],fov:52,fog:0.017,d:7,fi:1.4,world:true,me:false},
+    {loc:true,who:'BASE TARSIS',text:'MARISMAS DEL GUADALQUIVIR<br>NOVIEMBRE DE 1983 · '+(ENV.day?'14:10':'02:10'),a:[3,14,1],b:[8,12,4],la:[30,2,22],lb:[32,1,24],fov:52,fog:0.017,d:7,fi:1.4,world:true,me:false},
     {a:[26.2,1.0,30.2],b:[27,1.2,30.9],la:[30.9,5.6,35],fov:38,d:4.5,world:true,me:false},
     ln(0,{a:[x+3.7,1.3,z+1.65],b:[x+3.1,1.38,z+1.35],la:[x,1.4,z+0.75],fov:34}),
     ln(1,aR), ln(2,Object.assign({b:[x+0.5,1.68,z+2.2]},aI)), ln(3,aR),
@@ -700,10 +747,10 @@ const TWH=4.2, TOWERS=[{tx:15,ty:17,yaw:-2.36},{tx:32,ty:24,yaw:-1.95}].map(t=>O
     OBST.push(['torre',x,-z,1.0,1.0,0]); t.lad=[x+1.75,z]; });
   const mk=(L,mat)=>{ const m=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat,L.length), o=new THREE.Object3D(); L.forEach((q,i)=>{ o.scale.set(q[0],q[1],q[2]); o.position.set(q[3],q[4],q[5]); o.rotation.set(q[7],0,q[6]); o.updateMatrix(); m.setMatrixAt(i,o.matrix); }); m.castShadow=m.receiveShadow=true; m.frustumCulled=false; scene.add(m); };
   mk(W,M.madera||M.hierro); mk(I,M.hierro); })();
-function towerGuard(p,dt,live){ const t=TOWERS[p.q.tower], r=p.root.position; r.set(t.cx-0.25,TWH+0.05,t.cz); if(!p.act)p.act='idle'; aimTick(p); if(p.dead)return;
+function towerGuard(p,dt,live){ const t=TOWERS[p.q.tower], r=p.root.position; r.set(t.cx-0.25,TWH+0.05,t.cz); if(!p.act)p.act='idle'; aimTick(p); if(p.dead||window.__ESC_BLIND)return;
   p.tph=(p.tph||0)+dt; const dx=P.x-r.x, dz=P.z-r.z, d=Math.hypot(dx,dz); if(p.alertT>0){ p.alertT-=dt; face(p,Math.atan2(dx,dz),dt,2.2); } else { p.yaw=t.yaw+Math.sin(p.tph*0.42+p.q.tower*2.1)*0.95; p.root.rotation.y=p.yaw; }
   gAct(p,p.alertT>0?'aim':'idle'); if(p.cd>0)p.cd-=dt; if(!live||CELL.on)return;
-  let da=Math.atan2(dx,dz)-p.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; const same=PL.tw===t||(PL.h>1&&d<2.5), lit=PL.lit===undefined?1:PL.lit, range=(PL.crouch?12:20)*(0.4+0.6*lit);
+  let da=Math.atan2(dx,dz)-p.yaw; while(da>Math.PI)da-=2*Math.PI; while(da<-Math.PI)da+=2*Math.PI; const same=PL.tw===t||(PL.h>1&&d<2.5), lit=Math.min(ENV.day?0.45:1,PL.lit===undefined?1:PL.lit), range=(PL.crouch?12:20)*(0.4+0.6*lit);   /* de día no hay foco y la torre no ve más que de noche con luz media */
   const vis=same?Math.abs(da)<1.25:(d<range&&d>2.2&&Math.abs(da)<0.5&&!blocked(r.x,r.z,P.x,P.z,false));
   p.tm=Math.max(0,Math.min(1.2,(p.tm||0)+(vis?dt/(same?0.7:1.5+d*0.09):-dt*0.4)));
   if(vis&&p.tm>0.2&&p.tm<1&&!(p.alertT>0)&&!(ALERT.msgT>0)){ ALERT.info=true; ALERT.msg='EL CENTINELA DE LA TORRE MIRA HACIA TI'; ALERT.msgT=0.4; }
@@ -747,7 +794,7 @@ function roigLines(){ const n=ROIG.n++, L=[], RR=t=>L.push({who:'ROIG',freq:'140
   RR(ROIG.mode==='wait'?'Estoy donde me dejaste. Si disparo es porque os han visto. Si me quieres detrás, ya sabes cómo pedirlo.':'Estoy a dos pasos. Si disparo es porque os han visto; si no disparo, agradécemelo luego.');
   if(MS.kill>0&&!ROIG.saidK){ ROIG.saidK=true; RR('Has matado a uno. Antes no lo hacías. O sí, y no te acuerdas. Yo sí me acuerdo.'); }
   else if(!MS.vault&&(MS.code||(MS.clues||{}).rezo)&&n>=1)RR('De profundis. Mi madre lo rezaba: es el ciento treinta... en nuestra Biblia. Alarcón no usa la nuestra. La suya va uno por detrás.');
-  else RR(['Cuando esto acabe te llevo a esa cocina que sueñas. Si existe. Si no, a otra.','Cuttlas: la luz de la tarde no existe aquí. Solo llueve. Lo digo por si te orientas por eso.','Hablas dormido. Cuentas. Siempre te paras en ciento veintinueve y vuelves a empezar.'][n%3]); return L; }
+  else RR(['Cuando esto acabe te llevo a esa cocina que sueñas. Si existe. Si no, a otra.',(ENV.day?'Cuttlas: aquí hasta de día parece de noche. Lo digo por si te orientas por eso.':'Cuttlas: la luz de la tarde no existe aquí. '+(ENV.w==='nieve'?'Solo nieva.':ENV.w==='nada'?'Solo este cielo quieto.':'Solo llueve.')+' Lo digo por si te orientas por eso.'),'Hablas dormido. Cuentas. Siempre te paras en ciento veintinueve y vuelves a empezar.'][n%3]); return L; }
 addEventListener('keydown',e=>{ if(e.code!=='KeyZ'||!PL.p||hold()||KP.open||CELL.on)return; if(!PEOPLE.some(o=>o.q.name==='roig'))return; ROIG.mode=ROIG.mode==='wait'?'follow':'wait'; say(ROIG.mode==='follow'?'ROIG TE SIGUE':'ROIG ESPERA AQUÍ',2); });
 // orden a Roig (G): duerme al guardia al que miras, si lo tiene a tiro desde donde está; lleva tres dardos
 function roigOrder(){ if(!PL.p||hold()||KP.open||CELL.on||ALERT.caught||ROIG.shot)return; const ro=PEOPLE.find(o=>o.q.name==='roig'); if(!ro)return; const RS=t=>{ ALERT.sub='<b>Roig</b> '+t; ALERT.subT=2.8; };
@@ -973,13 +1020,14 @@ let last=performance.now(), fpsT=0, fpsN=0, t=0;
 // vigilancia de fluidez: si va por debajo de 27 fps baja la calidad por pasos (sombras del foco, resplandor, resolución, lluvia)
 const PERF={t:0,n:0,bad:0,step:0,wait:5,k:0};
 function perfTick(raw){ PERF.k++; SPOTS.forEach((L,i)=>{ if(L.castShadow&&(PERF.k+i*5)%10===0)L.shadow.needsUpdate=true; }); if(LOW||!locked||CINE.q)return; if(PERF.wait>0){ PERF.wait-=raw; return; } PERF.t+=raw; PERF.n++; if(PERF.t<2)return; const f=PERF.n/PERF.t; PERF.t=0; PERF.n=0; PERF.bad=f<27?PERF.bad+1:0; if(PERF.bad<2||PERF.step>=4)return; PERF.bad=0; PERF.step++; PERF.wait=3;
-  if(PERF.step===1){ SPOTS.forEach(L=>{ L.castShadow=false; }); scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.needsUpdate=true; }); } }); }
+  if(PERF.step===1){ SPOTS.forEach(L=>{ L.castShadow=false; }); ENV.noSun=true; ENV.sun=false; moon.castShadow=false; scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ m.needsUpdate=true; }); } }); }
   else if(PERF.step===2){ useBloom=false; }
   else { const pr=PERF.step===3?1:0.75; renderer.setPixelRatio(pr); renderer.setSize(innerWidth,innerHeight); if(composer){ if(composer.setPixelRatio)composer.setPixelRatio(pr); composer.setSize(innerWidth,innerHeight); } if(PERF.step===4)rainGeo.setDrawRange(0,RAIN_N); } }
 function frame(now){ const raw=(now-last)/1000, rc=Math.min(0.1,raw), dt=hold()?0:rc; last=now; dlgTick(rc);   /* mientras se lee o se habla, el mundo espera */ perfTick(raw); const cn=!!CINE.q&&!DLG.q&&!TIT.q, va=cn?rc:dt;   /* en una cinemática siguen la lluvia, el cielo y la cámara */ t+=va; move(dt); if(CINE.q)cineTick(cn&&!CINE.pause?rc:0); fxTick(dt); rainTick(va); spotTick(t); skyTick(va,t); peopleTick(dt);
   if(finalPass)finalPass.uniforms.time.value=t; if(composer){ bloom.enabled=useBloom; composer.render(); } else renderer.render(scene,camera);
-  fpsT+=raw; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (F/G) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
+  fpsT+=raw; fpsN++; if(fpsT>0.5){ el('fps').textContent=Math.round(fpsN/fpsT)+' fps · '+Math.round(stats.tris/1000)+' mil triángulos · niebla '+scene.fog.density.toFixed(3)+' (U/I) · exposición '+(finalPass?finalPass.uniforms.exposure.value.toFixed(2):'1')+' (J/K)'; fpsT=0; fpsN=0; }
   requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window.__ESC={BASE,STASH,TOSS,keys,litAt,stain,stashAt,dropTxt,redAlert,relief,deploy,reserveG,baseTick,baseReset,spotBodies,findBody,findBlood,tossPath,tossTick,nearBody,coverAt,sees,fxTick,KONT,inHole,bfs,gAct,CINE,cine,cineNext,cineSkip,cineKey,cineTick,cineIntro,cineVault,cineCapture,cineDogs,cellIn,openCell,resetStealth,msTarget,msTick,msStep,roigOrder,roigBeat,RBEAT,RADIO,outro,CHAT,CHATS,chatTick,chatEnd,BINO,binoTick,binoMark,stageIbarra,STG,CODEC,spots,spotTick,lightTick,shade,TOWERS,TWH,towerUse,towerGuard,KEN,GENR,genStop,genTick,notebook,cageDogs,AMMO,wake,koGuard,roigTick,DOGS,DOG,releaseDogs,dogTick,ROIG,roigLines,DLG,CELL,choose,pick,toCell,grab,cellUse,TIT,FIN,codec,dlgNext,callControl,startStory,msUse,ending,MUS,musTick,STEAM,SKY,skyTick,setPal,PALS,shade,hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(CINE.q)cineTick(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
+applyEnv(false);
+window.__ESC={ENV,applyEnv,BASE,STASH,TOSS,keys,litAt,stain,stashAt,dropTxt,redAlert,relief,deploy,reserveG,baseTick,baseReset,spotBodies,findBody,findBlood,tossPath,tossTick,nearBody,coverAt,sees,fxTick,KONT,inHole,bfs,gAct,CINE,cine,cineNext,cineSkip,cineKey,cineTick,cineIntro,cineVault,cineCapture,cineDogs,cellIn,openCell,resetStealth,msTarget,msTick,msStep,roigOrder,roigBeat,RBEAT,RADIO,outro,CHAT,CHATS,chatTick,chatEnd,BINO,binoTick,binoMark,stageIbarra,STG,CODEC,spots,spotTick,lightTick,shade,TOWERS,TWH,towerUse,towerGuard,KEN,GENR,genStop,genTick,notebook,cageDogs,AMMO,wake,koGuard,roigTick,DOGS,DOG,releaseDogs,dogTick,ROIG,roigLines,DLG,CELL,choose,pick,toCell,grab,cellUse,TIT,FIN,codec,dlgNext,callControl,startStory,msUse,ending,MUS,musTick,STEAM,SKY,skyTick,setPal,PALS,shade,hpTick,RADIO,radioTick,gObst,stepTo,goTo,openDoor,LIT,lampOff,spots,toss,PERF,gFire,setState,save,load,newGame,OBST,KP,kpKey,SND,MS,DOORS,PTS,msStep,MAP,shoot,useKey,reload,bodyC,blocked,NOISES,ALERT,PL,PEOPLE,GEAR,peopleTick,scene,camera,renderer,P,stats,M,isReady:()=>ready,spotTick,frameOnce:()=>{ move(0); if(CINE.q)cineTick(0); if(composer)composer.render(); else renderer.render(scene,camera); }};
 })();
