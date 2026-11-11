@@ -30,6 +30,8 @@ PEOPLE = {
                  pose={'upperarm_r': (-0.22, 0.1, -1), 'lowerarm_r': (0.55, -0.75, -0.4), 'upperarm_l': (0.2, -0.3, -1), 'lowerarm_l': (-0.5, -0.65, 0.5)}),
     'peris': dict(macro=dict(age=0.42, muscle=0.5, weight=0.42), skin='young_caucasian_male2', hair='short03', hair_tint=(0.75, 0.6, 0.5),
                   clothes=[('male_casualsuit01', (0.37, 0.43, 0.26)), ('toigo_ankle_boots_male', NEGRO)], pose=dict(STAND, head=(-0.2, -0.12, 1), spine_03=(0.02, 0.03, 1)), walks=True, swing=True),
+    'roig': dict(macro=dict(gender=0.0, age=0.5, muscle=0.62, weight=0.42), skin='young_caucasian_female', hair='ponytail01', hair_tint=(0.32, 0.2, 0.13),   # la teniente Roig, compañera de Cuttlas
+                 clothes=[('toigo_fisherman_sweater', (0.2, 0.23, 0.27)), ('cortu_cargo_pants', NEGRO), ('toigo_ankle_boots_female', NEGRO)], pose=dict(STAND, head=(-0.1, -0.08, 1)), walks=True, swing=True, curl={'_l': 0.6, '_r': 0.8}, puff={'toigo_fisherman_sweater': 0.011, 'cortu_cargo_pants': 0.008}),
 }
 
 def tint(obj, colour):
@@ -80,14 +82,15 @@ def export_anim(name, P, arm):
         me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg); o.modifiers.clear(); o.data = me
         me.polygons.foreach_set('use_smooth', [True] * len(me.polygons)); o.modifiers.new('esqueleto', 'ARMATURE').object = arm; o.name = name + '_' + o.name.split('.')[-1]
         for mat in me.materials:
-            mat.name = name + '_' + mat.name.split('.')[-1]; nt = mat.node_tree; bs = nt.nodes.get('Principled BSDF'); fine = any(k in mat.name for k in ('short', 'eyebrow', 'eyelash'))
-            for inp in ('Normal',) if fine else ('Normal', 'Alpha'):
-                for l in list(bs.inputs[inp].links): nt.links.remove(l)
+            mat.name = name + '_' + mat.name.split('.')[-1]; nt = mat.node_tree; bs = nt.nodes.get('Principled BSDF'); fine = any(k in mat.name for k in ('short', 'ponytail', 'eyebrow', 'eyelash'))
+            for inp in bs.inputs:                  # en el visor solo cuentan el color y, en pelo y cejas, la transparencia: el resto de mapas sobra y pesa
+                if inp.name == 'Base Color' or (fine and inp.name == 'Alpha'): continue
+                for l in list(inp.links): nt.links.remove(l)
             if not fine: mat.blend_method = 'OPAQUE'
             for n in list(nt.nodes):
                 if n.type == 'TEX_IMAGE' and not n.outputs[0].links and not n.outputs[1].links: nt.nodes.remove(n)
                 elif n.type == 'TEX_IMAGE' and n.image:
-                    lim = 256 if fine or 'low-poly' in mat.name else 512
+                    lim = 128 if 'eyebrow' in mat.name or 'eyelash' in mat.name else 256 if fine or 'low-poly' in mat.name else 512
                     if n.image.size[0] > lim: n.image.scale(lim, lim * n.image.size[1] // n.image.size[0]); n.image.pack()
     arm.location = off; arm.name = name; ad = arm.animation_data_create(); bones = [b_.name for b_ in arm.data.bones]
     root = arm.pose.bones['Root']; Rinv = arm.data.bones['Root'].matrix_local.to_3x3().inverted(); FEET = ('foot_l', 'foot_r', 'ball_l', 'ball_r')
@@ -165,6 +168,9 @@ def build(name, anim=False):
     for c, col in P['clothes']:
         before = set(bpy.data.objects); add('Clothes', 'clothes/%s/%s.mhclo' % (c, c))
         for o in set(bpy.data.objects) - before: tint(o, col)
+        if P.get('puff') and c in P['puff']:           # prenda ceñida: se separa un poco del cuerpo para que la piel no asome al aligerar la malla
+            for o in set(bpy.data.objects) - before:
+                if o.type == 'MESH': dm = o.modifiers.new('holgura', 'DISPLACE'); dm.mid_level = 0.0; dm.strength = P['puff'][c]
     if P.get('hair_tint'):
         for o in bpy.data.objects:
             if o.type == 'MESH' and P['hair'] in o.name: tint(o, P['hair_tint'])

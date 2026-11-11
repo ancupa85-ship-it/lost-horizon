@@ -627,7 +627,8 @@ def people():
     cast = [('cuttlas', wpos(4.9, 2.6), math.pi / 2 + 0.25, dict(gun='pistola'), dict(pose='agachado', gun='pistola', suit='traje', gloves=True)),
             ('ibarra', wpos(12.6, 4.2), 0.6, dict(poncho=True, head='gorra', gun='hombro', seed=1.3, belt=True), dict(pose='pie', poncho=True, head='gorra', gun='hombro', seed=1.3)),
             ('moya', wpos(20.4, 15.6), -1.9, dict(head='casco', gun='terciado', belt=True), dict(pose='firme', head='casco', gun='terciado')),
-            ('peris', wpos(26.4, 6.6), 2.4, dict(belt=True), dict(pose='pie'))]
+            ('peris', wpos(26.4, 6.6), 2.4, dict(belt=True), dict(pose='pie')),
+            ('roig', wpos(3.6, 1.0), -2.3, dict(), dict(pose='pie'))]
     walk = {'ibarra': [[13, 4], [13, 9], [9, 9], [9, 4]], 'moya': [[20, 19], [33, 19], [33, 20], [20, 20]]}   # rondas del visor, por casillas libres
     for name, pos, rz, g, old in cast:
         i = 'persona_' + name; M0 = Matrix.Translation(pos) @ Matrix.Rotation(rz, 4, 'Z')
