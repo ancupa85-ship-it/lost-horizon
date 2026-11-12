@@ -67,6 +67,16 @@ for m in meshes:
             m.set_editor_property('nanite_settings', ns)
     eal.save_loaded_asset(m)
 
+# materiales realistas (texturas de Poly Haven), si están descargadas en assets/texturas
+try:
+    import sys
+    sys.path.insert(0, HERE)
+    import importlib, materiales
+    importlib.reload(materiales)
+    materiales.aplicar(meshes)
+except Exception as e:
+    log('AVISO: materiales realistas no aplicados:', repr(e))
+
 # ------------------------------------------------------------------ 2. nivel nuevo
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
