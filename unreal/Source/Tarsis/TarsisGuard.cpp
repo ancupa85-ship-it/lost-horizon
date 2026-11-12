@@ -30,7 +30,7 @@ ATarsisGuard::ATarsisGuard()
 	Move->bOrientRotationToMovement = true;
 	Move->RotationRate = FRotator(0.0f, 240.0f, 0.0f);
 	Move->MaxWalkSpeed = WalkSpeed;
-	Move->bUseAccelerationForPaths = true;   // si no, al seguir un camino no gira hacia donde anda
+	Move->GetNavMovementProperties()->bUseAccelerationForPaths = true;   // si no, al seguir un camino no gira hacia donde anda (en 5.8 va en NavMovementProperties)
 
 	// cuerpo provisional con formas básicas del motor (luego irá el modelo con animaciones)
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cyl(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));

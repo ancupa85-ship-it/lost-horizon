@@ -57,6 +57,10 @@ if not meshes:
 
 # colisión: la propia malla, para poder andar por suelos, escaleras y tejados
 for m in meshes:
+    # Interchange añade a cada malla un envolvente convexo automático. El mapa de navegación usa ese convexo en vez
+    # de los triángulos, y en mallas que abarcan toda la base (base_oscuro: postes y antena en las esquinas) tapaba
+    # el suelo entero: no salía navmesh. Con «compleja como simple» el convexo sobra, así que se quita.
+    unreal.EditorStaticMeshLibrary.remove_collisions(m)
     bs = m.get_editor_property('body_setup')
     if bs:
         bs.set_editor_property('collision_trace_flag', unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
