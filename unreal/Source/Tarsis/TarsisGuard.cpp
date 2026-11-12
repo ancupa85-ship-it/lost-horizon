@@ -16,6 +16,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 #include "AIController.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 ATarsisGuard::ATarsisGuard()
@@ -29,6 +30,7 @@ ATarsisGuard::ATarsisGuard()
 	Move->bOrientRotationToMovement = true;
 	Move->RotationRate = FRotator(0.0f, 240.0f, 0.0f);
 	Move->MaxWalkSpeed = WalkSpeed;
+	Move->bUseAccelerationForPaths = true;   // si no, al seguir un camino no gira hacia donde anda
 
 	// cuerpo provisional con formas básicas del motor (luego irá el modelo con animaciones)
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cyl(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -142,6 +144,11 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 	StateT = 0.0f;
 	WaitT = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = (State == ETarsisGuardState::Alert) ? RunSpeed : WalkSpeed;
+	if (AAIController* AI = Cast<AAIController>(GetController()))
+	{
+		AI->StopMovement();
+	}
+	bNoPath = false;
 	UpdateMark();
 }
 
@@ -162,6 +169,19 @@ bool ATarsisGuard::Near2D(const FVector& Dest, float Radius) const
 void ATarsisGuard::Walk(const FVector& Dest, float Speed)
 {
 	GetCharacterMovement()->MaxWalkSpeed = Speed;
+	// con mapa de navegación (MapaNavegacion, lo pone tools/unreal/guardias.py) rodea paredes y vallas;
+	// si no hay camino, va en línea recta como antes
+	if (AAIController* AI = Cast<AAIController>(GetController()))
+	{
+		const bool bIdle = AI->GetMoveStatus() == EPathFollowingStatus::Idle;
+		if (bIdle || FVector::DistSquared2D(MoveDest, Dest) > FMath::Square(60.0f))
+		{
+			MoveDest = Dest;
+			const EPathFollowingRequestResult::Type R = AI->MoveToLocation(Dest, 30.0f, false, true, true, false);
+			bNoPath = (R == EPathFollowingRequestResult::Failed);
+		}
+		if (!bNoPath) return;
+	}
 	FVector Dir = Dest - GetActorLocation();
 	Dir.Z = 0.0f;
 	if (Dir.SizeSquared() > 1.0f)
@@ -297,7 +317,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		if (Near2D(P, 60.0f))
 		{
 			WaitT += DeltaSeconds;
-			if (WaitT >= WaitAtPoint) { WaitT = 0.0f; PointIndex = (PointIndex + 1) % PatrolPoints.Num(); }
+			if (WaitT >= (PatrolWaits.IsValidIndex(PointIndex) ? PatrolWaits[PointIndex] : WaitAtPoint)) { WaitT = 0.0f; PointIndex = (PointIndex + 1) % PatrolPoints.Num(); }
 		}
 		else
 		{

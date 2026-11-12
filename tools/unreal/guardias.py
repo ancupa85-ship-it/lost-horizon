@@ -11,10 +11,14 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 DATA = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json')))
 T = DATA.get('T', 2.0)
 
-# nombre: (ronda en casillas [col, fila], espera en cada punto, s)
+# nombre: (ronda en casillas [col, fila], espera en cada punto (s, o una lista por punto), persona del cuerpo)
+# rondas de escenario/visor.js (walk de escena_base.py, EXTRA y WPX)
 GUARDIAS = {
-    'Ibarra': ([[13, 4], [13, 9], [9, 9], [9, 4]], 2.5),   # patio norte, con la llave de la jefatura
-    'Moya': ([[20, 19], [33, 19], [33, 20], [20, 20]], 3.0),   # patio central
+    'Ibarra': ([[13, 4], [13, 9], [9, 9], [9, 4]], 2.5, 'ibarra'),   # patio norte, con la llave de la jefatura
+    'Moya': ([[20, 19], [33, 19], [33, 20], [20, 20]], 3.0, 'moya'),   # patio central
+    'Peris': ([[28, 7], [28, 8], [23, 8], [28, 8]], [9.0, 0.5, 16.0, 0.5], 'peris'),   # cuartelero: sale a fumar a la puerta y vuelve a la mesa
+    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], 2.5, 'moya'),   # portón
+    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], 2.5, 'peris'),   # barracón
 }
 
 def log(*a):
@@ -46,24 +50,49 @@ def cuerpo(g, nombre):
     if hasattr(g, 'rerun_construction_scripts'):
         g.rerun_construction_scripts()
 
+def navegacion():
+    # volumen del mapa de navegación sobre toda la base (36 x 28 casillas de T m), para que los guardias
+    # rodeen paredes, vallas y contenedores al perseguir o volver a su ronda
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    for a in eas.get_all_level_actors():
+        if isinstance(a, unreal.NavMeshBoundsVolume):
+            eas.destroy_actor(a)
+    filas = len(DATA['map'])
+    cols = max(len(f) for f in DATA['map'])
+    ancho, largo = cols * T * 100.0, filas * T * 100.0
+    v = eas.spawn_actor_from_class(unreal.NavMeshBoundsVolume, unreal.Vector(ancho / 2, largo / 2, 300.0), unreal.Rotator(0, 0, 0))
+    v.set_actor_label('MapaNavegacion')
+    v.set_folder_path('Guardias')
+    # la caja por defecto mide 200 cm de lado
+    v.set_actor_scale3d(unreal.Vector((ancho + 400) / 200.0, (largo + 400) / 200.0, 1400 / 200.0))
+    try:
+        unreal.SystemLibrary.execute_console_command(unreal.EditorLevelLibrary.get_editor_world(), 'RebuildNavigation')
+    except Exception as e:
+        log('AVISO: no se pudo reconstruir la navegación:', repr(e))
+    log('mapa de navegación', round(ancho / 100), 'x', round(largo / 100), 'm')
+
 def colocar():
     cls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
     if not cls:
         log('AVISO: la clase TarsisGuard no está compilada; no se colocan guardias')
         return 0
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    navegacion()
     for a in eas.get_all_level_actors():
         if a.get_class() == cls:
             eas.destroy_actor(a)
     n = 0
-    for nombre, (ronda, espera) in GUARDIAS.items():
+    for nombre, (ronda, espera, persona) in GUARDIAS.items():
         pts = [casilla(c, r) for c, r in ronda]
         g = eas.spawn_actor_from_class(cls, pts[0], unreal.Rotator(0, 0, 0))
         g.set_actor_label('Guardia_' + nombre)
         g.set_folder_path('Guardias')
         g.set_editor_property('patrol_points', pts)
-        g.set_editor_property('wait_at_point', espera)
-        cuerpo(g, nombre.lower())
+        if isinstance(espera, list):
+            g.set_editor_property('patrol_waits', espera)
+        else:
+            g.set_editor_property('wait_at_point', espera)
+        cuerpo(g, persona)
         n += 1
     # el director del sigilo (indicador de luz, agacharse con C, avisos); uno por nivel
     dcls = unreal.load_class(None, '/Script/PruebaLumen.TarsisDirector')

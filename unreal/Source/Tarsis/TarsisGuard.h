@@ -38,6 +38,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
 	float WaitAtPoint = 2.0f;
 
+	/** Espera en cada punto (s), si se quiere distinta por punto; donde falte se usa WaitAtPoint. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
+	TArray<float> PatrolWaits;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
 	float WalkSpeed = 140.0f;
 
@@ -121,6 +125,8 @@ private:
 	float UnseenT = 0.0f;
 	FVector LastSeen = FVector::ZeroVector;
 	FVector Home = FVector::ZeroVector;
+	FVector MoveDest = FVector(1e9f);
+	bool bNoPath = false;
 
 	void SetState(ETarsisGuardState NewState);
 	void Walk(const FVector& Dest, float Speed);
