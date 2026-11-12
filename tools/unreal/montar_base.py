@@ -61,7 +61,9 @@ for m in meshes:
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 if eal.does_asset_exist(MAPA):   # se rehace por dentro: vaciar el nivel existente
-    les.load_level(MAPA)
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    if MAPA not in world.get_path_name():
+        les.load_level(MAPA)
     for a in eas.get_all_level_actors():
         eas.destroy_actor(a)
 else:
