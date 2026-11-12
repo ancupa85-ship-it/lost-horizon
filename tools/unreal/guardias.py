@@ -66,7 +66,7 @@ def navegacion():
     # la caja por defecto mide 200 cm de lado
     v.set_actor_scale3d(unreal.Vector((ancho + 400) / 200.0, (largo + 400) / 200.0, 1400 / 200.0))
     try:
-        unreal.SystemLibrary.execute_console_command(unreal.EditorLevelLibrary.get_editor_world(), 'RebuildNavigation')
+        unreal.SystemLibrary.execute_console_command(unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world(), 'RebuildNavigation')
     except Exception as e:
         log('AVISO: no se pudo reconstruir la navegación:', repr(e))
     log('mapa de navegación', round(ancho / 100), 'x', round(largo / 100), 'm')
