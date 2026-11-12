@@ -74,20 +74,31 @@ def textura(nombre, tipo):
 WAT = '/Engine/Functions/Engine_MaterialFunctions01/Texturing/WorldAlignedTexture.WorldAlignedTexture'
 WAN = '/Engine/Functions/Engine_MaterialFunctions01/Texturing/WorldAlignedNormal.WorldAlignedNormal'
 
-def maestro():
+def maestro(defecto):
+    """defecto: {'diff': textura, 'nor': textura, 'rough': textura} para los valores por defecto de los parámetros.
+    Un TextureObjectParameter sin textura, o con una de otro tipo (sRGB / normal / máscara), no compila."""
     ruta = DM + '/M_LH'
     if eal.does_asset_exist(ruta):
-        return eal.load_asset(ruta)
-    m = tools.create_asset('M_LH', DM, unreal.Material, unreal.MaterialFactoryNew())
+        m = eal.load_asset(ruta)
+        # se rehace el grafo en el mismo recurso (las instancias siguen apuntando a él).
+        # delete_all_material_expressions deja nodos sueltos (máscaras sin entrada, parámetros repetidos) que impiden
+        # compilar, así que se borran también uno a uno
+        mel.delete_all_material_expressions(m)
+        for e in list(mel.get_material_expressions(m)):
+            mel.delete_material_expression(m, e)
+    else:
+        m = tools.create_asset('M_LH', DM, unreal.Material, unreal.MaterialFactoryNew())
     E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
     # tamaño de la textura (cm) como vector para las funciones alineadas al mundo
     size = E(unreal.MaterialExpressionScalarParameter, -1200, 0)
     size.set_editor_property('parameter_name', 'Tamano'); size.set_editor_property('default_value', 300.0)
-    def tex_obj(nombre, x, y, normal=False):
+    SAMPLER = {'diff': unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, 'nor': unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
+               'rough': unreal.MaterialSamplerType.SAMPLERTYPE_MASKS}
+    def tex_obj(nombre, x, y, tipo):
         p = E(unreal.MaterialExpressionTextureObjectParameter, x, y)
         p.set_editor_property('parameter_name', nombre)
-        if normal:
-            p.set_editor_property('sampler_type', unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+        p.set_editor_property('texture', defecto[tipo])
+        p.set_editor_property('sampler_type', SAMPLER[tipo])
         return p
     def wat(obj, x, y, fn=WAT):
         f = E(unreal.MaterialExpressionMaterialFunctionCall, x, y)
@@ -95,7 +106,7 @@ def maestro():
         mel.connect_material_expressions(obj, '', f, 'TextureObject')
         mel.connect_material_expressions(size, '', f, 'TextureSize')
         return f
-    col = wat(tex_obj('Color', -1000, -300), -700, -300)
+    col = wat(tex_obj('Color', -1000, -300, 'diff'), -700, -300)
     tint = E(unreal.MaterialExpressionVectorParameter, -700, -500)
     tint.set_editor_property('parameter_name', 'Tinte'); tint.set_editor_property('default_value', unreal.LinearColor(1, 1, 1, 1))
     mul = E(unreal.MaterialExpressionMultiply, -400, -350)
@@ -103,10 +114,10 @@ def maestro():
     mel.connect_material_expressions(tint, '', mul, 'B')
     mel.connect_material_property(mul, '', unreal.MaterialProperty.MP_BASE_COLOR)
     # relieve: si una instancia no tiene normal, se queda con la normal plana por defecto del parámetro
-    nor = wat(tex_obj('Normal', -1000, 0, True), -700, 0, WAN)
+    nor = wat(tex_obj('Normal', -1000, 0, 'nor'), -700, 0, WAN)
     mel.connect_material_property(nor, 'XYZ Texture', unreal.MaterialProperty.MP_NORMAL)
     # rugosidad: textura (si hay) x escala
-    rt = wat(tex_obj('Rugosidad', -1000, 300), -700, 300)
+    rt = wat(tex_obj('Rugosidad', -1000, 300, 'rough'), -700, 300)
     rs = E(unreal.MaterialExpressionScalarParameter, -700, 500)
     rs.set_editor_property('parameter_name', 'RugosidadEscala'); rs.set_editor_property('default_value', 1.0)
     rm = E(unreal.MaterialExpressionMultiply, -400, 350)
@@ -115,7 +126,8 @@ def maestro():
     mask = E(unreal.MaterialExpressionComponentMask, -250, 350)
     mask.set_editor_property('r', True); mask.set_editor_property('g', False)
     mask.set_editor_property('b', False); mask.set_editor_property('a', False)
-    mel.connect_material_expressions(rm, '', mask, '')
+    if not mel.connect_material_expressions(rm, '', mask, 'Input'):   # con '' no conecta («Missing ComponentMask input»)
+        mel.connect_material_expressions(rm, '', mask, '')
     mel.connect_material_property(mask, '', unreal.MaterialProperty.MP_ROUGHNESS)
     met = E(unreal.MaterialExpressionScalarParameter, -400, 600)
     met.set_editor_property('parameter_name', 'Metal'); met.set_editor_property('default_value', 0.0)
@@ -126,16 +138,23 @@ def maestro():
 
 # ------------------------------------------------------------------ 3. instancias y asignación
 def instancias():
-    base = maestro()
-    blanco = unreal.load_asset('/Engine/EngineResources/WhiteSquareTexture')
-    plana = unreal.load_asset('/Engine/EngineMaterials/FlatNormal')
+    # primero las texturas: el maestro usa unas de ellas como valor por defecto de sus parámetros
+    tex = {}
+    for clave, (nombre, rep) in TEXTURAS.items():
+        if nombre not in tex:
+            tex[nombre] = {t: textura(nombre, t) for t in ('diff', 'nor', 'rough')}
+    defecto = {}
+    for t in ('diff', 'nor', 'rough'):
+        defecto[t] = next((v[t] for v in tex.values() if v[t] is not None), None)
+    if None in defecto.values():
+        return {}
+    base = maestro(defecto)
     out = {}
     for clave, (nombre, rep) in TEXTURAS.items():
-        c = textura(nombre, 'diff')
+        c, n, r = tex[nombre]['diff'], tex[nombre]['nor'], tex[nombre]['rough']
         if c is None:
             log('AVISO: falta la textura', nombre, '- se deja el color liso en', clave)
             continue
-        n = textura(nombre, 'nor'); r = textura(nombre, 'rough')
         ruta = DM + '/MI_' + clave
         mi = eal.load_asset(ruta) if eal.does_asset_exist(ruta) else tools.create_asset(
             'MI_' + clave, DM, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
@@ -144,8 +163,11 @@ def instancias():
         tinte = unreal.LinearColor(*[lin((hexc >> s) & 255) for s in (16, 8, 0)], 1)
         # igual que en el visor: textura x color (si queda oscuro con la luz de Unreal se sube el Tinte de la instancia)
         mel.set_material_instance_texture_parameter_value(mi, 'Color', c)
-        mel.set_material_instance_texture_parameter_value(mi, 'Normal', n or plana)
-        mel.set_material_instance_texture_parameter_value(mi, 'Rugosidad', r or blanco)
+        # si falta normal o rugosidad se deja el valor por defecto del maestro (misma clase de textura)
+        if n:
+            mel.set_material_instance_texture_parameter_value(mi, 'Normal', n)
+        if r:
+            mel.set_material_instance_texture_parameter_value(mi, 'Rugosidad', r)
         mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', 1.0 if r else rough)
         mel.set_material_instance_scalar_parameter_value(mi, 'Metal', metal)
         mel.set_material_instance_scalar_parameter_value(mi, 'Tamano', rep * 100.0)
@@ -168,6 +190,8 @@ def aplicar(meshes):
             nombre = (mi.get_name() if mi else '') or str(sm.get_editor_property('material_slot_name'))
             # el material importado se llama lh_<clave> (a veces con prefijo MI_ o sufijo de Interchange)
             k = nombre.split('lh_', 1)[1] if 'lh_' in nombre else None
+            if k is None and nombre[3:] in mis and nombre.startswith('MI_'):
+                k = nombre[3:]   # ya tiene nuestra instancia de una ejecución anterior
             for clave in sorted(mis, key=len, reverse=True):
                 if k and (k == clave or k.startswith(clave + '_') or k.startswith(clave + '.')) and not (clave == 'suelo' and k.startswith('suelo_int')):
                     sm.set_editor_property('material_interface', mis[clave]); cambia = True; n += 1
