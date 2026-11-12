@@ -72,6 +72,25 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Vista")
 	float CatchDistance = 130.0f;
 
+	/** Centinela de torre: no anda; barre con la vista (y con su foco) a un lado y a otro y, si te ve, avisa a los de abajo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	bool bTowerSentry = false;
+
+	/** Foco de la torre, que gira con el centinela (lo pone tools/unreal/guardias.py). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	TObjectPtr<AActor> TowerLight;
+
+	/** Hacia dónde mira la torre (yaw en grados) y cuánto barre a cada lado. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float TowerYaw = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float TowerSweep = 54.0f;
+
+	/** Un compañero (por ejemplo una torre) da la voz: viene corriendo a ese sitio. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Alarm(const FVector& Where);
+
 	/** Cuerpo con esqueleto (personas del juego web, importadas por tools/unreal/personas.py). Sin él se ve el cilindro provisional. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	TObjectPtr<USkeletalMesh> BodyMesh;
@@ -136,5 +155,8 @@ private:
 	void UpdateMark();
 	void SetupBody();
 	void UpdateAnim();
+	void TowerTick(float DeltaSeconds, APawn* Player, float V);
+	float TowerT = 0.0f;
+	float LightPitch = 0.0f;
 	TObjectPtr<UAnimationAsset> CurrentAnim;
 };

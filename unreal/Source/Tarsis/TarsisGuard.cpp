@@ -136,6 +136,69 @@ void ATarsisGuard::BeginPlay()
 		PatrolPoints.Add(Home);
 	}
 	SetState(ETarsisGuardState::Patrol);
+	if (bTowerSentry)
+	{
+		GetCharacterMovement()->DisableMovement();   // se queda en la plataforma, sin caer ni andar
+		TowerT = FMath::FRand() * 10.0f;
+		if (TowerLight) LightPitch = TowerLight->GetActorRotation().Pitch;
+	}
+}
+
+void ATarsisGuard::Alarm(const FVector& Where)
+{
+	if (bTowerSentry || State == ETarsisGuardState::Alert) return;
+	LastSeen = Where;
+	UnseenT = 0.0f;
+	Meter = 1.0f;
+	SetState(ETarsisGuardState::Alert);
+}
+
+void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
+{
+	TowerT += DeltaSeconds;
+	if (State == ETarsisGuardState::Search || State == ETarsisGuardState::Return)
+	{
+		SetState(ETarsisGuardState::Patrol);   // tras una captura todos vuelven; el de la torre ya está en su sitio
+	}
+	if (State == ETarsisGuardState::Alert)
+	{
+		// te sigue con la vista y con el foco mientras te vea; si te pierde, vuelve a barrer
+		FaceTowards(LastSeen, DeltaSeconds * 1.5f);
+		if (UnseenT > 5.0f) { Meter = 0.5f; SetState(ETarsisGuardState::Suspicious); }
+	}
+	else
+	{
+		if (Meter >= 1.0f)
+		{
+			SetState(ETarsisGuardState::Alert);
+			// da la voz: los dos guardias de suelo más cercanos vienen corriendo a donde te ha visto
+			TArray<ATarsisGuard*> Ground;
+			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+			{
+				if (!It->bTowerSentry) Ground.Add(*It);
+			}
+			Ground.Sort([this](const ATarsisGuard& A, const ATarsisGuard& B)
+			{
+				return FVector::DistSquared2D(A.GetActorLocation(), LastSeen) < FVector::DistSquared2D(B.GetActorLocation(), LastSeen);
+			});
+			for (int32 i = 0; i < FMath::Min(2, Ground.Num()); ++i) Ground[i]->Alarm(LastSeen);
+		}
+		else if (State == ETarsisGuardState::Suspicious)
+		{
+			FaceTowards(LastSeen, DeltaSeconds);
+			if (Meter <= 0.0f) SetState(ETarsisGuardState::Patrol);
+		}
+		else
+		{
+			if (Meter > 0.3f) { SetState(ETarsisGuardState::Suspicious); }
+			const float Yaw = TowerYaw + FMath::Sin(TowerT * 0.42f) * TowerSweep;
+			SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, Yaw, 0.0f), DeltaSeconds, 3.0f));
+		}
+	}
+	if (TowerLight)
+	{
+		TowerLight->SetActorRotation(FRotator(LightPitch, GetActorRotation().Yaw, 0.0f));
+	}
 }
 
 void ATarsisGuard::SetState(ETarsisGuardState NewState)
@@ -305,6 +368,12 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		{
 			Meter = FMath::Max(0.0f, Meter - SuspicionDecay * DeltaSeconds);
 		}
+	}
+
+	if (bTowerSentry)
+	{
+		TowerTick(DeltaSeconds, Player, V);
+		return;
 	}
 
 	switch (State)

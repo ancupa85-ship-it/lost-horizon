@@ -71,6 +71,36 @@ def navegacion():
         log('AVISO: no se pudo reconstruir la navegación:', repr(e))
     log('mapa de navegación', round(ancho / 100), 'x', round(largo / 100), 'm')
 
+def centinelas(eas, cls):
+    # un centinela en cada torre (TOWERS del visor), en la plataforma, junto a su foco, que gira con él
+    import math
+    focos = [a for a in eas.get_all_level_actors() if isinstance(a, unreal.SpotLight)]
+    n = 0
+    for i, t in enumerate(DATA.get('torres', [])):
+        bx, by = t['pos'][0], t['pos'][1]
+        loc = unreal.Vector((bx - 0.25) * 100.0, -by * 100.0, t.get('altura', 4.2) * 100.0 + 95.0)
+        d = t['foco']['dir']
+        yaw = math.degrees(math.atan2(-d[1], d[0]))   # Blender -> Unreal: Y cambia de signo
+        g = eas.spawn_actor_from_class(cls, loc, unreal.Rotator(roll=0, pitch=0, yaw=yaw))
+        g.set_actor_label('Centinela_' + t['name'])
+        g.set_folder_path('Guardias')
+        g.set_editor_property('tower_sentry', True)
+        g.set_editor_property('tower_yaw', yaw)
+        g.set_editor_property('view_distance', 2500.0)
+        g.set_editor_property('view_half_angle', 32.0)
+        fp = t['foco']['pos']
+        fl = unreal.Vector(fp[0] * 100.0, -fp[1] * 100.0, fp[2] * 100.0)
+        if focos:
+            f = min(focos, key=lambda a: (a.get_actor_location() - fl).length())
+            if (f.get_actor_location() - fl).length() < 400:
+                f.get_editor_property('root_component').set_editor_property('mobility', unreal.ComponentMobility.MOVABLE)
+                g.set_editor_property('tower_light', f)
+            else:
+                log('AVISO: no encuentro el foco de', t['name'])
+        cuerpo(g, 'moya')
+        n += 1
+    return n
+
 def colocar():
     cls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
     if not cls:
@@ -94,6 +124,7 @@ def colocar():
             g.set_editor_property('wait_at_point', espera)
         cuerpo(g, persona)
         n += 1
+    n += centinelas(eas, cls)
     # el director del sigilo (indicador de luz, agacharse con C, avisos); uno por nivel
     dcls = unreal.load_class(None, '/Script/PruebaLumen.TarsisDirector')
     if dcls:
