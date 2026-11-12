@@ -36,14 +36,27 @@ def importar(nombre, forzar=False):
     if not os.path.exists(glb):
         log('AVISO: falta', glb)
         return None
-    task = unreal.AssetImportTask()
-    task.set_editor_property('filename', glb)
-    task.set_editor_property('destination_path', ruta)
-    task.set_editor_property('automated', True)
-    task.set_editor_property('replace_existing', True)
-    task.set_editor_property('save', True)
-    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
-    log('persona importada', nombre, len(list(task.get_editor_property('imported_object_paths') or [])), 'assets')
+    eal = unreal.EditorAssetLibrary
+    if eal.does_directory_exist(ruta):
+        eal.delete_directory(ruta)   # sin restos de una importación anterior (p. ej. con las mallas separadas)
+    # Cada persona trae varias mallas con el mismo esqueleto (cuerpo, ojos, cejas, ropa, pelo, botas). Con
+    # AssetImportTask, Interchange las importa como 7 SkeletalMesh sueltas; se fuerza una sola por esqueleto.
+    pipe = unreal.InterchangeGenericAssetsPipeline()
+    pipe.get_editor_property('mesh_pipeline').set_editor_property(
+        'combine_skeletal_meshes_behavior', unreal.InterchangeCombineSkeletalMeshesBehavior.BY_SKELETON)
+    params = unreal.ImportAssetParameters()
+    params.set_editor_property('is_automated', True)
+    params.set_editor_property('replace_existing', True)
+    ov = params.get_editor_property('override_pipelines')
+    ov.append(unreal.SoftObjectPath(pipe.get_path_name()))
+    params.set_editor_property('override_pipelines', ov)
+    mgr = unreal.InterchangeManager.get_interchange_manager_scripted()
+    res = mgr.import_asset(ruta, unreal.InterchangeManager.create_source_data(glb), params)
+    for p in res or []:
+        a = eal.load_asset(str(p).split("'")[1] if "'" in str(p) else str(p))
+        if a:
+            eal.save_loaded_asset(a)
+    log('persona importada', nombre, len(res or []), 'assets')
     return ruta
 
 def cargar(nombre, forzar=False):

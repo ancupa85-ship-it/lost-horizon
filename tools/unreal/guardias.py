@@ -41,7 +41,10 @@ def cuerpo(g, nombre):
     for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim')):
         if p.get(k):
             g.set_editor_property(prop, p[k])
-    g.rerun_construction_scripts()
+    # set_editor_property ya avisa al actor del cambio (OnConstruction -> SetupBody); rerun_construction_scripts
+    # no está expuesto a Python en 5.8
+    if hasattr(g, 'rerun_construction_scripts'):
+        g.rerun_construction_scripts()
 
 def colocar():
     cls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
