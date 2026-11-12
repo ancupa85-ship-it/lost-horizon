@@ -134,6 +134,10 @@ def colocar():
         d = eas.spawn_actor_from_class(dcls, unreal.Vector(0, 0, 300), unreal.Rotator(0, 0, 0))
         d.set_actor_label('DirectorSigilo')
         d.set_folder_path('Guardias')
+        # calabozo (puerta «b» del plano, casilla 31,12): despiertas dentro, mirando a la reja
+        d.set_editor_property('cell_spot', unreal.Vector(31 * T * 100 + T * 50, 12 * T * 100 + T * 50 + 340.0, 110.0))
+        d.set_editor_property('cell_yaw', -90.0)
+        d.set_editor_property('cell_door', unreal.Vector(31 * T * 100 + T * 50, 13 * T * 100, 0.0))
     log('guardias colocados', n, '- director', 'sí' if dcls else 'no compilado')
     return n
 

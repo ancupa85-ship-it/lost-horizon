@@ -1,7 +1,11 @@
 #include "TarsisDirector.h"
 #include "TarsisGuard.h"
+#include "TarsisHUD.h"
 
 #include "Camera/CameraComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "GameFramework/PlayerStart.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
@@ -30,6 +34,7 @@ void ATarsisDirector::SetupPlayer()
 	// el personaje de la plantilla no se agacha: se le permite y se enlaza la C (y Ctrl izquierdo)
 	C->GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
 	C->GetCharacterMovement()->MaxWalkSpeedCrouched = 200.0f;
+	PC->ClientSetHUD(ATarsisHUD::StaticClass());
 	EnableInput(PC);
 	if (InputComponent)
 	{
@@ -37,6 +42,76 @@ void ATarsisDirector::SetupPlayer()
 		InputComponent->BindKey(EKeys::LeftControl, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
 	}
 	bPlayerReady = true;
+	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado."), 7.0f);
+}
+
+void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
+{
+	Message = Text;
+	MessageT = Seconds;
+}
+
+void ATarsisDirector::Captured(APawn* Player)
+{
+	if (!Player) return;
+	++Captures;
+	ACharacter* C = Cast<ACharacter>(Player);
+	if (C && C->bIsCrouched) C->UnCrouch();
+	AController* Ctl = Player->GetController();
+	if (Captures == 1 && !CellSpot.IsZero())
+	{
+		const FRotator R(0.0f, CellYaw, 0.0f);
+		Player->TeleportTo(CellSpot, R);
+		if (Ctl) Ctl->SetControlRotation(R);
+		CloseCell();
+		CellT = CellTime;
+		ShowMessage(TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas."), 8.0f);
+		return;
+	}
+	if (AActor* Start = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
+	{
+		Player->TeleportTo(Start->GetActorLocation(), Start->GetActorRotation());
+		if (Ctl) Ctl->SetControlRotation(Start->GetActorRotation());
+	}
+	ShowMessage(TEXT("TE HAN COGIDO\nVuelves a la entrada de la base."), 4.0f);
+}
+
+void ATarsisDirector::CloseCell()
+{
+	if (Bars.Num() > 0 || CellDoor.IsZero()) return;
+	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	auto Add = [this](UStaticMesh* Mesh, const FVector& Loc, const FVector& Scale)
+	{
+		UStaticMeshComponent* B = NewObject<UStaticMeshComponent>(this);
+		B->SetStaticMesh(Mesh);
+		B->SetMobility(EComponentMobility::Movable);
+		B->SetWorldLocation(Loc);
+		B->SetWorldScale3D(Scale);
+		B->SetCollisionProfileName(TEXT("BlockAll"));
+		B->RegisterComponent();
+		Bars.Add(B);
+	};
+	// reja de 2 m: barrotes cada 20 cm y dos travesaños (el hueco de la puerta va a lo largo de X)
+	for (int32 i = -4; i <= 4; ++i)
+	{
+		if (Cyl) Add(Cyl, CellDoor + FVector(i * 20.0f, 0.0f, 110.0f), FVector(0.05f, 0.05f, 2.2f));
+	}
+	if (Cube)
+	{
+		Add(Cube, CellDoor + FVector(0.0f, 0.0f, 30.0f), FVector(1.9f, 0.06f, 0.06f));
+		Add(Cube, CellDoor + FVector(0.0f, 0.0f, 200.0f), FVector(1.9f, 0.06f, 0.06f));
+	}
+}
+
+void ATarsisDirector::OpenCell()
+{
+	for (UStaticMeshComponent* B : Bars)
+	{
+		if (B) B->DestroyComponent();
+	}
+	Bars.Empty();
+	ShowMessage(TEXT("CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia."), 8.0f);
 }
 
 void ATarsisDirector::ToggleCrouch()
@@ -51,7 +126,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (!bPlayerReady) { SetupPlayer(); return; }
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	if (!C || !GEngine) return;
+	if (!C) return;
 
 	// agachado: la cámara de la plantilla cuelga del brazo en primera persona, que el motor mantiene a la misma altura
 	// al encoger la cápsula, así que se baja a mano. La etiqueta de la cámara recuerda si ya está bajada.
@@ -76,31 +151,10 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		PlayerLight = FMath::Lerp(PlayerLight, L, 0.5f);
 	}
 
-	// barra de luz: 10 tramos
-	const int32 N = FMath::Clamp(FMath::RoundToInt(PlayerLight * 10.0f), 0, 10);
-	FString Bar = TEXT("LUZ  [");
-	for (int32 i = 0; i < 10; ++i) Bar += (i < N) ? TEXT("#") : TEXT("-");
-	Bar += TEXT("]  ");
-	Bar += PlayerLight < 0.3f ? TEXT("EN SOMBRA") : (PlayerLight < 0.6f ? TEXT("PENUMBRA") : TEXT("ILUMINADO"));
-	if (C->bIsCrouched) Bar += TEXT("   -   AGACHADO");
-	const FColor BarColor = PlayerLight < 0.3f ? FColor(120, 200, 140) : (PlayerLight < 0.6f ? FColor(230, 200, 90) : FColor(255, 140, 70));
-	GEngine->AddOnScreenDebugMessage(9101, 0.5f, BarColor, Bar, false, FVector2D(1.4f, 1.4f));
-
-	// estado de los guardias: el peor manda
-	ETarsisGuardState Worst = ETarsisGuardState::Patrol;
-	float MaxMeter = 0.0f;
-	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	if (MessageT > 0.0f) MessageT -= DeltaSeconds;
+	if (CellT > 0.0f)
 	{
-		MaxMeter = FMath::Max(MaxMeter, It->Meter);
-		if (It->State == ETarsisGuardState::Alert) Worst = ETarsisGuardState::Alert;
-		else if (Worst != ETarsisGuardState::Alert && (It->State == ETarsisGuardState::Suspicious || It->State == ETarsisGuardState::Search))
-			Worst = It->State;
+		CellT -= DeltaSeconds;
+		if (CellT <= 0.0f) OpenCell();
 	}
-	FString Msg;
-	FColor MsgColor = FColor::White;
-	if (Worst == ETarsisGuardState::Alert) { Msg = TEXT("TE HAN VISTO! Rompe la linea de vista y escondete"); MsgColor = FColor(255, 59, 47); }
-	else if (Worst == ETarsisGuardState::Search) { Msg = TEXT("TE BUSCAN"); MsgColor = FColor(255, 160, 60); }
-	else if (Worst == ETarsisGuardState::Suspicious) { Msg = TEXT("?  Un guardia sospecha"); MsgColor = FColor(255, 210, 58); }
-	GEngine->AddOnScreenDebugMessage(9102, 0.5f, MsgColor, Msg.IsEmpty() ? FString(TEXT(" ")) : Msg, false, FVector2D(1.6f, 1.6f));
-	bWasAlert = Worst == ETarsisGuardState::Alert;
 }

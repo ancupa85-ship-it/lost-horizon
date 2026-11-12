@@ -1,4 +1,5 @@
 #include "TarsisGuard.h"
+#include "TarsisDirector.h"
 
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -329,12 +330,14 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 
 void ATarsisGuard::Caught(APawn* Player)
 {
-	if (GEngine)
+	// el director decide adónde vas (calabozo la primera vez); sin director, a la salida
+	ATarsisDirector* D = nullptr;
+	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { D = *It; break; }
+	if (D)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 4.0f, FColor::Red, TEXT("TE HAN COGIDO"));
+		D->Captured(Player);
 	}
-	// de momento vuelve a la salida de Cuttlas (luego irá la celda, como en el juego web)
-	if (AActor* Start = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
+	else if (AActor* Start = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
 	{
 		Player->TeleportTo(Start->GetActorLocation(), Start->GetActorRotation());
 		if (AController* PC = Player->GetController()) PC->SetControlRotation(Start->GetActorRotation());
