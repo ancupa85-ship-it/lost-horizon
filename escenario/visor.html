@@ -1,0 +1,81 @@
+<meta charset="utf-8">
+<title>Tarsis: escenario realista</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+:root{--bg:#07080b;--ink:#e8dccb;--dim:#9a8f80;--acc:#ffb060}
+:root[data-theme="dark"],:root:not([data-theme="light"]){--bg:#07080b;--ink:#e8dccb}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;font-family:ui-monospace,Menlo,Consolas,monospace}
+canvas{display:block;touch-action:none}
+#intro{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(ellipse at 50% 60%,rgba(40,24,10,.55),rgba(4,5,8,.92));cursor:default;text-align:center;padding:16px}
+#intro.ok{cursor:pointer}
+#opc{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;cursor:default}#opc span{font-size:11px;letter-spacing:.2em;color:var(--dim);margin:0 4px 0 14px}#opc button{font:inherit;font-size:12px;letter-spacing:.14em;min-height:34px;padding:6px 14px;background:rgba(0,0,0,.35);color:var(--dim);border:1px solid rgba(255,255,255,.18);border-radius:3px;cursor:pointer}#opc button:hover{color:#fff;border-color:rgba(255,255,255,.45)}#opc button.on{color:#14100a;background:var(--acc);border-color:var(--acc)}
+#intro[hidden],#hud[hidden]{display:none}
+#intro h1{font-size:clamp(20px,4vw,40px);letter-spacing:.3em;margin:0;font-weight:500;color:var(--acc)}
+#intro p{margin:0;color:var(--dim);font-size:13px;line-height:1.7;max-width:560px}
+#load{margin-top:10px;padding:10px 18px;border:1px solid var(--acc);color:var(--acc);letter-spacing:.2em;font-size:13px}
+#hud{position:fixed;left:12px;bottom:10px;font-size:11px;color:var(--dim);text-shadow:0 1px 2px #000;pointer-events:none}
+#estado{position:fixed;top:14px;left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:.18em;color:#9fd6a8;text-shadow:0 1px 2px #000;pointer-events:none;text-align:center}
+#estado[hidden]{display:none}
+#estado i{display:block;width:150px;height:3px;margin:6px auto 0;background:rgba(255,255,255,.14)}
+#estado b{display:block;height:100%;width:0;background:currentColor}
+#estado small{display:block;margin-top:5px;font-size:9px;letter-spacing:.22em;color:var(--dim)}
+#sub{position:fixed;left:0;right:0;bottom:16%;text-align:center;font-size:15px;color:var(--ink);text-shadow:0 1px 4px #000,0 0 2px #000;pointer-events:none}#sub b{color:var(--acc);font-weight:400;margin-right:8px}
+#estado.sos{color:#ffd23a}#estado.ale{color:#ff4a3a}
+#aviso{position:fixed;top:30%;left:0;right:0;text-align:center;font-size:22px;letter-spacing:.2em;color:#ff4a3a;text-shadow:0 2px 6px #000;pointer-events:none}
+#aviso.cap{font-size:40px}#aviso.ok{color:#9fd6a8}
+#mira{position:fixed;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 3px #000;pointer-events:none}
+#radar{position:fixed;right:14px;top:14px;width:150px;height:150px;pointer-events:none}#radar[hidden]{display:none}
+#guard{position:fixed;right:18px;bottom:66px;font-size:10px;letter-spacing:.2em;color:var(--dim);pointer-events:none}#guard[hidden]{display:none}
+#vida{position:fixed;right:18px;bottom:50px;width:120px;height:4px;background:rgba(255,255,255,.14);pointer-events:none}#vida[hidden]{display:none}#vida b{display:block;height:100%;background:#9fd6a8}#vida.mal b{background:#ff4a3a}
+#dano{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(120,0,0,0) 45%,rgba(150,0,0,.75) 100%)}
+#mira[hidden],#mun[hidden],#obj[hidden],#tec[hidden]{display:none}
+#tec{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:18px 26px;background:rgba(8,10,12,.88);border:1px solid #3a4038;text-align:center;pointer-events:none}
+#tec b{display:block;font-size:10px;letter-spacing:.24em;color:var(--dim);font-weight:400}
+#tecD{font-size:34px;letter-spacing:.2em;color:#9fd6a8;margin:12px 0}#tecD.err{color:#ff4a3a}
+#tecP{font-size:11px;color:var(--acc);max-width:300px}#tec small{display:block;margin-top:10px;font-size:10px;color:var(--dim)}
+#obj{position:fixed;left:16px;top:14px;max-width:min(360px,60vw);font-size:12px;line-height:1.5;letter-spacing:.06em;color:var(--acc);text-shadow:0 1px 3px #000;pointer-events:none}
+#obj:before{content:'OBJETIVO';display:block;font-size:10px;letter-spacing:.2em;color:var(--dim)}
+#obj em{display:block;margin-top:8px;font-style:normal;color:#a9c9a4}
+#equipo{position:fixed;left:16px;bottom:40px;font-size:10px;letter-spacing:.18em;line-height:1.8;color:var(--acc);text-shadow:0 1px 3px #000;pointer-events:none}#equipo i{font-style:normal;color:var(--dim)}#equipo b{font-weight:400;color:#ff6a5a}#equipo[hidden],#ayuda[hidden]{display:none}
+#ayuda{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(720px,92vw);background:rgba(6,10,8,.93);border:1px solid #2f6a4a;padding:18px 24px;z-index:5;pointer-events:none;color:#bfe8cf;font-size:12.5px;line-height:1.7}#ayuda h3{margin:0 0 8px;font-size:11px;letter-spacing:.26em;font-weight:400;color:#6fd39a}#ayuda div{display:grid;grid-template-columns:1fr 1fr;gap:2px 26px}#ayuda span{display:block;padding-left:7.2em;text-indent:-7.2em}#ayuda b{color:#fff;font-weight:600}#ayuda span b:first-child{display:inline-block;min-width:7.2em;text-indent:0}#ayuda small{display:block;margin-top:10px;font-size:10px;letter-spacing:.18em;color:#4a8f6a;text-align:right}
+#mun{position:fixed;right:18px;bottom:14px;font-size:22px;letter-spacing:.08em;color:var(--ink);text-shadow:0 1px 3px #000;pointer-events:none;text-align:right}
+#mun i{font-style:normal;font-size:13px;color:var(--dim)}#mun u{display:block;text-decoration:none;font-size:11px;letter-spacing:.14em;color:var(--acc);margin-top:4px}
+#dlg{position:fixed;left:50%;bottom:9%;transform:translateX(-50%);width:min(680px,88vw);background:rgba(6,14,10,.9);border:1px solid #2f6a4a;box-shadow:0 0 0 1px #000,0 8px 30px rgba(0,0,0,.6);padding:14px 18px 12px;color:#bfe8cf;font-size:15px;line-height:1.55;z-index:6}
+#dlg[hidden],#titulo[hidden],#fin[hidden]{display:none}
+#dlgH{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.22em;color:#6fd39a;margin-bottom:8px}#dlgH i{font-style:normal;color:#4a8f6a}
+#dlgT{min-height:3.1em}#dlgT p{margin:0 0 .7em}#dlgT b{color:#fff;font-weight:600}
+#dlg small{display:block;text-align:right;font-size:10px;letter-spacing:.18em;color:#4a8f6a;margin-top:6px}
+#dlg{pointer-events:auto}#dlg ol.op{margin:.7em 0 0;padding-left:1.7em}#dlg ol.op li{cursor:pointer;margin:.2em 0;color:#fff}#dlg .st{color:#d9a44a;font-size:13px}#dlg i{color:#ffd23a;font-style:normal}#dlgH i{color:#4a8f6a}#dlg.fuente{border-color:#3a8a60;color:#9ff0c0;font-style:italic;background:rgba(2,12,8,.94)}
+#dlg.voz{border-color:#7a5a2a;background:rgba(16,12,6,.9);color:#ecd9b0}#dlg.voz #dlgH{color:#e0a850}#dlg.voz #dlgH i{color:#8a6a3a}#dlg.voz small{color:#8a6a3a}
+#bino{position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 41vh,rgba(0,0,0,.6) 42vh,#000 44vh)}#bino[hidden]{display:none}#bino:before,#bino:after{content:'';position:absolute;left:50%;top:50%;background:rgba(190,255,210,.5)}#bino:before{width:26vh;height:1px;margin-left:-13vh}#bino:after{height:26vh;width:1px;margin-top:-13vh}#binoT{position:absolute;left:50%;top:calc(50% + 30vh);transform:translateX(-50%);color:#bfe8cf;font-size:12px;letter-spacing:.2em;text-shadow:0 0 4px #000;white-space:nowrap}
+#dlg.doc{background:rgba(226,214,180,.96);border-color:#6a5a3a;color:#2a2318;font-family:Georgia,serif;font-size:16px}#dlg.doc #dlgH{color:#6a2a18}#dlg.doc #dlgT b{color:#000}#dlg.doc small{color:#6a5a3a}
+#titulo,#fin{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#d8d2c4;font-size:19px;letter-spacing:.14em;line-height:1.9;padding:0 8vw;z-index:7}
+#titulo span{display:block;font-size:11px;letter-spacing:.34em;color:#8a8474;margin-bottom:18px}#titulo b{display:block;font-size:46px;letter-spacing:.3em;font-weight:400;margin-top:10px;color:#fff}
+#titulo small,#fin small{position:absolute;bottom:7%;font-size:10px;letter-spacing:.24em;color:#5a564c}
+#cineA,#cineB{position:fixed;left:0;right:0;height:11.5vh;background:#000;z-index:4;pointer-events:none;transition:transform .6s ease}#cineA{top:0;transform:translateY(-101%)}#cineB{bottom:0;transform:translateY(101%)}
+body.cine #cineA,body.cine #cineB{transform:none}#cineK{position:absolute;right:18px;bottom:12px;font-size:10px;letter-spacing:.22em;color:#5a564c}
+#cineF{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:3}
+#cineS{position:fixed;left:0;right:0;bottom:14vh;text-align:center;font-size:17px;line-height:1.5;color:#efe6d4;text-shadow:0 1px 4px #000,0 0 2px #000;pointer-events:none;z-index:5;padding:0 9vw}
+#cineS b{display:block;font-size:10px;letter-spacing:.3em;color:var(--acc);font-weight:400;margin-bottom:5px}
+#cineS.loc{bottom:auto;top:17vh;text-align:left;padding:0 0 0 6vw;font-size:12px;letter-spacing:.3em;line-height:2;color:#cfc8b8}#cineS.loc b{font-size:24px;letter-spacing:.34em;color:#fff;margin-bottom:6px}
+body.cine #obj,body.cine #estado,body.cine #radar,body.cine #mun,body.cine #equipo,body.cine #hud,body.cine #aviso,body.cine #mira,body.cine #vida,body.cine #guard,body.cine #sub,body.cine #bino,body.cine #dano,body.cine #ayuda,body.cine #tec{display:none!important}
+#fin{background:#000}#fin h2{font-size:30px;letter-spacing:.3em;font-weight:400;color:#fff;margin:0 0 22px}#fin p{max-width:640px;font-size:16px;letter-spacing:.03em;line-height:1.7;margin:0 0 16px}#fin p.m{font-size:12px;letter-spacing:.14em;color:#8a8474}
+</style>
+<div id="intro"><h1>TARSIS</h1><p>Base hispano-americana, marismas del Guadalquivir. Noviembre de 1983.<br>Escenario a escala del primer nivel, para recorrerlo a pie.</p>
+<p>W A S D para moverse · ratón para mirar · botón derecho apunta · botón izquierdo dispara · R recarga · E usar, subir a una torre, agarrar e interrogar por la espalda o arrastrar un cuerpo y esconderlo tras unas cajas o dentro de un contenedor · 1 a 7 eligen en los diálogos · 1 y 2 cambian entre la pistola y la de dardos, si la has conseguido · 3 pide a Ramos, si está contigo, que reclame al guardia que miras · en las escenas, E pasa de plano e Intro las salta · B prismáticos (observar a un guardia lo marca) · C agacharse · Mayús correr · V tercera persona · Q lanza un casquillo para distraer (mantenla para ver dónde cae) · Y cambia el clima (lluvia, nieve o despejado) · F cambia entre noche y día · P cambia la paleta de colores · T música · X llama a Control por radio · Z ordena a Roig seguirte o esperar · G ordena a Roig dormir al guardia que miras (tres dardos) · L abre el cuaderno de pistas · Alt+1 a 4 cambian de vista · U e I niebla · J y K exposición · O resplandor · H oculta el texto · M silencia el sonido · N partida nueva (desde esta pantalla) · Esc suelta el ratón</p><div id="opc"><span>CLIMA</span><button data-w="lluvia">LLUVIA</button><button data-w="nieve">NIEVE</button><button data-w="nada">DESPEJADO</button><span>HORA</span><button data-d="0">NOCHE</button><button data-d="1">DÍA</button></div><div id="load">CARGANDO…</div></div>
+<div id="estado" class="ok" hidden><span id="estadoT">SIGILO</span><i><b id="estadoB"></b></i><small id="luzT"></small></div><div id="aviso"></div><div id="sub"></div><div id="mira" hidden></div><div id="dano"></div><div id="mun" hidden></div><div id="vida" hidden><b id="vidaB"></b></div><div id="guard" hidden>PARTIDA GUARDADA</div><canvas id="radar" width="300" height="300" hidden></canvas><div id="obj" hidden></div><div id="tec" hidden><b>ARCHIVO · CLAVE DE ACCESO</b><div id="tecD"></div><div id="tecP"></div><small>Teclea los cuatro números · Retroceso borra · E cierra</small></div>
+<div id="equipo" hidden></div><div id="ayuda" hidden><h3>CONTROLES</h3><div>
+<span><b>W A S D</b> moverse</span><span><b>Ratón</b> mirar</span>
+<span><b>Mayús</b> correr (hace ruido)</span><span><b>C</b> agacharse (y pasar por los huecos de la valla)</span>
+<span><b>Botón dcho.</b> apuntar</span><span><b>Botón izq.</b> disparar</span>
+<span><b>R</b> recargar</span><span><b>Q</b> casquillo: mantener apunta, soltar lanza</span>
+<span><b>E</b> usar, subir, agarrar por la espalda, arrastrar y esconder un cuerpo</span><span><b>1 a 7</b> elegir en los diálogos; fuera de ellos, <b>1</b> pistola, <b>2</b> dardos y <b>3</b> pide a Ramos que reclame al guardia que miras</span>
+<span><b>B</b> prismáticos: observar marca al guardia</span><span><b>V</b> tercera persona</span>
+<span><b>Z</b> Roig te sigue o espera</span><span><b>G</b> Roig duerme al guardia que miras</span>
+<span><b>X</b> llamar a Control</span><span><b>L</b> cuaderno de pistas</span>
+<span><b>Tiros</b> a la cabeza, uno y sin ruido; al cuerpo, grita</span><span><b>Cuerpos</b> al dormido lo despiertan; por un muerto, alerta roja</span>
+<span><b>E</b> · <b>Intro</b> en las escenas: siguiente plano · saltarla</span><span><b>O</b> resplandor · <b>U I</b> niebla</span>
+<span><b>T</b> música · <b>M</b> silencio</span><span><b>P</b> paleta · <b>H</b> ocultar texto</span>
+</div><small>TAB cerrar</small></div><div id="bino" hidden><span id="binoT"></span></div><div id="dlg" hidden><div id="dlgH"><b id="dlgW"></b><i id="dlgF"></i></div><div id="dlgT"></div><small id="dlgK">E continuar</small></div><div id="titulo" hidden></div><div id="fin" hidden></div>
+<div id="cineF"></div><div id="cineA"></div><div id="cineB"><span id="cineK"></span></div><div id="cineS"></div>
+<div id="hud"><span id="fps"></span></div>

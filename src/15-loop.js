@@ -6,7 +6,7 @@ let perfEma=0.016, perfSlow=0, perfStep=0;
 function perfWatch(raw){ if(!started||paused||raw<=0||raw>0.25)return; perfEma+=(raw-perfEma)*0.05; if(perfEma>0.045)perfSlow+=raw; else perfSlow=Math.max(0,perfSlow-raw*0.5); if(perfSlow<4||perfStep>=3)return; perfSlow=0; perfStep++; perfEma=0.016;
   if(perfStep===1){ renderer.setPixelRatio(Math.min(devicePixelRatio,0.85)); resize(); } else if(perfStep===2){ OPT.shadows=false; applyOpt(); } else { OPT.post=false; applyOpt(); }
   try{ syncOptUI(); }catch(e){} flash('MODO LIGERO '+perfStep+'/3','El juego iba lento: '+(perfStep===1?'bajo la resolución.':perfStep===2?'quito las sombras.':'quito los contornos.')+' Puedes cambiarlo en Opciones.',6); }
-function loop(ts){ requestAnimationFrame(loop); const raw=(ts-last)/1000||0.016; perfWatch(raw); const dt=Math.min(0.05,raw); last=ts; if(started&&!S.over)updObj(); if(started&&!uiOpen&&!S.over&&!cut)update(dt); else if(started){ S.t+=dt; } cutTick(dt); codecTick(dt); rainUpdate(dt); music.tick(dt); render(dt); }
+function loop(ts){ requestAnimationFrame(loop); const raw=(ts-last)/1000||0.016; perfWatch(raw); const dt=Math.min(0.05,raw); last=ts; if(started&&!S.over)updObj(); const running=started&&!uiOpen&&!S.over&&!cut; reflexTick(Math.min(0.25,raw),running); if(running)update(dt*timeScale()); else if(started){ S.t+=dt; } cutTick(dt); codecTick(dt); rainUpdate(dt); music.tick(dt); render(dt); }
 function update(dt){ const P=S.p; S.t+=dt;
   S.spotlit=false; spots.forEach(s=>{ const a=S.t*0.35+s.ph; const tx=s.cx+Math.cos(a)*s.rad, tz=s.cz+Math.sin(a)*s.rad; s.tg.position.set(tx,0,tz); if(W.power&&Math.hypot(tx-P.x,tz-P.z)<2.4&&!interior(tile(P.x),tile(P.z)))S.spotlit=true; });
   if(S.freeze>0){ S.freeze-=dt; return; }
@@ -47,7 +47,7 @@ function update(dt){ const P=S.p; S.t+=dt;
     const C=S.c; const cAlive=C&&C.down<=0; let visC=cAlive?(entHidden(C)?T*1.3:!litAt(C)?T*3:C.crouch?T*5.5:T*8):0; if(cAlive&&C.disguise)visC=Math.min(visC,DISG_D);
     const seeP0=sees(g,P,visRange,half), seeC=cAlive&&sees(g,C,visC,half); const seeP=seeP0||seeC; const V=(seeP0&&seeC)?(dist(g,P)<=dist(g,C)?P:C):(seeP0?P:C);
     if(seeP){ const dv=dist(g,V);
-      if(S.alertT>0)S.alertT=10; if(dv<ALARM_D||V.disguise){ g.susp+=dt*(dv<T*3?3.5:1.4)*(P.run?1.5:1); if(g.susp>=1){ raiseAlarm(V); g.target={x:V.x,z:V.z}; } else if(g.state==='patrol'){ g.state='suspect'; g.target={x:V.x,z:V.z}; g.searchT=4; } }
+      if(S.alertT>0)S.alertT=10; if(dv<ALARM_D||V.disguise){ g.susp+=dt*(dv<T*3?3.5:1.4)*(P.run?1.5:1); if(g.susp>=1){ if(!reflexTry(g,V)){ raiseAlarm(V); g.target={x:V.x,z:V.z}; } } else if(g.state==='patrol'){ g.state='suspect'; g.target={x:V.x,z:V.z}; g.searchT=4; } }
       else { // de lejos no da la alarma: duda unos segundos y se acerca a mirar
         g.susp=Math.min(0.95,g.susp+dt*0.4); if(g.state==='patrol'){ g.state='suspect'; g.doubtT=2.2; g.searchT=9; if(!S.flashSeen.doubt){ S.flashSeen.doubt=true; flash('TE HA VISTO DE LEJOS','Duda. Si te quedas a la vista vendrá a mirar; a menos de siete metros dará la alarma.',5); } }
         if(g.state!=='alert'){ g.target={x:V.x,z:V.z}; g.searchT=Math.max(g.searchT,3); } } }
@@ -60,7 +60,8 @@ function update(dt){ const P=S.p; S.t+=dt;
     else if(g.state==='suspect'||g.state==='search'){ sp=2.6; g.searchT-=dt; tx=g.target.x;tz=g.target.z; if(g.doubtT>0){ g.doubtT-=dt; if(!seeP)g.doubtT=0; }
       if(g.fixing){ const go=genOff(); if(!go)g.fixing=false; else if(Math.hypot(g.x-wx(go.x),g.z-wx(go.y))<T*1.1){ g.fixing=false; go.fix(); g.state='patrol'; flash('AVISO',S.mission>=2?'Un guardia ha vuelto a arrancar un grupo.':'Un guardia ha vuelto a arrancar el generador.',4); } }
       else if(Math.hypot(g.x-tx,g.z-tz)<T*0.7||g.searchT<=0){ if(g.searchT<=0){g.state='patrol';g.fixing=false;} else g.target={x:tx+(Math.random()-0.5)*T*4,z:tz+(Math.random()-0.5)*T*4}; } }
-    else { sp=1.7; const w=g.wps[g.wi]; tx=wx(w[0]); tz=wx(w[1]); if(Math.hypot(g.x-tx,g.z-tz)<0.15)g.wi=(g.wi+1)%g.wps.length; }
+    if(g.heardF){ if(g.state!=='suspect'||g.target!==g.heardN)g.heardF=null; else { const fs=flowStepIn(g.heardF,g); if(fs&&Math.hypot(g.x-g.target.x,g.z-g.target.z)>T*1.2){ tx=fs.x; tz=fs.z; } } }
+    if(g.state==='patrol'){ sp=1.7; const w=g.wps[g.wi]; tx=wx(w[0]); tz=wx(w[1]); if(Math.hypot(g.x-tx,g.z-tz)<0.15)g.wi=(g.wi+1)%g.wps.length; }
     const ddx=tx-g.x,ddz=tz-g.z,L0=Math.hypot(ddx,ddz),L=L0||1; g.moving=false;
     if(g.doubtT>0&&g.target){ const dd=Math.hypot(g.target.x-g.x,g.target.z-g.z)||1; g.fx=(g.target.x-g.x)/dd; g.fz=(g.target.z-g.z)/dd; }
     else if(L0>0.12){ const ox=g.x,oz=g.z; move(g,ddx/L*sp*dt,ddz/L*sp*dt,0.4); const mv=Math.abs(g.x-ox)+Math.abs(g.z-oz); g.moving=mv>0.004; if(mv<0.004){ if(g.state==='patrol')g.wi=(g.wi+1)%g.wps.length; else g.target={x:g.x+(Math.random()-0.5)*T*3,z:g.z+(Math.random()-0.5)*T*3}; } g.fx=ddx/L; g.fz=ddz/L; }
@@ -68,24 +69,24 @@ function update(dt){ const P=S.p; S.t+=dt;
     g.fig.g.position.set(g.x,0,g.z); g.fig.g.rotation.y=Math.atan2(g.fx,g.fz); animFig(g.fig,g.moving,dt,g.state==='alert');
     g.mark.visible=g.state!=='patrol'; g.mark.material.map=g.state==='alert'?MK.ex:MK.q; g.mark.position.set(g.x,2.3,g.z);
   });
-  updateTeam(dt); if(S.swapT>0)S.swapT-=dt; if(S.muzzleC>0)S.muzzleC-=dt;
+  reconUpdate(dt); updateTeam(dt); if(S.swapT>0)S.swapT-=dt; if(S.muzzleC>0)S.muzzleC-=dt;
   const it=currentInter(); let lab=it?(typeof it.label==='function'?it.label():it.label):''; const ng=nearestGuard(2.0); const ngFar=ng?null:nearestGuard(4.5);
   if(!lab&&ng)lab=ng.state==='alert'?'F · FORCEJEAR':'F · AGARRAR E INTERROGAR'; if(!lab&&ngFar&&ngFar.state!=='alert')lab=(P.crouch?'':'CTRL · AGÁCHATE · ')+'ACÉRCATE POR DETRÁS Y PULSA F';
   fMark.visible=!!(ng&&ng.state!=='alert'); if(ng)fMark.position.set(ng.x,2.25,ng.z);
   guideTick(); if(!lab&&nearestDog(1.8))lab='F · PATADA'; if(!lab&&!P.carry&&!P.disguise&&S.bodies.some(b=>!b.stripped&&!b.carried&&dist(b,P)<2.2))lab='E · QUITARLE EL UNIFORME'; if(!lab&&!P.carry&&S.bodies.some(b=>dist(b,P)<2.2))lab='C · CARGAR EL CUERPO'; if(!lab&&P.carry)lab='C · SOLTAR EL CUERPO';
-  if(!locked)lab='CLIC PARA CAPTURAR EL RATÓN'; promptEl.hidden=!lab; promptEl.textContent=lab;
+  if(scopeOn())lab=''; if(!locked)lab='CLIC PARA CAPTURAR EL RATÓN'; promptEl.hidden=!lab; promptEl.textContent=lab;
   if(flashT>0){flashT-=dt; if(flashT<=0)flashEl.hidden=true;}
   if(S.recoil>0)S.recoil=Math.max(0,S.recoil-dt*5); if(S.muzzle>0)S.muzzle-=dt;
 }
 function render(dt){ const P=S.p||{x:wx(start.x),z:wx(start.y),crouch:false};
   if(!cut){ const targetH=P.crouch?0.95:1.6; S.camH=S.camH===undefined?targetH:S.camH+(targetH-S.camH)*Math.min(1,dt*10);
     const bob=P.moving?Math.sin(S.bob||0)*0.04:0;
-    if(third){ const f=fwd(); const r={x:Math.cos(yaw),z:-Math.sin(yaw)}; const d=3.4, cp=Math.cos(pitch), sp=Math.sin(pitch);
+    if(third&&scopeK<0.5){ const f=fwd(); const r={x:Math.cos(yaw),z:-Math.sin(yaw)}; const d=3.4, cp=Math.cos(pitch), sp=Math.sin(pitch);
       let cx=P.x-f.x*d*cp+r.x*0.7, cz=P.z-f.z*d*cp+r.z*0.7, cy=S.camH+0.6-sp*d;
       for(let k=1;k<=12;k++){ const t=k/12; const sx=P.x+(cx-P.x)*t, sz=P.z+(cz-P.z)*t, sy=S.camH+(cy-S.camH)*t; if(solidT(tile(sx),tile(sz))||sy<0.3||(sy>2.85&&interior(tile(sx),tile(sz)))){ const tt=Math.max(0.12,(k-1)/12); cx=P.x+(cx-P.x)*tt; cz=P.z+(cz-P.z)*tt; cy=S.camH+(cy-S.camH)*tt; break; } }
       camera.position.set(cx,Math.max(0.3,cy),cz); camera.lookAt(P.x+f.x*2.5+r.x*0.7,S.camH+0.1+sp*2.5,P.z+f.z*2.5+r.z*0.7); }
     else { camera.position.set(P.x,S.camH+bob,P.z); camera.rotation.set(pitch,yaw,0); } }
-  arms.visible=!third&&!cut; const pf=S.p?S.p.fig:playerFig; pf.g.visible=third||!!cut;
+  scopeTick(dt); arms.visible=!third&&!cut&&scopeK<0.5; const pf=S.p?S.p.fig:playerFig; pf.g.visible=(third&&scopeK<0.5)||!!cut;
   if(S.p){ pf.g.position.set(P.x,S.lying?0.26:0,P.z); pf.g.rotation.y=yaw+Math.PI; pf.g.rotation.z=S.lying?Math.PI/2:0; pf.g.scale.y=P.crouch&&!S.lying?0.7:1; animFig(pf,P.moving&&!S.lying,dt,false); pf.armR.rotation.x=S.lying?0:(S.smoke>0?-2.5:-1.25); }
   ember.intensity=S.smoke>0?0.45+Math.sin((S.t||0)*7)*0.25:0; if(S.smoke>0){ const f=fwd(); ember.position.set(P.x+f.x*0.4,S.camH-0.05,P.z+f.z*0.4); }
   arms.position.set(P.moving?Math.sin((S.bob||0)*0.5)*0.01:0,(P.moving?Math.abs(Math.sin(S.bob||0))*0.015:0)+(P.crouch?-0.03:0),S.recoil*0.07); arms.rotation.set(S.recoil*0.3,0,0);
@@ -93,7 +94,7 @@ function render(dt){ const P=S.p||{x:wx(start.x),z:wx(start.y),crouch:false};
   muzzle.position.set(P.x,1.4,P.z); muzzle.intensity=S.muzzle>0?3:0; if(S.muzzleC>0&&S.c){ muzzle.position.set(S.c.x,1.4,S.c.z); muzzle.intensity=1.2; }
   if(usePost&&rt){ renderer.setRenderTarget(rt); renderer.render(scene,camera); renderer.setRenderTarget(null); post.uniforms.hurt.value=P.hurtT>0?P.hurtT:0; post.uniforms.time.value=S.t||0; renderer.render(postScene,postCam); } else renderer.render(scene,camera);
   drawHud(); }
-function drawHud(){ const w=hud.width,h=hud.height; hctx.clearRect(0,0,w,h); if(!started||cut)return; const P=S.p;
+function drawHud(){ const w=hud.width,h=hud.height; hctx.clearRect(0,0,w,h); if(!started||cut)return; const P=S.p; reconHudUnder(w,h);
   hctx.strokeStyle='rgba(214,228,220,.8)'; hctx.lineWidth=2; const cx=w/2,cy=h/2,g=P.crouch?5:9; hctx.beginPath(); hctx.moveTo(cx-g-6,cy);hctx.lineTo(cx-g,cy);hctx.moveTo(cx+g,cy);hctx.lineTo(cx+g+6,cy);hctx.moveTo(cx,cy-g-6);hctx.lineTo(cx,cy-g);hctx.moveTo(cx,cy+g);hctx.lineTo(cx,cy+g+6); hctx.stroke();
   hctx.font='9px "Press Start 2P",monospace'; hctx.textAlign='left';
   const hidden=playerHidden(); if(hidden){ hctx.fillStyle='#4fb9d6'; hctx.fillText('OCULTO',16,h-20); } else if(S.spotlit){ hctx.fillStyle='#e0483a'; hctx.fillText('¡EN EL FOCO!',16,h-20); } else if(P.crouch){ hctx.fillStyle='#7d948a'; hctx.fillText('AGACHADO',16,h-20); }
@@ -104,7 +105,7 @@ function drawHud(){ const w=hud.width,h=hud.height; hctx.clearRect(0,0,w,h); if(
   if(S.swapT>0){ hctx.fillStyle='rgba(79,185,214,'+(S.swapT*0.8)+')'; hctx.fillRect(0,0,w,h); hctx.fillStyle='#fff'; hctx.font='12px "Press Start 2P",monospace'; hctx.textAlign='center'; hctx.fillText(P.name,cx,cy-60); }
   if(S.freeze>0){ hctx.fillStyle='#ff4a3a'; hctx.font='48px "Press Start 2P",monospace'; hctx.textAlign='center'; hctx.fillText('!',cx,cy-40); }
   if(S.savedT>0){ S.savedT-=0.016; hctx.fillStyle='#f0b240'; hctx.font='8px "Press Start 2P",monospace'; hctx.textAlign='right'; hctx.fillText('● GUARDADO',w-16,h-40); }
-  if(!cut)radar(w,h); }
+  reconHud(w,h); if(!cut)radar(w,h); }
 function radar(w,h){ const sc=3.4, rw=COLS*sc, rh=ROWS*sc, ox=w-rw-16, oy=44; hctx.save(); hctx.globalAlpha=0.85; hctx.fillStyle='rgba(4,10,8,.8)'; hctx.fillRect(ox-4,oy-4,rw+8,rh+8); hctx.strokeStyle='#2a5a3a'; hctx.strokeRect(ox-4,oy-4,rw+8,rh+8);
   if(S.alertT>0){ for(let i=0;i<120;i++){ hctx.fillStyle=Math.random()<0.5?'#1a3a2a':'#0a1a12'; hctx.fillRect(ox+Math.random()*rw,oy+Math.random()*rh,3,2); } hctx.fillStyle='#e0483a'; hctx.font='7px "Press Start 2P",monospace'; hctx.textAlign='center'; hctx.fillText('INTERFERENCIA',ox+rw/2,oy+rh/2); hctx.restore(); return; }
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){ const c=cell(x,y); if(c==='#'||c==='W'||c==='T'||c==='c'||c==='g'){ hctx.fillStyle='#2f5a44'; hctx.fillRect(ox+x*sc,oy+y*sc,sc,sc); } else if(interior(x,y)){ hctx.fillStyle='#0f2a1c'; hctx.fillRect(ox+x*sc,oy+y*sc,sc,sc); } }
@@ -116,7 +117,10 @@ function radar(w,h){ const sc=3.4, rw=COLS*sc, rh=ROWS*sc, ox=w-rw-16, oy=44; hc
     const dx=tx-P.x, dz=tz-P.z, dist=Math.hypot(dx,dz); const f=fwd(); const rel=Math.atan2(dx*f.z-dz*f.x,dx*f.x+dz*f.z); const cx=ox+rw/2, cy=oy+rh+14;
     hctx.fillStyle='#ffe066'; hctx.font='7px "Press Start 2P",monospace'; hctx.textAlign='center'; hctx.fillText('OBJ · '+Math.round(dist)+' m',cx+12,cy+3);
     hctx.save(); hctx.translate(cx-rw/2+10,cy); hctx.rotate(rel); hctx.beginPath(); hctx.moveTo(0,-6); hctx.lineTo(4,4); hctx.lineTo(0,2); hctx.lineTo(-4,4); hctx.closePath(); hctx.fill(); hctx.restore(); }
+  reconRadar(ox,oy,sc);
   const px=ox+P.x/T*sc, pz=oy+P.z/T*sc, f=fwd(); hctx.fillStyle='#4fc77a'; hctx.beginPath(); hctx.moveTo(px+f.x*5,pz+f.z*5); hctx.lineTo(px-f.z*3-f.x*3,pz+f.x*3-f.z*3); hctx.lineTo(px+f.z*3-f.x*3,pz-f.x*3-f.z*3); hctx.closePath(); hctx.fill(); hctx.restore(); }
 
-window.__LH={burnArchive,objective3,carryState,outro2,outro3,showEnd,set useGrace(v){useGrace=v},get useGrace(){return useGrace},get MAPSRC(){return ZONE.src},get ZONE(){return ZONE},ZONES,travel,enterZone,startMission,toggleGen,applyGens,genOff,litAt,reset,perfWatch,get perfStep(){return perfStep},music,toggleSilencer,stripUniform,setDisguise,nearestBody,teamOrder,releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,get INTER(){return INTER},codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
+// para las pruebas: avanza la simulación n pasos sin dibujar (la máquina de pruebas no tiene tarjeta gráfica)
+function simStep(n,dt){ dt=dt||0.05; for(let i=0;i<(n||1);i++){ const running=started&&!uiOpen&&!S.over&&!cut; reflexTick(dt,running); if(running)update(dt*timeScale()); scopeTick(dt); } }
+window.__LH={step:simStep,loadModel,MODELS,MODEL_INFO,MODEL_SLOTS,slotInst,THREE,scene,figure,get zoneGroup(){return zoneGroup},throwDecoy,makeNoise,markGuard,scopeOn,decoyLanding,reflexTry,get scopeKey(){return scopeKey},set scopeKey(v){scopeKey=v},get scopeK(){return scopeK},get scopeAim(){return scopeAim},burnArchive,objective3,carryState,outro2,outro3,showEnd,set useGrace(v){useGrace=v},get useGrace(){return useGrace},get MAPSRC(){return ZONE.src},get ZONE(){return ZONE},ZONES,travel,enterZone,startMission,toggleGen,applyGens,genOff,litAt,reset,perfWatch,get perfStep(){return perfStep},music,toggleSilencer,stripUniform,setDisguise,nearestBody,teamOrder,releaseDogs,captured,defeat,saveGame,loadGame,radioMenu,startSmoke,wx,swapChar,los,teamThreat,entHidden,get uiOpen(){return uiOpen},get paused(){return paused},get codecQ(){return codecQ},get started(){return started},doGrab,doUse,ask,squeeze,knock:knock,shoot,get locked(){return locked},set locked(v){locked=v},keys,showMenu,startGame,OPT,get third(){return third},set third(v){third=v},S,W,camera,get yaw(){return yaw},set yaw(v){yaw=v},set pitch(v){pitch=v},setPower,keypadIn,openKeypad,knock,raiseAlarm,get INTER(){return INTER},codec,CODEC,cutSkip,codecNext,get cut(){return cut}};
 resize(); reset(); requestAnimationFrame(loop);

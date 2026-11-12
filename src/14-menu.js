@@ -9,7 +9,9 @@ function applyOpt(){ usePost=!!OPT.post&&!!rt; if(renderer.shadowMap.enabled!==!
 const guideEl=el('guide');
 const GUIDE=[
   {k:'crouch',t:'Agáchate (Ctrl) en una sombra hasta leer OCULTO',ok:()=>S.guide.hidden},
+  {k:'scope',t:'Mantén B (o el botón derecho): prismáticos. Deja la mira sobre un guardia para marcarlo',ok:()=>S.marks>0},
   {k:'grab',t:'Acércate a un guardia por la espalda y pulsa F',ok:()=>S.interro>0},
+  {k:'decoy',t:'Z lanza un cargador vacío: quien lo oiga irá a mirar y dejará el paso libre',ok:()=>S.decoys>0},
   {k:'ask',t:'Pregúntale; si calla, APRIETA, y luego duérmelo',ok:()=>S.clues.some(k=>['peris','c130','c1983','roma','llave','fuente'].includes(k))&&S.ko>0},
   {k:'read',t:'Lee lo que encuentres (E). Tab abre el cuaderno de pistas',ok:()=>S.clues.length>=2},
   {k:'order',t:'Roig espera donde está. G hace que te siga (y G otra vez, que espere)',ok:()=>S.orders>0},
@@ -31,14 +33,14 @@ function startGame(withIntro,silent){ initAudio(); applyOpt(); if(GFX_PRESET&&!S
 // guardado automático en puntos clave; CONTINUAR en el menú
 const pickEnt=e=>({name:e.name,x:e.x,z:e.z,hp:e.hp,ammo:e.ammo,key:e.key,file:e.file,crouch:e.crouch,down:e.down,disguise:!!e.disguise});
 function saveGame(tag){ if(!started||S.over)return; try{ const zones=Object.assign({},S.zoneState); zones[S.zone]=zoneSnapshot(); const d={v:3,tag,when:Date.now(),mission:S.mission||1,t:S.t,ctrl:S.p.name,yaw,p:pickEnt(S.p),c:pickEnt(S.c),W:Object.assign({},W),zone:S.zone,zones,
-  clues:S.clues.slice(),kill:S.kill,ko:S.ko,alarms:S.alarms,interro:S.interro,base:S.base,cigs:S.cigs,inCell:S.inCell,dogsDone:S.dogsDone,dogsOut:!!S.dogsOut,capturedOnce:!!S.capturedOnce,swaps:S.swaps,cOrder:S.cOrder,orders:S.orders,silencer:!!S.silencer,disguises:S.disguises,teamKO:S.teamKO,ammoTaken:S.ammoTaken,wrongCode:S.wrongCode,halloTalked:S.halloTalked,codecSeen:S.codecSeen,flashSeen:S.flashSeen,guide:S.guide,vidal:S.vidal,reinforced:S.reinforced,refPending:!!S.refPending,dogKills:S.dogKills,cellEscaped:!!S.cellEscaped,cellKey:!!S.cellKey,calls:S.calls||null,gas:!!S.gas,prev:S.prev||null};
+  clues:S.clues.slice(),kill:S.kill,ko:S.ko,alarms:S.alarms,interro:S.interro,base:S.base,cigs:S.cigs,inCell:S.inCell,dogsDone:S.dogsDone,dogsOut:!!S.dogsOut,capturedOnce:!!S.capturedOnce,swaps:S.swaps,cOrder:S.cOrder,orders:S.orders,silencer:!!S.silencer,disguises:S.disguises,teamKO:S.teamKO,ammoTaken:S.ammoTaken,wrongCode:S.wrongCode,halloTalked:S.halloTalked,codecSeen:S.codecSeen,flashSeen:S.flashSeen,guide:S.guide,vidal:S.vidal,reinforced:S.reinforced,refPending:!!S.refPending,dogKills:S.dogKills,cellEscaped:!!S.cellEscaped,cellKey:!!S.cellKey,calls:S.calls||null,gas:!!S.gas,prev:S.prev||null,marks:S.marks||0,decoys:S.decoys||0};
   localStorage.setItem('lh-save',JSON.stringify(d)); S.savedT=2.5; }catch(e){} }
 function hasSave(){ try{ return JSON.parse(localStorage.getItem('lh-save')||'null'); }catch(e){ return null; } }
 function loadGame(){ const d=hasSave(); if(!d)return null; reset();
   // guardados antiguos (v1): un solo mapa, guardias en d.guards
   S.zoneState=d.zones||(d.guards?{base:{guards:d.guards.map(g=>Object.assign({},g,{ref:false}))}}:{}); if(d.v===undefined||d.v<2){ const gs=S.zoneState.base&&S.zoneState.base.guards; if(gs&&d.reinforced&&gs.length>GDEF.length)gs[gs.length-1].ref=true; }
   Object.assign(W,d.W); if(!Array.isArray(W.gens))W.gens=[true,true,true];
-  ['clues','kill','ko','alarms','interro','base','cigs','inCell','dogsDone','dogsOut','capturedOnce','swaps','cOrder','orders','silencer','disguises','teamKO','ammoTaken','wrongCode','halloTalked','codecSeen','flashSeen','guide','vidal','reinforced','refPending','dogKills','cellEscaped','cellKey','mission','t','gas','prev'].forEach(k=>{ if(d[k]!==undefined)S[k]=d[k]; }); if(d.calls)S.calls=d.calls;
+  ['clues','kill','ko','alarms','interro','base','cigs','inCell','dogsDone','dogsOut','capturedOnce','swaps','cOrder','orders','silencer','disguises','teamKO','ammoTaken','wrongCode','halloTalked','codecSeen','flashSeen','guide','vidal','reinforced','refPending','dogKills','cellEscaped','cellKey','mission','t','gas','prev','marks','decoys'].forEach(k=>{ if(d[k]!==undefined)S[k]=d[k]; }); if(d.calls)S.calls=d.calls;
   enterZone(d.zone||'base',null,d.yaw||yaw,{noSave:true});
   const byName={CUTTLAS:S.p,ROIG:S.c}; [d.p,d.c].forEach(e=>{ const t=byName[e.name]; if(t){ Object.assign(t,e); setDisguise(t,!!e.disguise); } }); if(d.ctrl==='ROIG'){ const a=S.p; S.p=S.c; S.c=a; }
   if(ZONE.sync)ZONE.sync(); pitch=0; S.camH=undefined; updHud(); renderNote(); el('hCig').textContent=S.cigs;

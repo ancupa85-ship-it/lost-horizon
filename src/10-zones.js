@@ -95,15 +95,15 @@ ZONES.galeria={id:'galeria',title:'GALERÍA DE ACCESO',sub:'BAJO EL PATIO SUR ·
   onEnter(){ if(!S.codecSeen.down){ S.codecSeen.down=true; setTimeout(()=>{ if(!uiOpen&&!S.over&&!cut)codec(CODEC.down); },1200); } }};
 
 // ---- estado de los guardias por zona (se conserva al salir y al guardar)
-function guardState(g){ return {x:g.x,z:g.z,fx:g.fx,fz:g.fz,wi:g.wi,dead:g.dead,down:g.down,fear:g.fear,hasKey:g.hasKey,stripped:!!g.stripped,ref:!!g.red}; }
+function guardState(g){ return {x:g.x,z:g.z,fx:g.fx,fz:g.fz,wi:g.wi,dead:g.dead,down:g.down,fear:g.fear,hasKey:g.hasKey,stripped:!!g.stripped,ref:!!g.red,marked:!!g.marked,decoy:g.decoy||0}; }
 function applyGuardState(list){ (list||[]).forEach((sg,i)=>{ let g=S.guards[i]; if(!g){ if(!sg.ref)return; g=mkGuard(REFDEF,true); S.guards.push(g); }
-  Object.assign(g,{x:sg.x,z:sg.z,fx:sg.fx,fz:sg.fz,wi:sg.wi,dead:sg.dead,down:sg.down,fear:sg.fear,hasKey:sg.hasKey,stripped:!!sg.stripped}); g.state='patrol'; g.susp=0; g.held=false;
+  Object.assign(g,{x:sg.x,z:sg.z,fx:sg.fx,fz:sg.fz,wi:sg.wi,dead:sg.dead,down:sg.down,fear:sg.fear,hasKey:sg.hasKey,stripped:!!sg.stripped,marked:!!sg.marked,decoy:sg.decoy||0}); g.state='patrol'; g.susp=0; g.held=false;
   if(g.dead||g.down>0){ S.bodies.push({x:g.x,z:g.z,dead:g.dead,g,carried:false,hidden:false,stripped:!!g.stripped}); g.fall=1; g.fig.g.rotation.z=Math.PI/2; g.fig.g.position.y=0.26; g.mark.visible=false; } g.fig.g.position.x=g.x; g.fig.g.position.z=g.z; }); }
 function zoneSnapshot(){ return {guards:S.guards.map(guardState),dogs:S.dogs.filter(d=>!d.dead).length}; }
 function leaveZone(keep){ if(!ZONE)return; if(keep)S.zoneState[ZONE.id]=zoneSnapshot(); S.guards.forEach(g=>{scene.remove(g.fig.g);scene.remove(g.mark);}); S.dogs.forEach(d=>scene.remove(d.fig.g)); S.guards=[]; S.dogs=[]; S.bodies=[]; if(S.p&&S.p.carry){S.p.carry.carried=false;S.p.carry=null;} unloadWorld(); }
 // carga una zona: at = casilla de llegada [x,y] (por defecto el inicio de la zona), face = yaw de llegada
 function enterZone(id,at,face,o){ o=o||{}; const z=ZONES[id]; if(!z)throw new Error('zona desconocida: '+id);
-  leaveZone(!(o.fresh||o.noSave)); S.zone=id; setMap(z); buildWorld(z); INTER=z.inter||[]; flow=null;
+  leaveZone(!(o.fresh||o.noSave)); reconZone(); S.zone=id; setMap(z); buildWorld(z); INTER=z.inter||[]; flow=null;
   S.guards=(z.guards||[]).map(d=>mkGuard(d)); S.bodies=[]; S.dogs=[]; const st=S.zoneState[id]; if(st){ applyGuardState(st.guards); if(st.dogs&&id==='base')releaseDogs(st.dogs,true); }
   if(S.refPending&&id==='base'){ S.refPending=false; S.guards.push(mkGuard(REFDEF,true)); }
   const t=at||[start.x,start.y]; const P=S.p, C=S.c; P.x=wx(t[0]); P.z=wx(t[1]); P.moving=false;
