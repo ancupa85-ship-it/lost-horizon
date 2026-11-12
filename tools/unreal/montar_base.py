@@ -5,7 +5,7 @@ Se ejecuta dentro del editor (Python del editor de Unreal), por ejemplo:
 o desde el editor: Herramientas > Ejecutar script de Python.
 
 Qué hace (se puede repetir: rehace el nivel cada vez):
-1. Importa base.glb en /Game/Tarsis/Base (mallas y materiales).
+1. Importa base.glb en /Game/Tarsis/Base/v<huella> (mallas y materiales); al final borra las versiones anteriores.
 2. Crea el nivel /Game/Tarsis/Mapas/Tarsis y coloca todas las mallas en el origen (vienen con la posición aplicada).
    Las torres de vigilancia (torre1_*, torre2_*) van a la carpeta «Torres»; vallas y contenedores, a «Recintos»
    (la tela de las vallas con un material translúcido, M_Tela).
@@ -13,14 +13,17 @@ Qué hace (se puede repetir: rehace el nivel cada vez):
    la luna, el cielo nocturno, la niebla y la salida de Cuttlas.
 4. Pone colisión «compleja como simple» para poder andar por todo, y guarda.
 """
-import os, json
+import os, json, hashlib
 import unreal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 GLB = os.path.join(ROOT, 'assets', 'unreal', 'base.glb')
 DATA = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json')))
-DEST = '/Game/Tarsis/Base'
+BASE = '/Game/Tarsis/Base'
+# cada versión de base.glb se importa en su propia carpeta (v + 8 cifras de su huella); al final se borran las viejas
+VER = hashlib.md5(open(GLB, 'rb').read()).hexdigest()[:8]
+DEST = BASE + '/v' + VER
 MAPA = '/Game/Tarsis/Mapas/Tarsis'
 
 def log(*a):
@@ -34,9 +37,8 @@ def mallas():
     return [a.get_asset() for a in ar.get_assets_by_path(DEST, recursive=True)
             if str(a.asset_class_path.asset_name) == 'StaticMesh']
 
-# si la base ya está importada se reutiliza (LH_REIMPORT=1 para importarla de nuevo)
-# también se reimporta solo si base.glb trae mallas nuevas (p. ej. las torres)
-if os.environ.get('LH_REIMPORT') or len(mallas()) < DATA.get('mallas', 1):
+# si esta versión de la base ya está importada se reutiliza (LH_REIMPORT=1 para importarla de nuevo)
+if os.environ.get('LH_REIMPORT') or not mallas():
     task = unreal.AssetImportTask()
     task.set_editor_property('filename', GLB)
     task.set_editor_property('destination_path', DEST)
@@ -177,3 +179,13 @@ if DATA.get('spawn'):
 
 les.save_current_level()
 log('nivel guardado en', MAPA)
+
+# limpiar importaciones anteriores (el nivel ya no las usa)
+viejas = [p for p in eal.list_assets(BASE, recursive=True, include_folder=False) if not p.startswith(DEST + '/')]
+for p in viejas:
+    eal.delete_asset(p.split('.')[0])
+for d in eal.list_assets(BASE, recursive=False, include_folder=True):
+    d = d.rstrip('/')
+    if d != DEST and eal.does_directory_exist(d):
+        eal.delete_directory(d)
+log('versión', VER, '- borrados', len(viejas), 'recursos de importaciones anteriores')

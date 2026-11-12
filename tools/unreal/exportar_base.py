@@ -9,7 +9,7 @@ Parte de la misma escena que el visor realista (tools/blender/escena_base.py con
 Uso (con el módulo bpy: pip install bpy):  python3 tools/unreal/exportar_base.py
 Salida: assets/unreal/base.glb y assets/unreal/base.json
 """
-import os, re, sys, json, subprocess, tempfile, shutil
+import os, re, sys, json, math, subprocess, tempfile, shutil
 
 R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(R, 'assets', 'unreal')
@@ -23,7 +23,7 @@ subprocess.run([sys.executable, os.path.join(R, 'tools', 'blender', 'escena_base
                stdout=subprocess.DEVNULL)
 
 import bpy
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=glb0)
@@ -79,6 +79,45 @@ for mat in bpy.data.materials:
     if 'emissive' in d:
         b.inputs['Emission Color'].default_value = (*d['emissive'], 1)
         b.inputs['Emission Strength'].default_value = d.get('emissiveIntensity', 1.0)
+
+# 3b) farolas solo a la entrada de cada zona (Andres, 2026-11-12: «desentonan un poco»). Casillas del plano:
+#     puerta del patio norte a la zona este, hueco de la valla norte, cancela de servicios y control de salida.
+#     Las que ya están en una entrada se quedan; otras se mueven allí y las demás se quitan (farola y bombilla).
+FAROLAS = [(17, 5), (16, 12), (26, 14), (28, 24)]
+_T0 = json.load(open(os.path.splitext(glb0)[0] + '.json'))['T']
+cen = lambda c: (c[0] * _T0 + _T0 / 2, -(c[1] * _T0 + _T0 / 2))
+fobjs = [o for o in bpy.data.objects if o.type == 'MESH' and o.name.split('.')[0] == 'farola']
+def fcell(o):
+    xs = [v.co.x for v in o.data.vertices]; ys = [v.co.y for v in o.data.vertices]
+    return (sum(xs) / len(xs), sum(ys) / len(ys))
+old = {o: fcell(o) for o in fobjs}
+want = [cen(c) for c in FAROLAS]
+mov = {}   # posición vieja -> nueva (None = quitar)
+libres = [w for w in want if not any(math.hypot(w[0] - p[0], w[1] - p[1]) < 0.6 for p in old.values())]
+for o, p in sorted(old.items(), key=lambda kv: kv[1]):
+    if any(math.hypot(w[0] - p[0], w[1] - p[1]) < 0.6 for w in want):
+        mov[p] = p
+    elif libres:
+        # la más cercana de las entradas que faltan
+        w = min(libres, key=lambda w: math.hypot(w[0] - p[0], w[1] - p[1])); libres.remove(w); mov[p] = w
+        o.data.transform(Matrix.Translation((w[0] - p[0], w[1] - p[1], 0)))
+    else:
+        mov[p] = None; bpy.data.objects.remove(o)
+bulbs = bpy.data.objects.get('luces_bombilla')
+if bulbs:
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(bulbs.data); quitar = []
+    for v in bm.verts:
+        p = min(mov, key=lambda q: math.hypot(v.co.x - q[0], v.co.y - q[1]))
+        if math.hypot(v.co.x - p[0], v.co.y - p[1]) > 0.8:
+            continue
+        if mov[p] is None:
+            quitar.append(v)
+        else:
+            v.co.x += mov[p][0] - p[0]; v.co.y += mov[p][1] - p[1]
+    bmesh.ops.delete(bm, geom=quitar, context='VERTS'); bm.to_mesh(bulbs.data); bm.free()
+FAROLA_POS = [w for w in mov.values() if w]
+print('FAROLAS', len(FAROLA_POS), FAROLA_POS)
 
 # 4) marcas para deducir los ejes en Unreal (cubos de 2 cm en posiciones conocidas, coordenadas de Blender en metros)
 MARCAS = {'lh_marca_o': (0, 0, 0), 'lh_marca_x': (10, 0, 0), 'lh_marca_y': (0, 10, 0), 'lh_marca_z': (0, 0, 10)}
@@ -174,6 +213,9 @@ TORRES = [torre(i, t) for i, t in enumerate(TOWERS)]
 # 4c) recintos del visor (v51): vallas de tela metálica (f), huecos para pasar agachado (h) y contenedores (m).
 #     El plano se parchea como en visor.js y se levanta la misma geometría.
 MAP = list(json.load(open(os.path.splitext(glb0)[0] + '.json'))['map'])
+MAP = [r.replace('l', '.') for r in MAP]   # en el plano, solo las farolas que quedan
+for fx, fy in FAROLAS:
+    MAP[fy] = MAP[fy][:fx] + 'l' + MAP[fy][fx + 1:]
 pre = vjs[:vjs.index('KONT.forEach(k=>{ for')]
 KONT = json.loads(re.search(r'const KONT=(\[\[.*?\]\]);', vjs).group(1))
 def put(x, y, t):
@@ -263,7 +305,10 @@ for y, row in enumerate(j['map']):
     if x >= 0:
         spawn = [x * T + T / 2, -(y * T + T / 2), 0.0]
 # los focos de torreta del visor cuelgan de las torres (en Blender estaban en las torretas antiguas)
-lights = [l for l in j['lights'] if l.get('name') != 'foco_torreta']
+lights = [l for l in j['lights'] if l.get('name') not in ('foco_torreta', 'farola')]
+f0 = next(l for l in j['lights'] if l.get('name') == 'farola')
+for w in FAROLA_POS:
+    lights.append(dict(f0, pos=[w[0], w[1], f0['pos'][2]]))
 for tw in TORRES:
     lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': tw['foco']['pos'], 'dir': tw['foco']['dir'],
                    'color': [0.8, 0.9, 1.0], 'power': 90000})
