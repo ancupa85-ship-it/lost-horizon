@@ -28,6 +28,11 @@ from mathutils import Vector, Matrix
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=glb0)
 
+# fuera los maniquíes fijos de los personajes (gente_*, gear_*): en Unreal los guardias son actores con esqueleto
+for o in [o for o in bpy.data.objects if o.name.split('.')[0].startswith(('gente_', 'gear_'))]:
+    print('quitado', o.name)
+    bpy.data.objects.remove(o)
+
 # 2) aplicar transformaciones (las mallas compartidas se duplican primero)
 meshes = [o for o in bpy.data.objects if o.type == 'MESH']
 for o in meshes:

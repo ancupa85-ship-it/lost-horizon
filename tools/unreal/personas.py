@@ -2,13 +2,15 @@
 
 Los .glb salen del visor realista (window.LH_ESC.people en tarsis-escenario.html): personas de MakeHuman con
 esqueleto de 53 huesos con nombres al estilo de Unreal (Root, pelvis, spine_01... ball_r) y animaciones
-idle, walk, down y aim (Cuttlas: idle, stand, walk y sneak). Se importan en /Game/Tarsis/Personas/<nombre>.
+idle, walk, down y aim (Cuttlas: idle, stand, walk y sneak). Se importan en /Game/Tarsis/Personas/<nombre>_<huella>.
+La traslación del nodo del armazón (~0,83 m) está pasada al hueso Root, en reposo y en las animaciones: Interchange
+la metía en la pose de referencia pero no en las animaciones, y los guardias salían hundidos hasta la cintura.
 
 Uso desde otro script del editor:
     import personas
     p = personas.cargar('ibarra')   # {'malla': SkeletalMesh, 'idle': AnimSequence, 'walk': ..., 'aim': ..., 'down': ...}
 """
-import os
+import os, hashlib
 import unreal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,15 +32,17 @@ def _assets(ruta):
 
 def importar(nombre, forzar=False):
     glb = os.path.join(CARPETA, nombre + '.glb')
-    ruta = DEST + '/' + nombre
-    if not forzar and _assets(ruta).get('SkeletalMesh'):
-        return ruta
     if not os.path.exists(glb):
         log('AVISO: falta', glb)
         return None
+    # cada versión del .glb va a su carpeta (<nombre>_<huella>): si cambia el archivo se importa de nuevo
+    ruta = DEST + '/' + nombre + '_' + hashlib.md5(open(glb, 'rb').read()).hexdigest()[:6]
+    if not forzar and _assets(ruta).get('SkeletalMesh'):
+        return ruta
     eal = unreal.EditorAssetLibrary
-    if eal.does_directory_exist(ruta):
-        eal.delete_directory(ruta)   # sin restos de una importación anterior (p. ej. con las mallas separadas)
+    for d in [DEST + '/' + nombre, ruta]:
+        if eal.does_directory_exist(d):
+            eal.delete_directory(d)   # sin restos de una importación anterior (p. ej. con las mallas separadas)
     # Cada persona trae varias mallas con el mismo esqueleto (cuerpo, ojos, cejas, ropa, pelo, botas). Con
     # AssetImportTask, Interchange las importa como 7 SkeletalMesh sueltas; se fuerza una sola por esqueleto.
     pipe = unreal.InterchangeGenericAssetsPipeline()
