@@ -67,7 +67,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	for (int32 i = 0; i < 10; ++i) Bar += (i < N) ? TEXT("#") : TEXT("-");
 	Bar += TEXT("]  ");
 	Bar += PlayerLight < 0.3f ? TEXT("EN SOMBRA") : (PlayerLight < 0.6f ? TEXT("PENUMBRA") : TEXT("ILUMINADO"));
-	if (C->bIsCrouched) Bar += TEXT("   ·   AGACHADO");
+	if (C->bIsCrouched) Bar += TEXT("   -   AGACHADO");
 	const FColor BarColor = PlayerLight < 0.3f ? FColor(120, 200, 140) : (PlayerLight < 0.6f ? FColor(230, 200, 90) : FColor(255, 140, 70));
 	GEngine->AddOnScreenDebugMessage(9101, 0.5f, BarColor, Bar, false, FVector2D(1.4f, 1.4f));
 
@@ -83,7 +83,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	}
 	FString Msg;
 	FColor MsgColor = FColor::White;
-	if (Worst == ETarsisGuardState::Alert) { Msg = TEXT("¡TE HAN VISTO! Rompe la línea de vista y escóndete"); MsgColor = FColor(255, 59, 47); }
+	if (Worst == ETarsisGuardState::Alert) { Msg = TEXT("TE HAN VISTO! Rompe la linea de vista y escondete"); MsgColor = FColor(255, 59, 47); }
 	else if (Worst == ETarsisGuardState::Search) { Msg = TEXT("TE BUSCAN"); MsgColor = FColor(255, 160, 60); }
 	else if (Worst == ETarsisGuardState::Suspicious) { Msg = TEXT("?  Un guardia sospecha"); MsgColor = FColor(255, 210, 58); }
 	GEngine->AddOnScreenDebugMessage(9102, 0.5f, MsgColor, Msg.IsEmpty() ? FString(TEXT(" ")) : Msg, false, FVector2D(1.6f, 1.6f));
