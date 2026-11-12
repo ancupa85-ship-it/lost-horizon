@@ -39,8 +39,8 @@ VALORES = {
     'pared': (0xa39c8e, 0.85, 0.0), 'madera': (0xb09a80, 0.75, 0.0), 'hierro': (0x999999, 0.6, 0.55),
     'oliva': (0x6f8a4c, 0.5, 0.1), 'tejado': (0x666668, 0.6, 0.4), 'suelo_int': (0x8c8c8c, 0.55, 0.0),
     # colores de KC en visor.js, aclarados: la chapa gris ya oscurece al multiplicar
-    'contenedor_0': (0xc0583f, 0.62, 0.35), 'contenedor_1': (0x4f86a8, 0.62, 0.35),
-    'contenedor_2': (0x6e9a66, 0.62, 0.35), 'contenedor_3': (0xc9ae4c, 0.62, 0.35),
+    'contenedor_0': (0xe0785c, 0.62, 0.15), 'contenedor_1': (0x78aed0, 0.62, 0.15),
+    'contenedor_2': (0x94c48a, 0.62, 0.15), 'contenedor_3': (0xe8cf70, 0.62, 0.15),
 }
 
 def lin(c):
@@ -167,6 +167,8 @@ def instancias():
         mel.set_material_instance_parent(mi, base)
         hexc, rough, metal = VALORES[clave]
         tinte = unreal.LinearColor(*[lin((hexc >> s) & 255) for s in (16, 8, 0)], 1)
+        if clave.startswith('contenedor'):   # la chapa gris x el color queda casi negra de noche: se permite pasar de 1
+            tinte = unreal.LinearColor(tinte.r * 1.8, tinte.g * 1.8, tinte.b * 1.8, 1)
         # igual que en el visor: textura x color (si queda oscuro con la luz de Unreal se sube el Tinte de la instancia)
         mel.set_material_instance_texture_parameter_value(mi, 'Color', c)
         # si falta normal o rugosidad se deja el valor por defecto del maestro (misma clase de textura)
