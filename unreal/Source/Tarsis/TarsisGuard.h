@@ -9,6 +9,8 @@
 
 class UStaticMeshComponent;
 class UTextRenderComponent;
+class USkeletalMesh;
+class UAnimationAsset;
 
 UENUM(BlueprintType)
 enum class ETarsisGuardState : uint8
@@ -66,6 +68,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Vista")
 	float CatchDistance = 130.0f;
 
+	/** Cuerpo con esqueleto (personas del juego web, importadas por tools/unreal/personas.py). Sin él se ve el cilindro provisional. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	TObjectPtr<USkeletalMesh> BodyMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	TObjectPtr<UAnimationAsset> IdleAnim;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	TObjectPtr<UAnimationAsset> WalkAnim;
+
+	/** Apuntando (en alerta cuando se para). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	TObjectPtr<UAnimationAsset> AimAnim;
+
+	/** Velocidad (cm/s) a la que la animación de andar no patina; con más velocidad se reproduce más rápido. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float WalkAnimSpeed = 150.0f;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
 	ETarsisGuardState State = ETarsisGuardState::Patrol;
 
@@ -83,6 +103,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 	UPROPERTY(VisibleAnywhere, Category = "Tarsis")
 	TObjectPtr<UStaticMeshComponent> Body;
@@ -107,4 +128,7 @@ private:
 	bool Near2D(const FVector& Dest, float Radius) const;
 	void Caught(APawn* Player);
 	void UpdateMark();
+	void SetupBody();
+	void UpdateAnim();
+	TObjectPtr<UAnimationAsset> CurrentAnim;
 };

@@ -3,7 +3,7 @@
 Se ejecuta en el editor con el nivel abierto (montar_base.py lo llama al final si la clase está compilada).
 Rondas por casillas del plano (como en tools/blender/escena_base.py y escenario/visor.js); cada casilla mide T m.
 """
-import os, json
+import os, sys, json, importlib
 import unreal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +24,25 @@ def casilla(c, r, z=100.0):
     # Blender (x*T+T/2, -(r*T+T/2)) -> Unreal: X*100, Y*-100
     return unreal.Vector((c * T + T / 2) * 100.0, (r * T + T / 2) * 100.0, z)
 
+def cuerpo(g, nombre):
+    # malla con esqueleto y animaciones del juego web (tools/unreal/personas.py); sin ella queda el cilindro
+    try:
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        import personas
+        importlib.reload(personas)
+        p = personas.cargar(nombre)
+    except Exception as e:
+        log('AVISO: sin cuerpo para', nombre, repr(e))
+        return
+    if not p:
+        return
+    g.set_editor_property('body_mesh', p['malla'])
+    for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim')):
+        if p.get(k):
+            g.set_editor_property(prop, p[k])
+    g.rerun_construction_scripts()
+
 def colocar():
     cls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
     if not cls:
@@ -41,6 +60,7 @@ def colocar():
         g.set_folder_path('Guardias')
         g.set_editor_property('patrol_points', pts)
         g.set_editor_property('wait_at_point', espera)
+        cuerpo(g, nombre.lower())
         n += 1
     # el director del sigilo (indicador de luz, agacharse con C, avisos); uno por nivel
     dcls = unreal.load_class(None, '/Script/PruebaLumen.TarsisDirector')

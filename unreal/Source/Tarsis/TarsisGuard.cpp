@@ -1,6 +1,9 @@
 #include "TarsisGuard.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimationAsset.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/LocalLightComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -52,9 +55,79 @@ ATarsisGuard::ATarsisGuard()
 	Mark->SetHiddenInGame(true);
 }
 
+void ATarsisGuard::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	SetupBody();
+}
+
+// posición de un hueso en la pose de referencia, en espacio de la malla
+static FVector RefBonePos(const USkeletalMesh* Mesh, FName Bone)
+{
+	const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+	int32 I = Ref.FindBoneIndex(Bone);
+	if (I == INDEX_NONE) return FVector::ZeroVector;
+	FTransform T = FTransform::Identity;
+	while (I != INDEX_NONE)
+	{
+		T = T * Ref.GetRefBonePose()[I];
+		I = Ref.GetParentIndex(I);
+	}
+	return T.GetLocation();
+}
+
+void ATarsisGuard::SetupBody()
+{
+	USkeletalMeshComponent* M = GetMesh();
+	const bool bHasBody = BodyMesh != nullptr;
+	Body->SetVisibility(!bHasBody);
+	Head->SetVisibility(!bHasBody);
+	if (!bHasBody || !M) return;
+	M->SetSkeletalMesh(BodyMesh);
+	M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	M->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+	M->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	// Los modelos vienen de glTF y no sabemos de antemano hacia dónde miran ni dónde tienen el suelo:
+	// se deduce del esqueleto en reposo. Hacia delante = del tobillo a la punta del pie; suelo = punta del pie.
+	const FVector Foot = RefBonePos(BodyMesh, TEXT("foot_l"));
+	const FVector Ball = RefBonePos(BodyMesh, TEXT("ball_l"));
+	const FVector FootR = RefBonePos(BodyMesh, TEXT("foot_r"));
+	const FVector BallR = RefBonePos(BodyMesh, TEXT("ball_r"));
+	FVector Fwd = (Ball - Foot) + (BallR - FootR);
+	Fwd.Z = 0.0f;
+	const float Yaw = Fwd.IsNearlyZero() ? 0.0f : -FMath::RadiansToDegrees(FMath::Atan2(Fwd.Y, Fwd.X));
+	const float BallZ = FMath::Min(Ball.Z, BallR.Z);
+	const float HalfH = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const float Z = (BallZ == 0.0f && Foot.Z == 0.0f) ? -HalfH : (-HalfH - BallZ + 3.0f);
+	M->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, Z), FRotator(0.0f, Yaw, 0.0f));
+	if (IdleAnim)
+	{
+		M->PlayAnimation(IdleAnim, true);
+		CurrentAnim = IdleAnim;
+	}
+}
+
+void ATarsisGuard::UpdateAnim()
+{
+	USkeletalMeshComponent* M = GetMesh();
+	if (!BodyMesh || !M) return;
+	const float Speed = GetVelocity().Size2D();
+	UAnimationAsset* Want = IdleAnim;
+	if (Speed > 15.0f && WalkAnim) Want = WalkAnim;
+	else if (State == ETarsisGuardState::Alert && AimAnim) Want = AimAnim;
+	if (Want && Want != CurrentAnim)
+	{
+		M->PlayAnimation(Want, true);
+		CurrentAnim = Want;
+	}
+	M->SetPlayRate(Want == WalkAnim ? FMath::Clamp(Speed / FMath::Max(WalkAnimSpeed, 1.0f), 0.5f, 2.6f) : 1.0f);
+}
+
 void ATarsisGuard::BeginPlay()
 {
 	Super::BeginPlay();
+	SetupBody();
 	Home = GetActorLocation();
 	if (PatrolPoints.Num() == 0)
 	{
@@ -194,6 +267,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	StateT += DeltaSeconds;
+	UpdateAnim();
 
 	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
 	const float V = Visibility(Player);
