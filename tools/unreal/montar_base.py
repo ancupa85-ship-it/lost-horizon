@@ -221,6 +221,17 @@ if DATA.get('spawn'):
     ps.set_actor_label('SalidaCuttlas')
     log('salida de Cuttlas', ps.get_actor_location(), 'mirando a', round(yaw))
 
+# guardias de la fase 2 (si la clase C++ ATarsisGuard está compilada)
+try:
+    import sys, importlib
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    import guardias
+    importlib.reload(guardias)
+    guardias.colocar()
+except Exception as e:
+    log('AVISO: guardias no colocados:', repr(e))
+
 les.save_current_level()
 log('nivel guardado en', MAPA)
 
