@@ -42,7 +42,16 @@ def colocar():
         g.set_editor_property('patrol_points', pts)
         g.set_editor_property('wait_at_point', espera)
         n += 1
-    log('guardias colocados', n)
+    # el director del sigilo (indicador de luz, agacharse con C, avisos); uno por nivel
+    dcls = unreal.load_class(None, '/Script/PruebaLumen.TarsisDirector')
+    if dcls:
+        for a in eas.get_all_level_actors():
+            if a.get_class() == dcls:
+                eas.destroy_actor(a)
+        d = eas.spawn_actor_from_class(dcls, unreal.Vector(0, 0, 300), unreal.Rotator(0, 0, 0))
+        d.set_actor_label('DirectorSigilo')
+        d.set_folder_path('Guardias')
+    log('guardias colocados', n, '- director', 'sí' if dcls else 'no compilado')
     return n
 
 if __name__ == '__main__':
