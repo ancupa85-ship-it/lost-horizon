@@ -7,7 +7,8 @@ o desde el editor: Herramientas > Ejecutar script de Python.
 Qué hace (se puede repetir: rehace el nivel cada vez):
 1. Importa base.glb en /Game/Tarsis/Base (mallas y materiales).
 2. Crea el nivel /Game/Tarsis/Mapas/Tarsis y coloca todas las mallas en el origen (vienen con la posición aplicada).
-   Las torres de vigilancia (torre1_*, torre2_*) van a la carpeta «Torres».
+   Las torres de vigilancia (torre1_*, torre2_*) van a la carpeta «Torres»; vallas y contenedores, a «Recintos»
+   (la tela de las vallas con un material translúcido, M_Tela).
 3. Deduce cómo quedaron los ejes con las marcas lh_marca_* y coloca con esa conversión las luces del visor,
    la luna, el cielo nocturno, la niebla y la salida de Cuttlas.
 4. Pone colisión «compleja como simple» para poder andar por todo, y guarda.
@@ -71,12 +72,38 @@ if eal.does_asset_exist(MAPA):   # se rehace por dentro: vaciar el nivel existen
 else:
     les.new_level(MAPA)
 
+def tela_mat(actor):
+    """La tela metálica se ve a través (en el visor es una textura con agujeros): material translúcido gris metálico."""
+    ruta = '/Game/Tarsis/Materiales/M_Tela'
+    if eal.does_asset_exist(ruta):
+        m = eal.load_asset(ruta)
+    else:
+        mel = unreal.MaterialEditingLibrary
+        m = unreal.AssetToolsHelpers.get_asset_tools().create_asset('M_Tela', '/Game/Tarsis/Materiales',
+                                                                     unreal.Material, unreal.MaterialFactoryNew())
+        m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT)
+        m.set_editor_property('two_sided', True)
+        col = mel.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -300, 0)
+        col.set_editor_property('constant', unreal.LinearColor(0.38, 0.41, 0.41, 1))
+        mel.connect_material_property(col, '', unreal.MaterialProperty.MP_BASE_COLOR)
+        op = mel.create_material_expression(m, unreal.MaterialExpressionConstant, -300, 200)
+        op.set_editor_property('r', 0.35)
+        mel.connect_material_property(op, '', unreal.MaterialProperty.MP_OPACITY)
+        mel.recompile_material(m)
+        eal.save_loaded_asset(m)
+    c = actor.get_component_by_class(unreal.StaticMeshComponent)
+    if c:
+        c.set_material(0, m)
+
 marks = {}
 for m in meshes:
     a = eas.spawn_actor_from_object(m, unreal.Vector(0, 0, 0))
     name = m.get_name()
     a.set_actor_label(name)
-    a.set_folder_path('Torres' if name.startswith('torre') else 'Base')
+    a.set_folder_path('Torres' if name.startswith('torre') else
+                      'Recintos' if name.startswith(('valla', 'contenedor')) else 'Base')
+    if name.startswith('valla_tela'):
+        tela_mat(a)
     for k in ('lh_marca_o', 'lh_marca_x', 'lh_marca_y', 'lh_marca_z'):
         if name.startswith(k):
             o, _ = a.get_actor_bounds(False)

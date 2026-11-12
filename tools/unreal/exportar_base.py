@@ -114,6 +114,25 @@ def mat_lh(key):
     b.inputs['Metallic'].default_value = d.get('metalness', 0.0)
     return m
 
+def malla(nombre, L, key, mat=None):
+    """Una malla de cajas. L: (sx, sy, sz, px, py, pz, rx, ry, rz) en coordenadas del visor (three.js, orden XYZ)."""
+    verts, faces = [], []
+    for sx, sy, sz, px, py, pz, rx, ry, rz in L:
+        M3 = Matrix.Rotation(rx, 3, 'X') @ Matrix.Rotation(ry, 3, 'Y') @ Matrix.Rotation(rz, 3, 'Z')
+        n = len(verts)
+        for cx in (-0.5, 0.5):
+            for cy in (-0.5, 0.5):
+                for cz in (-0.5, 0.5):
+                    v = M3 @ Vector((cx * sx, cy * sy, cz * sz)) + Vector((px, py, pz))
+                    verts.append((v.x, -v.z, v.y))
+        faces += [tuple(n + k for k in f) for f in
+                  ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3))]
+    me = bpy.data.meshes.new(nombre)
+    me.from_pydata(verts, [], faces)
+    me.validate()
+    me.materials.append(mat or mat_lh(key))
+    bpy.context.scene.collection.objects.link(bpy.data.objects.new(me.name, me))
+
 def torre(i, t):
     x, z = t['tx'] * TT + TT / 2, t['ty'] * TT + TT / 2
     W, I = [], []
@@ -141,22 +160,7 @@ def torre(i, t):
     while h < TWH + 0.9:
         B(W, 0.035, 0.035, 0.5, x + 1.13, h, z); h += 0.3
     for L, key in ((W, 'madera'), (I, 'hierro')):
-        verts, faces = [], []
-        for sx, sy, sz, px, py, pz, rz, rx in L:
-            M3 = Matrix.Rotation(rx, 3, 'X') @ Matrix.Rotation(rz, 3, 'Z')   # three.js, orden XYZ
-            n = len(verts)
-            for cx in (-0.5, 0.5):
-                for cy in (-0.5, 0.5):
-                    for cz in (-0.5, 0.5):
-                        v = M3 @ Vector((cx * sx, cy * sy, cz * sz)) + Vector((px, py, pz))
-                        verts.append((v.x, -v.z, v.y))
-            faces += [tuple(n + k for k in f) for f in
-                      ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3))]
-        me = bpy.data.meshes.new('torre%d_%s' % (i + 1, key))
-        me.from_pydata(verts, [], faces)
-        me.validate()
-        me.materials.append(mat_lh(key))
-        bpy.context.scene.collection.objects.link(bpy.data.objects.new(me.name, me))
+        malla('torre%d_%s' % (i + 1, key), [(q[0], q[1], q[2], q[3], q[4], q[5], q[7], 0.0, q[6]) for q in L], key)
     # el foco cuelga bajo el tejadillo y mira hacia donde mira el centinela (como spotTick del visor, sin bajar)
     ph = 0.27
     return {'name': 'torre%d' % (i + 1), 'pos': [x, -z, 0.0], 'yaw': t['yaw'], 'altura': TWH,
@@ -166,6 +170,84 @@ def torre(i, t):
 
 import math
 TORRES = [torre(i, t) for i, t in enumerate(TOWERS)]
+
+# 4c) recintos del visor (v51): vallas de tela metálica (f), huecos para pasar agachado (h) y contenedores (m).
+#     El plano se parchea como en visor.js y se levanta la misma geometría.
+MAP = list(json.load(open(os.path.splitext(glb0)[0] + '.json'))['map'])
+pre = vjs[:vjs.index('KONT.forEach(k=>{ for')]
+KONT = json.loads(re.search(r'const KONT=(\[\[.*?\]\]);', vjs).group(1))
+def put(x, y, t):
+    MAP[y] = MAP[y][:x] + t + MAP[y][x + len(t):]
+for a, b, t in re.findall(r"put\((\d+),(\d+),'([fhm]+)'\)", pre):
+    put(int(a), int(b), t)
+for k in KONT:
+    for i in range(k[3]):
+        put(k[0] + (i if k[2] else 0), k[1] + (0 if k[2] else i), 'm')
+
+def mat_rgb(nombre, rgb, rough, metal):
+    m = bpy.data.materials.get(nombre) or bpy.data.materials.new(nombre)
+    m.use_nodes = True
+    b = next(n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    b.inputs['Base Color'].default_value = (*[lin(c) for c in rgb], 1)
+    b.inputs['Roughness'].default_value = rough
+    b.inputs['Metallic'].default_value = metal
+    return m
+
+ROWS, COLS = len(MAP), max(len(r) for r in MAP)
+ch = lambda x, y: (MAP[y] if 0 <= y < ROWS else '')[x] if 0 <= y < ROWS and 0 <= x < len(MAP[y]) else '#'
+isF = lambda x, y: ch(x, y) in 'fh'
+con = lambda x, y: ch(x, y) in 'fh#W'
+H, HH, PI = 2.3, 0.85, math.pi
+arms, holes, posts = [], [], []
+for y in range(ROWS):
+    for x in range(len(MAP[y])):
+        if not isF(x, y):
+            continue
+        cx, cz = x * TT + TT / 2, y * TT + TT / 2
+        ds = [d for d in ((1, 0), (-1, 0), (0, 1), (0, -1)) if con(x + d[0], y + d[1])]
+        if len(ds) == 1:
+            ds = [ds[0], (-ds[0][0], -ds[0][1])]
+        posts.append((cx, cz, 0))
+        for d in ds:
+            (holes if ch(x, y) == 'h' else arms).append((cx + d[0] * 0.5, cz + d[1] * 0.5, 0 if d[0] else PI / 2))
+            if not con(x + d[0], y + d[1]):
+                posts.append((cx + d[0], cz + d[1], 0.5))
+tela, hierro = [], []
+for q in arms:   # la tela: placa fina (en Unreal se le pondrá un material de malla con transparencia)
+    tela.append((1.0, H, 0.015, q[0], H / 2, q[1], 0, q[2], 0))
+for q in holes:
+    tela.append((1.0, H - HH, 0.015, q[0], HH + (H - HH) / 2, q[1], 0, q[2], 0))
+for q in posts:
+    hh = H + 0.3 + q[2]
+    hierro.append((0.07, hh, 0.07, q[0], hh / 2, q[1], 0, 0, 0))
+for q in arms + holes:
+    hierro += [(1.0, r, r, q[0], yy, q[1], 0, q[2], 0) for yy, r in ((H, 0.05), (H + 0.14, 0.018), (H + 0.27, 0.018))]
+for q in holes:
+    hierro.append((1.0, 0.02, 0.02, q[0], HH, q[1], 0, q[2], 0))
+# cancelas abiertas, plegadas contra la valla (hoja de 1,9 m)
+for gx, gz, yaw in ((20 * TT, 15 * TT + TT / 2 + 0.1, PI), (22 * TT, 15 * TT + TT / 2 + 0.1, 0), (29 * TT + TT / 2 + 0.1, 25 * TT, PI / 2)):
+    c, s_ = math.cos(yaw), math.sin(yaw)
+    P = lambda lx, ly: (gx + lx * c, ly, gz - lx * s_)   # rotación en Y de three.js: x' = x cos, z' = -x sin
+    p = P(0.98, H / 2 - 0.02); tela.append((1.9, H - 0.15, 0.015, p[0], p[1], p[2], 0, yaw, 0))
+    for ly in (H - 0.08, 0.12):
+        p = P(0.98, ly); hierro.append((1.9, 0.05, 0.05, p[0], p[1], p[2], 0, yaw, 0))
+    p = P(1.93, H / 2 - 0.02); hierro.append((0.05, H - 0.2, 0.05, p[0], p[1], p[2], 0, yaw, 0))
+malla('valla_tela', tela, None, mat_rgb('lh_tela', (167, 173, 173), 0.5, 0.6))
+malla('valla_hierro', hierro, 'hierro')
+# contenedores de 20 pies, cuatro colores como en el visor; los dobles llevan otro encima algo girado
+KC = [(0x6a, 0x2c, 0x20), (0x28, 0x46, 0x5a), (0x3a, 0x55, 0x37), (0x77, 0x67, 0x2a)]
+kont = [[] for _ in KC]
+for i, k in enumerate(KONT):
+    L = k[3]
+    def caja(col, y, dx, ry):
+        kont[col % 4].append((L * TT - 0.12, 2.6, TT - 0.1, (k[0] + (L / 2 if k[2] else 0.5)) * TT + dx, y,
+                              (k[1] + (0.5 if k[2] else L / 2)) * TT, 0, (0 if k[2] else PI / 2) + ry, 0))
+    caja(i, 1.3, 0, 0)
+    if k[4]:
+        caja(i + 2, 3.9, 0.12, 0.03)
+for c, L in enumerate(kont):
+    if L:
+        malla('contenedor_%d' % c, L, None, mat_rgb('lh_contenedor_%d' % c, KC[c], 0.62, 0.35))
 
 glb = os.path.join(OUT, 'base.glb')
 kw = dict(filepath=glb, export_format='GLB', export_yup=True, export_cameras=False, export_lights=False,
@@ -185,7 +267,7 @@ lights = [l for l in j['lights'] if l.get('name') != 'foco_torreta']
 for tw in TORRES:
     lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': tw['foco']['pos'], 'dir': tw['foco']['dir'],
                    'color': [0.8, 0.9, 1.0], 'power': 90000})
-json.dump({'T': T, 'map': j['map'], 'lights': lights, 'spawn': spawn, 'marcas': MARCAS, 'torres': TORRES,
+json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'marcas': MARCAS, 'torres': TORRES,
            'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
           open(os.path.join(OUT, 'base.json'), 'w'), indent=1)
 shutil.rmtree(tmp, ignore_errors=True)
