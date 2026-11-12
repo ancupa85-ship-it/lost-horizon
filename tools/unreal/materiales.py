@@ -29,12 +29,18 @@ TEXTURAS = {
     'suelo': ('asphalt_02', 3.0), 'muro': ('concrete_wall_008', 3.2), 'hormigon': ('concrete_wall_008', 3.2),
     'pared': ('painted_plaster_wall', 2.6), 'madera': ('wood_planks_dirt', 1.6), 'hierro': ('rusty_metal_02', 1.4),
     'oliva': ('green_metal_rust', 2.2), 'tejado': ('corrugated_iron_02', 2.0), 'suelo_int': ('concrete_floor_worn_001', 2.0),
+    # contenedores (exportar_base.py, lh_contenedor_N): chapa ondulada teñida con los cuatro colores del visor
+    'contenedor_0': ('corrugated_iron_02', 1.2), 'contenedor_1': ('corrugated_iron_02', 1.2),
+    'contenedor_2': ('corrugated_iron_02', 1.2), 'contenedor_3': ('corrugated_iron_02', 1.2),
 }
 # tinte, rugosidad y metal del visor (escenario/visor.js, tabla M; color en sRGB)
 VALORES = {
     'suelo': (0x777777, 0.75, 0.0), 'muro': (0x8a8a88, 0.82, 0.0), 'hormigon': (0x8a8a88, 0.82, 0.0),
     'pared': (0xa39c8e, 0.85, 0.0), 'madera': (0xb09a80, 0.75, 0.0), 'hierro': (0x999999, 0.6, 0.55),
     'oliva': (0x6f8a4c, 0.5, 0.1), 'tejado': (0x666668, 0.6, 0.4), 'suelo_int': (0x8c8c8c, 0.55, 0.0),
+    # colores de KC en visor.js, aclarados: la chapa gris ya oscurece al multiplicar
+    'contenedor_0': (0xc0583f, 0.62, 0.35), 'contenedor_1': (0x4f86a8, 0.62, 0.35),
+    'contenedor_2': (0x6e9a66, 0.62, 0.35), 'contenedor_3': (0xc9ae4c, 0.62, 0.35),
 }
 
 def lin(c):
