@@ -26,23 +26,26 @@ def log(*a):
 
 # ------------------------------------------------------------------ 1. importar
 eal = unreal.EditorAssetLibrary
-if eal.does_directory_exist(DEST):
-    eal.delete_directory(DEST)
-task = unreal.AssetImportTask()
-task.set_editor_property('filename', GLB)
-task.set_editor_property('destination_path', DEST)
-task.set_editor_property('automated', True)
-task.set_editor_property('replace_existing', True)
-task.set_editor_property('save', True)
-unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
-imported = list(task.get_editor_property('imported_object_paths') or [])
-log('importados', len(imported))
-
 ar = unreal.AssetRegistryHelpers.get_asset_registry()
-meshes = []
-for a in ar.get_assets_by_path(DEST, recursive=True):
-    if str(a.asset_class_path.asset_name) == 'StaticMesh':
-        meshes.append(a.get_asset())
+
+def mallas():
+    return [a.get_asset() for a in ar.get_assets_by_path(DEST, recursive=True)
+            if str(a.asset_class_path.asset_name) == 'StaticMesh']
+
+# si la base ya está importada se reutiliza (LH_REIMPORT=1 para importarla de nuevo)
+if os.environ.get('LH_REIMPORT') or not mallas():
+    task = unreal.AssetImportTask()
+    task.set_editor_property('filename', GLB)
+    task.set_editor_property('destination_path', DEST)
+    task.set_editor_property('automated', True)
+    task.set_editor_property('replace_existing', True)
+    task.set_editor_property('save', True)
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    log('importados', len(list(task.get_editor_property('imported_object_paths') or [])))
+else:
+    log('base ya importada: se reutiliza')
+
+meshes = mallas()
 log('mallas', len(meshes))
 if not meshes:
     raise RuntimeError('No se importó ninguna malla de ' + GLB)
@@ -57,9 +60,12 @@ for m in meshes:
 # ------------------------------------------------------------------ 2. nivel nuevo
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-if eal.does_asset_exist(MAPA):
-    eal.delete_asset(MAPA)
-les.new_level(MAPA)
+if eal.does_asset_exist(MAPA):   # se rehace por dentro: vaciar el nivel existente
+    les.load_level(MAPA)
+    for a in eas.get_all_level_actors():
+        eas.destroy_actor(a)
+else:
+    les.new_level(MAPA)
 
 marks = {}
 for m in meshes:
@@ -102,7 +108,7 @@ for i, l in enumerate(DATA['lights']):
         a = spawn(unreal.DirectionalLight, ue(l['pos']), 'Luna', rot)
         c = a.get_component_by_class(unreal.DirectionalLightComponent)
         c.set_editor_property('intensity', 0.6)
-        c.set_editor_property('light_color', col.to_fcolor(True))
+        c.set_light_color(col)
         c.set_editor_property('atmosphere_sun_light', True)
         continue
     if l['kind'] == 'SPOT':
@@ -120,7 +126,7 @@ for i, l in enumerate(DATA['lights']):
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
         c.set_editor_property('intensity', min(l['power'] * 2.0, 4000.0))
         c.set_editor_property('attenuation_radius', 1800.0 if l['name'] == 'farola' else 900.0)
-    c.set_editor_property('light_color', col.to_fcolor(True))
+    c.set_light_color(col)
 
 # noche: cielo, luz ambiente tenue y niebla
 spawn(unreal.SkyAtmosphere, unreal.Vector(0, 0, 0), 'Cielo')

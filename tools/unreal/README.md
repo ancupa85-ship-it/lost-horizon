@@ -7,6 +7,7 @@ Plan completo: «Plan de migración a Unreal Engine 5 — Lost Horizon» (Claude
 2. En el PC con Unreal 5.8, con el editor cerrado:
    `D:\ue_5.8\Engine\Binaries\Win64\UnrealEditor.exe "<proyecto>.uproject" -ExecutePythonScript="<repo>\tools\unreal\montar_base.py"`
    Importa la base en `/Game/Tarsis/Base` y crea el nivel `/Game/Tarsis/Mapas/Tarsis` con luces, niebla y la salida de Cuttlas.
+   Con el editor ya abierto, también vale escribir en la consola (Cmd): `py "<repo>\tools\unreal\montar_base.py"`.
    Necesita el plugin «Python Editor Script Plugin» activo en el proyecto.
 
 Sin texturas todavía: los materiales llevan el color, la rugosidad y la emisión del visor.
