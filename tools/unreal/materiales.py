@@ -185,7 +185,8 @@ def aplicar(meshes):
     for m in meshes:
         cambia = False
         mats = m.get_editor_property('static_materials')
-        for sm in mats:
+        for idx in range(len(mats)):
+            sm = mats[idx]   # copia del struct: hay que volver a escribirla en la lista (abajo)
             mi = sm.get_editor_property('material_interface')
             nombre = (mi.get_name() if mi else '') or str(sm.get_editor_property('material_slot_name'))
             # el material importado se llama lh_<clave> (a veces con prefijo MI_ o sufijo de Interchange)
@@ -194,7 +195,7 @@ def aplicar(meshes):
                 k = nombre[3:]   # ya tiene nuestra instancia de una ejecución anterior
             for clave in sorted(mis, key=len, reverse=True):
                 if k and (k == clave or k.startswith(clave + '_') or k.startswith(clave + '.')) and not (clave == 'suelo' and k.startswith('suelo_int')):
-                    sm.set_editor_property('material_interface', mis[clave]); cambia = True; n += 1
+                    sm.set_editor_property('material_interface', mis[clave]); mats[idx] = sm; cambia = True; n += 1
                     break
         if cambia:
             m.set_editor_property('static_materials', mats)

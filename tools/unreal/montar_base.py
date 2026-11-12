@@ -143,6 +143,9 @@ def ue(p):
 def ue_dir(d):
     return ax[0] * d[0] + ax[1] * d[1] + ax[2] * d[2]
 
+# noche: exposición manual (EV) e intensidades de luna y luz ambiente, ajustadas con capturas en el patio
+EXPO = {'ev': 0.5, 'luna': 0.6, 'cielo': 2.5}
+
 def spawn(cls, loc, label, rot=None):
     a = eas.spawn_actor_from_class(cls, loc, rot or unreal.Rotator(0, 0, 0))
     a.set_actor_label(label)
@@ -155,7 +158,7 @@ for i, l in enumerate(DATA['lights']):
         rot = unreal.MathLibrary.make_rot_from_x(ue_dir(l['dir']))
         a = spawn(unreal.DirectionalLight, ue(l['pos']), 'Luna', rot)
         c = a.get_component_by_class(unreal.DirectionalLightComponent)
-        c.set_editor_property('intensity', 0.6)
+        c.set_editor_property('intensity', EXPO['luna'])
         c.set_light_color(col)
         c.set_editor_property('atmosphere_sun_light', True)
         continue
@@ -166,7 +169,7 @@ for i, l in enumerate(DATA['lights']):
         c.set_editor_property('outer_cone_angle', 13.0)
         c.set_editor_property('inner_cone_angle', 9.0)
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
-        c.set_editor_property('intensity', 60000.0)
+        c.set_editor_property('intensity', 8000.0)   # con 60000 el suelo bajo las torretas queda quemado con exposición nocturna
         c.set_editor_property('attenuation_radius', 4000.0)
     else:
         a = spawn(unreal.PointLight, ue(l['pos']), '%s_%d' % (l['name'], i))
@@ -181,16 +184,42 @@ spawn(unreal.SkyAtmosphere, unreal.Vector(0, 0, 0), 'Cielo')
 sky = spawn(unreal.SkyLight, unreal.Vector(0, 0, 500), 'LuzAmbiente')
 sc = sky.get_component_by_class(unreal.SkyLightComponent)
 sc.set_editor_property('real_time_capture', True)
-sc.set_editor_property('intensity', 0.25)
+sc.set_editor_property('intensity', EXPO['cielo'])
 fog = spawn(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), 'Niebla')
 fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
 fc.set_editor_property('fog_density', 0.03)
 
-# salida de Cuttlas (casilla P del plano), un poco por encima del suelo
+# exposición fija de noche: sin esto la exposición automática sube la escena hasta parecer de día (cielo azul)
+pp = spawn(unreal.PostProcessVolume, unreal.Vector(0, 0, 0), 'Exposicion')
+pp.set_editor_property('unbound', True)
+st = pp.get_editor_property('settings')
+st.set_editor_property('override_auto_exposure_method', True)
+st.set_editor_property('auto_exposure_method', unreal.AutoExposureMethod.AEM_MANUAL)
+st.set_editor_property('override_auto_exposure_apply_physical_camera_exposure', True)
+st.set_editor_property('auto_exposure_apply_physical_camera_exposure', False)
+st.set_editor_property('override_auto_exposure_bias', True)
+st.set_editor_property('auto_exposure_bias', EXPO['ev'])
+pp.set_editor_property('settings', st)
+
+# salida de Cuttlas (casilla P del plano), un poco por encima del suelo, mirando hacia el espacio libre más cercano
 if DATA.get('spawn'):
     p = DATA['spawn']
-    ps = eas.spawn_actor_from_class(unreal.PlayerStart, ue([p[0], p[1], 1.0]), unreal.Rotator(0, 0, 0))
+    yaw = 0.0
+    mapa = DATA.get('map') or []
+    T = DATA.get('T', 2.0)
+    pr = next(((r, row.index('P')) for r, row in enumerate(mapa) if 'P' in row), None)
+    if pr:
+        sx = sy = 0.0
+        for r, row in enumerate(mapa):
+            for c, ch in enumerate(row):
+                if ch == '.' and abs(r - pr[0]) <= 6 and abs(c - pr[1]) <= 6:
+                    sx += c - pr[1]; sy += r - pr[0]
+        d = ue_dir([sx * T, -sy * T, 0])   # columnas -> +x de Blender, filas -> -y de Blender
+        if d.length() > 0:
+            yaw = unreal.MathLibrary.make_rot_from_x(d).yaw
+    ps = eas.spawn_actor_from_class(unreal.PlayerStart, ue([p[0], p[1], 1.0]), unreal.Rotator(roll=0, pitch=0, yaw=yaw))
     ps.set_actor_label('SalidaCuttlas')
+    log('salida de Cuttlas', ps.get_actor_location(), 'mirando a', round(yaw))
 
 les.save_current_level()
 log('nivel guardado en', MAPA)
