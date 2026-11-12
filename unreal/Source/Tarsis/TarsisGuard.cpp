@@ -131,7 +131,7 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 		// las luces están en lúmenes: una farola (~3000) cuenta como 1 a su pie
 		F *= FMath::Clamp(L->Intensity / 3000.0f, 0.2f, 2.0f);
 		if (F < 0.02f) continue;
-		Q.ClearIgnoredActors();
+		Q.ClearIgnoredSourceObjects();   // ClearIgnoredActors está obsoleto en 5.8
 		Q.AddIgnoredActor(*It);
 		FHitResult Hit;
 		if (World->LineTraceSingleByChannel(Hit, LP, Point, ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, Point) > 40.0f)
