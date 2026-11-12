@@ -7,6 +7,7 @@ o desde el editor: Herramientas > Ejecutar script de Python.
 Qué hace (se puede repetir: rehace el nivel cada vez):
 1. Importa base.glb en /Game/Tarsis/Base (mallas y materiales).
 2. Crea el nivel /Game/Tarsis/Mapas/Tarsis y coloca todas las mallas en el origen (vienen con la posición aplicada).
+   Las torres de vigilancia (torre1_*, torre2_*) van a la carpeta «Torres».
 3. Deduce cómo quedaron los ejes con las marcas lh_marca_* y coloca con esa conversión las luces del visor,
    la luna, el cielo nocturno, la niebla y la salida de Cuttlas.
 4. Pone colisión «compleja como simple» para poder andar por todo, y guarda.
@@ -33,7 +34,8 @@ def mallas():
             if str(a.asset_class_path.asset_name) == 'StaticMesh']
 
 # si la base ya está importada se reutiliza (LH_REIMPORT=1 para importarla de nuevo)
-if os.environ.get('LH_REIMPORT') or not mallas():
+# también se reimporta solo si base.glb trae mallas nuevas (p. ej. las torres)
+if os.environ.get('LH_REIMPORT') or len(mallas()) < DATA.get('mallas', 1):
     task = unreal.AssetImportTask()
     task.set_editor_property('filename', GLB)
     task.set_editor_property('destination_path', DEST)
@@ -74,7 +76,7 @@ for m in meshes:
     a = eas.spawn_actor_from_object(m, unreal.Vector(0, 0, 0))
     name = m.get_name()
     a.set_actor_label(name)
-    a.set_folder_path('Base')
+    a.set_folder_path('Torres' if name.startswith('torre') else 'Base')
     for k in ('lh_marca_o', 'lh_marca_x', 'lh_marca_y', 'lh_marca_z'):
         if name.startswith(k):
             o, _ = a.get_actor_bounds(False)
@@ -117,8 +119,8 @@ for i, l in enumerate(DATA['lights']):
         rot = unreal.MathLibrary.make_rot_from_x(ue_dir(l['dir']))
         a = spawn(unreal.SpotLight, ue(l['pos']), '%s_%d' % (l['name'], i), rot)
         c = a.get_component_by_class(unreal.SpotLightComponent)
-        c.set_editor_property('outer_cone_angle', 8.0)
-        c.set_editor_property('inner_cone_angle', 5.0)
+        c.set_editor_property('outer_cone_angle', 13.0)
+        c.set_editor_property('inner_cone_angle', 9.0)
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
         c.set_editor_property('intensity', 60000.0)
         c.set_editor_property('attenuation_radius', 4000.0)
