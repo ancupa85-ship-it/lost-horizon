@@ -60,6 +60,11 @@ for m in meshes:
     bs = m.get_editor_property('body_setup')
     if bs:
         bs.set_editor_property('collision_trace_flag', unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
+    if m.get_name().startswith('valla_tela'):   # Nanite no admite materiales translúcidos (M_Tela)
+        ns = m.get_editor_property('nanite_settings')
+        if ns.get_editor_property('enabled'):
+            ns.set_editor_property('enabled', False)
+            m.set_editor_property('nanite_settings', ns)
     eal.save_loaded_asset(m)
 
 # ------------------------------------------------------------------ 2. nivel nuevo
