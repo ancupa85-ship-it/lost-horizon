@@ -1,6 +1,7 @@
 #include "TarsisDirector.h"
 #include "TarsisGuard.h"
 
+#include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
@@ -51,6 +52,20 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (!bPlayerReady) { SetupPlayer(); return; }
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (!C || !GEngine) return;
+
+	// agachado: la cámara de la plantilla cuelga del brazo en primera persona, que el motor mantiene a la misma altura
+	// al encoger la cápsula, así que se baja a mano. La etiqueta de la cámara recuerda si ya está bajada.
+	if (UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>())
+	{
+		static const FName Tag(TEXT("LH_agachado"));
+		const bool bLowered = Cam->ComponentHasTag(Tag);
+		if (C->bIsCrouched != bLowered)
+		{
+			const float Drop = 55.0f;
+			Cam->AddWorldOffset(FVector(0.0f, 0.0f, C->bIsCrouched ? -Drop : Drop));
+			if (C->bIsCrouched) Cam->ComponentTags.Add(Tag); else Cam->ComponentTags.Remove(Tag);
+		}
+	}
 
 	// la luz se mide unas 8 veces por segundo y se suaviza
 	LightT -= DeltaSeconds;
