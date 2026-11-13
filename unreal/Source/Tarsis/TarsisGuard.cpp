@@ -191,7 +191,28 @@ void ATarsisGuard::Hold(float Seconds)
 void ATarsisGuard::HearNoise(const FVector& Where)
 {
 	if (bTowerSentry || bAlly || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
-	if (bRepairing) { RepairLook = Where; RepairLookT = 4.0f; UpdateMark(); return; }   // gira la linterna hacia el ruido y sigue con el generador
+	if (bRepairing)
+	{
+		// el primer ruido: gira la linterna hacia él unos segundos y sigue con el generador.
+		// Un segundo ruido en menos de 20 s ya no cuela: deja el generador y va a mirar.
+		const float Now = GetWorld()->GetTimeSeconds();
+		if (Now - LastRepairNoise > 20.0f)
+		{
+			LastRepairNoise = Now;
+			RepairLook = Where;
+			RepairLookT = 4.0f;
+			UpdateMark();
+			return;
+		}
+		LastRepairNoise = -100.0f;
+		bRepairing = false;
+		LastSeen = Where;
+		Meter = FMath::Max(Meter, 0.6f);
+		SetState(ETarsisGuardState::Suspicious);
+		bInvestigate = true;
+		UpdateMark();
+		return;
+	}
 	if (State == ETarsisGuardState::Suspicious && bInvestigate) { LastSeen = Where; return; }   // ya va a mirar: sigue el ruido
 	LastSeen = Where;
 	Meter = FMath::Max(Meter, 0.5f);

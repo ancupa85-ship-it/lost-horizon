@@ -737,6 +737,7 @@ void ATarsisDirector::ShootDart()
 			break;
 		}
 	}
+	if (ShootLamp(Loc, Fwd, Best ? BestT : 3500.0f)) return;
 	if (!Best)
 	{
 		ShowMessage(FString::Printf(TEXT("FALLASTE\nTe quedan %d dardos."), Darts), 1.8f);
@@ -759,7 +760,12 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	{
 		// en el control, el de la garita levanta la barrera y mira hacia otro lado (sale en el plano de LS_Salida)
 		BarrierT = 0.001f;
-		if (GateLamp && GateLamp->GetLightComponent()) GateLamp->GetLightComponent()->SetVisibility(true);   // que el plano final se vea aunque cortaras la luz
+		if (GateLamp && GateLamp->GetLightComponent())
+		{
+			// que el plano final se vea aunque cortaras la luz; si rompiste el farol, solo la bombilla de dentro de la garita
+			if (bLampBroken) GateLamp->GetLightComponent()->SetIntensity(700.0f);
+			GateLamp->GetLightComponent()->SetVisibility(true);
+		}
 		ATarsisGuard* Best = nullptr;
 		float BestD = TNumericLimits<float>::Max();
 		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
@@ -1113,6 +1119,7 @@ void ATarsisDirector::CutPower()
 	OffLights.Reset();
 	PendingOff.Reset();
 	OffClock = 0.0f;
+	RepairCallT = 0.0f;
 	// se apagan farolas, focos de las torres y luces de dentro (el cielo y la luna siguen), en cadena desde el
 	// generador hacia fuera en unos 2,5 s, cada una con su chasquido: ves venir la oscuridad
 	for (TActorIterator<ALight> It(GetWorld()); It; ++It)
@@ -1160,7 +1167,7 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 	PowerT = 0.0f;
 	for (ULightComponent* L : OffLights)
 	{
-		if (L) L->SetVisibility(true);
+		if (L && !(bLampBroken && GateLamp && L == GateLamp->GetLightComponent())) L->SetVisibility(true);
 	}
 	OffLights.Reset();
 	PendingOff.Reset();
@@ -1196,6 +1203,35 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) It->SetFlashlight(true);
 	PowerT -= DeltaSeconds;
 	if (PowerT <= 0.0f) { RestorePower(false); return; }
+	// cada 15 s la radio pregunta al reparador; si lo has derribado y no contesta, entra la reserva y la base se alarma
+	RepairCallT += DeltaSeconds;
+	if (Repairer && RepairCallT >= 15.0f)
+	{
+		RepairCallT = 0.0f;
+		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
+		if (Repairer->State != ETarsisGuardState::Down)
+		{
+			ShowMessage(FString::Printf(TEXT("RADIO: \"%s, como va eso?\" - \"Ya casi.\""), *Repairer->GuardName), 2.5f);
+		}
+		else
+		{
+			const FString Name = Repairer->GuardName;
+			RestorePower(false);
+			TensionT = 90.0f;
+			// los dos de suelo más cercanos van corriendo al generador
+			TArray<ATarsisGuard*> Near;
+			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+			{
+				if (It->State == ETarsisGuardState::Down || It->bTowerSentry || It->bAlly) continue;
+				Near.Add(*It);
+			}
+			const FVector G = GeneratorLoc;
+			Near.Sort([G](const ATarsisGuard& A, const ATarsisGuard& B) { return FVector::DistSquared(A.GetActorLocation(), G) < FVector::DistSquared(B.GetActorLocation(), G); });
+			for (int32 i = 0; i < Near.Num() && i < 2; ++i) Near[i]->Alarm(GeneratorLoc);
+			ShowMessage(FString::Printf(TEXT("RADIO: \"%s, como va eso?\" ... Nada.\nEntra el generador de reserva y mandan gente corriendo al generador. LA BASE ESTA EN ALERTA."), *Name), 5.0f);
+			return;
+		}
+	}
 	// el enviado lo arregla tras RepairSeconds junto al generador; si lo derribas antes, la luz tarda lo que le quede
 	if (Repairer && Repairer->State != ETarsisGuardState::Down && Repairer->State != ETarsisGuardState::Alert)
 	{
@@ -1334,4 +1370,38 @@ void ATarsisDirector::BarrierTick(float DeltaSeconds)
 	const FRotator R(Pitch, ExitBarrierYaw, 0.0f);
 	const FVector Pivot = ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f);
 	BarrierArm->SetWorldLocationAndRotation(Pivot + R.RotateVector(FVector(ExitBarrierLength * 0.5f, 0.0f, 0.0f)), R);
+}
+
+// ---------------------------------------------------------------- farol de la garita: se rompe de un disparo
+
+bool ATarsisDirector::ShootLamp(const FVector& From, const FVector& Fwd, float MaxT)
+{
+	if (!GateLamp || bLampBroken) return false;
+	ULightComponent* L = GateLamp->GetLightComponent();
+	if (!L) return false;
+	const FVector P = GateLamp->GetActorLocation();
+	const float T = FVector::DotProduct(P - From, Fwd);
+	if (T < 0.0f || T > MaxT || FVector::Dist(From + Fwd * T, P) > 40.0f) return false;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisFarol), true, this);
+	if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
+	Q.AddIgnoredActor(GateLamp);
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, From, P, ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, P) > 60.0f) return false;
+	bLampBroken = true;
+	L->SetVisibility(false);
+	OffLights.Remove(L);   // si hay apagón, al volver la luz sigue roto
+	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, P, 1.0f, 1.6f, 0.0f, Atten);
+	// el ruido de cristales llama al guardia más cercano, que viene a mirar
+	ATarsisGuard* Best = nullptr;
+	float BestD = 2500.0f;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Down || It->bTowerSentry || It->bAlly) continue;
+		const float D = FVector::Dist(It->GetActorLocation(), P);
+		if (D < BestD) { BestD = D; Best = *It; }
+	}
+	if (Best) Best->HearNoise(FVector(P.X, P.Y, ExitBarrierLoc.Z));
+	ShowMessage(FString::Printf(TEXT("FAROL ROTO\nEl control queda a oscuras.%s Te quedan %d dardos."),
+		Best ? *FString::Printf(TEXT(" %s ha oido los cristales y viene a mirar."), *Best->GuardName) : TEXT(""), Darts), 4.0f);
+	return true;
 }

@@ -230,6 +230,7 @@ private:
 	FVector RepairCenter = FVector::ZeroVector;
 	float SweepT = 0.0f;
 	float RepairLookT = 0.0f;
+	float LastRepairNoise = -100.0f;
 	FVector RepairLook = FVector::ZeroVector;
 	float HoldT = 0.0f;
 	void WakeUp();

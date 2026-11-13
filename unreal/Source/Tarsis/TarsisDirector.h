@@ -378,6 +378,10 @@ private:
 	float BarrierT = 0.0f;
 	UPROPERTY()
 	TObjectPtr<class ASpotLight> GateLamp;
+	bool bLampBroken = false;
+	float RepairCallT = 0.0f;
+	bool bRepairerSilent = false;
+	bool ShootLamp(const FVector& From, const FVector& Fwd, float MaxT);
 	void SetupBarrier();
 	void BarrierTick(float DeltaSeconds);
 
