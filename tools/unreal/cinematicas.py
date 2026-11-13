@@ -111,11 +111,11 @@ secuencia('LS_Entrada', 14, claves, focal=22.0)
 salida = unreal.Vector(6900, 5300, 120)
 # desde dentro, por el pasillo de la fila 26 hacia la barrera (fuera, el muro perimetral z 465 tapa; desde el noroeste, la torre 2)
 p0 = unreal.Vector(6150, 5200, 230)
-p1 = unreal.Vector(6000, 5300, 600)
+p1 = unreal.Vector(6300, 4950, 500)
 p2 = unreal.Vector(10500, 8800, 2600)
 secuencia('LS_Salida', 10, [
     (0.0, p0, mira(p0, salida)),
-    (4.0, p1, mira(p1, salida)),
+    (4.0, p1, mira(p1, unreal.Vector(6780, 5060, 120))),   # a la barrera
     (10.0, p2, mira(p2, CENTRO)),
 ], focal=28.0, fundido=(6.0, 0.7))
 

@@ -1311,6 +1311,7 @@ void ATarsisDirector::SetupBarrier()
 	if (GateLamp)
 	{
 		if (USceneComponent* Root = GateLamp->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
+		GateLamp->SetActorRotation(FRotator(-90.0f, 0.0f, 0.0f));   // el giro del SpawnActor no se aplica sobre la luz estática: se fija ya móvil
 		if (USpotLightComponent* L = Cast<USpotLightComponent>(GateLamp->GetLightComponent()))
 		{
 			L->SetIntensityUnits(ELightUnits::Lumens);
