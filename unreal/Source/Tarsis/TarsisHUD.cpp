@@ -11,6 +11,14 @@
 
 // Textos del HUD solo en ASCII: MSVC lee los .cpp sin BOM como si no fueran UTF-8.
 
+float ATarsisHUD::UiScale() const
+{
+	// todo a escala de 1080 p, por el tamaño del texto del menú (accesibilidad)
+	float K = 1.0f;
+	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { K = It->OptTextScale; break; }
+	return Canvas ? Canvas->ClipY / 1080.0f * K : 1.0f;
+}
+
 void ATarsisHUD::Panel(float X, float Y, float W, float H, const FLinearColor& C)
 {
 	DrawRect(C, X, Y, W, H);
@@ -59,7 +67,7 @@ void ATarsisHUD::DrawHUD()
 void ATarsisHUD::DrawExtras(ATarsisDirector* D)
 {
 	if (!D) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	// contador de fps (opción del menú), suavizado
 	const float Dt = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f;
 	if (Dt > 0.0f) FpsSmooth = FpsSmooth <= 0.0f ? 1.0f / Dt : FMath::Lerp(FpsSmooth, 1.0f / Dt, 0.05f);
@@ -72,6 +80,12 @@ void ATarsisHUD::DrawExtras(ATarsisDirector* D)
 	if (D->bShowHelp && !D->bKeypad && !D->bMenu)
 	{
 		Text(D->HelpLine(), Canvas->ClipX / 2.0f, Canvas->ClipY - 26.0f * S, FLinearColor(0.85f, 0.85f, 0.85f, 0.6f), 0.7f * S, true);
+	}
+	// subtítulos de sonidos (opción del menú), encima del panel de mensajes
+	if (D->bSubtitles && D->SubtitleT > 0.0f && !D->Subtitle.IsEmpty() && !D->bMenu)
+	{
+		const float A = FMath::Clamp(D->SubtitleT * 2.0f, 0.0f, 1.0f);
+		Text(D->Subtitle, Canvas->ClipX / 2.0f, Canvas->ClipY * 0.66f, FLinearColor(0.95f, 0.95f, 0.75f, A), 0.8f * S, true);
 	}
 	// aviso de punto de control, arriba a la derecha
 	if (D->CheckT > 0.0f && !D->CheckpointName.IsEmpty())
@@ -87,10 +101,10 @@ void ATarsisHUD::DrawExtras(ATarsisDirector* D)
 void ATarsisHUD::DrawMenu(ATarsisDirector* D)
 {
 	if (!D || !D->bMenu) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = Canvas->ClipY / 1080.0f;   // el menú no crece con el tamaño del texto: tiene que caber entero
 	Panel(0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY, FLinearColor(0.0f, 0.0f, 0.0f, 0.6f));
 	const TArray<FString> L = D->MenuLines();
-	const float CX = Canvas->ClipX / 2.0f, LH = 46.0f * S;
+	const float CX = Canvas->ClipX / 2.0f, LH = 40.0f * S;
 	const float W = 720.0f * S, Y0 = Canvas->ClipY / 2.0f - (L.Num() * LH) / 2.0f;
 	Text(D->MenuPage == 1 ? TEXT("CONTROLES") : TEXT("PAUSA"), CX, Y0 - 90.0f * S, FLinearColor(1.0f, 0.85f, 0.55f), 1.6f * S, true);
 	for (int32 i = 0; i < L.Num(); ++i)
@@ -107,7 +121,7 @@ void ATarsisHUD::DrawMenu(ATarsisDirector* D)
 void ATarsisHUD::DrawBinoculars(ATarsisDirector* D)
 {
 	if (!D || !D->bBinoculars) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	const float W = Canvas->ClipX, H = Canvas->ClipY;
 	// dos círculos de los prismáticos, aproximados con franjas negras arriba, abajo y a los lados
 	const FLinearColor K(0.0f, 0.0f, 0.0f, 0.92f);
@@ -125,7 +139,7 @@ void ATarsisHUD::DrawMarked()
 	APlayerController* PC = GetOwningPlayerController();
 	const APawn* Pl = GetOwningPawn();
 	if (!PC || !Pl) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		if (!It->bMarked) continue;
@@ -149,7 +163,7 @@ void ATarsisHUD::DrawHeard(ATarsisDirector* D)
 	if (!D || D->HeardT <= 0.0f) return;
 	APlayerController* PC = GetOwningPlayerController();
 	if (!PC) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	const float A = FMath::Min(1.0f, D->HeardT);
 	const FLinearColor Col(0.47f, 0.78f, 1.0f, A);   // azul, como el «?» del guardia que te oye
 	const float CX = Canvas->ClipX / 2.0f, Y = Canvas->ClipY * 0.2f;
@@ -171,7 +185,7 @@ void ATarsisHUD::DrawObjective(ATarsisDirector* D)
 	if (!D) return;
 	const FString O = D->Objective();
 	if (O.IsEmpty()) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	const float X = 32.0f * S, Y = 28.0f * S;
 	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
 	const FString Side = D->SideObjective();
@@ -198,7 +212,7 @@ void ATarsisHUD::DrawPrompt(ATarsisDirector* D)
 	if (!D) return;
 	const FString P = D->InteractPrompt();
 	if (P.IsEmpty()) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
 	float W = 200.0f * S, H = 0.0f;
 	if (F) GetTextSize(P, W, H, F, 1.05f * S);
@@ -210,7 +224,7 @@ void ATarsisHUD::DrawPrompt(ATarsisDirector* D)
 void ATarsisHUD::DrawKeypad(ATarsisDirector* D)
 {
 	if (!D || !D->bKeypad) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	const float W = 380.0f * S, H = 150.0f * S;
 	const float X = Canvas->ClipX / 2.0f - W / 2.0f, Y = Canvas->ClipY * 0.36f;
 	Panel(X, Y, W, H, FLinearColor(0.02f, 0.03f, 0.03f, 0.8f));
@@ -228,10 +242,13 @@ void ATarsisHUD::DrawKeypad(ATarsisDirector* D)
 void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 {
 	const float L = D ? D->PlayerLight : 0.0f;
-	const float S = Canvas->ClipY / 1080.0f;   // todo a escala de 1080 p
+	const float S = UiScale();   // todo a escala de 1080 p
 	const float X = 32.0f * S, Y = Canvas->ClipY - 118.0f * S, W = 300.0f * S, H = 86.0f * S;
 	Panel(X, Y, W, H, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f));
-	const FLinearColor Col = L < 0.3f ? FLinearColor(0.45f, 0.85f, 0.55f) : (L < 0.6f ? FLinearColor(0.95f, 0.8f, 0.3f) : FLinearColor(1.0f, 0.5f, 0.25f));
+	// daltonismo: azul, blanco y naranja (no verde, amarillo y naranja, que se confunden)
+	const bool bCB = D && D->bColorblind;
+	const FLinearColor Col = L < 0.3f ? (bCB ? FLinearColor(0.35f, 0.6f, 1.0f) : FLinearColor(0.45f, 0.85f, 0.55f))
+		: (L < 0.6f ? (bCB ? FLinearColor(0.95f, 0.95f, 0.95f) : FLinearColor(0.95f, 0.8f, 0.3f)) : FLinearColor(1.0f, 0.5f, 0.25f));
 	Text(TEXT("LUZ"), X + 14.0f * S, Y + 10.0f * S, FLinearColor(0.8f, 0.8f, 0.8f), 1.0f * S);
 	Text(L < 0.3f ? TEXT("EN SOMBRA") : (L < 0.6f ? TEXT("PENUMBRA") : TEXT("ILUMINADO")), X + 70.0f * S, Y + 10.0f * S, Col, 1.0f * S);
 	const int32 N = FMath::Clamp(FMath::RoundToInt(L * 10.0f), 0, 10);
@@ -285,7 +302,7 @@ void ATarsisHUD::DrawAlert()
 		else if (Worst == ETarsisGuardState::Patrol && It->State == ETarsisGuardState::Suspicious) Worst = ETarsisGuardState::Suspicious;
 	}
 	if (Worst == ETarsisGuardState::Patrol && MaxMeter < 0.05f) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	const float CX = Canvas->ClipX / 2.0f, Y = 28.0f * S, W = 460.0f * S;
 	FString T = TEXT("TODO TRANQUILO");
 	FLinearColor Col(0.8f, 0.8f, 0.8f);
@@ -306,7 +323,7 @@ void ATarsisHUD::DrawGuardMarks()
 	if (!PC) return;
 	FVector CamLoc; FRotator CamRot;
 	PC->GetPlayerViewPoint(CamLoc, CamRot);
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	const float CX = Canvas->ClipX / 2.0f, CY = Canvas->ClipY / 2.0f, M = 60.0f * S;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
@@ -351,7 +368,7 @@ void ATarsisHUD::DrawGuardMarks()
 void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 {
 	if (!D) return;
-	const float S = Canvas->ClipY / 1080.0f;
+	const float S = UiScale();
 	if (D->MessageT > 0.0f && !D->Message.IsEmpty())
 	{
 		// más abajo y más pequeño que antes: no tapa a los guardias del centro de la pantalla

@@ -30,6 +30,7 @@ private:
 	void DrawExtras(class ATarsisDirector* D);
 	void DrawMenu(class ATarsisDirector* D);
 	float FpsSmooth = 0.0f;
+	float UiScale() const;
 	void Panel(float X, float Y, float W, float H, const FLinearColor& C);
 	void Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale, bool bCenter = false);
 };

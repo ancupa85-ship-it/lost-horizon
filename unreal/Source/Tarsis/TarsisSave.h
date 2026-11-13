@@ -39,5 +39,9 @@ public:
 	UPROPERTY() bool bShowFps = false;
 	UPROPERTY() float Music = 0.7f;
 	UPROPERTY() bool bShowHelp = true;
+	UPROPERTY() float TextScale = 1.0f;
+	UPROPERTY() bool bColorblind = false;
+	UPROPERTY() bool bSubtitles = false;
+	UPROPERTY() int32 Difficulty = 1;
 	UPROPERTY() TArray<FName> Keys;   // teclas de las acciones, en el orden de ATarsisDirector::ActionName
 };

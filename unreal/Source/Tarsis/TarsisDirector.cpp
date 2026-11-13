@@ -115,7 +115,7 @@ void ATarsisDirector::Captured(APawn* Player)
 		ShowMessage(TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas."), 8.0f);
 		return;
 	}
-	if (bHasCheck)
+	if (bHasCheck && Difficulty < 2)
 	{
 		// al último punto de control, no a la entrada: la segunda mitad de la misión no se repite entera
 		Player->TeleportTo(CheckLoc, CheckRot);
@@ -234,6 +234,8 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (MessageT > 0.0f) MessageT -= DeltaSeconds;
 	if (RadioT > 0.0f) RadioT -= DeltaSeconds;
 	if (CheckT > 0.0f) CheckT -= DeltaSeconds;
+	if (SubtitleT > 0.0f) SubtitleT -= DeltaSeconds;
+	DetectTick();
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
 	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
 	BinocularTick();
@@ -815,7 +817,16 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	}
 	PlayCine(bByMarsh ? TEXT("LS_Marisma") : TEXT("LS_Salida"), false);
 	const int32 Secs = FMath::FloorToInt(MissionTime);
-	const FString Stats = FString::Printf(TEXT("Tiempo %d:%02d   Capturas %d   Derribos %d"), Secs / 60, Secs % 60, Captures, Takedowns);
+	// puntuación de sigilo: te ven, te cogen y derribas, menos; tardar mucho, algo menos. En fácil cuenta menos y en difícil más
+	static const float DiffMul[] = { 0.8f, 1.0f, 1.2f };
+	static const TCHAR* Df[] = { TEXT("FACIL"), TEXT("NORMAL"), TEXT("DIFICIL") };
+	const float Raw = 1000.0f - 120.0f * Detections - 200.0f * Captures - 30.0f * Takedowns - FMath::Max(0.0f, MissionTime - 600.0f) * 0.5f;
+	Score = FMath::Clamp(FMath::RoundToInt(Raw * DiffMul[FMath::Clamp(Difficulty, 0, 2)]), 0, 1200);
+	Rank = (Detections == 0 && Captures == 0 && Takedowns == 0) ? TEXT("FANTASMA")
+		: (Detections == 0 && Captures == 0) ? TEXT("SOMBRA")
+		: Score >= 600 ? TEXT("INFILTRADO") : TEXT("RUIDOSO");
+	const FString Stats = FString::Printf(TEXT("Tiempo %d:%02d   Te vieron %d   Capturas %d   Derribos %d\nSIGILO: %d puntos - %s (%s)"),
+		Secs / 60, Secs % 60, Detections, Captures, Takedowns, Score, *Rank, Df[FMath::Clamp(Difficulty, 0, 2)]);
 	if (bByMarsh)
 	{
 		ShowMessage(FString(TEXT("EL QUE NO ENTREGO\nRamos abre el portillo y rema sin encender la linterna. El expediente sigue en tu chaqueta.\nControl pierde tu rastro en la marisma.\n")) + Stats, 20.0f);
@@ -863,7 +874,8 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 		bIndoor = IndoorAt(P, C);
 		// dentro suena menos; con lluvia, el agua tapa los pasos
 		const float Surf = (bIndoor ? 0.6f : 1.0f) * (Weather == 1 && !bIndoor ? 0.6f : 1.0f);
-		PlayerNoise = (C->bIsCrouched || bAir || Speed < 60.0f) ? 0.0f : Speed * 1.15f * Surf;
+		static const float DiffHear[] = { 0.75f, 1.0f, 1.25f };
+		PlayerNoise = (C->bIsCrouched || bAir || Speed < 60.0f) ? 0.0f : Speed * 1.15f * Surf * DiffHear[FMath::Clamp(Difficulty, 0, 2)];
 		if (PlayerNoise > 0.0f)
 		{
 			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
@@ -1022,6 +1034,16 @@ void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
 		D = 0.0f;
 		if (FVector::Dist(It->GetActorLocation(), C->GetActorLocation()) > 1600.0f) continue;
 		StepSound(It->GetActorLocation(), IndoorAt(It->GetActorLocation(), *It), GS > 300.0f ? 1.0f : 0.75f, true);
+		if (bSubtitles)
+		{
+			const float Dm = FVector::Dist2D(It->GetActorLocation(), C->GetActorLocation()) / 100.0f;
+			if (SubtitleT <= 0.0f || Dm < SubtitleDist)
+			{
+				SubtitleDist = Dm;
+				Subtitle = FString::Printf(TEXT("[%s - %s, %s, %d m]"), GS > 300.0f ? TEXT("CORRE") : TEXT("PASOS"), *It->GuardName.ToUpper(), *Direction(It->GetActorLocation()), FMath::RoundToInt(Dm));
+				SubtitleT = 1.2f;
+			}
+		}
 	}
 	// viento y lluvia: más bajos bajo techo
 	if (WindComp) WindComp->SetVolumeMultiplier(bIndoor ? 0.12f : (Weather == 1 ? 0.2f : 0.3f));
@@ -1108,7 +1130,8 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 	else if (TensionT > 0.0f) TensionT -= DeltaSeconds;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
-		It->AlertBoost = TensionT > 0.0f ? 1.5f : 1.0f;
+		static const float DiffSight[] = { 0.65f, 1.0f, 1.4f };   // fácil, normal, difícil
+		It->AlertBoost = (TensionT > 0.0f ? 1.5f : 1.0f) * DiffSight[FMath::Clamp(Difficulty, 0, 2)];
 		// en guardia, la ronda se hace a paso ligero (se ve en el mundo, no solo en el HUD)
 		const TObjectPtr<ATarsisGuard> K(*It);
 		const float& B = BaseWalkSpeed.FindOrAdd(K, It->WalkSpeed);
@@ -1590,9 +1613,14 @@ TArray<FString> ATarsisDirector::MenuLines() const
 	L.Add(FString::Printf(TEXT("VOLUMEN   < %d %% >"), FMath::RoundToInt(OptVolume * 100.0f)));
 	L.Add(FString::Printf(TEXT("CALIDAD GRAFICA   < %s >"), Q[FMath::Clamp(OptQuality, 0, 3)]));
 	L.Add(FString::Printf(TEXT("CONTADOR DE FPS   < %s >"), bShowFps ? TEXT("SI") : TEXT("NO")));
+	static const TCHAR* Df[] = { TEXT("FACIL"), TEXT("NORMAL"), TEXT("DIFICIL") };
 	L.Add(FString::Printf(TEXT("MUSICA   < %d %% >"), FMath::RoundToInt(OptMusic * 100.0f)));
 	L.Add(FString::Printf(TEXT("AYUDA DE TECLAS EN PANTALLA   < %s >"), bShowHelp ? TEXT("SI") : TEXT("NO")));
 	L.Add(TEXT("CONTROLES..."));
+	L.Add(FString::Printf(TEXT("DIFICULTAD   < %s >"), Df[FMath::Clamp(Difficulty, 0, 2)]));
+	L.Add(FString::Printf(TEXT("TAMANO DEL TEXTO   < %d %% >"), FMath::RoundToInt(OptTextScale * 100.0f)));
+	L.Add(FString::Printf(TEXT("COLORES PARA DALTONISMO   < %s >"), bColorblind ? TEXT("SI") : TEXT("NO")));
+	L.Add(FString::Printf(TEXT("SUBTITULOS DE SONIDOS   < %s >"), bSubtitles ? TEXT("SI") : TEXT("NO")));
 	L.Add(TEXT("SALIR DEL JUEGO"));
 	return L;
 }
@@ -1645,7 +1673,11 @@ void ATarsisDirector::MenuActivate(int32 Dir)
 	case 9:
 		if (Dir == 0) { MenuPage = 1; MenuSel = 0; }
 		return;
-	case 10:
+	case 10: Difficulty = (Difficulty + Step + 3) % 3; break;
+	case 11: OptTextScale = FMath::Clamp(FMath::RoundToFloat((OptTextScale + 0.1f * Step) * 10.0f) / 10.0f, 0.8f, 1.4f); break;
+	case 12: bColorblind = !bColorblind; break;
+	case 13: bSubtitles = !bSubtitles; break;
+	case 14:
 		if (Dir == 0) UKismetSystemLibrary::QuitGame(this, UGameplayStatics::GetPlayerController(this, 0), EQuitPreference::Quit, false);
 		return;
 	default: return;
@@ -1712,6 +1744,10 @@ void ATarsisDirector::SaveOptions() const
 	S->bShowFps = bShowFps;
 	S->Music = OptMusic;
 	S->bShowHelp = bShowHelp;
+	S->TextScale = OptTextScale;
+	S->bColorblind = bColorblind;
+	S->bSubtitles = bSubtitles;
+	S->Difficulty = Difficulty;
 	for (int32 i = 0; i < NumActions; ++i) S->Keys.Add(ActionKeys[i].GetFName());
 	UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisOpciones"), 0);
 }
@@ -1723,6 +1759,20 @@ void ATarsisDirector::LoadOptions()
 		const int32 Cur = G->GetOverallScalabilityLevel();   // -1 si los grupos van mezclados
 		OptQuality = Cur >= 0 ? FMath::Clamp(Cur, 0, 3) : 1;
 	}
+	if (!GIsEditor && !UGameplayStatics::DoesSaveGameExist(TEXT("TarsisOpciones"), 0))
+	{
+		// primera vez que se arranca el juego: el motor mide el PC y elige la calidad (luego se cambia en Pausa)
+		if (UGameUserSettings* G = UGameUserSettings::GetGameUserSettings())
+		{
+			G->RunHardwareBenchmark();
+			G->ApplyHardwareBenchmarkResults();
+			const int32 Cur = G->GetOverallScalabilityLevel();
+			OptQuality = Cur >= 0 ? FMath::Clamp(Cur, 0, 3) : 1;
+			SaveOptions();
+			ShowMessage(FString::Printf(TEXT("CALIDAD GRAFICA\nElegida segun tu PC: %s. Se cambia en Pausa (P)."),
+				OptQuality == 0 ? TEXT("BAJA") : OptQuality == 1 ? TEXT("MEDIA") : OptQuality == 2 ? TEXT("ALTA") : TEXT("EPICA")), 5.0f);
+		}
+	}
 	if (UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::LoadGameFromSlot(TEXT("TarsisOpciones"), 0)))
 	{
 		OptSensitivity = FMath::Clamp(S->Sensitivity, 0.2f, 3.0f);
@@ -1732,6 +1782,10 @@ void ATarsisDirector::LoadOptions()
 		bShowFps = S->bShowFps;
 		OptMusic = FMath::Clamp(S->Music, 0.0f, 1.0f);
 		bShowHelp = S->bShowHelp;
+		OptTextScale = FMath::Clamp(S->TextScale, 0.8f, 1.4f);
+		bColorblind = S->bColorblind;
+		bSubtitles = S->bSubtitles;
+		Difficulty = FMath::Clamp(S->Difficulty, 0, 2);
 		for (int32 i = 0; i < NumActions && i < S->Keys.Num(); ++i)
 		{
 			const FKey K(S->Keys[i]);
@@ -1867,4 +1921,35 @@ void ATarsisDirector::MusicTick(float DeltaSeconds)
 	if (MusicBase) MusicBase->SetVolumeMultiplier(FMath::Max(0.001f, Base * OptMusic));
 	if (MusicTen) MusicTen->SetVolumeMultiplier(FMath::Max(0.001f, 0.5f * MusicTension * (1.0f - 0.5f * MusicAlert) * OptMusic));
 	if (MusicAlr) MusicAlr->SetVolumeMultiplier(FMath::Max(0.001f, 0.55f * MusicAlert * OptMusic));
+}
+
+// ---------------------------------------------------------------- detecciones (para la puntuación) y dirección de un sonido
+
+void ATarsisDirector::DetectTick()
+{
+	if (bDone || bCine) return;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		const TObjectPtr<ATarsisGuard> K(*It);
+		uint8& Prev = PrevState.FindOrAdd(K, (uint8)It->State);
+		const uint8 Now = (uint8)It->State;
+		if (Now != Prev && It->State == ETarsisGuardState::Alert && !It->bRadioCall && !It->bAlly) ++Detections;
+		Prev = Now;
+	}
+}
+
+FString ATarsisDirector::Direction(const FVector& Where) const
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!PC || !P) return TEXT("CERCA");
+	const FRotator R(0.0f, PC->GetControlRotation().Yaw, 0.0f);
+	const FVector L = R.UnrotateVector(Where - P->GetActorLocation());
+	const float A = FMath::RadiansToDegrees(FMath::Atan2(L.Y, L.X));   // 0 delante, 90 derecha
+	if (FMath::Abs(A) < 30.0f) return TEXT("DELANTE");
+	if (FMath::Abs(A) > 150.0f) return TEXT("DETRAS");
+	const TCHAR* Side = A > 0.0f ? TEXT("DERECHA") : TEXT("IZQUIERDA");
+	if (FMath::Abs(A) < 75.0f) return FString::Printf(TEXT("DELANTE A LA %s"), Side);
+	if (FMath::Abs(A) > 105.0f) return FString::Printf(TEXT("DETRAS A LA %s"), Side);
+	return FString::Printf(TEXT("A LA %s"), Side);
 }

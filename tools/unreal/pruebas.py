@@ -134,7 +134,7 @@ def prueba_menu():
     d.press_key('P'); yield 0.2
     check('P abre el menú y pausa', d.get_editor_property('menu') and unreal.GameplayStatics.is_game_paused(mundo()))
     lineas = list(d.menu_lines())
-    check('el menú tiene sus 11 líneas', len(lineas) == 11, ' / '.join(lineas))
+    check('el menú tiene sus 15 líneas', len(lineas) == 15, ' / '.join(lineas))
     sens0 = float(lineas[2].split('<')[1].split('>')[0])
     for k in ('Down', 'Down', 'Right', 'Right', 'Right', 'Right', 'Right'):
         d.press_key(k); yield 0.1
@@ -262,6 +262,7 @@ def prueba_final():
     yield ('hasta', lambda: director().get_editor_property('done'), 5.0)
     check('final por la salida', d.get_editor_property('done') and 'MISION CUMPLIDA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     check('cinemática LS_Salida', d.get_editor_property('cine'))
+    check('puntuación de sigilo en el final', 'SIGILO:' in str(d.get_editor_property('message')) and d.get_editor_property('rank') != '', '%s %s' % (d.get_editor_property('score'), d.get_editor_property('rank')))
     if 'musica_t0' in R:
         capas = capas_musica()
         check('la música sigue en bucle pasados 32 s', len(capas) == 3 and all(c.is_playing() for c in capas.values()) and time.time() - R['musica_t0'] > 32, '%d s, %s' % (time.time() - R['musica_t0'], {k: c.is_playing() for k, c in capas.items()}))
@@ -337,12 +338,32 @@ def prueba_controles():
     ls = lineas(d)
     check('TECLAS POR DEFECTO lo deshace', ls[0] == tecla0 and ls[1] == interact, '%s / %s' % (ls[0], ls[1]))
     yield from teclas(d, 'Escape')
-    check('Esc vuelve a la página principal', len(lineas(d)) == 11, len(lineas(d)))
+    check('Esc vuelve a la página principal', len(lineas(d)) == 15, len(lineas(d)))
     yield from teclas(d, 'P')
     check('P cierra el menú', not d.get_editor_property('menu'))
 
 
-PRUEBAS = [prueba_intro, prueba_menu, prueba_musica, prueba_controles, prueba_dardos, prueba_punto_control,
+def prueba_opciones():
+    d = director()
+    yield from teclas(d, 'P', *(['Down'] * 10), 'Right')
+    check('DIFICULTAD pasa a DIFICIL', 'DIFICULTAD   < DIFICIL >' in ' '.join(lineas(d)), [x for x in lineas(d) if 'DIFICULTAD' in x])
+    check('la dificultad se guarda en el director', d.get_editor_property('difficulty') == 2, d.get_editor_property('difficulty'))
+    yield from teclas(d, 'Left', 'Down', 'Right', 'Down', 'Enter', 'Down', 'Enter', 'P')
+    ls = ' '.join(lineas(d))
+    check('tamaño del texto al 110 %', 'TAMANO DEL TEXTO   < 110 %' in ls, [x for x in lineas(d) if 'TAMANO' in x])
+    check('daltonismo y subtítulos activados', 'DALTONISMO   < SI' in ls and 'SUBTITULOS DE SONIDOS   < SI' in ls)
+    g = guardia('Moya')
+    l = g.get_actor_location()
+    tp(l.x + 600, l.y, 180)
+    yield ('hasta', lambda: str(director().get_editor_property('subtitle')).startswith('['), 8.0)
+    check('subtítulo de los pasos de un guardia', 'MOYA' in str(d.get_editor_property('subtitle')) or str(d.get_editor_property('subtitle')).startswith('['), d.get_editor_property('subtitle'))
+    tp(500, 500, 0)
+    # dejarlo todo como estaba
+    yield from teclas(d, 'P', *(['Down'] * 11), 'Left', 'Down', 'Enter', 'Down', 'Enter', 'P')
+    check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < 100 %' in ' '.join(lineas(d)))
+
+
+PRUEBAS = [prueba_intro, prueba_menu, prueba_musica, prueba_controles, prueba_opciones, prueba_dardos, prueba_punto_control,
            prueba_generador, prueba_reserva, prueba_farol, prueba_final]
 
 

@@ -273,6 +273,28 @@ public:
 	bool bShowFps = false;
 	float OptMusic = 0.7f;
 	bool bShowHelp = true;
+	/** Accesibilidad: tamaño del texto del HUD (0,8-1,4), colores para daltonismo y subtítulos de sonidos. */
+	float OptTextScale = 1.0f;
+	bool bColorblind = false;
+	bool bSubtitles = false;
+	/** Dificultad: 0 fácil, 1 normal, 2 difícil (vista y oído de los guardias; en difícil no hay puntos de control). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	int32 Difficulty = 1;
+
+	/** Subtítulo de sonido ahora mismo («[PASOS - MOYA, DETRAS A LA IZQUIERDA, 8 m]») y segundos que le quedan. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	FString Subtitle;
+	float SubtitleT = 0.0f;
+
+	/** Veces que un guardia te ha visto (pasa a alerta por verte, no por la radio). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 Detections = 0;
+
+	/** Puntuación de sigilo al acabar (0-1000) y su rango («FANTASMA»...). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 Score = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	FString Rank;
 
 	/** Página del menú: 0 la principal, 1 los controles. Esperando tecla para la acción ActionSel (o -1). */
 	int32 MenuPage = 0;
@@ -485,6 +507,11 @@ private:
 	TObjectPtr<class UAudioComponent> MusicAlr;
 	void SetupMusic();
 	void MusicTick(float DeltaSeconds);
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, uint8> PrevState;
+	void DetectTick();
+	FString Direction(const FVector& Where) const;
+	float SubtitleDist = 0.0f;
 
 	// cinemáticas
 	UPROPERTY()
