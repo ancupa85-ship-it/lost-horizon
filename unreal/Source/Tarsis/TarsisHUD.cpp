@@ -159,8 +159,16 @@ void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 		const FLinearColor SC = i < N ? Col : FLinearColor(1.0f, 1.0f, 1.0f, 0.12f);
 		Panel(X + 14.0f * S + i * (SegW + 4.0f * S), Y + 38.0f * S, SegW, 12.0f * S, SC);
 	}
-	Text(bCrouched ? TEXT("AGACHADO  (C)") : TEXT("DE PIE  (C para agacharte)"), X + 14.0f * S, Y + 58.0f * S,
-		bCrouched ? FLinearColor(0.6f, 0.85f, 1.0f) : FLinearColor(0.7f, 0.7f, 0.7f), 0.85f * S);
+	// postura y ruido de los pasos
+	const float Nz = D ? D->PlayerNoise : 0.0f;
+	FString Post = bCrouched ? TEXT("AGACHADO - SILENCIOSO") : TEXT("DE PIE  (C agacharte, Shift correr)");
+	FLinearColor PC = bCrouched ? FLinearColor(0.6f, 0.85f, 1.0f) : FLinearColor(0.7f, 0.7f, 0.7f);
+	if (!bCrouched && Nz > 0.0f)
+	{
+		Post = FString::Printf(TEXT("%s - TE OYEN A %d m"), (D && D->bSprint) ? TEXT("CORRIENDO") : TEXT("PASOS"), FMath::RoundToInt(Nz / 100.0f));
+		PC = Nz > 700.0f ? FLinearColor(1.0f, 0.5f, 0.25f) : FLinearColor(0.95f, 0.8f, 0.3f);
+	}
+	Text(Post, X + 14.0f * S, Y + 58.0f * S, PC, 0.85f * S);
 }
 
 void ATarsisHUD::DrawAlert()
@@ -200,13 +208,31 @@ void ATarsisHUD::DrawGuardMarks()
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		const ETarsisGuardState St = It->State;
-		if (St == ETarsisGuardState::Patrol || St == ETarsisGuardState::Return || St == ETarsisGuardState::Down) continue;
+		if (St == ETarsisGuardState::Down || It->bAlly) continue;
+		const bool bCalm = St == ETarsisGuardState::Patrol || St == ETarsisGuardState::Return;
+		const float Mt = FMath::Clamp(It->Meter, 0.0f, 1.0f);
+		if (bCalm && Mt < 0.05f) continue;
 		const bool bAlert = St == ETarsisGuardState::Alert;
-		const FLinearColor Col = bAlert ? FLinearColor(1.0f, 0.23f, 0.18f) : FLinearColor(1.0f, 0.82f, 0.23f);
+		// la sospecha va del amarillo al rojo según se llena
+		const FLinearColor Col = bAlert ? FLinearColor(1.0f, 0.23f, 0.18f) : FLinearColor(1.0f, FMath::Lerp(0.82f, 0.35f, Mt), FMath::Lerp(0.23f, 0.15f, Mt), bCalm ? 0.4f + 0.6f * Mt : 1.0f);
 		const FVector P = It->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f);
 		FVector2D Scr;
 		const bool bIn = PC->ProjectWorldLocationToScreen(P, Scr, true) && Scr.X > M && Scr.X < Canvas->ClipX - M && Scr.Y > M && Scr.Y < Canvas->ClipY - M;
-		if (bIn) continue;   // si se le ve, ya lleva su marca encima de la cabeza
+		if (bIn)
+		{
+			// a la vista: barra de sospecha sobre la cabeza, que avisa antes del «!»
+			if (!bAlert)
+			{
+				FVector2D Top;
+				if (PC->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), Top, true))
+				{
+					const float BW = 64.0f * S, BH = 7.0f * S;
+					Panel(Top.X - BW / 2.0f - 2.0f * S, Top.Y - 2.0f * S, BW + 4.0f * S, BH + 4.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
+					Panel(Top.X - BW / 2.0f, Top.Y, BW * Mt, BH, Col);
+				}
+			}
+			continue;
+		}
 		// fuera de la pantalla: marca en el borde, en la dirección del guardia
 		const FVector Local = CamRot.UnrotateVector(P - CamLoc);
 		FVector2D Dir(Local.Y, -Local.X);   // vista desde arriba: derecha = +Y, delante = arriba

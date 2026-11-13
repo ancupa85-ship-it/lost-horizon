@@ -37,6 +37,7 @@ void ATarsisDirector::SetupPlayer()
 	// el personaje de la plantilla no se agacha: se le permite y se enlaza la C (y Ctrl izquierdo)
 	C->GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
 	C->GetCharacterMovement()->MaxWalkSpeedCrouched = 200.0f;
+	BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
 	PC->ClientSetHUD(ATarsisHUD::StaticClass());
 	EnableInput(PC);
 	if (InputComponent)
@@ -46,6 +47,8 @@ void ATarsisDirector::SetupPlayer()
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ATarsisDirector::Interact);
 		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ATarsisDirector::ThrowStone);
 		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
+		InputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &ATarsisDirector::SprintOn);
+		InputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &ATarsisDirector::SprintOff);
 		{
 			FInputKeyBinding& B = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATarsisDirector::ShootDart);
 			B.bConsumeInput = false;
@@ -62,7 +65,7 @@ void ATarsisDirector::SetupPlayer()
 		}
 	}
 	bPlayerReady = true;
-	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires."), 10.0f);
+	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (Shift) y sobre la gravilla mas que dentro. Agachado, nada."), 11.0f);
 }
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
@@ -209,6 +212,8 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	// salida con el expediente
 	if (bFile && !bDone && NearPlayer(Cell(34, 26), 260.0f)) Finish(false);
 	if (DartT > 0.0f) DartT -= DeltaSeconds;
+	NoiseTick(C, DeltaSeconds);
+	BobTick(C, DeltaSeconds);
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
 	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
 	{
@@ -479,8 +484,9 @@ void ATarsisDirector::StartDrag(ATarsisGuard* G)
 	if (!C || !G) return;
 	Dragged = G;
 	UCharacterMovementComponent* M = C->GetCharacterMovement();
-	SavedWalk = M->MaxWalkSpeed;
+	SavedWalk = BaseWalk > 0.0f ? BaseWalk : M->MaxWalkSpeed;
 	SavedCrouch = M->MaxWalkSpeedCrouched;
+	bSprint = false;
 	M->MaxWalkSpeed = 180.0f;
 	M->MaxWalkSpeedCrouched = 140.0f;
 	ShowMessage(FString::Printf(TEXT("ARRASTRAS A %s\nLlevalo a la sombra y sueltalo con E. Si un guardia te ve con el, dara la alarma."), *G->GuardName.ToUpper()), 4.0f);
@@ -710,4 +716,77 @@ void ATarsisDirector::Finish(bool bByMarsh)
 		if (bRamosAlly) T += TEXT("\nRamos sale solo por la marisma y os espera en el camino de Trebujena.");
 		ShowMessage(T, 15.0f);
 	}
+}
+
+// ---------------------------------------------------------------- pasos, carrera y balanceo
+
+void ATarsisDirector::SprintOn()
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!C || Dragged || bDone) return;
+	if (BaseWalk <= 0.0f) BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
+	bSprint = true;
+	C->GetCharacterMovement()->MaxWalkSpeed = BaseWalk * 1.5f;
+}
+
+void ATarsisDirector::SprintOff()
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!C || !bSprint) return;
+	bSprint = false;
+	if (!Dragged && BaseWalk > 0.0f) C->GetCharacterMovement()->MaxWalkSpeed = BaseWalk;
+}
+
+void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
+{
+	const float Speed = C->GetVelocity().Size2D();
+	const bool bAir = C->GetCharacterMovement()->IsFalling();
+	// suelo: dentro (cemento, base_suelo_int) suena menos que fuera (gravilla y tierra)
+	StepT -= DeltaSeconds;
+	if (StepT <= 0.0f)
+	{
+		StepT = 0.35f;
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisSuelo), true, this);
+		Q.AddIgnoredActor(C);
+		const FVector P = C->GetActorLocation();
+		bIndoor = false;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, P, P - FVector(0.0f, 0.0f, 250.0f), ECC_Visibility, Q))
+		{
+			if (const UStaticMeshComponent* SM = Cast<UStaticMeshComponent>(Hit.GetComponent()))
+			{
+				if (SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().Contains(TEXT("suelo_int"))) bIndoor = true;
+			}
+		}
+		const float Surf = bIndoor ? 0.6f : 1.0f;
+		PlayerNoise = (C->bIsCrouched || bAir || Speed < 60.0f) ? 0.0f : Speed * 1.15f * Surf;
+		if (PlayerNoise > 0.0f)
+		{
+			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+			{
+				if (FVector::Dist(It->GetActorLocation(), P) > PlayerNoise) continue;
+				if (It->Visibility(C) > 0.0f) continue;   // si ya te ve, manda la vista
+				It->HearNoise(P);
+			}
+		}
+	}
+	if (C->bIsCrouched || Speed < 60.0f) PlayerNoise = 0.0f;   // al pararte o agacharte, el HUD lo ve enseguida
+}
+
+void ATarsisDirector::BobTick(ACharacter* C, float DeltaSeconds)
+{
+	UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>();
+	if (!Cam) return;
+	const float Speed = C->GetCharacterMovement()->IsFalling() ? 0.0f : C->GetVelocity().Size2D();
+	FVector Want = FVector::ZeroVector;
+	if (Speed > 40.0f && !bBinoculars)
+	{
+		// un paso cada ~0,55 s andando; corriendo más rápido y más marcado, agachado más suave
+		BobPhase += DeltaSeconds * Speed / 45.0f;
+		const float Amp = C->bIsCrouched ? 0.6f : (bSprint ? 2.0f : 1.1f);
+		Want = FVector(0.0f, FMath::Sin(BobPhase * 0.5f) * Amp * 0.6f, -FMath::Abs(FMath::Sin(BobPhase)) * Amp);
+	}
+	const FVector Next = FMath::VInterpTo(BobApplied, Want, DeltaSeconds, 10.0f);
+	Cam->AddRelativeLocation(Next - BobApplied);
+	BobApplied = Next;
 }

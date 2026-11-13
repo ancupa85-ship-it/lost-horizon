@@ -171,7 +171,8 @@ void ATarsisGuard::Hold(float Seconds)
 
 void ATarsisGuard::HearNoise(const FVector& Where)
 {
-	if (bTowerSentry || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
+	if (bTowerSentry || bAlly || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
+	if (State == ETarsisGuardState::Suspicious && bInvestigate) { LastSeen = Where; return; }   // ya va a mirar: sigue el ruido
 	LastSeen = Where;
 	Meter = FMath::Max(Meter, 0.5f);
 	SetState(ETarsisGuardState::Suspicious);

@@ -115,6 +115,13 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
 	float MissionTime = 0.0f;
 
+	/** Radio (cm) al que se oyen ahora tus pasos: 0 agachado o quieto; más corriendo (Shift) y fuera (gravilla) que dentro. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	float PlayerNoise = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	bool bSprint = false;
+
 	/** Q: lanza una piedra hacia donde miras; los guardias a menos de NoiseRadius van a mirar. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void ThrowStone();
@@ -227,5 +234,14 @@ private:
 	class ATarsisGuard* FindGuard(const TCHAR* Name) const;
 	void Finish(bool bByMarsh);
 	float DartT = 0.0f;
+	float StepT = 0.0f;
+	float BobPhase = 0.0f;
+	FVector BobApplied = FVector::ZeroVector;
+	float BaseWalk = 0.0f;
+	bool bIndoor = false;
+	void SprintOn();
+	void SprintOff();
+	void NoiseTick(class ACharacter* C, float DeltaSeconds);
+	void BobTick(class ACharacter* C, float DeltaSeconds);
 	bool bRamosSent = false;
 };
