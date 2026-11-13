@@ -42,7 +42,7 @@ def cuerpo(g, nombre):
     if not p:
         return
     g.set_editor_property('body_mesh', p['malla'])
-    for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim'), ('down_anim', 'down')):
+    for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim'), ('down_anim', 'down'), ('move_blend', 'blend')):
         if p.get(k):
             g.set_editor_property(prop, p[k])
     # set_editor_property ya avisa al actor del cambio (OnConstruction -> SetupBody); rerun_construction_scripts

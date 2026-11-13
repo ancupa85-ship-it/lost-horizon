@@ -278,6 +278,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<class USoundBase> RainSnd;
 	UPROPERTY()
+	TObjectPtr<class USoundBase> RadioSnd;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, float> BaseWalkSpeed;
+	UPROPERTY()
 	TObjectPtr<class USoundAttenuation> Atten;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> WindComp;

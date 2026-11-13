@@ -23,6 +23,9 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Engine/Light.h"
+#include "Components/SpotLightComponent.h"
+#include "Components/PointLightComponent.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -820,6 +823,16 @@ void ATarsisDirector::SetupSound()
 	DartSnd = LoadSnd(TEXT("dardo"));
 	WindSnd = LoadSnd(TEXT("viento"));
 	RainSnd = LoadSnd(TEXT("lluvia"));
+	RadioSnd = LoadSnd(TEXT("radio"));
+	// haces de luz con niebla o lluvia: las farolas y los focos dispersan más en la niebla volumétrica
+	for (TActorIterator<ALight> It(GetWorld()); It; ++It)
+	{
+		if (ULightComponent* L = It->GetLightComponent())
+		{
+			if (L->IsA<USpotLightComponent>()) L->SetVolumetricScatteringIntensity(4.0f);
+			else if (L->IsA<UPointLightComponent>()) L->SetVolumetricScatteringIntensity(2.5f);
+		}
+	}
 	// atenuación: se oye en 3D y se apaga hacia los 15 m (los pasos de un guardia tras una pared, la piedra al caer)
 	Atten = NewObject<USoundAttenuation>(this);
 	Atten->Attenuation.bAttenuate = true;
@@ -991,6 +1004,10 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		It->AlertBoost = TensionT > 0.0f ? 1.5f : 1.0f;
+		// en guardia, la ronda se hace a paso ligero (se ve en el mundo, no solo en el HUD)
+		const TObjectPtr<ATarsisGuard> K(*It);
+		const float& B = BaseWalkSpeed.FindOrAdd(K, It->WalkSpeed);
+		It->WalkSpeed = TensionT > 0.0f ? B * 1.7f : B;
 	}
 	// radio: a los 40 s de caer un guardia, no contesta y mandan al más cercano a donde cayó.
 	// Si lo has arrastrado y escondido, el que va a mirar no lo encuentra.
@@ -1011,6 +1028,7 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 		}
 		if (!Best) continue;
 		Best->HearNoise(G->KnockLoc);
+		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Best->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		ShowMessage(FString::Printf(TEXT("RADIO: \"%s, responde.\" ... Nada.\n%s va a ver que pasa donde le toca la ronda."),
 			*G->GuardName, *Best->GuardName), 4.5f);
 	}

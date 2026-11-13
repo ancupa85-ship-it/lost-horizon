@@ -81,9 +81,42 @@ def cargar(nombre, forzar=False):
             # Interchange suele llamarlas <archivo>_<animación> o solo <animación>
             if n == k or n.endswith('_' + k) or n.endswith(k):
                 res.setdefault(k, a.get_asset())
+    if res.get('idle') and res.get('walk'):
+        try:
+            res['blend'] = mezcla(ruta, res['malla'], res['idle'], res['walk'])
+        except Exception as e:
+            log('AVISO: sin mezcla idle/walk para', nombre, repr(e))
     log('persona', nombre, '- animaciones:', sorted(k for k in res if k != 'malla'),
         '- todas:', [str(a.asset_name) for a in clases.get('AnimSequence') or []])
     return res
+
+def mezcla(ruta, malla, idle, walk, andar=150.0):
+    """BlendSpace1D «BS_mover» de quieto (0) a andar (andar cm/s, el WalkAnimSpeed del guardia), una por esqueleto."""
+    nombre = ruta + '/BS_mover'
+    eal = unreal.EditorAssetLibrary
+    if eal.does_asset_exist(nombre):
+        return eal.load_asset(nombre)
+    f = unreal.BlendSpaceFactory1D()
+    f.set_editor_property('target_skeleton', malla.get_editor_property('skeleton'))
+    bs = unreal.AssetToolsHelpers.get_asset_tools().create_asset('BS_mover', ruta, unreal.BlendSpace1D, f)
+    params = bs.get_editor_property('blend_parameters')
+    p0 = params[0]
+    p0.set_editor_property('display_name', 'Speed')
+    p0.set_editor_property('min', 0.0)
+    p0.set_editor_property('max', andar * 3.0)
+    p0.set_editor_property('grid_num', 3)
+    params[0] = p0
+    bs.set_editor_property('blend_parameters', params)
+    muestras = []
+    for anim, v in ((idle, 0.0), (walk, andar)):
+        m = unreal.BlendSample()
+        m.set_editor_property('animation', anim)
+        m.set_editor_property('sample_value', unreal.Vector(v, 0.0, 0.0))
+        muestras.append(m)
+    bs.set_editor_property('sample_data', muestras)
+    eal.save_loaded_asset(bs)
+    log('mezcla creada', nombre)
+    return bs
 
 if __name__ == '__main__':
     for f in sorted(os.listdir(CARPETA)):

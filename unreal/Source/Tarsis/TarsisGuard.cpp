@@ -1,4 +1,6 @@
 #include "TarsisGuard.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/AnimSingleNodeInstance.h"
 #include "TarsisDirector.h"
 
 #include "Components/CapsuleComponent.h"
@@ -116,6 +118,21 @@ void ATarsisGuard::UpdateAnim()
 	USkeletalMeshComponent* M = GetMesh();
 	if (!BodyMesh || !M || State == ETarsisGuardState::Down) return;
 	const float Speed = GetVelocity().Size2D();
+	// con la mezcla, de quieto a andar sin saltos; apuntar (en alerta y parado) sigue siendo una animación suelta
+	if (MoveBlend && !(State == ETarsisGuardState::Alert && Speed <= 15.0f && AimAnim))
+	{
+		if (CurrentAnim != MoveBlend)
+		{
+			M->PlayAnimation(MoveBlend, true);
+			CurrentAnim = MoveBlend;
+		}
+		if (UAnimSingleNodeInstance* SI = M->GetSingleNodeInstance())
+		{
+			SI->SetBlendSpacePosition(FVector(FMath::Min(Speed, WalkAnimSpeed), 0.0f, 0.0f));
+		}
+		M->SetPlayRate(Speed > WalkAnimSpeed ? FMath::Clamp(Speed / FMath::Max(WalkAnimSpeed, 1.0f), 1.0f, 2.6f) : 1.0f);
+		return;
+	}
 	UAnimationAsset* Want = IdleAnim;
 	if (Speed > 15.0f && WalkAnim) Want = WalkAnim;
 	else if (State == ETarsisGuardState::Alert && AimAnim) Want = AimAnim;

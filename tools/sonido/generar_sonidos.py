@@ -87,6 +87,16 @@ def lluvia(sec=10):
         x[p:p + m] += rng.normal(0, 1, m) * env(m, 0.0002, 0.002) * rng.uniform(0.5, 2.0)
     return bucle(x)
 
+def radio():
+    # chasquido de radio: ruido filtrado a banda de voz que entra y sale, con un pitido corto al final
+    n = int(0.9 * SR); t = np.arange(n) / SR
+    x = hp(lp(rng.normal(0, 1, n), 0.6), 0.97)
+    g = np.ones(n); g[:int(0.03 * SR)] = np.linspace(0, 1, int(0.03 * SR)); g[int(0.7 * SR):] = 0
+    x = x * g * (0.6 + 0.4 * (rng.random(n) > 0.02))
+    b = int(0.72 * SR); m = int(0.08 * SR)
+    x[b:b + m] += 0.5 * np.sin(2 * np.pi * 1200 * t[:m]) * env(m, 0.002, 0.03)
+    return x
+
 if __name__ == '__main__':
     for k in range(3):
         save('paso_grava_%d' % (k + 1), grava(k), 0.7)
@@ -95,3 +105,4 @@ if __name__ == '__main__':
     save('dardo', dardo(), 0.6)
     save('viento', viento(), 0.5)
     save('lluvia', lluvia(), 0.5)
+    save('radio', radio(), 0.6)

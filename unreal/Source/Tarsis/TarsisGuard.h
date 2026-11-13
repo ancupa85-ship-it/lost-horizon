@@ -157,6 +157,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	TObjectPtr<UAnimationAsset> WalkAnim;
 
+	/** Mezcla de quieto a andar según la velocidad (BlendSpace1D, lo crea tools/unreal/personas.py). Si está, sustituye a IdleAnim/WalkAnim. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	TObjectPtr<class UBlendSpace> MoveBlend;
+
 	/** Apuntando (en alerta cuando se para). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	TObjectPtr<UAnimationAsset> AimAnim;
