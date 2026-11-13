@@ -33,6 +33,15 @@ void ATarsisHUD::DrawHUD()
 	ATarsisDirector* D = nullptr;
 	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { D = *It; break; }
 	const ACharacter* C = Cast<ACharacter>(GetOwningPawn());
+	if (D && D->bCine)
+	{
+		// cinemática: franjas de cine y solo el texto
+		const float H = Canvas->ClipY * 0.11f;
+		Panel(0.0f, 0.0f, Canvas->ClipX, H, FLinearColor::Black);
+		Panel(0.0f, Canvas->ClipY - H, Canvas->ClipX, H, FLinearColor::Black);
+		DrawMessage(D);
+		return;
+	}
 	DrawBinoculars(D);
 	DrawMarked();
 	DrawHeard(D);

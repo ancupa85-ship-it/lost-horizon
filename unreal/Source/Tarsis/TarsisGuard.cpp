@@ -440,6 +440,11 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 	return FMath::Clamp(Sum, 0.0f, 1.0f);
 }
 
+void ATarsisGuard::SetFlashlightShadows(bool bOn)
+{
+	if (Flashlight) Flashlight->SetCastShadows(bOn);   // solo la del reparador: una luz con sombra cuesta poco en la 1050
+}
+
 bool ATarsisGuard::HasFlashlightOn() const
 {
 	return Flashlight && Flashlight->IsVisible();
@@ -470,11 +475,18 @@ void ATarsisGuard::SetFlashlight(bool bOn)
 
 float ATarsisGuard::Visibility(const AActor* Target) const
 {
-	if (!Target || State == ETarsisGuardState::Down || bAlly) return 0.0f;
+	if (!Target || State == ETarsisGuardState::Down || bAlly || Target->IsHidden()) return 0.0f;   // oculto: durante una cinemática
 	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
 	const FVector Aim = Target->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f);
 	const float D = FVector::Dist(Eye, Aim);
-	if (D > ViewDistance) return 0.0f;
+	// en el cono de su linterna te ve de más lejos que a simple vista (pero solo de frente: el cono es estrecho)
+	bool bTorch = false;
+	if (HasFlashlightOn() && D < Flashlight->AttenuationRadius)
+	{
+		const FVector LP = Flashlight->GetComponentLocation();
+		bTorch = FVector::DotProduct(Flashlight->GetForwardVector(), (Aim - LP).GetSafeNormal()) >= FMath::Cos(FMath::DegreesToRadians(Flashlight->OuterConeAngle + 4.0f));
+	}
+	if (D > ViewDistance && !bTorch) return 0.0f;
 	const float CosA = FVector::DotProduct(GetActorForwardVector(), (Aim - Eye).GetSafeNormal2D());
 	const bool bInCone = CosA >= FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle));
 	if (!bInCone && D > NearDistance) return 0.0f;
@@ -485,10 +497,11 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 		return 0.0f;   // pared, cajas o contenedor por medio
 	}
 	const float Light = LightAt(this, Aim);
-	float V = (1.0f - FMath::Pow(D / ViewDistance, 1.5f)) * (0.2f + 0.8f * Light);
+	float V = D < ViewDistance ? (1.0f - FMath::Pow(D / ViewDistance, 1.5f)) * (0.2f + 0.8f * Light) : 0.0f;
+	if (bTorch) V = FMath::Max(V, 0.9f * (1.0f - FMath::Pow(D / Flashlight->AttenuationRadius, 2.0f)));
 	if (const ACharacter* C = Cast<ACharacter>(Target))
 	{
-		if (C->bIsCrouched) V *= 0.55f;
+		if (C->bIsCrouched) V *= bTorch ? 0.8f : 0.55f;   // agachado en plena luz de linterna te esconde poco
 	}
 	if (D < NearDistance)
 	{

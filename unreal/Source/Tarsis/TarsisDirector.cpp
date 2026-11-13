@@ -27,6 +27,9 @@
 #include "Components/SpotLightComponent.h"
 #include "Components/PointLightComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "LevelSequence.h"
+#include "LevelSequencePlayer.h"
+#include "LevelSequenceActor.h"
 #include "Components/MeshComponent.h"
 #include "Materials/MaterialInterface.h"
 
@@ -81,6 +84,17 @@ void ATarsisDirector::SetupPlayer()
 		}
 	}
 	bPlayerReady = true;
+	if (InputComponent)
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ATarsisDirector::SkipCine);
+		B.bConsumeInput = false;
+	}
+	// entrada: sobrevuelo de la base; al acabar (o al saltarla) salen las instrucciones
+	if (!(bPlayIntro && PlayCine(TEXT("LS_Entrada"), true))) IntroText();
+}
+
+void ATarsisDirector::IntroText()
+{
 	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (Shift) y sobre la gravilla mas que dentro. Agachado, nada."), 11.0f);
 }
 
@@ -222,7 +236,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
 	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
 	BinocularTick();
-	if (!bDone) MissionTime += DeltaSeconds;
+	if (!bDone && !bCine) MissionTime += DeltaSeconds;
 	DragTick();
 	if (bKeypad && !NearPlayer(Cell(6, 17), 260.0f)) { bKeypad = false; KeypadInput.Reset(); }
 	// salida con el expediente
@@ -371,6 +385,7 @@ FString ATarsisDirector::Objective() const
 
 void ATarsisDirector::Interact()
 {
+	if (bCine) { SkipCine(); return; }
 	if (bDone) return;
 	if (Dragged) { StopDrag(); ShowMessage(TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), 3.0f); return; }
 	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
@@ -733,6 +748,9 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	if (bDone) return;
 	bDone = true;
 	bMarsh = bByMarsh;
+	StopDrag();
+	if (bBinoculars) ToggleBinoculars();
+	PlayCine(bByMarsh ? TEXT("LS_Marisma") : TEXT("LS_Salida"), false);
 	const int32 Secs = FMath::FloorToInt(MissionTime);
 	const FString Stats = FString::Printf(TEXT("Tiempo %d:%02d   Capturas %d   Derribos %d"), Secs / 60, Secs % 60, Captures, Takedowns);
 	if (bByMarsh)
@@ -1092,6 +1110,8 @@ void ATarsisDirector::CutPower()
 	WindowsDark(true);
 	if (Repairer)
 	{
+		Repairer->SetFlashlight(true);
+		Repairer->SetFlashlightShadows(true);   // su cono recorta cajas y muros: te puedes esconder detrás
 		Repairer->HearNoise(GeneratorLoc);
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		ShowMessage(FString::Printf(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.\nRADIO: \"%s, mira el generador.\""), *Repairer->GuardName), 5.0f);
@@ -1112,7 +1132,7 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 	}
 	OffLights.Reset();
 	WindowsDark(false);
-	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) It->SetFlashlight(false);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) { It->SetFlashlightShadows(false); It->SetFlashlight(false); }
 	if (HumComp) HumComp->Play();
 	ShowMessage(bByGuard && Repairer
 		? FString::Printf(TEXT("VUELVE LA LUZ\n%s ha arrancado el generador."), *Repairer->GuardName)
@@ -1178,4 +1198,48 @@ void ATarsisDirector::WindowsDark(bool bDark)
 			}
 		}
 	}
+}
+
+// ---------------------------------------------------------------- cinemáticas (Sequencer)
+
+bool ATarsisDirector::PlayCine(const TCHAR* Name, bool bIntro)
+{
+	ULevelSequence* Seq = LoadObject<ULevelSequence>(nullptr, *FString::Printf(TEXT("/Game/Tarsis/Cine/%s.%s"), Name, Name));
+	if (!Seq) return false;
+	if (CinePlayer) { CinePlayer->Stop(); CinePlayer = nullptr; }
+	FMovieSceneSequencePlaybackSettings S;
+	S.bDisableMovementInput = true;
+	S.bDisableLookAtInput = true;
+	S.bHidePlayer = true;              // oculto, los guardias no lo ven (ATarsisGuard::Visibility)
+	S.bPauseAtEnd = !bIntro;           // en los finales la cámara se queda en el último plano con el texto
+	ALevelSequenceActor* Actor = nullptr;
+	CinePlayer = ULevelSequencePlayer::CreateLevelSequencePlayer(GetWorld(), Seq, S, Actor);
+	if (!CinePlayer) return false;
+	CinePlayer->OnFinished.AddDynamic(this, &ATarsisDirector::OnCineFinished);
+	bCine = true;
+	bCineIntro = bIntro;
+	CinePlayer->Play();
+	if (bIntro)
+	{
+		ShowMessage(TEXT("LOST HORIZON: DE PROFUNDIS\nMision 1 - Tarsis\nUna base en la marisma. Esta noche, el expediente LH-07 sale de ahi contigo.\n\n(E o Espacio para saltar)"), 30.0f);
+	}
+	return true;
+}
+
+void ATarsisDirector::SkipCine()
+{
+	if (!bCine || !CinePlayer) return;
+	if (!bCineIntro) return;   // los finales no se saltan: es la pantalla final
+	CinePlayer->Stop();        // Stop no lanza OnFinished: se cierra a mano
+	OnCineFinished();
+}
+
+void ATarsisDirector::OnCineFinished()
+{
+	if (!bCine) return;
+	if (!bCineIntro) return;   // final: se queda en el último plano (bPauseAtEnd)
+	bCine = false;
+	if (CinePlayer) { CinePlayer->Stop(); CinePlayer = nullptr; }
+	MessageT = 0.0f;
+	IntroText();
 }

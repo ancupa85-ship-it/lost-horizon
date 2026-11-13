@@ -144,6 +144,17 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Luz")
 	bool bPowerOff = false;
 
+	/** Cinemáticas de Sequencer (tools/unreal/cinematicas.py las crea en /Game/Tarsis/Cine). Sin ellas, el juego va igual. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
+	bool bPlayIntro = true;
+
+	/** Hay una cinemática en marcha (E o Espacio la saltan). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cine")
+	bool bCine = false;
+
+	UFUNCTION()
+	void OnCineFinished();
+
 	/** Segundos que tarda el guardia en arrancar el generador una vez junto a él. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
 	float RepairSeconds = 12.0f;
@@ -347,5 +358,13 @@ private:
 	void RestorePower(bool bByGuard);
 	void PowerTick(float DeltaSeconds);
 	void WindowsDark(bool bDark);
+
+	// cinemáticas
+	UPROPERTY()
+	TObjectPtr<class ULevelSequencePlayer> CinePlayer;
+	bool bCineIntro = false;
+	bool PlayCine(const TCHAR* Name, bool bIntro);
+	void SkipCine();
+	void IntroText();
 	bool bRamosSent = false;
 };

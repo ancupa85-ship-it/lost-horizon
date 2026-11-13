@@ -191,6 +191,7 @@ public:
 	/** Linterna en la mano (durante el apagón): el cono se ve en la niebla y cuenta como luz para verte. */
 	void SetFlashlight(bool bOn);
 	bool HasFlashlightOn() const;
+	void SetFlashlightShadows(bool bOn);
 
 protected:
 	virtual void BeginPlay() override;
