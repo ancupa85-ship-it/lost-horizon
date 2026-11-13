@@ -71,7 +71,7 @@ void ATarsisHUD::DrawExtras(ATarsisDirector* D)
 	// ayuda de teclas, abajo del todo (opción del menú)
 	if (D->bShowHelp && !D->bKeypad && !D->bMenu)
 	{
-		Text(D->HelpLine(), Canvas->ClipX / 2.0f, Canvas->ClipY - 26.0f * S, FLinearColor(0.85f, 0.85f, 0.85f, 0.55f), 0.6f * S, true);
+		Text(D->HelpLine(), Canvas->ClipX / 2.0f, Canvas->ClipY - 26.0f * S, FLinearColor(0.85f, 0.85f, 0.85f, 0.6f), 0.7f * S, true);
 	}
 	// aviso de punto de control, arriba a la derecha
 	if (D->CheckT > 0.0f && !D->CheckpointName.IsEmpty())
@@ -243,7 +243,10 @@ void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 	}
 	// postura y ruido de los pasos
 	const float Nz = D ? D->PlayerNoise : 0.0f;
-	FString Post = bCrouched ? TEXT("AGACHADO - SILENCIOSO") : TEXT("DE PIE  (C agacharte, Shift correr)");
+	// con las teclas configuradas (Controles): antes decía siempre C y Shift aunque las hubieras cambiado
+	FString Post = bCrouched ? FString(TEXT("AGACHADO - SILENCIOSO")) : (D
+		? FString::Printf(TEXT("DE PIE  (%s agacharte, %s correr)"), *D->ActionKeys[0].GetDisplayName().ToString(), *D->ActionKeys[4].GetDisplayName().ToString())
+		: FString(TEXT("DE PIE  (C agacharte, Shift correr)")));
 	FLinearColor PC = bCrouched ? FLinearColor(0.6f, 0.85f, 1.0f) : FLinearColor(0.7f, 0.7f, 0.7f);
 	if (!bCrouched && Nz > 0.0f)
 	{

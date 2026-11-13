@@ -77,7 +77,9 @@ void ATarsisDirector::SetupPlayer()
 
 void ATarsisDirector::IntroText()
 {
-	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (Shift) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control."), 11.0f);
+	auto K = [this](int32 I) { return ActionKeys[I].GetDisplayName().ToString(); };
+	ShowMessage(FString::Printf(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (%s) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n%s lanza una piedra para distraer. %s prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (%s) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control."),
+		*K(0), *K(2), *K(3), *K(4)), 11.0f);
 }
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
@@ -1677,6 +1679,7 @@ void ATarsisDirector::ApplyOptions()
 		PC->InputYawScale_DEPRECATED = BaseYawScale * OptSensitivity;
 		PC->InputPitchScale_DEPRECATED = BasePitchScale * OptSensitivity * (bOptInvertY ? -1.0f : 1.0f);
 	}
+	MusicTick(0.0f);   // en pausa MusicTick no corre: que el volumen de la música cambie ya, con el menú abierto
 	if (GEngine)
 	{
 		if (FAudioDeviceHandle Dev = GEngine->GetMainAudioDevice()) Dev->SetTransientPrimaryVolume(OptVolume);

@@ -263,7 +263,7 @@ public:
 
 	/** Pruebas automáticas: pulsa una tecla del menú por su nombre («P», «Down», «Right», «Enter»...) sin teclado real. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
-	void PressKey(FName Key) { MenuKey(FKey(Key)); }
+	void PressKey(FName Key) { const FKey K(Key); MenuKey(K); AnyKey(K); }   // en el mismo orden que BindAll: menú y luego AnyKey
 
 	/** Opciones: sensibilidad del ratón (0,2-3), invertir Y, volumen (0-1), calidad (0 baja - 3 épica) y contador de fps. */
 	float OptSensitivity = 1.0f;
