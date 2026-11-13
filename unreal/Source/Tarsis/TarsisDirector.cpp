@@ -103,6 +103,12 @@ void ATarsisDirector::IntroText()
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
 {
+	if (Text.StartsWith(TEXT("RADIO")))
+	{
+		Radio = Text;
+		RadioT = Seconds;
+		return;
+	}
 	Message = Text;
 	MessageT = Seconds;
 }
@@ -236,6 +242,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	}
 
 	if (MessageT > 0.0f) MessageT -= DeltaSeconds;
+	if (RadioT > 0.0f) RadioT -= DeltaSeconds;
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
 	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
 	BinocularTick();

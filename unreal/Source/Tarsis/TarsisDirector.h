@@ -31,6 +31,9 @@ public:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	float MessageT = 0.0f;
+	/** Mensajes de radio (los que empiezan por "RADIO"): van aparte, abajo a la izquierda, sin tapar el mensaje principal. */
+	FString Radio;
+	float RadioT = 0.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void ShowMessage(const FString& Text, float Seconds = 4.0f);

@@ -294,15 +294,45 @@ void ATarsisHUD::DrawGuardMarks()
 
 void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 {
-	if (!D || D->MessageT <= 0.0f || D->Message.IsEmpty()) return;
+	if (!D) return;
 	const float S = Canvas->ClipY / 1080.0f;
-	const float A = FMath::Clamp(D->MessageT, 0.0f, 1.0f);
-	TArray<FString> Lines;
-	D->Message.ParseIntoArray(Lines, TEXT("\n"));
-	const float Y0 = Canvas->ClipY * 0.62f;
-	Panel(Canvas->ClipX * 0.2f, Y0 - 12.0f * S, Canvas->ClipX * 0.6f, (Lines.Num() * 34.0f + 24.0f) * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * A));
-	for (int32 i = 0; i < Lines.Num(); ++i)
+	if (D->MessageT > 0.0f && !D->Message.IsEmpty())
 	{
-		Text(Lines[i], Canvas->ClipX / 2.0f, Y0 + i * 34.0f * S, FLinearColor(1.0f, 0.95f, 0.85f, A), (i == 0 ? 1.15f : 0.95f) * S, true);
+		// más abajo y más pequeño que antes: no tapa a los guardias del centro de la pantalla
+		const float A = FMath::Clamp(D->MessageT, 0.0f, 1.0f);
+		TArray<FString> Lines;
+		D->Message.ParseIntoArray(Lines, TEXT("\n"));
+		const float LH = 27.0f * S;
+		const float Y0 = Canvas->ClipY * 0.95f - Lines.Num() * LH;
+		Panel(Canvas->ClipX * 0.25f, Y0 - 10.0f * S, Canvas->ClipX * 0.5f, Lines.Num() * LH + 18.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f * A));
+		for (int32 i = 0; i < Lines.Num(); ++i)
+		{
+			Text(Lines[i], Canvas->ClipX / 2.0f, Y0 + i * LH, i == 0 ? FLinearColor(1.0f, 0.85f, 0.55f, A) : FLinearColor(1.0f, 0.95f, 0.85f, 0.9f * A), (i == 0 ? 0.95f : 0.78f) * S, true);
+		}
+	}
+	if (D->RadioT > 0.0f && !D->Radio.IsEmpty())
+	{
+		// radio: caja verde a la izquierda, con su cabecera, como una transmisión interceptada
+		const float A = FMath::Clamp(D->RadioT, 0.0f, 1.0f);
+		FString Body = D->Radio;
+		Body.RemoveFromStart(TEXT("RADIO"));
+		Body.RemoveFromStart(TEXT(":"));
+		Body.RemoveFromStart(TEXT(","));
+		Body.TrimStartInline();
+		TArray<FString> Lines;
+		Body.ParseIntoArray(Lines, TEXT("\n"));
+		const float LH = 25.0f * S;
+		const float X0 = 30.0f * S, W = Canvas->ClipX * 0.32f;
+		const float Y0 = Canvas->ClipY * 0.55f;
+		const float H = (Lines.Num() + 1) * LH + 18.0f * S;
+		Panel(X0, Y0, W, H, FLinearColor(0.0f, 0.06f, 0.02f, 0.6f * A));
+		Panel(X0, Y0, 4.0f * S, H, FLinearColor(0.35f, 1.0f, 0.45f, 0.9f * A));
+		// parpadeo del piloto mientras dura la transmisión
+		const bool bOn = FMath::Fmod(D->RadioT, 0.8f) > 0.3f;
+		Text(bOn ? TEXT("((o)) RADIO") : TEXT("( o ) RADIO"), X0 + 14.0f * S, Y0 + 8.0f * S, FLinearColor(0.45f, 1.0f, 0.55f, A), 0.72f * S, false);
+		for (int32 i = 0; i < Lines.Num(); ++i)
+		{
+			Text(Lines[i], X0 + 14.0f * S, Y0 + 8.0f * S + (i + 1) * LH, FLinearColor(0.75f, 1.0f, 0.8f, A), 0.72f * S, false);
+		}
 	}
 }
