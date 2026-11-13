@@ -9,7 +9,9 @@ function applyOpt(){ usePost=!!OPT.post&&!!rt; if(renderer.shadowMap.enabled!==!
 const guideEl=el('guide');
 const GUIDE=[
   {k:'crouch',t:'Agáchate (Ctrl) en una sombra hasta leer OCULTO',ok:()=>S.guide.hidden},
+  {k:'scope',t:'Mantén B (o el botón derecho): prismáticos. Deja la mira sobre un guardia para marcarlo',ok:()=>S.marks>0},
   {k:'grab',t:'Acércate a un guardia por la espalda y pulsa F',ok:()=>S.interro>0},
+  {k:'decoy',t:'Z lanza un cargador vacío: quien lo oiga irá a mirar y dejará el paso libre',ok:()=>S.decoys>0},
   {k:'ask',t:'Pregúntale; si calla, APRIETA, y luego duérmelo',ok:()=>S.clues.some(k=>['peris','c130','c1983','roma','llave','fuente'].includes(k))&&S.ko>0},
   {k:'read',t:'Lee lo que encuentres (E). Tab abre el cuaderno de pistas',ok:()=>S.clues.length>=2},
   {k:'order',t:'Roig espera donde está. G hace que te siga (y G otra vez, que espere)',ok:()=>S.orders>0},
@@ -17,43 +19,44 @@ const GUIDE=[
   {k:'uniform',t:'E junto a un guardia dormido le quita el uniforme: de lejos eres uno más',ok:()=>S.disguises>0},
   {k:'vault',t:'La clave del archivo sale de juntar pistas. Dos fallos: alarma',ok:()=>W.vaultOpen},
 ];
-function guideTick(){ if(entHidden(S.p))S.guide.hidden=true; if(!OPT.hints||!started||cut||S.mission===2){ guideEl.hidden=true; return; }
+function guideTick(){ if(entHidden(S.p))S.guide.hidden=true; if(!OPT.hints||!started||cut||S.mission>=2){ guideEl.hidden=true; return; }
   const items=GUIDE.map(g=>{ const done=S.guide[g.k]||(S.guide[g.k]=!!g.ok()); return {g,done}; }); const firstOpen=items.findIndex(i=>!i.done);
   if(firstOpen<0){ guideEl.hidden=true; return; } guideEl.hidden=false;
   const html=items.slice(0,Math.min(items.length,firstOpen+2)).map((i,n)=>'<li class="'+(i.done?'ok':(n===firstOpen?'now':''))+'">'+(i.done?'✓ ':'› ')+i.g.t+'</li>').join('');
   if(guideEl.dataset.html!==html){ guideEl.dataset.html=html; guideEl.innerHTML='<h4>GUÍA <span>H oculta</span></h4><ul>'+html+'</ul>'; } }
 // menú principal / pausa
 let paused=false;
-function showMenu(pane){ ov.hidden=false; el('end').hidden=true; const m=el('menu'); m.hidden=false; const sv=hasSave(); el('btnContinue').hidden=!sv||paused; if(sv)el('btnContinue').innerHTML='CONTINUAR <small>'+(sv.mission===2?'Misión 2 · ':'')+sv.tag+'</small>'; m.querySelectorAll('[data-pane]').forEach(p=>{ p.hidden=p.dataset.pane!==pane; }); m.classList.toggle('paused',paused); el('mTitle').textContent=paused?'PAUSA':'PROJECT LOST HORIZON'; syncOptUI(); }
+function showMenu(pane){ ov.hidden=false; el('end').hidden=true; const m=el('menu'); m.hidden=false; const sv=hasSave(); el('btnContinue').hidden=!sv||paused; if(sv)el('btnContinue').innerHTML='CONTINUAR <small>'+(sv.mission>1?'Misión '+sv.mission+' · ':'')+sv.tag+'</small>'; m.querySelectorAll('[data-pane]').forEach(p=>{ p.hidden=p.dataset.pane!==pane; }); m.classList.toggle('paused',paused); el('mTitle').textContent=paused?'PAUSA':'PROJECT LOST HORIZON'; syncOptUI(); }
 function syncOptUI(){ el('oSens').value=OPT.sens; el('oSensV').textContent=OPT.sens.toFixed(1); el('oInv').checked=OPT.invY; el('oView').value=OPT.view; el('oPost').checked=OPT.post; el('oShadow').checked=OPT.shadows; el('oSimple').checked=!!OPT.simpleFig; el('oVol').value=OPT.vol; el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; el('oMusic').value=OPT.music; el('oMusicV').textContent=Math.round(OPT.music*100)+'%'; el('oHints').checked=OPT.hints; }
 function readOptUI(){ OPT.sens=+el('oSens').value; OPT.invY=el('oInv').checked; OPT.view=el('oView').value; OPT.post=el('oPost').checked; OPT.shadows=el('oShadow').checked; OPT.simpleFig=el('oSimple').checked; OPT.vol=+el('oVol').value; OPT.music=+el('oMusic').value; OPT.hints=el('oHints').checked; el('oSensV').textContent=OPT.sens.toFixed(1); el('oVolV').textContent=Math.round(OPT.vol*100)+'%'; el('oMusicV').textContent=Math.round(OPT.music*100)+'%'; saveOpt(); applyOpt(); if(AC)beep(900,0.05,'sine',0.04); }
-function startGame(withIntro,silent){ initAudio(); applyOpt(); if(GFX_PRESET&&!S.flashSeen.gfx){ S.flashSeen.gfx=true; setTimeout(()=>flash('MODO '+GFX_PRESET.toUpperCase(),'Gráfica modesta detectada ('+(GPU_INFO||'desconocida').slice(0,40)+'): '+(GFX_PRESET==='ligero'?'sin sombras ni contornos y personajes sencillos.':'sin sombras.')+' Puedes cambiarlo en Opciones.',8),6000); } if(!silent)setPower(true); started=true; paused=false; uiOpen=false; ov.hidden=true; el('end').hidden=true; third=OPT.view==='3'; try{gl.requestPointerLock();}catch(e){} if(withIntro){ if(S.mission===2)intro2(); else intro(); } else if(!silent)codec(S.mission===2?CODEC.m2start:CODEC.start); }
+function startGame(withIntro,silent){ initAudio(); applyOpt(); if(GFX_PRESET&&!S.flashSeen.gfx){ S.flashSeen.gfx=true; setTimeout(()=>flash('MODO '+GFX_PRESET.toUpperCase(),'Gráfica modesta detectada ('+(GPU_INFO||'desconocida').slice(0,40)+'): '+(GFX_PRESET==='ligero'?'sin sombras ni contornos y personajes sencillos.':'sin sombras.')+' Puedes cambiarlo en Opciones.',8),6000); } if(!silent)setPower(true); started=true; paused=false; uiOpen=false; ov.hidden=true; el('end').hidden=true; third=OPT.view==='3'; try{gl.requestPointerLock();}catch(e){} if(withIntro){ if(S.mission===3)intro3(); else if(S.mission===2)intro2(); else intro(); } else if(!silent)codec(missionCodec(S.mission)); }
 // guardado automático en puntos clave; CONTINUAR en el menú
 const pickEnt=e=>({name:e.name,x:e.x,z:e.z,hp:e.hp,ammo:e.ammo,key:e.key,file:e.file,crouch:e.crouch,down:e.down,disguise:!!e.disguise});
 function saveGame(tag){ if(!started||S.over)return; try{ const zones=Object.assign({},S.zoneState); zones[S.zone]=zoneSnapshot(); const d={v:3,tag,when:Date.now(),mission:S.mission||1,t:S.t,ctrl:S.p.name,yaw,p:pickEnt(S.p),c:pickEnt(S.c),W:Object.assign({},W),zone:S.zone,zones,
-  clues:S.clues.slice(),kill:S.kill,ko:S.ko,alarms:S.alarms,interro:S.interro,base:S.base,cigs:S.cigs,inCell:S.inCell,dogsDone:S.dogsDone,dogsOut:!!S.dogsOut,capturedOnce:!!S.capturedOnce,swaps:S.swaps,cOrder:S.cOrder,orders:S.orders,silencer:!!S.silencer,disguises:S.disguises,teamKO:S.teamKO,ammoTaken:S.ammoTaken,wrongCode:S.wrongCode,halloTalked:S.halloTalked,codecSeen:S.codecSeen,flashSeen:S.flashSeen,guide:S.guide,vidal:S.vidal,reinforced:S.reinforced,refPending:!!S.refPending,dogKills:S.dogKills,cellEscaped:!!S.cellEscaped,cellKey:!!S.cellKey,calls:S.calls||null};
+  clues:S.clues.slice(),kill:S.kill,ko:S.ko,alarms:S.alarms,interro:S.interro,base:S.base,cigs:S.cigs,inCell:S.inCell,dogsDone:S.dogsDone,dogsOut:!!S.dogsOut,capturedOnce:!!S.capturedOnce,swaps:S.swaps,cOrder:S.cOrder,orders:S.orders,silencer:!!S.silencer,disguises:S.disguises,teamKO:S.teamKO,ammoTaken:S.ammoTaken,wrongCode:S.wrongCode,halloTalked:S.halloTalked,codecSeen:S.codecSeen,flashSeen:S.flashSeen,guide:S.guide,vidal:S.vidal,reinforced:S.reinforced,refPending:!!S.refPending,dogKills:S.dogKills,cellEscaped:!!S.cellEscaped,cellKey:!!S.cellKey,calls:S.calls||null,gas:!!S.gas,prev:S.prev||null,marks:S.marks||0,decoys:S.decoys||0};
   localStorage.setItem('lh-save',JSON.stringify(d)); S.savedT=2.5; }catch(e){} }
 function hasSave(){ try{ return JSON.parse(localStorage.getItem('lh-save')||'null'); }catch(e){ return null; } }
 function loadGame(){ const d=hasSave(); if(!d)return null; reset();
   // guardados antiguos (v1): un solo mapa, guardias en d.guards
   S.zoneState=d.zones||(d.guards?{base:{guards:d.guards.map(g=>Object.assign({},g,{ref:false}))}}:{}); if(d.v===undefined||d.v<2){ const gs=S.zoneState.base&&S.zoneState.base.guards; if(gs&&d.reinforced&&gs.length>GDEF.length)gs[gs.length-1].ref=true; }
   Object.assign(W,d.W); if(!Array.isArray(W.gens))W.gens=[true,true,true];
-  ['clues','kill','ko','alarms','interro','base','cigs','inCell','dogsDone','dogsOut','capturedOnce','swaps','cOrder','orders','silencer','disguises','teamKO','ammoTaken','wrongCode','halloTalked','codecSeen','flashSeen','guide','vidal','reinforced','refPending','dogKills','cellEscaped','cellKey','mission','t'].forEach(k=>{ if(d[k]!==undefined)S[k]=d[k]; }); if(d.calls)S.calls=d.calls;
+  ['clues','kill','ko','alarms','interro','base','cigs','inCell','dogsDone','dogsOut','capturedOnce','swaps','cOrder','orders','silencer','disguises','teamKO','ammoTaken','wrongCode','halloTalked','codecSeen','flashSeen','guide','vidal','reinforced','refPending','dogKills','cellEscaped','cellKey','mission','t','gas','prev','marks','decoys'].forEach(k=>{ if(d[k]!==undefined)S[k]=d[k]; }); if(d.calls)S.calls=d.calls;
   enterZone(d.zone||'base',null,d.yaw||yaw,{noSave:true});
   const byName={CUTTLAS:S.p,ROIG:S.c}; [d.p,d.c].forEach(e=>{ const t=byName[e.name]; if(t){ Object.assign(t,e); setDisguise(t,!!e.disguise); } }); if(d.ctrl==='ROIG'){ const a=S.p; S.p=S.c; S.c=a; }
   if(ZONE.sync)ZONE.sync(); pitch=0; S.camH=undefined; updHud(); renderNote(); el('hCig').textContent=S.cigs;
   updObj();
   S.c.fig.g.position.set(S.c.x,0,S.c.z); S.c.fig.g.rotation.z=0; return d; }
-function continueGame(){ const d=loadGame(); if(!d){ showMenu('main'); return; } startGame(false,true); flash('CONTINUAR · '+clockStr(),(d.mission===2?'Misión 2. ':'')+d.tag+'. '+(S.p.name==='ROIG'?'Controlas a Roig.':'Controlas a Cuttlas.')+' R abre la radio si no sabes seguir.',6); }
+function continueGame(){ const d=loadGame(); if(!d){ showMenu('main'); return; } startGame(false,true); flash('CONTINUAR · '+clockStr(),(d.mission>1?'Misión '+d.mission+'. ':'')+d.tag+'. '+(S.p.name==='ROIG'?'Controlas a Roig.':'Controlas a Cuttlas.')+' R abre la radio si no sabes seguir.',6); }
 function pauseGame(){ if(paused||!started)return; paused=true; uiOpen=true; unlockPtr(); showMenu('pause'); }
 function resumeGame(){ if(!paused)return; paused=false; uiOpen=false; ov.hidden=true; try{gl.requestPointerLock();}catch(e){} }
 el('menu').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; const go=b.dataset.go; if(AC)beep(700,0.04,'square',0.03);
   if(go==='main')showMenu(paused?'pause':'main'); else if(go)showMenu(go);
   else if(b.id==='btnStart'){ reset(); try{localStorage.removeItem('lh-save');}catch(e){} startGame(true); }
   else if(b.id==='btnM2')startMission(2,true);
+  else if(b.id==='btnM3')startMission(3,true);
   else if(b.id==='btnContinue')continueGame();
   else if(b.id==='btnResume')resumeGame();
-  else if(b.id==='btnRestart'){ const m=S.mission; reset(m); paused=false; uiOpen=false; ov.hidden=true; el('end').hidden=true; try{gl.requestPointerLock();}catch(e){} codec(m===2?CODEC.m2start:CODEC.start); }
+  else if(b.id==='btnRestart'){ const m=S.mission; reset(m); paused=false; uiOpen=false; ov.hidden=true; el('end').hidden=true; try{gl.requestPointerLock();}catch(e){} codec(missionCodec(m)); }
   else if(b.id==='btnQuit'){ reset(); paused=false; started=false; uiOpen=false; showMenu('main'); } });
 el('menu').addEventListener('input',e=>{ if(e.target.closest('[data-pane="opt"]'))readOptUI(); });
 el('menu').addEventListener('change',e=>{ if(e.target.closest('[data-pane="opt"]'))readOptUI(); });

@@ -1,13 +1,21 @@
 {
   "name": "lost-horizon-de-profundis",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Lost Horizon: De Profundis — misión en primera persona (Three.js, cel-shading, sigilo e interrogatorio)",
   "private": true,
   "scripts": {
     "start": "npx --yes serve -l 8080 .",
     "test": "node tests/smoke.js",
     "test:m2": "node tests/mission2.js",
-    "build:artifact": "python3 tools/build-artifact.py"
+    "build:artifact": "python3 tools/build-artifact.py",
+    "test:m3": "node tests/mission3.js",
+    "shots:m3": "node tests/shots-m3.js",
+    "test:recon": "node tests/recon.js",
+    "test:models": "node tests/models.js",
+    "build:models": "python3 tools/build-models.py",
+    "build:portraits": "python3 tools/build-portraits.py",
+    "blender": "python3 tools/blender/modelos.py",
+    "export:templates": "node tools/export-templates.js"
   },
   "devDependencies": {
     "playwright": "^1.47.0"

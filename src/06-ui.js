@@ -19,8 +19,8 @@ function objective2(){ if(S.zone==='templo')return {step:3,text:'SUBE EN EL MONT
   const n=W.gens.filter(v=>!v).length; if(W.gateOpen)return {step:2,text:'LA COMPUERTA HA CAÍDO: BAJA AL TEMPLO POR EL SUR',x:14,y:21};
   return {step:2,text:'BAJA AL TEMPLO: PARA LOS TRES GRUPOS ('+n+'/3) PARA QUE CAIGA LA COMPUERTA, O SIGUE EL CANAL DEL OESTE',x:n?14:3,y:n?19:9}; }
 // fuera de la base, el objetivo apunta a la salida que lleva de vuelta
-function objectiveHere(){ if(S.mission===2)return objective2(); const o=objective(); if(!o||!ZONE||ZONE.id==='base'||!ZONE.exitTo)return o; const ex=ZONE.exitTo.base; if(!ex)return o; return {step:o.step,text:'SUBE A LA BASE · '+o.text,x:ex[0],y:ex[1]}; }
-let lastObj=''; function updObj(){ const o=objectiveHere(); const t=(o.step?'OBJETIVO '+o.step+(S.mission===2?'/3: ':'/6: '):'OBJETIVO: ')+o.text; if(t!==lastObj){ lastObj=t; el('hObj').textContent=t; } return o; }
+function objectiveHere(){ if(S.mission===3)return objective3(); if(S.mission===2)return objective2(); const o=objective(); if(!o||!ZONE||ZONE.id==='base'||!ZONE.exitTo)return o; const ex=ZONE.exitTo.base; if(!ex)return o; return {step:o.step,text:'SUBE A LA BASE · '+o.text,x:ex[0],y:ex[1]}; }
+let lastObj=''; function updObj(){ const o=objectiveHere(); const t=(o.step?'OBJETIVO '+o.step+(S.mission>=2?'/3: ':'/6: '):'OBJETIVO: ')+o.text; if(t!==lastObj){ lastObj=t; el('hObj').textContent=t; } return o; }
 function renderNote(){ el('noteList').innerHTML=S.clues.length?S.clues.map(k=>'<li>'+CLUES[k]+'</li>').join(''):'<li class="e">Nada todavía. Lee, escucha, aprieta.</li>'; }
 let dlgOpts=[];
 function openDialog(title,html,opts){ uiOpen=true; unlockPtr(); el('dlgTitle').textContent=title; el('dlgTxt').innerHTML=html; dlgOpts=opts; const box=el('dlgOpts'); box.innerHTML=''; box.className='opts';

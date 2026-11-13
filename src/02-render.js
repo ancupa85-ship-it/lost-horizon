@@ -62,9 +62,9 @@ function frame(x,y){ const horiz=cell(x-1,y)==='W'||cell(x-1,y)==='#'; const g=n
 function prop(x,y,w,h,d,mat,yoff){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(wx(x),(yoff||0)+h/2,wx(y)); zadd(m); return m; }
 function mkSpot(px,pz,cx,cz,rad,ph){ const s=new THREE.SpotLight(0xfff4d0,2.4,45,0.22,0.4,1); s.position.set(px,7,pz); s.castShadow=true; s.shadow.mapSize.set(1024,1024); s.shadow.bias=-0.002; const tg=new THREE.Object3D(); zadd(tg); s.target=tg; zadd(s);
   const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.15,2.2,1,12,1,true),new THREE.MeshBasicMaterial({color:0xfff0c0,transparent:true,opacity:0.08,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide})); zadd(beam);
-  const tower=new THREE.Mesh(new THREE.BoxGeometry(1.2,7,1.2),M.concrete); tower.position.set(px,3.5,pz); zadd(tower);
+  slot('torreta',px,pz,0,()=>{ const tower=new THREE.Mesh(new THREE.BoxGeometry(1.2,7,1.2),M.concrete); tower.position.set(px,3.5,pz); zadd(tower); return [tower]; });
   spots.push({s,tg,beam,cx,cz,rad,ph}); }
-function unloadWorld(){ if(!zoneGroup)return; zoneGroup.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry!==box&&o.geometry!==tall)o.geometry.dispose(); }); scene.remove(zoneGroup); if(ground&&ground.material.map)ground.material.map.dispose(); zoneGroup=null; ground=null; dynamicDoors={}; lamps=[]; lampPosts=[]; spots=[]; emergency=null; ambient=null; }
+function unloadWorld(){ if(!zoneGroup)return; zoneGroup.traverse(o=>{ if(o.isMesh&&o.geometry&&o.geometry!==box&&o.geometry!==tall&&!o.geometry.userData.shared)o.geometry.dispose(); }); slotInst.length=0; scene.remove(zoneGroup); if(ground&&ground.material.map)ground.material.map.dispose(); zoneGroup=null; ground=null; dynamicDoors={}; lamps=[]; lampPosts=[]; spots=[]; emergency=null; ambient=null; }
 function buildWorld(z){ unloadWorld(); zoneGroup=new THREE.Group(); scene.add(zoneGroup);
   scene.background.set(z.sky||0x070a12); scene.fog.color.set(z.sky||0x070a12); scene.fog.density=W.power?(z.fog||0.026):(z.fogOff||0.04);
   ambient=zadd(new THREE.AmbientLight(z.ambient||0x2a3450,z.ambientI||0.8));
@@ -73,9 +73,10 @@ function buildWorld(z){ unloadWorld(); zoneGroup=new THREE.Group(); scene.add(zo
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){ const c=map[y][x];
     if(c==='#')wallMesh(x,y,tall,wallMat,3.6);
     else if(c==='W'){ const inside=interior(x-1,y)||interior(x+1,y)||interior(x,y-1)||interior(x,y+1); wallMesh(x,y,box,inside?M.plaster:M.concrete,3); }
-    else if(c==='T'){ const m=new THREE.Mesh(new THREE.BoxGeometry(T,1.7,T),M.olive); m.position.set(wx(x),0.85,wx(y)); zadd(m); const cab=new THREE.Mesh(new THREE.BoxGeometry(T*0.8,0.5,T*0.8),M.dark); cab.position.set(wx(x),1.95,wx(y)); zadd(cab); }
-    else if(c==='c'){ const m=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.3,1.8),M.wood); m.position.set(wx(x),0.65,wx(y)); zadd(m); }
-    else if(c==='g'){ const m=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.4,1.4),M.metal); m.position.set(wx(x),0.7,wx(y)); zadd(m); const pipe=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,2.2,6),M.dark); pipe.position.set(wx(x)+0.6,1.8,wx(y)); zadd(pipe); }
+    else if(c==='T'){ if(cell(x-1,y)==='T'||cell(x,y-1)==='T')continue; let bw=1,bh=1; while(cell(x+bw,y)==='T')bw++; while(cell(x,y+bh)==='T')bh++;   // bloque rectangular de casillas T: un solo camión
+      slot('camion',(x+bw/2)*T,(y+bh/2)*T,bw>bh?Math.PI/2:0,()=>{ const out=[]; for(let j=0;j<bh;j++)for(let i=0;i<bw;i++){ const m=new THREE.Mesh(new THREE.BoxGeometry(T,1.7,T),M.olive); m.position.set(wx(x+i),0.85,wx(y+j)); zadd(m); const cab=new THREE.Mesh(new THREE.BoxGeometry(T*0.8,0.5,T*0.8),M.dark); cab.position.set(wx(x+i),1.95,wx(y+j)); zadd(cab); out.push(m,cab); } return out; }); }
+    else if(c==='c'){ slot('caja',wx(x),wx(y),((x*7+y*13)%4)*Math.PI/2,()=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.3,1.8),M.wood); m.position.set(wx(x),0.65,wx(y)); zadd(m); return [m]; }); }
+    else if(c==='g'){ slot('generador',wx(x),wx(y),0,()=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.4,1.4),M.metal); m.position.set(wx(x),0.7,wx(y)); zadd(m); const pipe=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,2.2,6),M.dark); pipe.position.set(wx(x)+0.6,1.8,wx(y)); zadd(pipe); return [m,pipe]; }); }
     else if(c==='b'){ const m=new THREE.Mesh(new THREE.BoxGeometry(T,3,0.1),M.bars); m.position.set(wx(x),1.5,wx(y)); zadd(m); barsMesh=m; }
     else if(c==='B'){ const horiz=cell(x-1,y)==='#'||cell(x-1,y)==='B'; const m=new THREE.Mesh(new THREE.BoxGeometry(horiz?T:0.5,3.6,horiz?0.5:T),M.vault); m.position.set(wx(x),1.8,wx(y)); zadd(m); }
     else if(c==='D'){ frame(x,y); if(z.id==='base'&&x===18&&y===4){ const s=doorSlab(x,y,M.door); s.visible=false; dynamicDoors.yard=s; } }
@@ -91,7 +92,7 @@ function buildWorld(z){ unloadWorld(); zoneGroup=new THREE.Group(); scene.add(zo
   if(z.props)z.props(zadd);
   // luces: farolas 'l' del plano, puntos extra y focos de la zona
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(map[y][x]==='l'){ const L=new THREE.PointLight(z.indoor?0xffc070:0xffb060,z.indoor?1.15:1.3,z.indoor?10:15,1.6); L.position.set(wx(x),z.indoor?2.6:3.2,wx(y)); zadd(L); lamps.push(L);
-    const p=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,z.indoor?2.7:3.3,6),M.dark); p.position.set(wx(x),z.indoor?1.35:1.65,wx(y)); zadd(p);
+    const pole=()=>{ const p=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,z.indoor?2.7:3.3,6),M.dark); p.position.set(wx(x),z.indoor?1.35:1.65,wx(y)); zadd(p); return [p]; }; if(z.indoor)pole(); else slot('farola',wx(x),wx(y),0,pole);
     const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.16,6,6),new THREE.MeshBasicMaterial({color:0xffd080})); bulb.position.set(wx(x),z.indoor?2.65:3.25,wx(y)); zadd(bulb); lampPosts.push(bulb); }
   (z.lights||[]).forEach(r=>{ const L=new THREE.PointLight(r[2],r[3],r[4]||11,1.5); L.position.set(r[0]*T,r[5]!=null?r[5]:2.8,r[1]*T); zadd(L); lamps.push(L); });
   emergency=zadd(new THREE.AmbientLight(0x401010,0));

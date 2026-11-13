@@ -45,6 +45,7 @@
         <button id="btnContinue" hidden>CONTINUAR</button>
         <button data-go="brief">NUEVA PARTIDA</button>
         <button id="btnM2">MISIÓN 2 · DESCENSO <small>excavación y templo</small></button>
+        <button id="btnM3">MISIÓN 3 · TARSIS <small>la torre y el perímetro · cuatro finales</small></button>
         <button data-go="how">CÓMO SE JUEGA</button>
         <button data-go="ctrl">CONTROLES</button>
         <button data-go="opt">OPCIONES</button>
@@ -70,6 +71,9 @@
         <ol class="how">
           <li><b>La misión, en orden.</b> 1) La llave del despacho la lleva el cabo Ibarra (patio norte): agárralo por la espalda. 2) Abre el despacho de Alarcón, el edificio del oeste. 3) Averigua la clave del archivo cruzando pistas (escritorio, teletipo, interrogatorios, Halloran). 4) Teclea la clave en el archivo. 5) Coge el expediente LH-07. 6) Sal por la puerta sureste. El HUD muestra el paso actual y el radar marca el objetivo con un rombo amarillo y la distancia. La compuerta de la excavación (patio sur) se abre con la llave de Alarcón y baja a la galería de acceso, una zona aparte con su carga: abajo hay un guardia, munición y la puerta blindada ALEPH-07, que es la misión 2. La escalera te devuelve arriba.</li>
           <li><b>Esconderte.</b> Agáchate (<span class="k">Ctrl</span>) en zonas oscuras hasta que el HUD diga <b>OCULTO</b>. Los focos y la brasa del cigarro te delatan. Correr hace ruido.</li>
+          <li><b>Observar y marcar.</b> Mantén <span class="k">B</span> o el botón derecho del ratón para mirar con los prismáticos. Si dejas la mira medio segundo sobre un guardia, queda <b>marcado</b>: verás su posición y su distancia a través de las paredes, incluso cuando la alarma te deja sin radar.</li>
+          <li><b>Distraer.</b> <span class="k">Z</span> lanza un cargador vacío hacia donde miras (más lejos cuanto más alto apuntes). Los guardias que lo oigan, a unos diez metros, dejan la ronda y van a mirar sin dar la alarma. Al que se lo hagas tres veces deja de picar y viene a buscarte a ti.</li>
+          <li><b>Reflejo.</b> Cuando un guardia te descubre y va a dar la alarma, el tiempo se frena un instante: si lo tumbas (<span class="k">F</span>) o lo callas con el silenciador antes de que acabe, nadie se entera. Es una sola oportunidad; tarda medio minuto en volver.</li>
           <li><b>Interrogar.</b> Llega por la espalda a un guardia que no te haya visto y pulsa <span class="k">F</span> cuando aparezca la marca <b>F</b> sobre su cabeza. Pregúntale por la clave, la llave o el templo. Si no suelta prenda, <b>APRIETA</b>: cada guardia aguanta un número distinto de apretones antes de gritar. Después duérmelo, mátalo o suéltalo (correrá a avisar).</li>
           <li><b>Recoger pistas.</b> Todo lo que lees o te cuentan va al <b>cuaderno</b> (<span class="k">Tab</span>): teletipo, escritorio de Alarcón, la presa de la celda, los propios guardias. Los leales mienten.</li>
           <li><b>El archivo.</b> Tiene un teclado de cuatro cifras. La clave no está escrita en ningún sitio: sale de cruzar pistas. Dos errores y suena la alarma.</li>
@@ -82,6 +86,7 @@
           <li><b>El reloj.</b> A las 02:19 sueltan siete perros. Se matan a tiros o se apartan de una patada (<span class="k">F</span>). Si te derriban, despiertas en la celda. Se sale convenciendo al cabo Vidal (puedes fallar y volver a intentarlo; a la tercera deja de escucharte) o con la llave escondida bajo la losa del rincón, que te saca sin balas. Halloran, en el camastro, te da las pistas para ambas salidas.</li>
           <li><b>Salir.</b> Con el expediente, la puerta sureste. Cómo salgas (sin alarmas, con muertos, entre medias) decide el final.</li>
           <li><b>Misión 2 · Descenso.</b> Se entra desde el menú, desde el final de la misión 1 o, con el expediente en la mano, por la puerta blindada ALEPH-07 de la galería. Abajo: 1) la lista de sujetos en el laboratorio del este; 2) para los tres grupos electrógenos para que caiga la compuerta del sur (cada grupo apaga su sector y un guardia vendrá a arrancarlo) o baja por el canal de desagüe del oeste; 3) en el templo, el montacargas del noreste. Alarcón reza en la orilla: puedes pasar de largo o interrogarlo.</li>
+          <li><b>Misión 3 · Tarsis.</b> Se entra desde el menú o desde el final de la misión 2 (el montacargas sube a la torre). En el patio de la torre: el archivo (puerta oeste) guarda la lista completa; el depósito del este tiene gasolina para quemarlo (alarma, y a los pocos segundos se va toda la luz); la sala de radio (puerta este del edificio) llama a la Compañía. La puerta del este da al perímetro: verja o agujero de la valla, la marisma con el foco de la torreta y dos salidas. Cuatro finales: el bote (huir), la radio (entregarse), la carretera de Rota con la lista (Nínive) o sin ella. No hay celda: si te derriban, cuarta sesión.</li>
         </ol>
         <button data-go="main" class="ghost">VOLVER</button>
       </section>
@@ -94,7 +99,8 @@
           <tr><td><span class="k">F</span></td><td>agarrar e interrogar · patada a un perro</td><td><span class="k">C</span></td><td>cargar o soltar un cuerpo</td></tr>
           <tr><td><span class="k">X</span></td><td>cambiar entre Cuttlas y Roig</td><td><span class="k">V</span></td><td>primera o tercera persona</td></tr>
           <tr><td><span class="k">G</span></td><td>orden a Roig: sígueme / espera aquí</td><td><span class="k">T</span></td><td>poner o quitar el silenciador</td></tr>
-          <tr><td><span class="k">E</span></td><td>junto a un guardia caído: quitarle el uniforme</td><td></td><td></td></tr>
+          <tr><td><span class="k">E</span></td><td>junto a un guardia caído: quitarle el uniforme</td><td><span class="k">B</span> / <span class="k">Clic der.</span></td><td>mantener: prismáticos; la mira sobre un guardia lo marca</td></tr>
+          <tr><td><span class="k">Z</span></td><td>lanzar un cargador vacío: distrae a quien lo oiga</td><td></td><td></td></tr>
           <tr><td><span class="k">Q</span></td><td>fumar (8 s quieto, +2 vida)</td><td><span class="k">Tab</span></td><td>cuaderno de pistas</td></tr>
           <tr><td><span class="k">1-9</span></td><td>elegir opción en un diálogo</td><td><span class="k">H</span></td><td>mostrar u ocultar la guía</td></tr>
           <tr><td><span class="k">Esc</span></td><td>pausa y opciones</td><td><span class="k">R</span></td><td>radio: llamar a Control, a Roig o a la 000.00</td></tr>
@@ -122,10 +128,14 @@
   </div>
 </div>
 <script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="assets/models/pack.js"></script>
+<script src="assets/retratos/pack.js"></script>
 <script src="src/00-boot.js"></script>
 <script src="src/01-map.js"></script>
 <script src="src/02-render.js"></script>
 <script src="src/03-figures.js"></script>
+<script src="src/03-models.js"></script>
 <script src="src/04-state.js"></script>
 <script src="src/05-audio.js"></script>
 <script src="src/05-music.js"></script>
@@ -136,6 +146,8 @@
 <script src="src/10-actions.js"></script>
 <script src="src/10-zones.js"></script>
 <script src="src/10-zones2.js"></script>
+<script src="src/10-zones3.js"></script>
+<script src="src/11-recon.js"></script>
 <script src="src/11-team.js"></script>
 <script src="src/12-cinematics.js"></script>
 <script src="src/13-endings.js"></script>

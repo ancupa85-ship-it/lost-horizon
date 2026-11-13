@@ -12,7 +12,7 @@ npm start          # sirve la carpeta en http://localhost:8080
 o simplemente abre `index.html` en Chrome/Firefox (el juego pide el ratón al hacer clic).
 
 Controles: WASD mover · ratón mirar · Ctrl agacharse · Shift correr · E usar/hablar · F agarrar e interrogar / patada ·
-C cargar cuerpo · clic disparar · X cambiar entre Cuttlas y Roig · G orden a Roig (sígueme / espera) · T silenciador · E junto a un caído: quitarle el uniforme · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
+C cargar cuerpo · clic disparar · B o clic derecho (mantener) prismáticos y marcado · Z lanzar un cargador vacío (distracción) · X cambiar entre Cuttlas y Roig · G orden a Roig (sígueme / espera) · T silenciador · E junto a un caído: quitarle el uniforme · V vista 1ª/3ª persona · Q fumar (8 s quieto, +2 vida) ·
 Tab cuaderno · R radio (Control 141.12, Roig 140.85 y una frecuencia que no figura en el manual) · H guía · Esc pausa y opciones.
 El menú de inicio tiene "Cómo se juega", "Controles", "Opciones" y, si hay partida guardada, CONTINUAR.
 
@@ -26,6 +26,7 @@ src/
   00-boot.js        comprobación del motor
   01-map.js         motor de mapa por zonas: plano activo, leyenda y consultas (sólido, vista, sombra, interior)
   02-render.js      escena, materiales toon, texturas planas, postproceso; buildWorld(zona)/unloadWorld() levantan y quitan la geometría y luces de la zona
+  03-models.js      modelos de Blender (.glb) por huecos: caja, camión, generador, farola y torreta; si no hay modelo se dibuja la pieza de cajas (ver docs/ASSETS.md)
   03-figures.js     personajes torneados (cabeza esférica con cara pintada, peinados por guardia), modelos sencillos opcionales, perros, marcas ! y ?, brazos del jugador
   04-state.js       estado de partida, pistas, guardias, diálogos de interrogatorio, reset
   05-audio.js       sintetizador WebAudio (zumbido, sirena, ladridos, disparos)
@@ -37,6 +38,8 @@ src/
   10-actions.js     agarrar, interrogar, disparar, fumar, perros, captura, celda y cabo Vidal, teclado del archivo, compuerta
   10-zones.js       zonas: plano, guardias, props y puntos de interacción de la base y de la galería de acceso; enterZone()/travel() con pantalla de carga
   10-zones2.js      misión 2 «Descenso»: la excavación (laboratorio, tres grupos electrógenos por sectores, compuerta de extracción, canal) y el templo (la Fuente, Alarcón, montacargas); startMission()
+  10-zones3.js      misión 3 «Tarsis»: el patio de la torre (archivo con la lista completa, sala de radio, depósito de gasolina) y el perímetro (valla, marisma, embarcadero, carretera de Rota); objective3()
+  11-recon.js       prismáticos y marcado (B / clic derecho), distracción con cargador vacío (Z) y modo reflejo (cámara lenta antes de la alarma)
   11-team.js        la compañera (Roig): sigue, se esconde, dispara con silenciador; X intercambia el control
   12-cinematics.js  cámaras guiadas, bandas y títulos
   13-endings.js     finales
@@ -45,8 +48,14 @@ src/
 tests/smoke.js      prueba corta sin cabeza (perros, radio, captura → celda, Vidal, guardar/continuar, segunda derrota)
 tests/playthrough.js partida completa automática: menú, interrogatorio, llave, archivo, expediente, cambio de personaje, salida
 tests/mission2.js    recorrido completo de la misión 2: laboratorio, grupos y compuerta, canal, templo, Alarcón, montacargas, final y derrota
-tests/shots.js      capturas de referencia en tests/shots/ (tests/shots-guards.js: fila de guardias; tests/shots-galeria.js: la galería; tests/shots-m2.js: la misión 2)
+tests/mission3.js    recorrido completo de la misión 3: torre, lista, gasolina, incendio, radio, perímetro, los cuatro finales, derrota, guardado y encadenado desde la misión 2
+tests/recon.js       prismáticos, marcado, distracción y modo reflejo
+tests/models.js      entrada de modelos glTF: huecos, sustitución en caliente, cambio de zona y archivo roto
+tests/shots.js      capturas de referencia en tests/shots/ (tests/shots-guards.js: fila de guardias; tests/shots-galeria.js: la galería; tests/shots-m2.js: la misión 2; tests/shots-m3.js: la misión 3)
 assets/music/       los dos temas a 96 kb/s (los originales están en el proyecto)
+assets/models/      modelos de Blender (.glb) y su paquete pack.js; assets/plantillas/ tiene las piezas actuales a escala para abrirlas en Blender
+tools/build-models.py    empaqueta assets/models/*.glb en assets/models/pack.js
+tools/export-templates.js vuelve a generar las plantillas de assets/plantillas/
 tools/build-artifact.py  empaqueta todo en un solo HTML (música incrustada en base64) para publicarlo como Artifact
 ```
 
@@ -59,6 +68,9 @@ numérico importa. `window.__LH` expone el estado para depurar desde la consola.
 npm i -D playwright     # una vez; necesita Chromium (npx playwright install chromium)
 npm test                # prueba corta
 node tests/playthrough.js   # partida completa (varios minutos sin GPU)
+npm run test:m2 && npm run test:m3   # misiones 2 y 3
+npm run test:recon          # prismáticos, distracción y reflejo
+npm run test:models         # modelos de Blender
 node tests/shots.js         # capturas
 ```
 
@@ -94,6 +106,26 @@ y el guardado (`lh-save`, v3) incluye la misión. Zonas:
 - `templo` (22×20): columnas, la alberca con la luz de la Fuente (late más despacio cuantos más grupos haya
   parados, `ZONE.tick`), el coronel Alarcón rezando de cara al agua (guardia quieto, `face`; interrogable, nerve 5)
   con su escolta, y el montacargas del noreste que termina la misión (`outro2`, finales propios en 13-endings).
+
+## Misión 3 «Tarsis»
+
+`src/10-zones3.js`. Se arranca con `startMission(3,intro,prev)` desde el menú (MISIÓN 3 · TARSIS) o desde la pantalla
+final de la misión 2, que pasa en `prev` (`carryState()`: compuerta caída, lista de siete nombres, muertes) lo que la
+misión 3 hereda para sus finales. `S.mission` vale 3: sin perrera ni celda, el reloj empieza a las 03:40
+(`CLOCK_BASE` en 09-util), objetivos `objective3()` (3 pasos). Zonas:
+
+- `torre` (28×22, exterior con lluvia y dos reflectores): el montacargas del templo llega al rincón suroeste. El
+  edificio tiene el **archivo** (puerta oeste: la lista completa, pista `lista3`; y, con gasolina, «rociar y prender»:
+  `burnArchive()` → `W.burned`, alarma, llamas, y a los 5 s `setPower(false)`: el cuadro eléctrico está ahí y nadie
+  lo repara) y la **sala de radio** (puerta este: llamar a la Compañía = entregarse, final «Séneca»). El depósito
+  del este da la gasolina (`S.gas`). La puerta este (27,11) lleva al perímetro. Siete guardias, con el sargento
+  Ocaña (archivero, nerve 4) y el radiotelegrafista (nerve 1), que cuentan dónde está la lista y cómo se sale.
+- `perimetro` (32×18): la valla `W` en x=5 con su verja (5,8) vigilada y el agujero de los perros (5,13); la
+  marisma (`s` con láminas de agua y cañas en `props`), la torreta con el foco, y las dos salidas: el bote del
+  embarcadero (29,9) y la carretera de Rota (29,1), las dos con confirmación.
+- Finales (13-endings, `S.ending`): radio → **SÉNECA**; bote → **EL MAR** o, con el archivo quemado, **EL INCENDIO**;
+  carretera con `lista3` → **NÍNIVE** (con el archivo quemado, la Fuente queda libre a propósito); sin la lista →
+  **LA CARRETERA DE ROTA**. Derrota → «Cuarta sesión». No hay misión 4.
 
 ## Diseño
 

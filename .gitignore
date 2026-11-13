@@ -2,3 +2,6 @@ node_modules/
 dist/
 tests/last.png
 tests/shots/
+assets/texturas/
+assets/modelos-ph/
+__pycache__/

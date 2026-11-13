@@ -12,11 +12,12 @@ function litAt(e){ if(!W.power)return false; if(ZONE&&ZONE.dark)return !ZONE.dar
 function genOff(){ if(!ZONE)return null; if(ZONE.gens){ const i=W.gens.findIndex(v=>!v); if(i<0)return null; const g=ZONE.gens[i]; return {x:g[2],y:g[3],fix:()=>{ W.gens[i]=true; applyGens(); updObj(); }}; } if(ZONE.id==='base'&&!W.power)return {x:22,y:9,fix:()=>setPower(true)}; return null; }
 function playerHidden(){ const P=S.p; return S.spotlit?false:(shadowT(tile(P.x),tile(P.z))&&P.crouch); }
 const REFDEF={name:'Refuerzo',role:'puerta',nerve:3,loyal:2,wps:[[26,26],[33,26],[33,23],[26,23]],q:{}};
-function clockStr(){ const mins=(S.mission===2?70:10)+Math.floor((S.t||0)/60); return '0'+(2+Math.floor(mins/60))+':'+String(mins%60).padStart(2,'0'); }
+const CLOCK_BASE={1:10,2:70,3:100}; // minutos desde las 02:00 al empezar cada misión (02:10, 03:10, 03:40)
+function clockStr(){ const mins=(CLOCK_BASE[S.mission]||10)+Math.floor((S.t||0)/60); return '0'+(2+Math.floor(mins/60))+':'+String(mins%60).padStart(2,'0'); }
 function setBase(st){ if(S.base===st)return; const o={calma:0,sospecha:1,cierre:2}; if(o[st]<o[S.base])return; S.base=st; updHud();
   if(st==='cierre'&&!S.reinforced){ S.reinforced=true; W.yardDoorClosed=true; if(S.zone==='base'){ if(dynamicDoors.yard)dynamicDoors.yard.visible=true; S.guards.push(mkGuard(REFDEF,true)); } else S.refPending=true; flash('BASE EN CIERRE','Se cierra la puerta entre los patios. Un refuerzo cubre la salida. Ya solo se sale por abajo o por la fuerza.',7); beep(110,0.8,'sawtooth',0.08); } }
 const ALARM_D=7.5, DISG_D=3; // metros: de más lejos dudan y se acercan; con uniforme solo te calan a menos de 3
-function raiseAlarm(where){ [S.p,S.c].forEach(e=>{ if(e&&e.disguise){ setDisguise(e,false); flash('TE HAN CALADO','El uniforme ya no engaña a nadie. Vuelves a ser el intruso.',5); } });
+function raiseAlarm(where){ reflexEnd(); [S.p,S.c].forEach(e=>{ if(e&&e.disguise){ setDisguise(e,false); flash('TE HAN CALADO','El uniforme ya no engaña a nadie. Vuelves a ser el intruso.',5); } });
   if(S.alertT<=0){S.alarms++; alertJingle(); S.freeze=0.5; app.classList.add('cine'); setTimeout(()=>{ if(!cut)app.classList.remove('cine'); },900);
     if(!S.codecSeen.alarm){ S.codecSeen.alarm=true; setTimeout(()=>{ if(!S.over&&!uiOpen)codec(CODEC.alarm); },1200); } }
   S.alertT=10; setBase(S.alarms>=2?'cierre':'sospecha'); S.guards.forEach(g=>{ if(!g.dead&&g.down<=0&&!g.held){g.state='alert';g.target={x:where.x,z:where.z};g.fixing=false;} }); }
