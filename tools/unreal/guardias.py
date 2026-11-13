@@ -42,6 +42,19 @@ def cuerpo(g, nombre):
     if not p:
         return
     g.set_editor_property('body_mesh', p['malla'])
+    # idle, andar y trotar del maniquí de la plantilla retargeteados a su esqueleto (tools/unreal/animaciones.py);
+    # si no se puede, se quedan las del .glb. Apuntar y caer siguen siendo las del .glb.
+    try:
+        import animaciones
+        importlib.reload(animaciones)
+        a = animaciones.preparar(nombre, p)
+    except Exception as e:
+        log('AVISO: sin animaciones retargeteadas para', nombre, repr(e))
+        a = None
+    if a:
+        p = dict(p, idle=a['idle'], walk=a['walk'], blend=a['blend'])
+        g.set_editor_property('walk_anim_speed', a['walk_speed'])
+        g.set_editor_property('run_anim_speed', a['run_speed'])
     for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim'), ('down_anim', 'down'), ('move_blend', 'blend')):
         if p.get(k):
             g.set_editor_property(prop, p[k])

@@ -267,7 +267,8 @@ def prueba_final():
     rl = list(d.get_editor_property('report_lines'))
     check('sale el parte del día siguiente', d.get_editor_property('report') and len(rl) > 5 and rl[0] == 'PARTE DEL DIA SIGUIENTE', ' | '.join(rl[:4]))
     check('el parte recoge el farol roto y la llave', any('farol' in x for x in rl) and any('Ibarra' in x for x in rl), ' | '.join(rl))
-    yield 0.5
+    # el HUD cuenta fotogramas dibujados: con el editor en segundo plano (3-8 fps) medio segundo no llega a 5
+    yield ('hasta', lambda: director().get_editor_property('report_frames') > 5, 5.0)
     check('el parte se dibuja en pantalla', d.get_editor_property('report_frames') > 5, d.get_editor_property('report_frames'))
     check('el parte se guarda para la misión 2', unreal.GameplayStatics.does_save_game_exist('TarsisParte', 0))
     if 'musica_t0' in R:

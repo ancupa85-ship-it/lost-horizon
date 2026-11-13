@@ -113,6 +113,19 @@ void ATarsisGuard::SetupBody()
 	}
 }
 
+bool ATarsisGuard::RebuildBlendSpace(UBlendSpace* BS)
+{
+#if WITH_EDITOR
+	if (!BS) return false;
+	BS->Modify();
+	BS->ResampleData();   // también valida las muestras (duración, marcas de sincronía)
+	BS->MarkPackageDirty();
+	return true;
+#else
+	return false;
+#endif
+}
+
 void ATarsisGuard::UpdateAnim()
 {
 	USkeletalMeshComponent* M = GetMesh();
@@ -126,13 +139,20 @@ void ATarsisGuard::UpdateAnim()
 			M->PlayAnimation(MoveBlend, true);
 			CurrentAnim = MoveBlend;
 		}
+		// Las muestras de la mezcla están a su velocidad real (idle 0, andar WalkAnimSpeed, trotar RunAnimSpeed) y la
+		// mezcla de dos muestras avanza más o menos a la velocidad de su posición. Por debajo de andar no se mezcla con
+		// idle (arrastraría los pies): se anda más despacio; entre andar y trotar se mezcla; por encima se acelera.
+		const float Vw = FMath::Max(WalkAnimSpeed, 1.0f);
+		const float Vtop = RunAnimSpeed > Vw ? RunAnimSpeed : Vw;
+		const float Target = Speed < 8.0f ? 0.0f : FMath::Clamp(FMath::Max(Speed, Vw * FMath::Min(Speed / 40.0f, 1.0f)), 0.0f, Vtop);
 		if (UAnimSingleNodeInstance* SI = M->GetSingleNodeInstance())
 		{
 			// la posición en la mezcla se suaviza: aunque la cápsula frene en seco, las piernas no saltan de pose
-			BlendPos = FMath::FInterpTo(BlendPos, FMath::Min(Speed, WalkAnimSpeed), GetWorld()->GetDeltaSeconds(), 6.0f);
+			BlendPos = FMath::FInterpTo(BlendPos, Target, GetWorld()->GetDeltaSeconds(), 6.0f);
 			SI->SetBlendSpacePosition(FVector(BlendPos, 0.0f, 0.0f));
 		}
-		M->SetPlayRate(Speed > WalkAnimSpeed ? FMath::Clamp(Speed / FMath::Max(WalkAnimSpeed, 1.0f), 1.0f, 2.6f) : 1.0f);
+		// ritmo = velocidad de la cápsula / velocidad de la pose de la mezcla, para que el pie apoyado no patine
+		M->SetPlayRate(BlendPos > 20.0f && Speed >= 8.0f ? FMath::Clamp(Speed / BlendPos, 0.4f, RunAnimSpeed > Vw ? 1.6f : 2.6f) : 1.0f);
 		return;
 	}
 	UAnimationAsset* Want = IdleAnim;
