@@ -34,6 +34,11 @@
 #include "LevelSequenceActor.h"
 #include "Components/MeshComponent.h"
 #include "Materials/MaterialInterface.h"
+#include "TarsisSave.h"
+#include "GameFramework/GameUserSettings.h"
+#include "GameFramework/InputSettings.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "AudioDevice.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -87,6 +92,9 @@ void ATarsisDirector::SetupPlayer()
 		}
 	}
 	bPlayerReady = true;
+	BindMenuKeys();
+	LoadOptions();
+	bHasSave = UGameplayStatics::DoesSaveGameExist(TEXT("TarsisPartida"), 0);
 	if (InputComponent)
 	{
 		FInputKeyBinding& B = InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ATarsisDirector::SkipCine);
@@ -98,7 +106,7 @@ void ATarsisDirector::SetupPlayer()
 
 void ATarsisDirector::IntroText()
 {
-	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (Shift) y sobre la gravilla mas que dentro. Agachado, nada."), 11.0f);
+	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (Shift) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones y cargar el ultimo punto de control."), 11.0f);
 }
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
@@ -132,6 +140,15 @@ void ATarsisDirector::Captured(APawn* Player)
 		CloseCell();
 		CellT = CellTime;
 		ShowMessage(TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas."), 8.0f);
+		return;
+	}
+	if (bHasCheck)
+	{
+		// al último punto de control, no a la entrada: la segunda mitad de la misión no se repite entera
+		Player->TeleportTo(CheckLoc, CheckRot);
+		if (Ctl) Ctl->SetControlRotation(CheckRot);
+		Darts = FMath::Max(Darts, CheckDarts);
+		ShowMessage(FString::Printf(TEXT("TE HAN COGIDO\nVuelves al ultimo punto de control: %s."), *CheckpointName), 4.0f);
 		return;
 	}
 	if (AActor* Start = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
@@ -243,6 +260,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 
 	if (MessageT > 0.0f) MessageT -= DeltaSeconds;
 	if (RadioT > 0.0f) RadioT -= DeltaSeconds;
+	if (CheckT > 0.0f) CheckT -= DeltaSeconds;
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
 	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
 	BinocularTick();
@@ -445,6 +463,7 @@ void ATarsisDirector::Interact()
 		{
 			bKey = true;
 			ShowMessage(TEXT("LLAVE DE LA JEFATURA\nSe la quitas a Ibarra del cinturon. Ahora puedes arrastrarlo a la sombra (E)."), 5.0f);
+			Checkpoint(TEXT("LA LLAVE DE IBARRA"));
 			return;
 		}
 		if (G->bDarted)
@@ -463,6 +482,7 @@ void ATarsisDirector::Interact()
 		bJefOpen = true;
 		if (DoorL) { DoorL->DestroyComponent(); DoorL = nullptr; }
 		ShowMessage(TEXT("JEFATURA ABIERTA\nEl despacho de Alarcon. Al fondo, la puerta blindada del archivo."), 4.0f);
+		Checkpoint(TEXT("LA JEFATURA"));
 		return;
 	}
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))
@@ -492,6 +512,7 @@ void ATarsisDirector::Interact()
 		Darts = 5;
 		if (VetDoor) { VetDoor->DestroyComponent(); VetDoor = nullptr; }
 		ShowMessage(TEXT("PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres."), 5.0f);
+		Checkpoint(TEXT("EL BOTIQUIN"));
 		return;
 	}
 	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f))
@@ -513,6 +534,7 @@ void ATarsisDirector::Interact()
 		bFile = true;
 		if (FileProp) { FileProp->DestroyComponent(); FileProp = nullptr; }
 		ShowMessage(TEXT("EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base por el control de salida, al sureste."), 5.0f);
+		Checkpoint(TEXT("EL EXPEDIENTE"));
 	}
 }
 
@@ -1186,7 +1208,9 @@ void ATarsisDirector::CutPower()
 		Repairer->SetFlashlightShadows(true);   // su cono recorta cajas y muros: te puedes esconder detrás
 		Repairer->HearNoise(RepairSpot());
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
-		ShowMessage(FString::Printf(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.\nRADIO: \"Se ha ido la luz en toda la base! %s, mira el generador.\""), *Repairer->GuardName), 5.0f);
+		// el aviso va aparte, a la caja de radio (ShowMessage lo manda allí si empieza por RADIO)
+		ShowMessage(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia."), 5.0f);
+		ShowMessage(FString::Printf(TEXT("RADIO: \"Se ha ido la luz en toda la base! %s, mira el generador.\""), *Repairer->GuardName), 5.0f);
 	}
 	else
 	{
@@ -1205,7 +1229,11 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 	{
 		if (!L || (bLampBroken && GateLamp && L == GateLamp->GetLightComponent())) continue;
 		const AActor* Own = L->GetOwner();
-		const bool bTowerLamp = Own && Own->GetName().Contains(TEXT("torre"));   // foco_torreta_*: tienen su propio circuito
+		// los focos de las torres tienen su propio circuito. GetName() da el nombre del objeto (SpotLight_N), no la
+		// etiqueta del editor (foco_torreta_*), así que se reconocen por ser el TowerLight de un centinela.
+		// El farol de la garita (si no está roto) va con ellos: el control siempre está iluminado
+		bool bTowerLamp = GateLamp && Own == GateLamp.Get();
+		for (TActorIterator<ATarsisGuard> G(GetWorld()); G && !bTowerLamp; ++G) bTowerLamp = Own && G->TowerLight == Own;
 		const bool bOn = bByGuard || bTowerLamp || (Idx++ % 2 == 0);
 		if (bOn) L->SetVisibility(true);
 	}
@@ -1446,4 +1474,243 @@ bool ATarsisDirector::ShootLamp(const FVector& From, const FVector& Fwd, float M
 	ShowMessage(FString::Printf(TEXT("FAROL ROTO\nEl control queda a oscuras.%s Te quedan %d dardos."),
 		Best ? *FString::Printf(TEXT(" %s ha oido los cristales y viene a mirar."), *Best->GuardName) : TEXT(""), Darts), 4.0f);
 	return true;
+}
+
+// ---------------------------------------------------------------- puntos de control y guardado
+
+void ATarsisDirector::Checkpoint(const FString& Name)
+{
+	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P || bDone) return;
+	bHasCheck = true;
+	CheckLoc = P->GetActorLocation();
+	CheckRot = FRotator(0.0f, P->GetControlRotation().Yaw, 0.0f);
+	CheckDarts = Darts;
+	CheckpointName = Name;
+	CheckT = 3.0f;
+	UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::CreateSaveGameObject(UTarsisSave::StaticClass()));
+	if (!S) return;
+	S->Checkpoint = Name;
+	S->Loc = CheckLoc;
+	S->Rot = CheckRot;
+	S->MissionTime = MissionTime;
+	S->Captures = Captures;
+	S->Darts = Darts;
+	S->bKey = bKey;
+	S->bJefOpen = bJefOpen;
+	S->bNoteRead = bNoteRead;
+	S->bVaultOpen = bVaultOpen;
+	S->bFile = bFile;
+	S->bLetter = bLetter;
+	S->bVetKey = bVetKey;
+	S->bVetOpen = bVetOpen;
+	S->bRamosKnown = bRamosKnown;
+	S->bLampBroken = bLampBroken;
+	S->Weather = Weather;
+	bHasSave = UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisPartida"), 0) || bHasSave;
+}
+
+bool ATarsisDirector::LoadCheckpoint()
+{
+	UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::LoadGameFromSlot(TEXT("TarsisPartida"), 0));
+	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!S || !P) return false;
+	StopDrag();
+	bKeypad = false;
+	if (bBinoculars) ToggleBinoculars();
+	// la misión como estaba: puertas abiertas, objetos cogidos
+	bKey = S->bKey;
+	bJefOpen = S->bJefOpen;
+	bNoteRead = S->bNoteRead;
+	bVaultOpen = S->bVaultOpen;
+	bFile = S->bFile;
+	bLetter = S->bLetter;
+	bVetKey = S->bVetKey;
+	bVetOpen = S->bVetOpen;
+	bRamosKnown = S->bRamosKnown || bLetter || bVetKey;
+	Darts = S->Darts;
+	MissionTime = S->MissionTime;
+	Captures = FMath::Max(Captures, S->Captures);
+	if (bJefOpen && DoorL) { DoorL->DestroyComponent(); DoorL = nullptr; }
+	if (bVaultOpen && DoorV) { DoorV->DestroyComponent(); DoorV = nullptr; }
+	if (bFile && FileProp) { FileProp->DestroyComponent(); FileProp = nullptr; }
+	if (bLetter && LetterProp) { LetterProp->DestroyComponent(); LetterProp = nullptr; }
+	if (bVetOpen && VetDoor) { VetDoor->DestroyComponent(); VetDoor = nullptr; }
+	if (S->bLampBroken && GateLamp && GateLamp->GetLightComponent() && !bLampBroken)
+	{
+		bLampBroken = true;
+		GateLamp->GetLightComponent()->SetVisibility(false);
+		OffLights.Remove(GateLamp->GetLightComponent());
+	}
+	if (S->Weather != Weather) SetWeather(S->Weather);
+	bHasCheck = true;
+	CheckLoc = S->Loc;
+	CheckRot = S->Rot;
+	CheckDarts = S->Darts;
+	CheckpointName = S->Checkpoint;
+	P->TeleportTo(CheckLoc, CheckRot);
+	if (AController* Ctl = P->GetController()) Ctl->SetControlRotation(CheckRot);
+	// los guardias vuelven a su ronda (los que estaban dormidos o alerta no se guardan)
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->bAlly) continue;
+		if (It->State == ETarsisGuardState::Alert || It->State == ETarsisGuardState::Suspicious || It->State == ETarsisGuardState::Search)
+		{
+			It->Meter = 0.0f;
+			It->SetState(ETarsisGuardState::Return);
+		}
+	}
+	TensionT = 0.0f;
+	ShowMessage(FString::Printf(TEXT("PARTIDA CARGADA\nUltimo punto de control: %s."), *CheckpointName), 3.5f);
+	return true;
+}
+
+// ---------------------------------------------------------------- menú de pausa y opciones
+
+void ATarsisDirector::BindMenuKeys()
+{
+	if (!InputComponent) return;
+	const FKey Keys[] = { EKeys::P, EKeys::Escape, EKeys::Up, EKeys::Down, EKeys::Left, EKeys::Right, EKeys::W, EKeys::S,
+		EKeys::A, EKeys::D, EKeys::Enter, EKeys::SpaceBar };   // la E no: ya la usa Interact
+	for (const FKey& K : Keys)
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(K, IE_Pressed, this, &ATarsisDirector::MenuKey);
+		B.bConsumeInput = false;
+		B.bExecuteWhenPaused = true;
+	}
+}
+
+void ATarsisDirector::TogglePause()
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC) return;
+	bMenu = !bMenu;
+	MenuSel = 0;
+	if (bMenu) bHasSave = UGameplayStatics::DoesSaveGameExist(TEXT("TarsisPartida"), 0);
+	UGameplayStatics::SetGamePaused(this, bMenu);
+}
+
+TArray<FString> ATarsisDirector::MenuLines() const
+{
+	static const TCHAR* Q[] = { TEXT("BAJA"), TEXT("MEDIA"), TEXT("ALTA"), TEXT("EPICA") };
+	TArray<FString> L;
+	L.Add(TEXT("REANUDAR"));
+	L.Add(bHasSave ? FString::Printf(TEXT("CARGAR PUNTO DE CONTROL%s"), CheckpointName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *CheckpointName))
+		: FString(TEXT("CARGAR PUNTO DE CONTROL (no hay)")));
+	L.Add(FString::Printf(TEXT("SENSIBILIDAD DEL RATON   < %.1f >"), OptSensitivity));
+	L.Add(FString::Printf(TEXT("INVERTIR EJE Y   < %s >"), bOptInvertY ? TEXT("SI") : TEXT("NO")));
+	L.Add(FString::Printf(TEXT("VOLUMEN   < %d %% >"), FMath::RoundToInt(OptVolume * 100.0f)));
+	L.Add(FString::Printf(TEXT("CALIDAD GRAFICA   < %s >"), Q[FMath::Clamp(OptQuality, 0, 3)]));
+	L.Add(FString::Printf(TEXT("CONTADOR DE FPS   < %s >"), bShowFps ? TEXT("SI") : TEXT("NO")));
+	L.Add(TEXT("SALIR DEL JUEGO"));
+	return L;
+}
+
+void ATarsisDirector::MenuKey(FKey Key)
+{
+	if (Key == EKeys::P || Key == EKeys::Escape)
+	{
+		if (bKeypad && Key == EKeys::Escape) { bKeypad = false; return; }   // Esc cierra antes el teclado del archivo
+		if (!bCine || bMenu) TogglePause();
+		return;
+	}
+	if (!bMenu) return;
+	const int32 N = MenuLines().Num();
+	if (Key == EKeys::Up || Key == EKeys::W) MenuSel = (MenuSel + N - 1) % N;
+	else if (Key == EKeys::Down || Key == EKeys::S) MenuSel = (MenuSel + 1) % N;
+	else if (Key == EKeys::Left || Key == EKeys::A) MenuActivate(-1);
+	else if (Key == EKeys::Right || Key == EKeys::D) MenuActivate(1);
+	else MenuActivate(0);   // Intro o Espacio
+}
+
+void ATarsisDirector::MenuActivate(int32 Dir)
+{
+	const int32 Step = Dir == 0 ? 1 : Dir;
+	switch (MenuSel)
+	{
+	case 0: if (Dir == 0) TogglePause(); return;
+	case 1:
+		if (Dir == 0 && bHasSave) { TogglePause(); LoadCheckpoint(); }
+		return;
+	case 2: OptSensitivity = FMath::Clamp(FMath::RoundToFloat((OptSensitivity + 0.1f * Step) * 10.0f) / 10.0f, 0.2f, 3.0f); break;
+	case 3: bOptInvertY = !bOptInvertY; break;
+	case 4: OptVolume = FMath::Clamp(FMath::RoundToFloat((OptVolume + 0.1f * Step) * 10.0f) / 10.0f, 0.0f, 1.0f); break;
+	case 5: OptQuality = (OptQuality + Step + 4) % 4; break;
+	case 6: bShowFps = !bShowFps; break;
+	case 7:
+		if (Dir == 0) UKismetSystemLibrary::QuitGame(this, UGameplayStatics::GetPlayerController(this, 0), EQuitPreference::Quit, false);
+		return;
+	default: return;
+	}
+	ApplyOptions();
+	SaveOptions();
+}
+
+void ATarsisDirector::ApplyOptions()
+{
+	// ratón: las escalas «legacy» del PlayerController multiplican lo que llega por AddYawInput/AddPitchInput
+	// (la plantilla mueve la cámara con esas funciones). Si estaban desactivadas, la base es 1.
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		UInputSettings* IS = GetMutableDefault<UInputSettings>();
+		if (!bScalesRead)
+		{
+			bScalesRead = true;
+			if (IS && IS->bEnableLegacyInputScales)
+			{
+				BaseYawScale = PC->InputYawScale_DEPRECATED;
+				BasePitchScale = PC->InputPitchScale_DEPRECATED;
+			}
+			else
+			{
+				BaseYawScale = 1.0f;
+				BasePitchScale = 1.0f;
+			}
+		}
+		if (IS) IS->bEnableLegacyInputScales = true;
+		PC->InputYawScale_DEPRECATED = BaseYawScale * OptSensitivity;
+		PC->InputPitchScale_DEPRECATED = BasePitchScale * OptSensitivity * (bOptInvertY ? -1.0f : 1.0f);
+	}
+	if (GEngine)
+	{
+		if (FAudioDeviceHandle Dev = GEngine->GetMainAudioDevice()) Dev->SetTransientPrimaryVolume(OptVolume);
+	}
+	if (UGameUserSettings* G = UGameUserSettings::GetGameUserSettings())
+	{
+		if (G->GetOverallScalabilityLevel() != OptQuality)
+		{
+			G->SetOverallScalabilityLevel(OptQuality);
+			G->ApplySettings(false);
+		}
+	}
+}
+
+void ATarsisDirector::SaveOptions() const
+{
+	UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::CreateSaveGameObject(UTarsisSave::StaticClass()));
+	if (!S) return;
+	S->Sensitivity = OptSensitivity;
+	S->bInvertY = bOptInvertY;
+	S->Volume = OptVolume;
+	S->Quality = OptQuality;
+	S->bShowFps = bShowFps;
+	UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisOpciones"), 0);
+}
+
+void ATarsisDirector::LoadOptions()
+{
+	if (UGameUserSettings* G = UGameUserSettings::GetGameUserSettings())
+	{
+		const int32 Cur = G->GetOverallScalabilityLevel();   // -1 si los grupos van mezclados
+		OptQuality = Cur >= 0 ? FMath::Clamp(Cur, 0, 3) : 1;
+	}
+	if (UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::LoadGameFromSlot(TEXT("TarsisOpciones"), 0)))
+	{
+		OptSensitivity = FMath::Clamp(S->Sensitivity, 0.2f, 3.0f);
+		bOptInvertY = S->bInvertY;
+		OptVolume = FMath::Clamp(S->Volume, 0.0f, 1.0f);
+		if (S->Quality >= 0) OptQuality = FMath::Clamp(S->Quality, 0, 3);
+		bShowFps = S->bShowFps;
+		ApplyOptions();
+	}
 }

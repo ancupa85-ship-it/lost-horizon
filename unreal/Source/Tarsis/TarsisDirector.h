@@ -32,7 +32,10 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	float MessageT = 0.0f;
 	/** Mensajes de radio (los que empiezan por "RADIO"): van aparte, abajo a la izquierda, sin tapar el mensaje principal. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	FString Radio;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	float RadioT = 0.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
@@ -245,6 +248,41 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
 	bool bMarsh = false;
 
+	// ---- menú de pausa (P o Esc; en el editor Esc para el PIE, así que P) y puntos de control
+
+	/** Menú de pausa abierto (el juego está en pausa). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	bool bMenu = false;
+
+	/** Opción marcada del menú. */
+	int32 MenuSel = 0;
+
+	/** Líneas del menú tal como se ven (con el valor de cada opción). */
+	TArray<FString> MenuLines() const;
+
+	/** Opciones: sensibilidad del ratón (0,2-3), invertir Y, volumen (0-1), calidad (0 baja - 3 épica) y contador de fps. */
+	float OptSensitivity = 1.0f;
+	bool bOptInvertY = false;
+	float OptVolume = 1.0f;
+	int32 OptQuality = 1;
+	bool bShowFps = false;
+
+	/** Último punto de control («la llave de Ibarra»...) y segundos que queda el aviso en pantalla. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	FString CheckpointName;
+	float CheckT = 0.0f;
+
+	/** Hay partida guardada en disco (para «Continuar desde el último punto»). */
+	bool bHasSave = false;
+
+	/** Guarda un punto de control: dónde estás ahora y cómo va la misión (también en disco). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Checkpoint(const FString& Name);
+
+	/** Guardado en disco: vuelve al último punto de control con la misión como estaba. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	bool LoadCheckpoint();
+
 	/** Guardia caído que vas arrastrando (o nullptr). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	TObjectPtr<class ATarsisGuard> Dragged;
@@ -392,6 +430,22 @@ private:
 	FVector RepairSpot() const { return GeneratorLoc + FVector(0.0f, 280.0f, 0.0f); }
 	void SetupBarrier();
 	void BarrierTick(float DeltaSeconds);
+
+	// menú y guardado
+	bool bHasCheck = false;
+	FVector CheckLoc = FVector::ZeroVector;
+	FRotator CheckRot = FRotator::ZeroRotator;
+	int32 CheckDarts = 0;
+	float BaseYawScale = 1.0f;
+	float BasePitchScale = 1.0f;
+	bool bScalesRead = false;
+	void TogglePause();
+	void MenuKey(FKey Key);
+	void MenuActivate(int32 Dir);
+	void ApplyOptions();
+	void SaveOptions() const;
+	void LoadOptions();
+	void BindMenuKeys();
 
 	// cinemáticas
 	UPROPERTY()

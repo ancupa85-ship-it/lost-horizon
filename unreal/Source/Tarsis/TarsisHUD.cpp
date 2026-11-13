@@ -52,6 +52,50 @@ void ATarsisHUD::DrawHUD()
 	DrawObjective(D);
 	DrawPrompt(D);
 	DrawKeypad(D);
+	DrawExtras(D);
+	DrawMenu(D);
+}
+
+void ATarsisHUD::DrawExtras(ATarsisDirector* D)
+{
+	if (!D) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	// contador de fps (opción del menú), suavizado
+	const float Dt = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f;
+	if (Dt > 0.0f) FpsSmooth = FpsSmooth <= 0.0f ? 1.0f / Dt : FMath::Lerp(FpsSmooth, 1.0f / Dt, 0.05f);
+	if (D->bShowFps)
+	{
+		Text(FString::Printf(TEXT("%d FPS"), FMath::RoundToInt(FpsSmooth)), Canvas->ClipX - 20.0f * S - 90.0f * S, 12.0f * S,
+			FpsSmooth >= 55.0f ? FLinearColor(0.6f, 1.0f, 0.6f) : (FpsSmooth >= 30.0f ? FLinearColor(1.0f, 0.85f, 0.4f) : FLinearColor(1.0f, 0.4f, 0.3f)), 0.8f * S, false);
+	}
+	// aviso de punto de control, arriba a la derecha
+	if (D->CheckT > 0.0f && !D->CheckpointName.IsEmpty())
+	{
+		const float A = FMath::Clamp(D->CheckT, 0.0f, 1.0f);
+		const float W = 430.0f * S, X = Canvas->ClipX - W - 20.0f * S, Y = 48.0f * S;
+		Panel(X, Y, W, 58.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f * A));
+		Text(TEXT("PUNTO DE CONTROL GUARDADO"), X + 14.0f * S, Y + 6.0f * S, FLinearColor(1.0f, 0.85f, 0.55f, A), 0.72f * S, false);
+		Text(D->CheckpointName, X + 14.0f * S, Y + 30.0f * S, FLinearColor(1.0f, 0.95f, 0.85f, A), 0.72f * S, false);
+	}
+}
+
+void ATarsisHUD::DrawMenu(ATarsisDirector* D)
+{
+	if (!D || !D->bMenu) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	Panel(0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY, FLinearColor(0.0f, 0.0f, 0.0f, 0.6f));
+	const TArray<FString> L = D->MenuLines();
+	const float CX = Canvas->ClipX / 2.0f, LH = 46.0f * S;
+	const float W = 720.0f * S, Y0 = Canvas->ClipY / 2.0f - (L.Num() * LH) / 2.0f;
+	Text(TEXT("PAUSA"), CX, Y0 - 90.0f * S, FLinearColor(1.0f, 0.85f, 0.55f), 1.6f * S, true);
+	for (int32 i = 0; i < L.Num(); ++i)
+	{
+		const bool bSel = i == D->MenuSel;
+		if (bSel) Panel(CX - W / 2.0f, Y0 + i * LH - 6.0f * S, W, LH - 6.0f * S, FLinearColor(1.0f, 0.85f, 0.55f, 0.18f));
+		Text(L[i], CX, Y0 + i * LH, bSel ? FLinearColor(1.0f, 0.95f, 0.8f) : FLinearColor(0.75f, 0.75f, 0.75f), (bSel ? 0.95f : 0.85f) * S, true);
+	}
+	Text(TEXT("W/S o flechas: elegir    A/D: cambiar    Intro: aceptar    P: volver al juego"), CX, Y0 + L.Num() * LH + 30.0f * S,
+		FLinearColor(0.7f, 0.7f, 0.7f), 0.7f * S, true);
 }
 
 void ATarsisHUD::DrawBinoculars(ATarsisDirector* D)
@@ -222,9 +266,11 @@ void ATarsisHUD::DrawAlert()
 {
 	ETarsisGuardState Worst = ETarsisGuardState::Patrol;
 	float MaxMeter = 0.0f;
+	bool bSeen = false;   // alguno en alerta por haberte visto (no solo mandado por radio)
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		MaxMeter = FMath::Max(MaxMeter, It->Meter);
+		if (It->State == ETarsisGuardState::Alert && !It->bRadioCall) bSeen = true;
 		if (It->State == ETarsisGuardState::Alert) Worst = ETarsisGuardState::Alert;
 		else if (Worst != ETarsisGuardState::Alert && It->State == ETarsisGuardState::Search) Worst = ETarsisGuardState::Search;
 		else if (Worst == ETarsisGuardState::Patrol && It->State == ETarsisGuardState::Suspicious) Worst = ETarsisGuardState::Suspicious;
@@ -234,7 +280,8 @@ void ATarsisHUD::DrawAlert()
 	const float CX = Canvas->ClipX / 2.0f, Y = 28.0f * S, W = 460.0f * S;
 	FString T = TEXT("TODO TRANQUILO");
 	FLinearColor Col(0.8f, 0.8f, 0.8f);
-	if (Worst == ETarsisGuardState::Alert) { T = TEXT("!  TE HAN VISTO: ROMPE LA LINEA DE VISTA"); Col = FLinearColor(1.0f, 0.23f, 0.18f); }
+	if (Worst == ETarsisGuardState::Alert && bSeen) { T = TEXT("!  TE HAN VISTO: ROMPE LA LINEA DE VISTA"); Col = FLinearColor(1.0f, 0.23f, 0.18f); }
+	else if (Worst == ETarsisGuardState::Alert) { T = TEXT("!  ALERTA POR RADIO: VAN CORRIENDO AL GENERADOR"); Col = FLinearColor(1.0f, 0.45f, 0.2f); }
 	else if (Worst == ETarsisGuardState::Search) { T = TEXT("TE BUSCAN: NO TE MUEVAS DE LA SOMBRA"); Col = FLinearColor(1.0f, 0.6f, 0.2f); }
 	else if (Worst == ETarsisGuardState::Suspicious) { T = TEXT("?  UN GUARDIA SOSPECHA"); Col = FLinearColor(1.0f, 0.82f, 0.23f); }
 	Panel(CX - W / 2.0f, Y, W, 52.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
@@ -304,7 +351,10 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 		D->Message.ParseIntoArray(Lines, TEXT("\n"));
 		const float LH = 27.0f * S;
 		const float Y0 = Canvas->ClipY * 0.95f - Lines.Num() * LH;
-		Panel(Canvas->ClipX * 0.25f, Y0 - 10.0f * S, Canvas->ClipX * 0.5f, Lines.Num() * LH + 18.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f * A));
+		// a la derecha de los paneles de abajo a la izquierda (LUZ, BASE EN GUARDIA, SIN LUZ acaban en 472*S): en 16:10 o 4:3
+		// el 25 % del ancho se metía encima de ellos
+		const float PX = FMath::Max(Canvas->ClipX * 0.25f, 490.0f * S);
+		Panel(PX, Y0 - 10.0f * S, Canvas->ClipX - 2.0f * PX, Lines.Num() * LH + 18.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f * A));
 		for (int32 i = 0; i < Lines.Num(); ++i)
 		{
 			Text(Lines[i], Canvas->ClipX / 2.0f, Y0 + i * LH, i == 0 ? FLinearColor(1.0f, 0.85f, 0.55f, A) : FLinearColor(1.0f, 0.95f, 0.85f, 0.9f * A), (i == 0 ? 0.95f : 0.78f) * S, true);
@@ -322,7 +372,8 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 		TArray<FString> Lines;
 		Body.ParseIntoArray(Lines, TEXT("\n"));
 		const float LH = 25.0f * S;
-		const float X0 = 30.0f * S, W = Canvas->ClipX * 0.32f;
+		// mínimo 560*S: la línea más larga («Entra el generador de reserva...») mide ~510*S y en 4:3 el 32 % se quedaba corto
+		const float X0 = 30.0f * S, W = FMath::Max(Canvas->ClipX * 0.32f, 560.0f * S);
 		const float Y0 = Canvas->ClipY * 0.55f;
 		const float H = (Lines.Num() + 1) * LH + 18.0f * S;
 		Panel(X0, Y0, W, H, FLinearColor(0.0f, 0.06f, 0.02f, 0.6f * A));
