@@ -144,6 +144,14 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Luz")
 	bool bPowerOff = false;
 
+	/** Segundos que tarda el guardia en arrancar el generador una vez junto a él. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
+	float RepairSeconds = 12.0f;
+
+	/** Trozos del nombre de los materiales de ventana iluminada: con el apagón se cambian por uno oscuro. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
+	TArray<FString> WindowMaterialKeys = { TEXT("ventana"), TEXT("window"), TEXT("emis") };
+
 	/** Dónde está el guardia que te oyó por última vez (para la flecha del HUD). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	FVector HeardFrom = FVector::ZeroVector;
@@ -328,8 +336,16 @@ private:
 	UPROPERTY()
 	TObjectPtr<class ATarsisGuard> Repairer;
 	float RepairT = 0.0f;
+	UPROPERTY()
+	TArray<TObjectPtr<class UMeshComponent>> WinComps;
+	TArray<int32> WinSlots;
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInterface>> WinMats;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> DarkWindow;
 	void CutPower();
 	void RestorePower(bool bByGuard);
 	void PowerTick(float DeltaSeconds);
+	void WindowsDark(bool bDark);
 	bool bRamosSent = false;
 };

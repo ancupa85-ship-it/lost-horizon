@@ -27,6 +27,8 @@
 #include "Components/SpotLightComponent.h"
 #include "Components/PointLightComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "Components/MeshComponent.h"
+#include "Materials/MaterialInterface.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -839,7 +841,7 @@ void ATarsisDirector::SetupSound()
 		if (ULightComponent* L = It->GetLightComponent())
 		{
 			if (L->IsA<USpotLightComponent>()) L->SetVolumetricScatteringIntensity(4.0f);
-			else if (L->IsA<UPointLightComponent>()) L->SetVolumetricScatteringIntensity(2.5f);
+			else if (L->IsA<UPointLightComponent>()) L->SetVolumetricScatteringIntensity(1.0f);   // una puntual no hace haz: solo un halo suave
 		}
 	}
 	// atenuación: se oye en 3D y se apaga hacia los 15 m (los pasos de un guardia tras una pared, la piedra al caer)
@@ -1074,15 +1076,20 @@ void ATarsisDirector::CutPower()
 	if (HumComp) HumComp->Stop();
 	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, GeneratorLoc + FVector(0.0f, 0.0f, 80.0f), 1.0f, 0.6f, 0.0f, Atten);
 	TensionT = FMath::Max(TensionT, 60.0f);
-	// mandan al guardia de suelo más cercano a arreglarlo
+	// mandan a arreglarlo a uno que esté lejos (el más cercano de los que quedan a más de 20 m; si no, el más lejano),
+	// para que el apagón dé tiempo a cruzar a oscuras
 	Repairer = nullptr;
-	float BestD = TNumericLimits<float>::Max();
+	ATarsisGuard* Far = nullptr;
+	float BestD = TNumericLimits<float>::Max(), FarD = -1.0f;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		if (It->State == ETarsisGuardState::Down || It->State == ETarsisGuardState::Alert || It->bTowerSentry || It->bAlly) continue;
 		const float D = FVector::Dist(It->GetActorLocation(), GeneratorLoc);
-		if (D < BestD) { BestD = D; Repairer = *It; }
+		if (D >= 2000.0f && D < BestD) { BestD = D; Repairer = *It; }
+		if (D > FarD) { FarD = D; Far = *It; }
 	}
+	if (!Repairer) Repairer = Far;
+	WindowsDark(true);
 	if (Repairer)
 	{
 		Repairer->HearNoise(GeneratorLoc);
@@ -1104,6 +1111,8 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 		if (L) L->SetVisibility(true);
 	}
 	OffLights.Reset();
+	WindowsDark(false);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) It->SetFlashlight(false);
 	if (HumComp) HumComp->Play();
 	ShowMessage(bByGuard && Repairer
 		? FString::Printf(TEXT("VUELVE LA LUZ\n%s ha arrancado el generador."), *Repairer->GuardName)
@@ -1114,15 +1123,57 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 void ATarsisDirector::PowerTick(float DeltaSeconds)
 {
 	if (!bPowerOff) return;
+	// sin luz, los guardias de suelo sacan la linterna (también el que se despierta)
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) It->SetFlashlight(true);
 	PowerT -= DeltaSeconds;
 	if (PowerT <= 0.0f) { RestorePower(false); return; }
-	// el enviado lo arregla tras 4 s junto al generador; si lo derribas antes, la luz tarda lo que le quede
+	// el enviado lo arregla tras RepairSeconds junto al generador; si lo derribas antes, la luz tarda lo que le quede
 	if (Repairer && Repairer->State != ETarsisGuardState::Down && Repairer->State != ETarsisGuardState::Alert)
 	{
 		if (FVector::Dist2D(Repairer->GetActorLocation(), GeneratorLoc) < 320.0f)
 		{
 			RepairT += DeltaSeconds;
-			if (RepairT >= 4.0f) RestorePower(true);
+			if (RepairT >= RepairSeconds) RestorePower(true);
+		}
+	}
+}
+
+void ATarsisDirector::WindowsDark(bool bDark)
+{
+	if (!bDark)
+	{
+		for (int32 i = 0; i < WinComps.Num(); ++i)
+		{
+			if (WinComps[i]) WinComps[i]->SetMaterial(WinSlots[i], WinMats[i]);
+		}
+		WinComps.Reset(); WinSlots.Reset(); WinMats.Reset();
+		return;
+	}
+	if (!DarkWindow)
+	{
+		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		if (!Base) return;
+		DarkWindow = UMaterialInstanceDynamic::Create(Base, this);
+		DarkWindow->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.015f, 0.017f, 0.02f));
+	}
+	// las ventanas con material emisivo se quedan a oscuras (se cambia el material de esa ranura y se guarda el original)
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		TArray<UMeshComponent*> Meshes;
+		It->GetComponents<UMeshComponent>(Meshes);
+		for (UMeshComponent* M : Meshes)
+		{
+			for (int32 Slot = 0; Slot < M->GetNumMaterials(); ++Slot)
+			{
+				UMaterialInterface* Mat = M->GetMaterial(Slot);
+				if (!Mat) continue;
+				const FString N = Mat->GetName().ToLower();
+				bool bHit = false;
+				for (const FString& K : WindowMaterialKeys) if (!K.IsEmpty() && N.Contains(K.ToLower())) { bHit = true; break; }
+				if (!bHit) continue;
+				WinComps.Add(M); WinSlots.Add(Slot); WinMats.Add(Mat);
+				M->SetMaterial(Slot, DarkWindow);
+			}
 		}
 	}
 }

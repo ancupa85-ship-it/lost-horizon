@@ -331,6 +331,7 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 {
 	State = NewState;
 	StateT = 0.0f;
+	if (NewState == ETarsisGuardState::Down && Flashlight) Flashlight->SetVisibility(false);
 	if (NewState != ETarsisGuardState::Suspicious) bInvestigate = false;
 	WaitT = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = (State == ETarsisGuardState::Alert) ? RunSpeed : WalkSpeed;
@@ -392,6 +393,35 @@ void ATarsisGuard::FaceTowards(const FVector& Dest, float DeltaSeconds)
 	SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.0f, Want.Yaw, 0.0f), DeltaSeconds, 200.0f));
 }
 
+// lo que aporta una luz local al punto: 0 si queda fuera de su radio o de su cono, o si algo hace sombra
+static float LightContribution(const UWorld* World, const ULocalLightComponent* L, const FVector& Point, const AActor* Owner, FCollisionQueryParams& Q)
+{
+	if (!L || !L->IsVisible() || L->Intensity <= 0.0f) return 0.0f;
+	const FVector LP = L->GetComponentLocation();
+	const float D = FVector::Dist(LP, Point);
+	const float R = L->AttenuationRadius;
+	if (D >= R) return 0.0f;
+	float F = FMath::Square(1.0f - D / R);
+	if (const USpotLightComponent* S = Cast<USpotLightComponent>(L))
+	{
+		const float CosA = FVector::DotProduct(S->GetForwardVector(), (Point - LP).GetSafeNormal());
+		const float CosOut = FMath::Cos(FMath::DegreesToRadians(S->OuterConeAngle));
+		if (CosA < CosOut) return 0.0f;
+		F *= 1.5f;   // dentro de un foco (torre, farola, linterna) se ve de lejos
+	}
+	// las luces están en lúmenes: una farola (~3000) cuenta como 1 a su pie
+	F *= FMath::Clamp(L->Intensity / 3000.0f, 0.2f, 2.0f);
+	if (F < 0.02f) return 0.0f;
+	Q.ClearIgnoredSourceObjects();   // ClearIgnoredActors está obsoleto en 5.8
+	if (Owner) Q.AddIgnoredActor(Owner);
+	FHitResult Hit;
+	if (World->LineTraceSingleByChannel(Hit, LP, Point, ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, Point) > 40.0f)
+	{
+		return 0.0f;   // algo hace sombra entre la luz y el punto
+	}
+	return F;
+}
+
 float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 {
 	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
@@ -400,33 +430,42 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLuz), false);
 	for (TActorIterator<ALight> It(World); It; ++It)
 	{
-		const ULocalLightComponent* L = Cast<ULocalLightComponent>(It->GetLightComponent());
-		if (!L || !L->IsVisible() || L->Intensity <= 0.0f) continue;
-		const FVector LP = L->GetComponentLocation();
-		const float D = FVector::Dist(LP, Point);
-		const float R = L->AttenuationRadius;
-		if (D >= R) continue;
-		float F = FMath::Square(1.0f - D / R);
-		if (const USpotLightComponent* S = Cast<USpotLightComponent>(L))
-		{
-			const float CosA = FVector::DotProduct(S->GetForwardVector(), (Point - LP).GetSafeNormal());
-			const float CosOut = FMath::Cos(FMath::DegreesToRadians(S->OuterConeAngle));
-			if (CosA < CosOut) continue;
-			F *= 1.5f;   // dentro del foco de una torre se ve de lejos
-		}
-		// las luces están en lúmenes: una farola (~3000) cuenta como 1 a su pie
-		F *= FMath::Clamp(L->Intensity / 3000.0f, 0.2f, 2.0f);
-		if (F < 0.02f) continue;
-		Q.ClearIgnoredSourceObjects();   // ClearIgnoredActors está obsoleto en 5.8
-		Q.AddIgnoredActor(*It);
-		FHitResult Hit;
-		if (World->LineTraceSingleByChannel(Hit, LP, Point, ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, Point) > 40.0f)
-		{
-			continue;   // algo hace sombra entre la luz y el punto
-		}
-		Sum += F;
+		Sum += LightContribution(World, Cast<ULocalLightComponent>(It->GetLightComponent()), Point, *It, Q);
+	}
+	// linternas de los guardias
+	for (TActorIterator<ATarsisGuard> It(World); It; ++It)
+	{
+		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->Flashlight, Point, *It, Q);
 	}
 	return FMath::Clamp(Sum, 0.0f, 1.0f);
+}
+
+bool ATarsisGuard::HasFlashlightOn() const
+{
+	return Flashlight && Flashlight->IsVisible();
+}
+
+void ATarsisGuard::SetFlashlight(bool bOn)
+{
+	if (bOn && (bTowerSentry || bAlly || State == ETarsisGuardState::Down)) bOn = false;
+	if (!bOn) { if (Flashlight) Flashlight->SetVisibility(false); return; }
+	if (!Flashlight)
+	{
+		Flashlight = NewObject<USpotLightComponent>(this);
+		Flashlight->SetMobility(EComponentMobility::Movable);
+		Flashlight->SetupAttachment(GetRootComponent());
+		Flashlight->SetRelativeLocationAndRotation(FVector(35.0f, 18.0f, 55.0f), FRotator(-12.0f, 0.0f, 0.0f));   // a la altura del pecho, algo hacia abajo
+		Flashlight->SetIntensityUnits(ELightUnits::Lumens);
+		Flashlight->SetIntensity(2500.0f);
+		Flashlight->SetAttenuationRadius(1400.0f);
+		Flashlight->SetInnerConeAngle(10.0f);
+		Flashlight->SetOuterConeAngle(20.0f);
+		Flashlight->SetLightColor(FLinearColor(1.0f, 0.93f, 0.8f));
+		Flashlight->SetCastShadows(false);   // sin sombras: la 1050 no da para siete linternas con sombra
+		Flashlight->SetVolumetricScatteringIntensity(3.0f);
+		Flashlight->RegisterComponent();
+	}
+	Flashlight->SetVisibility(true);
 }
 
 float ATarsisGuard::Visibility(const AActor* Target) const

@@ -188,6 +188,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis", meta = (WorldContext = "WorldContext"))
 	static float LightAt(const UObject* WorldContext, FVector Point);
 
+	/** Linterna en la mano (durante el apagón): el cono se ve en la niebla y cuenta como luz para verte. */
+	void SetFlashlight(bool bOn);
+	bool HasFlashlightOn() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -200,6 +204,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "Tarsis")
 	TObjectPtr<UTextRenderComponent> Mark;
+
+	UPROPERTY()
+	TObjectPtr<class USpotLightComponent> Flashlight;
 
 private:
 	int32 PointIndex = 0;
