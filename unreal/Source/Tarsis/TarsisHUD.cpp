@@ -85,7 +85,8 @@ void ATarsisHUD::DrawExtras(ATarsisDirector* D)
 	if (D->bSubtitles && D->SubtitleT > 0.0f && !D->Subtitle.IsEmpty() && !D->bMenu)
 	{
 		const float A = FMath::Clamp(D->SubtitleT * 2.0f, 0.0f, 1.0f);
-		Text(D->Subtitle, Canvas->ClipX / 2.0f, Canvas->ClipY * 0.66f, FLinearColor(0.95f, 0.95f, 0.75f, A), 0.8f * S, true);
+		// a 0,75 del alto: entre la caja de radio (que al 140 % baja hasta ~0,67) y los paneles de abajo
+		Text(D->Subtitle, Canvas->ClipX / 2.0f, Canvas->ClipY * 0.75f, FLinearColor(0.95f, 0.95f, 0.75f, A), 0.8f * S, true);
 	}
 	// aviso de punto de control, arriba a la derecha
 	if (D->CheckT > 0.0f && !D->CheckpointName.IsEmpty())
@@ -303,7 +304,29 @@ void ATarsisHUD::DrawAlert()
 	}
 	if (Worst == ETarsisGuardState::Patrol && MaxMeter < 0.05f) return;
 	const float S = UiScale();
-	const float CX = Canvas->ClipX / 2.0f, Y = 28.0f * S, W = 460.0f * S;
+	float CX = Canvas->ClipX / 2.0f, Y = 28.0f * S;
+	const float W = 460.0f * S;
+	// no pisar el panel del objetivo (arriba a la izquierda): con texto grande o en 4:3 se metía debajo de esta barra.
+	// Se aparta a la derecha si cabe y, si no, baja por debajo del objetivo (mismas medidas que DrawObjective)
+	{
+		ATarsisDirector* D = nullptr;
+		for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { D = *It; break; }
+		UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+		if (D && F && !D->Objective().IsEmpty())
+		{
+			float OW = 0.0f, OH = 0.0f, OW2 = 0.0f;
+			GetTextSize(D->Objective(), OW, OH, F, 0.9f * S);
+			const FString Side = D->SideObjective();
+			if (!Side.IsEmpty()) GetTextSize(TEXT("SECUNDARIA: ") + Side, OW2, OH, F, 0.75f * S);
+			const float ObjRight = 32.0f * S + FMath::Max(FMath::Max(OW, OW2), 140.0f * S) + 28.0f * S;
+			const float ObjBottom = 28.0f * S + (Side.IsEmpty() ? 62.0f : 88.0f) * S;
+			if (CX - W / 2.0f < ObjRight + 12.0f * S)
+			{
+				if (ObjRight + 12.0f * S + W <= Canvas->ClipX - 12.0f * S) CX = ObjRight + 12.0f * S + W / 2.0f;
+				else Y = ObjBottom + 10.0f * S;
+			}
+		}
+	}
 	FString T = TEXT("TODO TRANQUILO");
 	FLinearColor Col(0.8f, 0.8f, 0.8f);
 	if (Worst == ETarsisGuardState::Alert && bSeen) { T = TEXT("!  TE HAN VISTO: ROMPE LA LINEA DE VISTA"); Col = FLinearColor(1.0f, 0.23f, 0.18f); }
@@ -379,11 +402,21 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 		const float Y0 = Canvas->ClipY * 0.93f - Lines.Num() * LH;
 		// a la derecha de los paneles de abajo a la izquierda (LUZ, BASE EN GUARDIA, SIN LUZ acaban en 472*S): en 16:10 o 4:3
 		// el 25 % del ancho se metía encima de ellos
-		const float PX = FMath::Max(Canvas->ClipX * 0.25f, 490.0f * S);
-		Panel(PX, Y0 - 10.0f * S, Canvas->ClipX - 2.0f * PX, Lines.Num() * LH + 18.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f * A));
+		// El panel se ajusta al texto: centrado si cabe a la derecha de los paneles de la izquierda; si no (texto grande o
+		// 4:3), empieza justo a su derecha. Antes, con 2*490*S de margen, al 140 % en 4:3 se quedaba en ~60 px de ancho.
+		const float Left = 490.0f * S;
+		float TW = 0.0f;
+		if (UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr)
+		{
+			for (int32 i = 0; i < Lines.Num(); ++i) { float LW = 0.0f, LHt = 0.0f; GetTextSize(Lines[i], LW, LHt, F, (i == 0 ? 0.95f : 0.78f) * S); TW = FMath::Max(TW, LW); }
+		}
+		const float PW = FMath::Min(FMath::Max(TW + 40.0f * S, Canvas->ClipX * 0.3f), Canvas->ClipX - Left - 12.0f * S);
+		const float PX = FMath::Max(Canvas->ClipX / 2.0f - PW / 2.0f, Left);
+		const float TX = PX + PW / 2.0f;
+		Panel(PX, Y0 - 10.0f * S, PW, Lines.Num() * LH + 18.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f * A));
 		for (int32 i = 0; i < Lines.Num(); ++i)
 		{
-			Text(Lines[i], Canvas->ClipX / 2.0f, Y0 + i * LH, i == 0 ? FLinearColor(1.0f, 0.85f, 0.55f, A) : FLinearColor(1.0f, 0.95f, 0.85f, 0.9f * A), (i == 0 ? 0.95f : 0.78f) * S, true);
+			Text(Lines[i], TX, Y0 + i * LH, i == 0 ? FLinearColor(1.0f, 0.85f, 0.55f, A) : FLinearColor(1.0f, 0.95f, 0.85f, 0.9f * A), (i == 0 ? 0.95f : 0.78f) * S, true);
 		}
 	}
 	if (D->RadioT > 0.0f && !D->Radio.IsEmpty())
