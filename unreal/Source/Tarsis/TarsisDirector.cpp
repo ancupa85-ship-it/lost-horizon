@@ -268,6 +268,14 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, LampChecker->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		ShowMessage(FString::Printf(TEXT("RADIO, %s: \"Farol roto en el control. Cristales por el suelo... esto no es el viento.\"\nLA BASE SE PONE EN GUARDIA."), *LampChecker->GuardName.ToUpper()), 4.5f);
 	}
+	// el camino hasta la garita es largo (rodea): a los 25 s de investigar lo deja a medio camino y vuelve a su ronda.
+	// Si no ha llegado a verlo, se le vuelve a mandar (sale ya más cerca)
+	else if (bLampBroken && !bLampReported && LampChecker && GateLamp
+		&& (LampChecker->State == ETarsisGuardState::Return || LampChecker->State == ETarsisGuardState::Patrol))
+	{
+		const FVector P = GateLamp->GetActorLocation();
+		LampChecker->HearNoise(FVector(P.X, P.Y, ExitBarrierLoc.Z));
+	}
 	if (HeardT > 0.0f) HeardT -= DeltaSeconds;
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
 	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
@@ -1196,7 +1204,9 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 	for (ULightComponent* L : OffLights)
 	{
 		if (!L || (bLampBroken && GateLamp && L == GateLamp->GetLightComponent())) continue;
-		const bool bOn = bByGuard || (Idx++ % 2 == 0);
+		const AActor* Own = L->GetOwner();
+		const bool bTowerLamp = Own && Own->GetName().Contains(TEXT("torre"));   // foco_torreta_*: tienen su propio circuito
+		const bool bOn = bByGuard || bTowerLamp || (Idx++ % 2 == 0);
 		if (bOn) L->SetVisibility(true);
 	}
 	OffLights.Reset();
@@ -1257,7 +1267,7 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 			}
 			const FVector G = GeneratorLoc;
 			Near.Sort([G](const ATarsisGuard& A, const ATarsisGuard& B) { return FVector::DistSquared(A.GetActorLocation(), G) < FVector::DistSquared(B.GetActorLocation(), G); });
-			for (int32 i = 0; i < Near.Num() && i < 2; ++i) Near[i]->Alarm(GeneratorLoc);
+			for (int32 i = 0; i < Near.Num() && i < 2; ++i) { Near[i]->Alarm(GeneratorLoc); Near[i]->bRadioCall = true; }
 			ShowMessage(FString::Printf(TEXT("RADIO: \"%s, como va eso?\" ... Nada.\nEntra el generador de reserva (solo la mitad de las luces) y mandan gente corriendo al generador. LA BASE ESTA EN ALERTA."), *Name), 5.0f);
 			return;
 		}

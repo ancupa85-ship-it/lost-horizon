@@ -201,6 +201,9 @@ public:
 	/** Dormido con un dardo: se le puede quitar (E) y vuelve a la pistola. */
 	bool bDarted = false;
 
+	/** En alerta porque se lo han mandado por radio (no te ha visto): no abandona por UnseenT antes de llegar. */
+	bool bRadioCall = false;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;

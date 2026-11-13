@@ -262,6 +262,7 @@ void ATarsisGuard::WakeUp()
 	LastSeen = GetActorLocation();
 	Meter = 0.6f;
 	bFound = false;
+	bDarted = false;   // al despertar se lo ha quitado él: si no, tras otro derribo a mano se recuperaba el dardo otra vez
 	SetState(ETarsisGuardState::Search);   // se levanta buscando a quien le ha tumbado
 	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It)
 	{
@@ -351,6 +352,7 @@ void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
 
 void ATarsisGuard::SetState(ETarsisGuardState NewState)
 {
+	if (NewState != ETarsisGuardState::Alert) bRadioCall = false;
 	State = NewState;
 	StateT = 0.0f;
 	bRepairing = false;
@@ -681,7 +683,8 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 			break;
 		}
 		Walk(LastSeen, RunSpeed);
-		if (UnseenT > 4.0f || (Near2D(LastSeen, 80.0f) && V <= 0.0f)) SetState(ETarsisGuardState::Search);
+		// mandado por radio: no te ha visto, así que no se rinde a los 4 s; va corriendo hasta el sitio
+		if ((UnseenT > 4.0f && (!bRadioCall || StateT > 20.0f)) || (Near2D(LastSeen, 80.0f) && V <= 0.0f)) SetState(ETarsisGuardState::Search);
 		break;
 	case ETarsisGuardState::Search:
 		// mira a un lado y a otro donde te perdió
