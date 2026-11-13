@@ -233,10 +233,10 @@ try:
     import guardias
     importlib.reload(guardias)
     guardias.colocar()
+    guardias.guardar_tras_navegacion()   # guarda ahora y otra vez cuando acaba el mapa de navegación
 except Exception as e:
     log('AVISO: guardias no colocados:', repr(e))
-
-les.save_current_level()
+    les.save_current_level()
 log('nivel guardado en', MAPA)
 
 # limpiar importaciones anteriores (el nivel ya no las usa)

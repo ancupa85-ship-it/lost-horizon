@@ -141,6 +141,25 @@ def colocar():
     log('guardias colocados', n, '- director', 'sí' if dcls else 'no compilado')
     return n
 
+def guardar_tras_navegacion():
+    # RebuildNavigation va en segundo plano: si se guarda enseguida, el nivel queda con el mapa a medias y en Play
+    # sale «hay que recompilar la malla de navegación». Se guarda ya y otra vez cuando termina de construirse.
+    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    les.save_current_level()
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    estado = {'t': 0.0, 'h': None}
+    def tick(dt):
+        estado['t'] += dt
+        try:
+            ocupado = unreal.NavigationSystemV1.is_navigation_being_built(world)
+        except Exception:
+            ocupado = estado['t'] < 20.0
+        if (estado['t'] > 2.0 and not ocupado) or estado['t'] > 180.0:
+            unreal.unregister_slate_post_tick_callback(estado['h'])
+            les.save_current_level()
+            log('navegación construida y nivel guardado de nuevo (%.0f s)' % estado['t'])
+    estado['h'] = unreal.register_slate_post_tick_callback(tick)
+
 if __name__ == '__main__':
     colocar()
-    unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
+    guardar_tras_navegacion()
