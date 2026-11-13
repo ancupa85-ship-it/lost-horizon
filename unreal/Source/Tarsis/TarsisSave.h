@@ -37,4 +37,7 @@ public:
 	UPROPERTY() float Volume = 1.0f;
 	UPROPERTY() int32 Quality = -1;   // -1: la que tenga el motor
 	UPROPERTY() bool bShowFps = false;
+	UPROPERTY() float Music = 0.7f;
+	UPROPERTY() bool bShowHelp = true;
+	UPROPERTY() TArray<FName> Keys;   // teclas de las acciones, en el orden de ATarsisDirector::ActionName
 };

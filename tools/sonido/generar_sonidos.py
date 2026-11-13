@@ -1,4 +1,4 @@
-"""Genera los sonidos de Tarsis (pasos, piedra, dardo, viento, lluvia, radio, generador) como .wav en assets/unreal/sonidos.
+"""Genera los sonidos de Tarsis (pasos, piedra, dardo, viento, lluvia, radio, generador y las tres capas de música) como .wav en assets/unreal/sonidos.
 
 Todo sintetizado con numpy (ruido filtrado y senos que decaen): sin bancos de sonidos ni licencias.
 Uso: python3 tools/sonido/generar_sonidos.py
@@ -105,6 +105,60 @@ def generador(sec=6):
     x += lp(rng.normal(0, 1, n), 0.8) * 0.25
     return bucle(x)
 
+# ---- música por capas (las tres duran lo mismo, MUS segundos, y empiezan juntas: siempre van a compás)
+# Re menor oscuro a 75 ppm (0,8 s el pulso, 40 pulsos). Todas las frecuencias dan ciclos enteros en MUS: el bucle no corta.
+MUS = 32.0
+
+def ciclico(x, a):
+    # paso bajo sin costura: se filtra la señal dos veces seguida y se queda la segunda vuelta
+    return lp(np.concatenate([x, x]), a)[len(x):]
+
+def tono(f, t):
+    return np.sin(2 * np.pi * (round(f * MUS) / MUS) * t)   # frecuencia redondeada a ciclos enteros en el bucle
+
+def musica_base():
+    # ambiente: bordón grave de re con la quinta, que respira despacio, y un soplo de ruido como viento lejano
+    n = int(MUS * SR); t = np.arange(n) / SR
+    resp = 0.7 + 0.3 * np.sin(2 * np.pi * t / 16.0)          # dos respiraciones por vuelta
+    x = (tono(73.42, t) + 0.6 * tono(110.0, t) + 0.35 * tono(146.83, t) + 0.15 * tono(174.61, t) * (0.5 + 0.5 * np.sin(2 * np.pi * t / 8.0))) * resp
+    x += ciclico(rng.normal(0, 1, n), 0.995) * 1.5
+    return x
+
+def musica_tension():
+    # tensión: latido grave en cada pulso (dos golpes) y un trémolo agudo de segunda menor (la - si bemol) que inquieta
+    n = int(MUS * SR); t = np.arange(n) / SR; x = np.zeros(n)
+    beat = int(0.8 * SR)
+    for k in range(40):
+        for d, a in ((0.0, 1.0), (0.18, 0.6)):
+            p = k * beat + int(d * SR); m = int(0.25 * SR)
+            if p + m > n: continue
+            tt = np.arange(m) / SR
+            x[p:p + m] += a * np.sin(2 * np.pi * 55 * tt * (1 - 0.3 * tt)) * env(m, 0.004, 0.07)
+    trem = 0.5 + 0.5 * np.sin(2 * np.pi * 6.25 * t)            # 6,25 Hz: 200 vueltas exactas
+    x += 0.18 * (tono(440.0, t) + tono(466.16, t)) * trem * (0.6 + 0.4 * np.sin(2 * np.pi * t / 32.0))
+    return x
+
+def musica_alerta():
+    # alerta: timbales al doble de pulso (0,4 s) y un ostinato de re - mi bemol en corcheas, áspero
+    n = int(MUS * SR); x = np.zeros(n)
+    step = int(0.4 * SR)
+    for k in range(80):
+        p = k * step; m = int(0.3 * SR)
+        if p + m > n: continue
+        tt = np.arange(m) / SR
+        f = 82.4 if k % 4 in (0, 3) else 98.0
+        x[p:p + m] += (1.0 if k % 2 == 0 else 0.7) * np.sin(2 * np.pi * f * tt * (1 - 0.4 * tt)) * env(m, 0.002, 0.09)
+        x[p:p + m] += 0.25 * rng.normal(0, 1, m) * env(m, 0.001, 0.02)
+    eighth = int(0.2 * SR)
+    for k in range(160):
+        p = k * eighth; m = int(0.17 * SR)
+        if p + m > n: continue
+        tt = np.arange(m) / SR
+        f = 293.66 if k % 8 not in (3, 7) else 311.13
+        sq = np.sign(np.sin(2 * np.pi * f * tt)) * 0.5 + np.sin(2 * np.pi * f * tt)
+        x[p:p + m] += 0.12 * sq * env(m, 0.003, 0.08)
+    return x
+
 if __name__ == '__main__':
     for k in range(3):
         save('paso_grava_%d' % (k + 1), grava(k), 0.7)
@@ -115,3 +169,6 @@ if __name__ == '__main__':
     save('lluvia', lluvia(), 0.5)
     save('radio', radio(), 0.6)
     save('generador', generador(), 0.5)
+    save('musica_base', musica_base(), 0.5)
+    save('musica_tension', musica_tension(), 0.5)
+    save('musica_alerta', musica_alerta(), 0.55)

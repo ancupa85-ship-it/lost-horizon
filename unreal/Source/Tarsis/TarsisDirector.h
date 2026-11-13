@@ -271,6 +271,26 @@ public:
 	float OptVolume = 1.0f;
 	int32 OptQuality = 1;
 	bool bShowFps = false;
+	float OptMusic = 0.7f;
+	bool bShowHelp = true;
+
+	/** Página del menú: 0 la principal, 1 los controles. Esperando tecla para la acción ActionSel (o -1). */
+	int32 MenuPage = 0;
+	int32 WaitKeyFor = -1;
+
+	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
+	static constexpr int32 NumActions = 6;
+	FKey ActionKeys[NumActions];
+	static const TCHAR* ActionName(int32 I);
+
+	/** Tira de ayuda de abajo a la derecha: teclas de lo que puedes hacer ahora. */
+	FString HelpLine() const;
+
+	/** Capas de música (0-1 cada una), para el HUD de pruebas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Musica")
+	float MusicTension = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Musica")
+	float MusicAlert = 0.0f;
 
 	/** Último punto de control («la llave de Ibarra»...) y segundos que queda el aviso en pantalla. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
@@ -451,6 +471,20 @@ private:
 	void SaveOptions() const;
 	void LoadOptions();
 	void BindMenuKeys();
+	void BindAll();
+	void AnyKey(FKey Key);
+	uint64 KeyFrame = 0;
+	void DefaultKeys();
+
+	// música por capas (tools/sonido/generar_sonidos.py): ambiente siempre, tensión con la sospecha, alerta con la alarma
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> MusicBase;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> MusicTen;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> MusicAlr;
+	void SetupMusic();
+	void MusicTick(float DeltaSeconds);
 
 	// cinemáticas
 	UPROPERTY()

@@ -66,47 +66,18 @@ void ATarsisDirector::SetupPlayer()
 	BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
 	PC->ClientSetHUD(ATarsisHUD::StaticClass());
 	EnableInput(PC);
-	if (InputComponent)
-	{
-		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
-		InputComponent->BindKey(EKeys::LeftControl, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
-		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ATarsisDirector::Interact);
-		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ATarsisDirector::ThrowStone);
-		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
-		InputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ATarsisDirector::CycleWeather);
-		InputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &ATarsisDirector::SprintOn);
-		InputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &ATarsisDirector::SprintOff);
-		{
-			FInputKeyBinding& B = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATarsisDirector::ShootDart);
-			B.bConsumeInput = false;
-		}
-		// teclado del archivo: cifras de arriba y del teclado numérico, y Retroceso para borrar
-		const FKey Keys[] = { EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six,
-			EKeys::Seven, EKeys::Eight, EKeys::Nine, EKeys::NumPadZero, EKeys::NumPadOne, EKeys::NumPadTwo,
-			EKeys::NumPadThree, EKeys::NumPadFour, EKeys::NumPadFive, EKeys::NumPadSix, EKeys::NumPadSeven,
-			EKeys::NumPadEight, EKeys::NumPadNine, EKeys::BackSpace };
-		for (const FKey& K : Keys)
-		{
-			FInputKeyBinding& B = InputComponent->BindKey(K, IE_Pressed, this, &ATarsisDirector::KeypadKey);
-			B.bConsumeInput = false;
-		}
-	}
-	bPlayerReady = true;
-	BindMenuKeys();
+	DefaultKeys();
 	LoadOptions();
+	BindAll();
+	bPlayerReady = true;
 	bHasSave = UGameplayStatics::DoesSaveGameExist(TEXT("TarsisPartida"), 0);
-	if (InputComponent)
-	{
-		FInputKeyBinding& B = InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ATarsisDirector::SkipCine);
-		B.bConsumeInput = false;
-	}
 	// entrada: sobrevuelo de la base; al acabar (o al saltarla) salen las instrucciones
 	if (!(bPlayIntro && PlayCine(TEXT("LS_Entrada"), true))) IntroText();
 }
 
 void ATarsisDirector::IntroText()
 {
-	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (Shift) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones y cargar el ultimo punto de control."), 11.0f);
+	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (Shift) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control."), 11.0f);
 }
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
@@ -277,6 +248,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	RadioTick(DeltaSeconds);
 	PowerTick(DeltaSeconds);
 	BarrierTick(DeltaSeconds);
+	MusicTick(DeltaSeconds);
 	// el que fue a mirar el farol roto encuentra los cristales y avisa: la base se pone en guardia un rato
 	if (bLampBroken && !bLampReported && LampChecker && LampChecker->State != ETarsisGuardState::Down
 		&& GateLamp && FVector::Dist2D(LampChecker->GetActorLocation(), GateLamp->GetActorLocation()) < 350.0f)
@@ -966,6 +938,7 @@ void ATarsisDirector::SetupSound()
 	{
 		WindComp = UGameplayStatics::SpawnSound2D(this, WindSnd, 0.3f, 1.0f, 0.0f, nullptr, false, false);
 	}
+	SetupMusic();
 	// zumbido del generador, en 3D: te guía hasta él y se calla cuando lo cortas
 	if (HumSnd)
 	{
@@ -1586,6 +1559,8 @@ void ATarsisDirector::TogglePause()
 	if (!PC) return;
 	bMenu = !bMenu;
 	MenuSel = 0;
+	MenuPage = 0;
+	WaitKeyFor = -1;
 	if (bMenu) bHasSave = UGameplayStatics::DoesSaveGameExist(TEXT("TarsisPartida"), 0);
 	UGameplayStatics::SetGamePaused(this, bMenu);
 }
@@ -1594,6 +1569,17 @@ TArray<FString> ATarsisDirector::MenuLines() const
 {
 	static const TCHAR* Q[] = { TEXT("BAJA"), TEXT("MEDIA"), TEXT("ALTA"), TEXT("EPICA") };
 	TArray<FString> L;
+	if (MenuPage == 1)
+	{
+		for (int32 i = 0; i < NumActions; ++i)
+		{
+			L.Add(WaitKeyFor == i ? FString::Printf(TEXT("%s   ... PULSA UNA TECLA (Esc cancela)"), ActionName(i))
+				: FString::Printf(TEXT("%s   [ %s ]"), ActionName(i), *ActionKeys[i].GetDisplayName().ToString().ToUpper()));
+		}
+		L.Add(TEXT("TECLAS POR DEFECTO"));
+		L.Add(TEXT("VOLVER"));
+		return L;
+	}
 	L.Add(TEXT("REANUDAR"));
 	L.Add(bHasSave ? FString::Printf(TEXT("CARGAR PUNTO DE CONTROL%s"), CheckpointName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *CheckpointName))
 		: FString(TEXT("CARGAR PUNTO DE CONTROL (no hay)")));
@@ -1602,12 +1588,18 @@ TArray<FString> ATarsisDirector::MenuLines() const
 	L.Add(FString::Printf(TEXT("VOLUMEN   < %d %% >"), FMath::RoundToInt(OptVolume * 100.0f)));
 	L.Add(FString::Printf(TEXT("CALIDAD GRAFICA   < %s >"), Q[FMath::Clamp(OptQuality, 0, 3)]));
 	L.Add(FString::Printf(TEXT("CONTADOR DE FPS   < %s >"), bShowFps ? TEXT("SI") : TEXT("NO")));
+	L.Add(FString::Printf(TEXT("MUSICA   < %d %% >"), FMath::RoundToInt(OptMusic * 100.0f)));
+	L.Add(FString::Printf(TEXT("AYUDA DE TECLAS EN PANTALLA   < %s >"), bShowHelp ? TEXT("SI") : TEXT("NO")));
+	L.Add(TEXT("CONTROLES..."));
 	L.Add(TEXT("SALIR DEL JUEGO"));
 	return L;
 }
 
 void ATarsisDirector::MenuKey(FKey Key)
 {
+	if (KeyFrame == GFrameCounter) return;   // esta pulsación ya se ha usado para asignar una tecla
+	if (WaitKeyFor >= 0) return;               // esperando la tecla nueva: la recoge AnyKey
+	if (bMenu && MenuPage == 1 && Key == EKeys::Escape) { MenuPage = 0; MenuSel = 0; return; }
 	if (Key == EKeys::P || Key == EKeys::Escape)
 	{
 		if (bKeypad && Key == EKeys::Escape) { bKeypad = false; KeypadInput.Reset(); return; }   // Esc cierra antes el teclado del archivo (y borra lo tecleado)
@@ -1626,6 +1618,15 @@ void ATarsisDirector::MenuKey(FKey Key)
 void ATarsisDirector::MenuActivate(int32 Dir)
 {
 	const int32 Step = Dir == 0 ? 1 : Dir;
+	if (MenuPage == 1)
+	{
+		if (Dir != 0) return;
+		if (MenuSel < NumActions) { WaitKeyFor = MenuSel; KeyFrame = GFrameCounter; return; }
+		if (MenuSel == NumActions) { DefaultKeys(); BindAll(); SaveOptions(); return; }
+		MenuPage = 0;
+		MenuSel = 9;
+		return;
+	}
 	switch (MenuSel)
 	{
 	case 0: if (Dir == 0) TogglePause(); return;
@@ -1637,7 +1638,12 @@ void ATarsisDirector::MenuActivate(int32 Dir)
 	case 4: OptVolume = FMath::Clamp(FMath::RoundToFloat((OptVolume + 0.1f * Step) * 10.0f) / 10.0f, 0.0f, 1.0f); break;
 	case 5: OptQuality = (OptQuality + Step + 4) % 4; break;
 	case 6: bShowFps = !bShowFps; break;
-	case 7:
+	case 7: OptMusic = FMath::Clamp(FMath::RoundToFloat((OptMusic + 0.1f * Step) * 10.0f) / 10.0f, 0.0f, 1.0f); break;
+	case 8: bShowHelp = !bShowHelp; break;
+	case 9:
+		if (Dir == 0) { MenuPage = 1; MenuSel = 0; }
+		return;
+	case 10:
 		if (Dir == 0) UKismetSystemLibrary::QuitGame(this, UGameplayStatics::GetPlayerController(this, 0), EQuitPreference::Quit, false);
 		return;
 	default: return;
@@ -1701,6 +1707,9 @@ void ATarsisDirector::SaveOptions() const
 	S->Volume = OptVolume;
 	S->Quality = OptQuality;
 	S->bShowFps = bShowFps;
+	S->Music = OptMusic;
+	S->bShowHelp = bShowHelp;
+	for (int32 i = 0; i < NumActions; ++i) S->Keys.Add(ActionKeys[i].GetFName());
 	UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisOpciones"), 0);
 }
 
@@ -1718,6 +1727,141 @@ void ATarsisDirector::LoadOptions()
 		OptVolume = FMath::Clamp(S->Volume, 0.0f, 1.0f);
 		if (S->Quality >= 0) OptQuality = FMath::Clamp(S->Quality, 0, 3);
 		bShowFps = S->bShowFps;
+		OptMusic = FMath::Clamp(S->Music, 0.0f, 1.0f);
+		bShowHelp = S->bShowHelp;
+		for (int32 i = 0; i < NumActions && i < S->Keys.Num(); ++i)
+		{
+			const FKey K(S->Keys[i]);
+			if (K.IsValid()) ActionKeys[i] = K;
+		}
 		ApplyOptions();
 	}
+}
+
+// ---------------------------------------------------------------- teclas configurables
+
+const TCHAR* ATarsisDirector::ActionName(int32 I)
+{
+	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA") };
+	return (I >= 0 && I < NumActions) ? N[I] : TEXT("");
+}
+
+void ATarsisDirector::DefaultKeys()
+{
+	ActionKeys[0] = EKeys::C;
+	ActionKeys[1] = EKeys::E;
+	ActionKeys[2] = EKeys::Q;
+	ActionKeys[3] = EKeys::B;
+	ActionKeys[4] = EKeys::LeftShift;
+	ActionKeys[5] = EKeys::Y;
+}
+
+void ATarsisDirector::BindAll()
+{
+	if (!InputComponent) return;
+	InputComponent->KeyBindings.Reset();
+	InputComponent->BindKey(ActionKeys[0], IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
+	if (ActionKeys[0] != EKeys::LeftControl) InputComponent->BindKey(EKeys::LeftControl, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
+	InputComponent->BindKey(ActionKeys[1], IE_Pressed, this, &ATarsisDirector::Interact);
+	InputComponent->BindKey(ActionKeys[2], IE_Pressed, this, &ATarsisDirector::ThrowStone);
+	InputComponent->BindKey(ActionKeys[3], IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
+	InputComponent->BindKey(ActionKeys[5], IE_Pressed, this, &ATarsisDirector::CycleWeather);
+	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);
+	InputComponent->BindKey(ActionKeys[4], IE_Released, this, &ATarsisDirector::SprintOff);
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATarsisDirector::ShootDart);
+		B.bConsumeInput = false;
+	}
+	// teclado del archivo: cifras de arriba y del teclado numérico, y Retroceso para borrar
+	const FKey Keys[] = { EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six,
+		EKeys::Seven, EKeys::Eight, EKeys::Nine, EKeys::NumPadZero, EKeys::NumPadOne, EKeys::NumPadTwo,
+		EKeys::NumPadThree, EKeys::NumPadFour, EKeys::NumPadFive, EKeys::NumPadSix, EKeys::NumPadSeven,
+		EKeys::NumPadEight, EKeys::NumPadNine, EKeys::BackSpace };
+	for (const FKey& K : Keys)
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(K, IE_Pressed, this, &ATarsisDirector::KeypadKey);
+		B.bConsumeInput = false;
+	}
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ATarsisDirector::SkipCine);
+		B.bConsumeInput = false;
+	}
+	BindMenuKeys();
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this, &ATarsisDirector::AnyKey);
+		B.bConsumeInput = false;
+		B.bExecuteWhenPaused = true;
+	}
+}
+
+void ATarsisDirector::AnyKey(FKey Key)
+{
+	if (WaitKeyFor < 0 || KeyFrame == GFrameCounter) return;
+	if (Key.IsMouseButton() || Key.IsAnalog() || Key == EKeys::Enter || Key == EKeys::P) return;   // no valen
+	const int32 I = WaitKeyFor;
+	WaitKeyFor = -1;
+	KeyFrame = GFrameCounter;
+	if (Key == EKeys::Escape) return;   // cancelar
+	// si la tecla ya era de otra acción, se intercambian
+	for (int32 j = 0; j < NumActions; ++j)
+	{
+		if (j != I && ActionKeys[j] == Key) ActionKeys[j] = ActionKeys[I];
+	}
+	ActionKeys[I] = Key;
+	BindAll();
+	SaveOptions();
+}
+
+FString ATarsisDirector::HelpLine() const
+{
+	auto K = [this](int32 I) { return ActionKeys[I].GetDisplayName().ToString().ToUpper(); };
+	FString S = FString::Printf(TEXT("%s agacharse   %s correr   %s piedra   %s prismaticos"), *K(0), *K(4), *K(2), *K(3));
+	if (Darts > 0) S += FString::Printf(TEXT("   CLIC dardo (%d)"), Darts);
+	if (bPowerOff) S += TEXT("   sin luz: busca la sombra de las linternas");
+	S += TEXT("   P pausa");
+	return S;
+}
+
+// ---------------------------------------------------------------- música por capas
+
+void ATarsisDirector::SetupMusic()
+{
+	auto Layer = [this](const TCHAR* Name, float Vol) -> UAudioComponent*
+	{
+		USoundBase* S = LoadSnd(Name);
+		if (!S) return nullptr;
+		if (USoundWave* W = Cast<USoundWave>(S)) W->bLooping = true;
+		UAudioComponent* A = UGameplayStatics::CreateSound2D(this, S, 1.0f, 1.0f, 0.0f, nullptr, true, false);
+		if (A) A->SetVolumeMultiplier(FMath::Max(Vol, 0.001f));
+		return A;
+	};
+	MusicBase = Layer(TEXT("musica_base"), 0.35f * OptMusic);
+	MusicTen = Layer(TEXT("musica_tension"), 0.001f);
+	MusicAlr = Layer(TEXT("musica_alerta"), 0.001f);
+	// las tres a la vez: duran lo mismo y así van a compás
+	for (UAudioComponent* A : { MusicBase.Get(), MusicTen.Get(), MusicAlr.Get() }) if (A) A->Play();
+}
+
+void ATarsisDirector::MusicTick(float DeltaSeconds)
+{
+	if (!MusicBase && !MusicTen && !MusicAlr) return;
+	float MaxMeter = 0.0f;
+	bool bAlert = false;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Down || It->bAlly) continue;
+		MaxMeter = FMath::Max(MaxMeter, It->Meter);
+		if (It->State == ETarsisGuardState::Alert) bAlert = true;
+	}
+	// tensión: sube con el guardia más mosqueado y se queda a medias mientras la base está en guardia o sin luz
+	float TenT = FMath::Clamp(MaxMeter * 1.4f, 0.0f, 1.0f);
+	if (TensionT > 0.0f || bPowerOff) TenT = FMath::Max(TenT, 0.45f);
+	const float AlrT = bAlert ? 1.0f : 0.0f;
+	const bool bQuiet = bCine || bDone;   // en las cinemáticas y el final, solo el ambiente
+	MusicTension = FMath::FInterpTo(MusicTension, bQuiet ? 0.0f : TenT, DeltaSeconds, TenT > MusicTension ? 2.0f : 0.4f);
+	MusicAlert = FMath::FInterpTo(MusicAlert, bQuiet ? 0.0f : AlrT, DeltaSeconds, AlrT > MusicAlert ? 4.0f : 0.3f);
+	const float Base = 0.35f * (1.0f - 0.4f * MusicAlert);
+	if (MusicBase) MusicBase->SetVolumeMultiplier(FMath::Max(0.001f, Base * OptMusic));
+	if (MusicTen) MusicTen->SetVolumeMultiplier(FMath::Max(0.001f, 0.5f * MusicTension * (1.0f - 0.5f * MusicAlert) * OptMusic));
+	if (MusicAlr) MusicAlr->SetVolumeMultiplier(FMath::Max(0.001f, 0.55f * MusicAlert * OptMusic));
 }

@@ -9,7 +9,7 @@ import unreal
 HERE = os.path.dirname(os.path.abspath(__file__))
 CARPETA = os.path.join(os.path.dirname(os.path.dirname(HERE)), 'assets', 'unreal', 'sonidos')
 DEST = '/Game/Tarsis/Sonidos'
-BUCLES = ('viento', 'lluvia', 'generador')
+BUCLES = ('viento', 'lluvia', 'generador', 'musica_base', 'musica_tension', 'musica_alerta')
 
 def importar():
     tareas = []

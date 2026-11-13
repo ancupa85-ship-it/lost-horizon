@@ -68,6 +68,11 @@ void ATarsisHUD::DrawExtras(ATarsisDirector* D)
 		Text(FString::Printf(TEXT("%d FPS"), FMath::RoundToInt(FpsSmooth)), Canvas->ClipX - 20.0f * S - 90.0f * S, 12.0f * S,
 			FpsSmooth >= 55.0f ? FLinearColor(0.6f, 1.0f, 0.6f) : (FpsSmooth >= 30.0f ? FLinearColor(1.0f, 0.85f, 0.4f) : FLinearColor(1.0f, 0.4f, 0.3f)), 0.8f * S, false);
 	}
+	// ayuda de teclas, abajo del todo (opción del menú)
+	if (D->bShowHelp && !D->bKeypad && !D->bMenu)
+	{
+		Text(D->HelpLine(), Canvas->ClipX / 2.0f, Canvas->ClipY - 26.0f * S, FLinearColor(0.85f, 0.85f, 0.85f, 0.55f), 0.6f * S, true);
+	}
 	// aviso de punto de control, arriba a la derecha
 	if (D->CheckT > 0.0f && !D->CheckpointName.IsEmpty())
 	{
@@ -87,14 +92,15 @@ void ATarsisHUD::DrawMenu(ATarsisDirector* D)
 	const TArray<FString> L = D->MenuLines();
 	const float CX = Canvas->ClipX / 2.0f, LH = 46.0f * S;
 	const float W = 720.0f * S, Y0 = Canvas->ClipY / 2.0f - (L.Num() * LH) / 2.0f;
-	Text(TEXT("PAUSA"), CX, Y0 - 90.0f * S, FLinearColor(1.0f, 0.85f, 0.55f), 1.6f * S, true);
+	Text(D->MenuPage == 1 ? TEXT("CONTROLES") : TEXT("PAUSA"), CX, Y0 - 90.0f * S, FLinearColor(1.0f, 0.85f, 0.55f), 1.6f * S, true);
 	for (int32 i = 0; i < L.Num(); ++i)
 	{
 		const bool bSel = i == D->MenuSel;
 		if (bSel) Panel(CX - W / 2.0f, Y0 + i * LH - 6.0f * S, W, LH - 6.0f * S, FLinearColor(1.0f, 0.85f, 0.55f, 0.18f));
 		Text(L[i], CX, Y0 + i * LH, bSel ? FLinearColor(1.0f, 0.95f, 0.8f) : FLinearColor(0.75f, 0.75f, 0.75f), (bSel ? 0.95f : 0.85f) * S, true);
 	}
-	Text(TEXT("W/S o flechas: elegir    A/D: cambiar    Intro: aceptar    P: volver al juego"), CX, Y0 + L.Num() * LH + 30.0f * S,
+	Text(D->MenuPage == 1 ? TEXT("Intro: cambiar la tecla (si ya la usa otra accion, se intercambian)    Esc: volver")
+		: TEXT("W/S o flechas: elegir    A/D: cambiar    Intro: aceptar    P: volver al juego"), CX, Y0 + L.Num() * LH + 30.0f * S,
 		FLinearColor(0.7f, 0.7f, 0.7f), 0.7f * S, true);
 }
 
@@ -350,7 +356,7 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 		TArray<FString> Lines;
 		D->Message.ParseIntoArray(Lines, TEXT("\n"));
 		const float LH = 27.0f * S;
-		const float Y0 = Canvas->ClipY * 0.95f - Lines.Num() * LH;
+		const float Y0 = Canvas->ClipY * 0.93f - Lines.Num() * LH;
 		// a la derecha de los paneles de abajo a la izquierda (LUZ, BASE EN GUARDIA, SIN LUZ acaban en 472*S): en 16:10 o 4:3
 		// el 25 % del ancho se metía encima de ellos
 		const float PX = FMath::Max(Canvas->ClipX * 0.25f, 490.0f * S);
