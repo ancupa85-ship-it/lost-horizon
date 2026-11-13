@@ -128,7 +128,9 @@ void ATarsisGuard::UpdateAnim()
 		}
 		if (UAnimSingleNodeInstance* SI = M->GetSingleNodeInstance())
 		{
-			SI->SetBlendSpacePosition(FVector(FMath::Min(Speed, WalkAnimSpeed), 0.0f, 0.0f));
+			// la posición en la mezcla se suaviza: aunque la cápsula frene en seco, las piernas no saltan de pose
+			BlendPos = FMath::FInterpTo(BlendPos, FMath::Min(Speed, WalkAnimSpeed), GetWorld()->GetDeltaSeconds(), 6.0f);
+			SI->SetBlendSpacePosition(FVector(BlendPos, 0.0f, 0.0f));
 		}
 		M->SetPlayRate(Speed > WalkAnimSpeed ? FMath::Clamp(Speed / FMath::Max(WalkAnimSpeed, 1.0f), 1.0f, 2.6f) : 1.0f);
 		return;
@@ -332,6 +334,9 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 	if (NewState != ETarsisGuardState::Suspicious) bInvestigate = false;
 	WaitT = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = (State == ETarsisGuardState::Alert) ? RunSpeed : WalkSpeed;
+	// arrancar y frenar poco a poco al andar (sin tirones); en alerta, reacción rápida
+	GetCharacterMovement()->MaxAcceleration = (State == ETarsisGuardState::Alert) ? 1200.0f : 320.0f;
+	GetCharacterMovement()->BrakingDecelerationWalking = (State == ETarsisGuardState::Alert) ? 1200.0f : 320.0f;
 	if (AAIController* AI = Cast<AAIController>(GetController()))
 	{
 		AI->StopMovement();

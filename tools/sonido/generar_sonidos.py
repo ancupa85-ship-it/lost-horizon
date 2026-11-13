@@ -1,4 +1,4 @@
-"""Genera los sonidos de Tarsis (pasos, piedra, dardo, viento, lluvia) como .wav en assets/unreal/sonidos.
+"""Genera los sonidos de Tarsis (pasos, piedra, dardo, viento, lluvia, radio, generador) como .wav en assets/unreal/sonidos.
 
 Todo sintetizado con numpy (ruido filtrado y senos que decaen): sin bancos de sonidos ni licencias.
 Uso: python3 tools/sonido/generar_sonidos.py
@@ -97,6 +97,14 @@ def radio():
     x[b:b + m] += 0.5 * np.sin(2 * np.pi * 1200 * t[:m]) * env(m, 0.002, 0.03)
     return x
 
+def generador(sec=6):
+    # motor diésel al ralentí: zumbido de 50 Hz con armónicos, golpeteo de 12,5 Hz y ruido mecánico
+    n = int((sec + 1) * SR); t = np.arange(n) / SR
+    x = sum(a * np.sin(2 * np.pi * f * t + i) for i, (f, a) in enumerate(((50, 1.0), (100, 0.6), (150, 0.35), (200, 0.2), (300, 0.08))))
+    x *= 0.75 + 0.25 * np.sin(2 * np.pi * 12.5 * t) ** 2
+    x += lp(rng.normal(0, 1, n), 0.8) * 0.25
+    return bucle(x)
+
 if __name__ == '__main__':
     for k in range(3):
         save('paso_grava_%d' % (k + 1), grava(k), 0.7)
@@ -106,3 +114,4 @@ if __name__ == '__main__':
     save('viento', viento(), 0.5)
     save('lluvia', lluvia(), 0.5)
     save('radio', radio(), 0.6)
+    save('generador', generador(), 0.5)

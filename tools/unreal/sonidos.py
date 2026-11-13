@@ -1,6 +1,6 @@
 """Importa los sonidos de assets/unreal/sonidos/*.wav en /Game/Tarsis/Sonidos (Python del editor).
 
-Los genera tools/sonido/generar_sonidos.py. viento y lluvia se marcan en bucle. Los usa ATarsisDirector
+Los genera tools/sonido/generar_sonidos.py. viento, lluvia y generador se marcan en bucle. Los usa ATarsisDirector
 (pasos según el suelo, piedra, dardo, viento y lluvia) cargándolos por su ruta.
 """
 import os
@@ -9,7 +9,7 @@ import unreal
 HERE = os.path.dirname(os.path.abspath(__file__))
 CARPETA = os.path.join(os.path.dirname(os.path.dirname(HERE)), 'assets', 'unreal', 'sonidos')
 DEST = '/Game/Tarsis/Sonidos'
-BUCLES = ('viento', 'lluvia')
+BUCLES = ('viento', 'lluvia', 'generador')
 
 def importar():
     tareas = []

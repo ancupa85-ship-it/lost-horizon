@@ -26,6 +26,7 @@
 #include "Engine/Light.h"
 #include "Components/SpotLightComponent.h"
 #include "Components/PointLightComponent.h"
+#include "HAL/IConsoleManager.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -230,6 +231,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	SoundTick(C, DeltaSeconds);
 	RainTick(DeltaSeconds);
 	RadioTick(DeltaSeconds);
+	PowerTick(DeltaSeconds);
 	if (HeardT > 0.0f) HeardT -= DeltaSeconds;
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
 	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
@@ -350,6 +352,7 @@ FString ATarsisDirector::InteractPrompt() const
 	if (!bLetter && NearPlayer(FVector(1130.0f, 2850.0f, 0.0f), 150.0f)) return TEXT("E   LEER LA CARTA");
 	if (!bVetOpen && NearPlayer(FVector(4660.0f, 300.0f, 0.0f), 170.0f)) return bVetKey ? TEXT("E   ABRIR EL BOTIQUIN") : TEXT("E   BOTIQUIN DEL VETERINARIO");
 	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f)) return TEXT("E   PORTILLO DE LA MARISMA");
+	if (NearPlayer(GeneratorLoc, 230.0f)) return bPowerOff ? TEXT("GENERADOR: PARADO") : TEXT("E   CORTAR EL GENERADOR (apaga las luces)");
 	return FString();
 }
 
@@ -445,6 +448,11 @@ void ATarsisDirector::Interact()
 		if (!bFile) { ShowMessage(TEXT("PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente."), 3.0f); return; }
 		if (!R || R->State == ETarsisGuardState::Down || FVector::Dist2D(R->GetActorLocation(), FVector(310.0f, 4900.0f, 0.0f)) > 700.0f) { ShowMessage(TEXT("ESPERA A RAMOS\nEl trae la llave del portillo."), 2.5f); return; }
 		Finish(true);
+		return;
+	}
+	if (!bPowerOff && NearPlayer(GeneratorLoc, 230.0f))
+	{
+		CutPower();
 		return;
 	}
 	if (bVaultOpen && !bFile && NearPlayer(Cell(9, 17), 160.0f))
@@ -824,6 +832,7 @@ void ATarsisDirector::SetupSound()
 	WindSnd = LoadSnd(TEXT("viento"));
 	RainSnd = LoadSnd(TEXT("lluvia"));
 	RadioSnd = LoadSnd(TEXT("radio"));
+	HumSnd = LoadSnd(TEXT("generador"));
 	// haces de luz con niebla o lluvia: las farolas y los focos dispersan más en la niebla volumétrica
 	for (TActorIterator<ALight> It(GetWorld()); It; ++It)
 	{
@@ -840,13 +849,18 @@ void ATarsisDirector::SetupSound()
 	Atten->Attenuation.AttenuationShape = EAttenuationShape::Sphere;
 	Atten->Attenuation.AttenuationShapeExtents = FVector(150.0f, 0.0f, 0.0f);
 	Atten->Attenuation.FalloffDistance = 1500.0f;
-	for (USoundBase* L : { WindSnd.Get(), RainSnd.Get() })
+	for (USoundBase* L : { WindSnd.Get(), RainSnd.Get(), HumSnd.Get() })
 	{
 		if (USoundWave* W = Cast<USoundWave>(L)) W->bLooping = true;
 	}
 	if (WindSnd)
 	{
 		WindComp = UGameplayStatics::SpawnSound2D(this, WindSnd, 0.3f, 1.0f, 0.0f, nullptr, false, false);
+	}
+	// zumbido del generador, en 3D: te guía hasta él y se calla cuando lo cortas
+	if (HumSnd)
+	{
+		HumComp = UGameplayStatics::SpawnSoundAtLocation(this, HumSnd, GeneratorLoc + FVector(0.0f, 0.0f, 100.0f), FRotator::ZeroRotator, 0.8f, 1.0f, 0.0f, Atten, nullptr, false);
 	}
 	// gotas de lluvia: rayas finas alrededor del jugador (se ocultan bajo techo)
 	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -977,13 +991,20 @@ void ATarsisDirector::SetWeather(int32 NewWeather)
 		UExponentialHeightFogComponent* F = It->GetComponent();
 		if (!F) continue;
 		if (BaseFog < 0.0f) { BaseFog = F->FogDensity; BaseFogColor = F->FogInscatteringLuminance; }
-		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 6.0f : (Weather == 1 ? 1.8f : 1.0f))));
+		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 4.0f : (Weather == 1 ? 1.8f : 1.0f))));
 		// niebla volumétrica: las farolas y los focos dibujan haces; de noche, sin ella, la niebla casi no se ve
 		F->SetVolumetricFog(Weather != 0);
 		F->SetVolumetricFogScatteringDistribution(Weather == 2 ? 0.6f : 0.4f);
 		F->SetVolumetricFogExtinctionScale(Weather == 2 ? 2.0f : 1.0f);
 		F->SetFogInscatteringColor(Weather == 2 ? FLinearColor(0.10f, 0.11f, 0.13f) : (Weather == 1 ? FLinearColor(0.05f, 0.06f, 0.07f) : BaseFogColor));
 		break;
+	}
+	// con escalabilidad Baja el motor desactiva la niebla volumétrica (r.VolumetricFog 0) y no hay haces:
+	// con lluvia o niebla se activa desde el juego y al despejar se deja como estaba
+	if (IConsoleVariable* CV = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricFog")))
+	{
+		if (SavedVolFog < 0) SavedVolFog = CV->GetInt();
+		CV->Set(Weather != 0 ? 1 : SavedVolFog, ECVF_SetByCode);
 	}
 	if (Weather == 1 && !RainComp && RainSnd) RainComp = UGameplayStatics::SpawnSound2D(this, RainSnd, 0.45f, 1.0f, 0.0f, nullptr, false, false);
 	if (Weather != 1 && RainComp) { RainComp->Stop(); RainComp->DestroyComponent(); RainComp = nullptr; }
@@ -1031,5 +1052,77 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Best->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		ShowMessage(FString::Printf(TEXT("RADIO: \"%s, responde.\" ... Nada.\n%s va a ver que pasa donde le toca la ronda."),
 			*G->GuardName, *Best->GuardName), 4.5f);
+	}
+}
+
+// ---------------------------------------------------------------- generador
+
+void ATarsisDirector::CutPower()
+{
+	bPowerOff = true;
+	PowerT = 60.0f;
+	RepairT = 0.0f;
+	OffLights.Reset();
+	// se apagan farolas, focos de las torres y luces de dentro (el cielo y la luna siguen)
+	for (TActorIterator<ALight> It(GetWorld()); It; ++It)
+	{
+		ULocalLightComponent* L = Cast<ULocalLightComponent>(It->GetLightComponent());
+		if (!L || !L->IsVisible()) continue;
+		L->SetVisibility(false);
+		OffLights.Add(L);
+	}
+	if (HumComp) HumComp->Stop();
+	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, GeneratorLoc + FVector(0.0f, 0.0f, 80.0f), 1.0f, 0.6f, 0.0f, Atten);
+	TensionT = FMath::Max(TensionT, 60.0f);
+	// mandan al guardia de suelo más cercano a arreglarlo
+	Repairer = nullptr;
+	float BestD = TNumericLimits<float>::Max();
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Down || It->State == ETarsisGuardState::Alert || It->bTowerSentry || It->bAlly) continue;
+		const float D = FVector::Dist(It->GetActorLocation(), GeneratorLoc);
+		if (D < BestD) { BestD = D; Repairer = *It; }
+	}
+	if (Repairer)
+	{
+		Repairer->HearNoise(GeneratorLoc);
+		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
+		ShowMessage(FString::Printf(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.\nRADIO: \"%s, mira el generador.\""), *Repairer->GuardName), 5.0f);
+	}
+	else
+	{
+		ShowMessage(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia."), 4.5f);
+	}
+}
+
+void ATarsisDirector::RestorePower(bool bByGuard)
+{
+	bPowerOff = false;
+	PowerT = 0.0f;
+	for (ULightComponent* L : OffLights)
+	{
+		if (L) L->SetVisibility(true);
+	}
+	OffLights.Reset();
+	if (HumComp) HumComp->Play();
+	ShowMessage(bByGuard && Repairer
+		? FString::Printf(TEXT("VUELVE LA LUZ\n%s ha arrancado el generador."), *Repairer->GuardName)
+		: FString(TEXT("VUELVE LA LUZ\nEl generador de reserva ha entrado solo.")), 3.5f);
+	Repairer = nullptr;
+}
+
+void ATarsisDirector::PowerTick(float DeltaSeconds)
+{
+	if (!bPowerOff) return;
+	PowerT -= DeltaSeconds;
+	if (PowerT <= 0.0f) { RestorePower(false); return; }
+	// el enviado lo arregla tras 4 s junto al generador; si lo derribas antes, la luz tarda lo que le quede
+	if (Repairer && Repairer->State != ETarsisGuardState::Down && Repairer->State != ETarsisGuardState::Alert)
+	{
+		if (FVector::Dist2D(Repairer->GetActorLocation(), GeneratorLoc) < 320.0f)
+		{
+			RepairT += DeltaSeconds;
+			if (RepairT >= 4.0f) RestorePower(true);
+		}
 	}
 }

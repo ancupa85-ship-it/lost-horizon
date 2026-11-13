@@ -212,6 +212,7 @@ private:
 	bool bNoPath = false;
 	float DownT = 0.0f;
 	bool bInvestigate = false;
+	float BlendPos = 0.0f;
 	float HoldT = 0.0f;
 	void WakeUp();
 	void LookForBodies();

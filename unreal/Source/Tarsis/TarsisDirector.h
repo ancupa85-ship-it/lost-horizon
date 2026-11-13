@@ -133,6 +133,17 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	float TensionT = 0.0f;
 
+	/** Generador de la base (base.glb, «generador.001»). Con E se corta: se apagan farolas y focos hasta que alguien lo arregla. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
+	FVector GeneratorLoc = FVector(4300.0f, 1700.0f, 0.0f);
+
+	/** Sin luz: segundos que quedan hasta que vuelve sola (si nadie la arregla antes). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Luz")
+	float PowerT = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Luz")
+	bool bPowerOff = false;
+
 	/** Dónde está el guardia que te oyó por última vez (para la flecha del HUD). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	FVector HeardFrom = FVector::ZeroVector;
@@ -305,5 +316,20 @@ private:
 	UPROPERTY()
 	TSet<TObjectPtr<class ATarsisGuard>> Called;
 	FLinearColor BaseFogColor = FLinearColor::Black;
+	int32 SavedVolFog = -1;
+
+	// generador
+	UPROPERTY()
+	TObjectPtr<class USoundBase> HumSnd;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> HumComp;
+	UPROPERTY()
+	TArray<TObjectPtr<class ULightComponent>> OffLights;
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> Repairer;
+	float RepairT = 0.0f;
+	void CutPower();
+	void RestorePower(bool bByGuard);
+	void PowerTick(float DeltaSeconds);
 	bool bRamosSent = false;
 };

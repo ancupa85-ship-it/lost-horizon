@@ -201,6 +201,11 @@ void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 			Panel(X, Y - 36.0f * S, 240.0f * S, 30.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
 			Text(FString::Printf(TEXT("BASE EN GUARDIA  %d s"), FMath::CeilToInt(D->TensionT)), X + 14.0f * S, Y - 32.0f * S, FLinearColor(1.0f, 0.45f, 0.3f), 0.85f * S);
 		}
+		if (D->bPowerOff)
+		{
+			Panel(X + 250.0f * S, Y - 36.0f * S, 190.0f * S, 30.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
+			Text(FString::Printf(TEXT("SIN LUZ  %d s"), FMath::CeilToInt(D->PowerT)), X + 264.0f * S, Y - 32.0f * S, FLinearColor(0.55f, 0.75f, 1.0f), 0.85f * S);
+		}
 	}
 }
 
