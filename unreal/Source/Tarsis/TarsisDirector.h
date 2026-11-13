@@ -379,6 +379,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<class ASpotLight> GateLamp;
 	bool bLampBroken = false;
+	bool bLampReported = false;
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> LampChecker;
 	float RepairCallT = 0.0f;
 	bool bRepairerSilent = false;
 	bool ShootLamp(const FVector& From, const FVector& Fwd, float MaxT);

@@ -252,6 +252,15 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	RadioTick(DeltaSeconds);
 	PowerTick(DeltaSeconds);
 	BarrierTick(DeltaSeconds);
+	// el que fue a mirar el farol roto encuentra los cristales y avisa: la base se pone en guardia un rato
+	if (bLampBroken && !bLampReported && LampChecker && LampChecker->State != ETarsisGuardState::Down
+		&& GateLamp && FVector::Dist2D(LampChecker->GetActorLocation(), GateLamp->GetActorLocation()) < 350.0f)
+	{
+		bLampReported = true;
+		TensionT = FMath::Max(TensionT, 60.0f);
+		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, LampChecker->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
+		ShowMessage(FString::Printf(TEXT("RADIO, %s: \"Farol roto en el control. Cristales por el suelo... esto no es el viento.\"\nLA BASE SE PONE EN GUARDIA."), *LampChecker->GuardName.ToUpper()), 4.5f);
+	}
 	if (HeardT > 0.0f) HeardT -= DeltaSeconds;
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
 	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
@@ -363,6 +372,7 @@ FString ATarsisDirector::InteractPrompt() const
 	{
 		if (IsIbarra(G) && !bKey) return TEXT("E   QUITARLE LA LLAVE");
 		if (G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bVetKey && !bVetOpen) return TEXT("E   QUITARLE LA LLAVE DEL BOTIQUIN");
+		if (G->bDarted) return TEXT("E   RECUPERAR EL DARDO");
 		return TEXT("E   ARRASTRAR (escondelo en la sombra)");
 	}
 	if (!bJefOpen && NearPlayer(Cell(4, 15), 190.0f)) return bKey ? TEXT("E   ABRIR LA JEFATURA") : TEXT("JEFATURA: CERRADA CON LLAVE");
@@ -420,6 +430,13 @@ void ATarsisDirector::Interact()
 		{
 			bKey = true;
 			ShowMessage(TEXT("LLAVE DE LA JEFATURA\nSe la quitas a Ibarra del cinturon. Ahora puedes arrastrarlo a la sombra (E)."), 5.0f);
+			return;
+		}
+		if (G->bDarted)
+		{
+			G->bDarted = false;
+			++Darts;
+			ShowMessage(FString::Printf(TEXT("DARDO RECUPERADO\nSe lo sacas del cuello a %s. Tienes %d."), *G->GuardName, Darts), 3.0f);
 			return;
 		}
 		StartDrag(G);
@@ -744,6 +761,7 @@ void ATarsisDirector::ShootDart()
 		return;
 	}
 	Best->KnockOut();
+	Best->bDarted = true;
 	++Takedowns;
 	ShowMessage(FString::Printf(TEXT("%s DORMIDO\nTe quedan %d dardos."), *Best->GuardName.ToUpper(), Darts), 2.5f);
 }
@@ -1165,9 +1183,14 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 {
 	bPowerOff = false;
 	PowerT = 0.0f;
+	// arreglado por el guardia, vuelven todas; con el generador de reserva, solo una de cada dos (las otras se quedan
+	// apagadas el resto de la partida): después del apagón la base queda distinta, con zonas nuevas de sombra
+	int32 Idx = 0;
 	for (ULightComponent* L : OffLights)
 	{
-		if (L && !(bLampBroken && GateLamp && L == GateLamp->GetLightComponent())) L->SetVisibility(true);
+		if (!L || (bLampBroken && GateLamp && L == GateLamp->GetLightComponent())) continue;
+		const bool bOn = bByGuard || (Idx++ % 2 == 0);
+		if (bOn) L->SetVisibility(true);
 	}
 	OffLights.Reset();
 	PendingOff.Reset();
@@ -1177,7 +1200,7 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 	if (HumComp) HumComp->Play();
 	ShowMessage(bByGuard && Repairer
 		? FString::Printf(TEXT("VUELVE LA LUZ\n%s ha arrancado el generador."), *Repairer->GuardName)
-		: FString(TEXT("VUELVE LA LUZ\nEl generador de reserva ha entrado solo.")), 3.5f);
+		: FString(TEXT("VUELVE LA LUZ (A MEDIAS)\nEl generador de reserva no da para todo: la mitad de las farolas se quedan apagadas.")), 4.0f);
 	Repairer = nullptr;
 }
 
@@ -1228,7 +1251,7 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 			const FVector G = GeneratorLoc;
 			Near.Sort([G](const ATarsisGuard& A, const ATarsisGuard& B) { return FVector::DistSquared(A.GetActorLocation(), G) < FVector::DistSquared(B.GetActorLocation(), G); });
 			for (int32 i = 0; i < Near.Num() && i < 2; ++i) Near[i]->Alarm(GeneratorLoc);
-			ShowMessage(FString::Printf(TEXT("RADIO: \"%s, como va eso?\" ... Nada.\nEntra el generador de reserva y mandan gente corriendo al generador. LA BASE ESTA EN ALERTA."), *Name), 5.0f);
+			ShowMessage(FString::Printf(TEXT("RADIO: \"%s, como va eso?\" ... Nada.\nEntra el generador de reserva (solo la mitad de las luces) y mandan gente corriendo al generador. LA BASE ESTA EN ALERTA."), *Name), 5.0f);
 			return;
 		}
 	}
@@ -1402,6 +1425,7 @@ bool ATarsisDirector::ShootLamp(const FVector& From, const FVector& Fwd, float M
 		if (D < BestD) { BestD = D; Best = *It; }
 	}
 	if (Best) Best->HearNoise(FVector(P.X, P.Y, ExitBarrierLoc.Z));
+	LampChecker = Best;
 	ShowMessage(FString::Printf(TEXT("FAROL ROTO\nEl control queda a oscuras.%s Te quedan %d dardos."),
 		Best ? *FString::Printf(TEXT(" %s ha oido los cristales y viene a mirar."), *Best->GuardName) : TEXT(""), Darts), 4.0f);
 	return true;

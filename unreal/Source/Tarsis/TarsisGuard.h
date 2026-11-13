@@ -198,6 +198,9 @@ public:
 	void StopRepair();
 	bool IsRepairing() const { return bRepairing; }
 
+	/** Dormido con un dardo: se le puede quitar (E) y vuelve a la pistola. */
+	bool bDarted = false;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
