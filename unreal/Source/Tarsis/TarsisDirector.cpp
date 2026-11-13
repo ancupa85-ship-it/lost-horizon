@@ -459,7 +459,18 @@ void ATarsisDirector::ThrowStone()
 		const FVector N = P + Vel * 0.05f;
 		Vel.Z -= 980.0f * 0.05f;
 		FHitResult Hit;
-		if (GetWorld()->LineTraceSingleByChannel(Hit, P, N, ECC_Visibility, Q)) { bHit = true; P = Hit.ImpactPoint; }
+		if (GetWorld()->LineTraceSingleByChannel(Hit, P, N, ECC_Visibility, Q))
+		{
+			bHit = true;
+			P = Hit.ImpactPoint;
+			// si da en una pared (o el canto de algo), rebota un poco hacia fuera y cae al suelo: no se queda pegada en el aire
+			if (Hit.ImpactNormal.Z < 0.7f)
+			{
+				const FVector Out = P + Hit.ImpactNormal.GetSafeNormal2D() * 12.0f;
+				FHitResult Down;
+				P = GetWorld()->LineTraceSingleByChannel(Down, Out, Out - FVector(0.0f, 0.0f, 3000.0f), ECC_Visibility, Q) ? Down.ImpactPoint : Out;
+			}
+		}
 		else P = N;
 	}
 	StoneT = 1.2f;
