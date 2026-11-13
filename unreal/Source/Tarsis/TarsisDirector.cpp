@@ -16,6 +16,13 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/CapsuleComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundWave.h"
+#include "Sound/SoundAttenuation.h"
+#include "Components/AudioComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Engine/ExponentialHeightFog.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -26,7 +33,9 @@ void ATarsisDirector::BeginPlay()
 {
 	Super::BeginPlay();
 	SetupMission();
+	SetupSound();
 	SetupPlayer();
+	SetWeather(Weather);
 }
 
 void ATarsisDirector::SetupPlayer()
@@ -47,6 +56,7 @@ void ATarsisDirector::SetupPlayer()
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ATarsisDirector::Interact);
 		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ATarsisDirector::ThrowStone);
 		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
+		InputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ATarsisDirector::CycleWeather);
 		InputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &ATarsisDirector::SprintOn);
 		InputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &ATarsisDirector::SprintOff);
 		{
@@ -214,6 +224,9 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (DartT > 0.0f) DartT -= DeltaSeconds;
 	NoiseTick(C, DeltaSeconds);
 	BobTick(C, DeltaSeconds);
+	SoundTick(C, DeltaSeconds);
+	RainTick(DeltaSeconds);
+	if (HeardT > 0.0f) HeardT -= DeltaSeconds;
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
 	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
 	{
@@ -557,6 +570,7 @@ void ATarsisDirector::ThrowStone()
 	}
 	StoneT = 1.2f;
 	LastStone = P;
+	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, P, 1.0f, FMath::FRandRange(0.9f, 1.1f), 0.0f, Atten);
 	if (UStaticMeshComponent* S = AddBlock(P + FVector(0.0f, 0.0f, 3.0f), FVector(0.06f, 0.05f, 0.05f), FLinearColor(0.3f, 0.29f, 0.27f), false))
 	{
 		Stones.Add(S);
@@ -664,6 +678,7 @@ void ATarsisDirector::ShootDart()
 	const FVector Fwd = Rot.Vector();
 	--Darts;
 	DartT = 0.8f;
+	if (DartSnd) UGameplayStatics::PlaySound2D(this, DartSnd, 0.7f);
 	// el guardia más cercano cuyo cuerpo cruza la línea de tiro (a menos de 35 m), sin nada en medio
 	ATarsisGuard* Best = nullptr;
 	float BestT = 3500.0f;
@@ -750,15 +765,9 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisSuelo), true, this);
 		Q.AddIgnoredActor(C);
 		const FVector P = C->GetActorLocation();
-		bIndoor = false;
-		if (GetWorld()->LineTraceSingleByChannel(Hit, P, P - FVector(0.0f, 0.0f, 250.0f), ECC_Visibility, Q))
-		{
-			if (const UStaticMeshComponent* SM = Cast<UStaticMeshComponent>(Hit.GetComponent()))
-			{
-				if (SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().Contains(TEXT("suelo_int"))) bIndoor = true;
-			}
-		}
-		const float Surf = bIndoor ? 0.6f : 1.0f;
+		bIndoor = IndoorAt(P, C);
+		// dentro suena menos; con lluvia, el agua tapa los pasos
+		const float Surf = (bIndoor ? 0.6f : 1.0f) * (Weather == 1 && !bIndoor ? 0.6f : 1.0f);
 		PlayerNoise = (C->bIsCrouched || bAir || Speed < 60.0f) ? 0.0f : Speed * 1.15f * Surf;
 		if (PlayerNoise > 0.0f)
 		{
@@ -766,6 +775,7 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 			{
 				if (FVector::Dist(It->GetActorLocation(), P) > PlayerNoise) continue;
 				if (It->Visibility(C) > 0.0f) continue;   // si ya te ve, manda la vista
+				if (It->State == ETarsisGuardState::Patrol || It->State == ETarsisGuardState::Return) HeardT = 2.0f;
 				It->HearNoise(P);
 			}
 		}
@@ -789,4 +799,173 @@ void ATarsisDirector::BobTick(ACharacter* C, float DeltaSeconds)
 	const FVector Next = FMath::VInterpTo(BobApplied, Want, DeltaSeconds, 10.0f);
 	Cam->AddRelativeLocation(Next - BobApplied);
 	BobApplied = Next;
+}
+
+// ---------------------------------------------------------------- sonido y clima
+
+static USoundBase* LoadSnd(const TCHAR* Name)
+{
+	return LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/Tarsis/Sonidos/%s.%s"), Name, Name));
+}
+
+void ATarsisDirector::SetupSound()
+{
+	for (int32 i = 1; i <= 3; ++i)
+	{
+		if (USoundBase* S = LoadSnd(*FString::Printf(TEXT("paso_grava_%d"), i))) StepGravel.Add(S);
+		if (USoundBase* S = LoadSnd(*FString::Printf(TEXT("paso_cemento_%d"), i))) StepConcrete.Add(S);
+	}
+	StoneSnd = LoadSnd(TEXT("piedra"));
+	DartSnd = LoadSnd(TEXT("dardo"));
+	WindSnd = LoadSnd(TEXT("viento"));
+	RainSnd = LoadSnd(TEXT("lluvia"));
+	// atenuación: se oye en 3D y se apaga hacia los 15 m (los pasos de un guardia tras una pared, la piedra al caer)
+	Atten = NewObject<USoundAttenuation>(this);
+	Atten->Attenuation.bAttenuate = true;
+	Atten->Attenuation.bSpatialize = true;
+	Atten->Attenuation.AttenuationShape = EAttenuationShape::Sphere;
+	Atten->Attenuation.AttenuationShapeExtents = FVector(150.0f, 0.0f, 0.0f);
+	Atten->Attenuation.FalloffDistance = 1500.0f;
+	for (USoundBase* L : { WindSnd.Get(), RainSnd.Get() })
+	{
+		if (USoundWave* W = Cast<USoundWave>(L)) W->bLooping = true;
+	}
+	if (WindSnd)
+	{
+		WindComp = UGameplayStatics::SpawnSound2D(this, WindSnd, 0.3f, 1.0f, 0.0f, nullptr, false, false);
+	}
+	// gotas de lluvia: rayas finas alrededor del jugador (se ocultan bajo techo)
+	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (Cyl)
+	{
+		RainISM = NewObject<UInstancedStaticMeshComponent>(this);
+		RainISM->SetStaticMesh(Cyl);
+		RainISM->SetMobility(EComponentMobility::Movable);
+		RainISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		RainISM->SetCastShadow(false);
+		RainISM->SetCanEverAffectNavigation(false);
+		if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"))) RainISM->SetMaterial(0, Base);
+		RainISM->RegisterComponent();
+		if (UMaterialInstanceDynamic* M = RainISM->CreateDynamicMaterialInstance(0)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.35f, 0.38f, 0.42f));
+		TArray<FTransform> T;
+		for (int32 i = 0; i < 300; ++i)
+		{
+			Drops.Add(FVector(FMath::FRandRange(-1200.0f, 1200.0f), FMath::FRandRange(-1200.0f, 1200.0f), FMath::FRandRange(-200.0f, 900.0f)));
+			T.Add(FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(0.004f, 0.004f, 0.35f)));
+		}
+		RainISM->AddInstances(T, false, true);
+		RainISM->SetVisibility(false);
+	}
+}
+
+bool ATarsisDirector::IndoorAt(const FVector& P, const AActor* Ignore) const
+{
+	FHitResult Hit;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisSuelo), true, this);
+	if (Ignore) Q.AddIgnoredActor(Ignore);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, P, P - FVector(0.0f, 0.0f, 250.0f), ECC_Visibility, Q))
+	{
+		if (const UStaticMeshComponent* SM = Cast<UStaticMeshComponent>(Hit.GetComponent()))
+		{
+			return SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().Contains(TEXT("suelo_int"));
+		}
+	}
+	return false;
+}
+
+void ATarsisDirector::StepSound(const FVector& Where, bool bIndoorStep, float Volume, bool b3D)
+{
+	const TArray<TObjectPtr<USoundBase>>& Set = bIndoorStep ? StepConcrete : StepGravel;
+	if (Set.Num() == 0) return;
+	USoundBase* S = Set[FMath::RandRange(0, Set.Num() - 1)];
+	const float Pitch = FMath::FRandRange(0.9f, 1.1f);
+	if (b3D) UGameplayStatics::PlaySoundAtLocation(this, S, Where, Volume, Pitch, 0.0f, Atten);
+	else UGameplayStatics::PlaySound2D(this, S, Volume, Pitch);
+}
+
+void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
+{
+	// tus pasos: uno cada ~1,4 m (agachado, flojito)
+	const float Speed = C->GetCharacterMovement()->IsFalling() ? 0.0f : C->GetVelocity().Size2D();
+	if (Speed > 40.0f)
+	{
+		PlayerStride += Speed * DeltaSeconds;
+		const float Stride = C->bIsCrouched ? 90.0f : (bSprint ? 190.0f : 140.0f);
+		if (PlayerStride >= Stride)
+		{
+			PlayerStride = 0.0f;
+			StepSound(C->GetActorLocation(), bIndoor, C->bIsCrouched ? 0.15f : (bSprint ? 0.8f : 0.45f), false);
+		}
+	}
+	// pasos de los guardias, en 3D: los oyes acercarse aunque haya una pared
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Down || It->bTowerSentry) continue;
+		const float GS = It->GetVelocity().Size2D();
+		if (GS < 40.0f) continue;
+		const TObjectPtr<ATarsisGuard> K(*It);
+		float& D = GuardStride.FindOrAdd(K);
+		D += GS * DeltaSeconds;
+		if (D < (GS > 300.0f ? 170.0f : 120.0f)) continue;
+		D = 0.0f;
+		if (FVector::Dist(It->GetActorLocation(), C->GetActorLocation()) > 1600.0f) continue;
+		StepSound(It->GetActorLocation(), IndoorAt(It->GetActorLocation(), *It), GS > 300.0f ? 1.0f : 0.75f, true);
+	}
+	// viento y lluvia: más bajos bajo techo
+	if (WindComp) WindComp->SetVolumeMultiplier(bIndoor ? 0.12f : (Weather == 1 ? 0.2f : 0.3f));
+	if (RainComp) RainComp->SetVolumeMultiplier(bIndoor ? 0.15f : 0.45f);
+}
+
+void ATarsisDirector::RainTick(float DeltaSeconds)
+{
+	if (!RainISM) return;
+	const bool bShow = Weather == 1 && !bIndoor;
+	if (RainISM->IsVisible() != bShow) RainISM->SetVisibility(bShow);
+	if (!bShow) return;
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC) return;
+	FVector Loc; FRotator Rot;
+	PC->GetPlayerViewPoint(Loc, Rot);
+	TArray<FTransform> T;
+	T.Reserve(Drops.Num());
+	for (FVector& D : Drops)
+	{
+		D.Z -= 1300.0f * DeltaSeconds;
+		if (D.Z < -250.0f) D = FVector(FMath::FRandRange(-1200.0f, 1200.0f), FMath::FRandRange(-1200.0f, 1200.0f), 900.0f);
+		T.Add(FTransform(FRotator::ZeroRotator, Loc + D, FVector(0.004f, 0.004f, 0.35f)));
+	}
+	RainISM->BatchUpdateInstancesTransforms(0, T, true, true, true);
+}
+
+void ATarsisDirector::CycleWeather()
+{
+	SetWeather((Weather + 1) % 3);
+	static const TCHAR* Texts[] = {
+		TEXT("DESPEJADO\nLa vista y el oido de los guardias, normales."),
+		TEXT("LLUVIA\nLos guardias ven menos de lejos y el agua tapa tus pasos fuera."),
+		TEXT("NIEBLA\nLos guardias ven mucho menos de lejos; tus pasos se oyen igual.") };
+	ShowMessage(Texts[Weather], 3.5f);
+}
+
+void ATarsisDirector::SetWeather(int32 NewWeather)
+{
+	Weather = FMath::Clamp(NewWeather, 0, 2);
+	const float ViewMul = Weather == 1 ? 0.75f : (Weather == 2 ? 0.55f : 1.0f);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		const TObjectPtr<ATarsisGuard> K(*It);
+		float& B = BaseView.FindOrAdd(K, It->ViewDistance);
+		It->ViewDistance = B * ViewMul;
+	}
+	// niebla de la escena (ExponentialHeightFog del nivel): más espesa con lluvia y mucho más con niebla
+	for (TActorIterator<AExponentialHeightFog> It(GetWorld()); It; ++It)
+	{
+		UExponentialHeightFogComponent* F = It->GetComponent();
+		if (!F) continue;
+		if (BaseFog < 0.0f) BaseFog = F->FogDensity;
+		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 6.0f : (Weather == 1 ? 1.8f : 1.0f))));
+		break;
+	}
+	if (Weather == 1 && !RainComp && RainSnd) RainComp = UGameplayStatics::SpawnSound2D(this, RainSnd, 0.45f, 1.0f, 0.0f, nullptr, false, false);
+	if (Weather != 1 && RainComp) { RainComp->Stop(); RainComp->DestroyComponent(); RainComp = nullptr; }
 }

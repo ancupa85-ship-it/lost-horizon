@@ -169,6 +169,16 @@ void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 		PC = Nz > 700.0f ? FLinearColor(1.0f, 0.5f, 0.25f) : FLinearColor(0.95f, 0.8f, 0.3f);
 	}
 	Text(Post, X + 14.0f * S, Y + 58.0f * S, PC, 0.85f * S);
+	if (D)
+	{
+		static const TCHAR* Wx[] = { TEXT("DESPEJADO"), TEXT("LLUVIA"), TEXT("NIEBLA") };
+		Text(FString::Printf(TEXT("%s (Y)"), Wx[FMath::Clamp(D->Weather, 0, 2)]), X + W - 120.0f * S, Y + 10.0f * S, FLinearColor(0.6f, 0.7f, 0.8f), 0.7f * S);
+		if (D->HeardT > 0.0f)
+		{
+			Panel(X, Y - 40.0f * S, 200.0f * S, 32.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f * FMath::Min(1.0f, D->HeardT)));
+			Text(TEXT("TE HAN OIDO"), X + 14.0f * S, Y - 36.0f * S, FLinearColor(1.0f, 0.55f, 0.25f, FMath::Min(1.0f, D->HeardT)), 0.95f * S);
+		}
+	}
 }
 
 void ATarsisHUD::DrawAlert()

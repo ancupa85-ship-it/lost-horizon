@@ -122,6 +122,17 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	bool bSprint = false;
 
+	/** Clima: 0 despejado, 1 lluvia (te ven menos de lejos y tus pasos se oyen menos), 2 niebla (te ven mucho menos). Tecla Y. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Clima")
+	int32 Weather = 0;
+
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void SetWeather(int32 NewWeather);
+
+	/** Segundos que queda el aviso «TE HAN OIDO». */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	float HeardT = 0.0f;
+
 	/** Q: lanza una piedra hacia donde miras; los guardias a menos de NoiseRadius van a mirar. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void ThrowStone();
@@ -240,8 +251,43 @@ private:
 	float BaseWalk = 0.0f;
 	bool bIndoor = false;
 	void SprintOn();
+	void CycleWeather();
 	void SprintOff();
 	void NoiseTick(class ACharacter* C, float DeltaSeconds);
 	void BobTick(class ACharacter* C, float DeltaSeconds);
+
+	// sonido (tools/unreal/sonidos.py los importa en /Game/Tarsis/Sonidos)
+	UPROPERTY()
+	TArray<TObjectPtr<class USoundBase>> StepGravel;
+	UPROPERTY()
+	TArray<TObjectPtr<class USoundBase>> StepConcrete;
+	UPROPERTY()
+	TObjectPtr<class USoundBase> StoneSnd;
+	UPROPERTY()
+	TObjectPtr<class USoundBase> DartSnd;
+	UPROPERTY()
+	TObjectPtr<class USoundBase> WindSnd;
+	UPROPERTY()
+	TObjectPtr<class USoundBase> RainSnd;
+	UPROPERTY()
+	TObjectPtr<class USoundAttenuation> Atten;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> WindComp;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> RainComp;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, float> GuardStride;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, float> BaseView;
+	UPROPERTY()
+	TObjectPtr<class UInstancedStaticMeshComponent> RainISM;
+	TArray<FVector> Drops;
+	float BaseFog = -1.0f;
+	float PlayerStride = 0.0f;
+	void SetupSound();
+	void StepSound(const FVector& Where, bool bIndoorStep, float Volume, bool b3D);
+	bool IndoorAt(const FVector& P, const AActor* Ignore) const;
+	void SoundTick(class ACharacter* C, float DeltaSeconds);
+	void RainTick(float DeltaSeconds);
 	bool bRamosSent = false;
 };
