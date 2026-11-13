@@ -258,7 +258,12 @@ public:
 	int32 MenuSel = 0;
 
 	/** Líneas del menú tal como se ven (con el valor de cada opción). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Menu")
 	TArray<FString> MenuLines() const;
+
+	/** Pruebas automáticas: pulsa una tecla del menú por su nombre («P», «Down», «Right», «Enter»...) sin teclado real. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void PressKey(FName Key) { MenuKey(FKey(Key)); }
 
 	/** Opciones: sensibilidad del ratón (0,2-3), invertir Y, volumen (0-1), calidad (0 baja - 3 épica) y contador de fps. */
 	float OptSensitivity = 1.0f;

@@ -1610,7 +1610,7 @@ void ATarsisDirector::MenuKey(FKey Key)
 {
 	if (Key == EKeys::P || Key == EKeys::Escape)
 	{
-		if (bKeypad && Key == EKeys::Escape) { bKeypad = false; return; }   // Esc cierra antes el teclado del archivo
+		if (bKeypad && Key == EKeys::Escape) { bKeypad = false; KeypadInput.Reset(); return; }   // Esc cierra antes el teclado del archivo (y borra lo tecleado)
 		if (!bCine || bMenu) TogglePause();
 		return;
 	}
@@ -1681,6 +1681,13 @@ void ATarsisDirector::ApplyOptions()
 		{
 			G->SetOverallScalabilityLevel(OptQuality);
 			G->ApplySettings(false);
+			// SetWeather fija r.VolumetricFog por código (pisa a la escalabilidad): con despejado, que siga a la calidad
+			// (Alta o Épica con niebla volumétrica, Baja y Media sin ella)
+			if (IConsoleVariable* CV = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricFog")))
+			{
+				SavedVolFog = OptQuality >= 2 ? 1 : 0;
+				if (Weather == 0) CV->Set(SavedVolFog, ECVF_SetByCode);
+			}
 		}
 	}
 }

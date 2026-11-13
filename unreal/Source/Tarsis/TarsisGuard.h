@@ -27,6 +27,8 @@ UCLASS()
 class ATarsisGuard : public ACharacter
 {
 	GENERATED_BODY()
+	// el director pone a los guardias en su ronda al cargar un punto de control (SetState es privado)
+	friend class ATarsisDirector;
 
 public:
 	ATarsisGuard();
