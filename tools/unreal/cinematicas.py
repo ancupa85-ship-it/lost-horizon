@@ -109,8 +109,9 @@ secuencia('LS_Entrada', 14, claves, focal=22.0)
 
 # ---- salida (G, celda 34,26): de cerca del control a un plano alto de la base que se oscurece
 salida = unreal.Vector(6900, 5300, 120)
-p0 = salida + unreal.Vector(500, 700, 220)
-p1 = salida + unreal.Vector(1400, 1800, 700)
+# desde dentro, por el pasillo de la fila 26 hacia la barrera (fuera, el muro perimetral z 465 tapa; desde el noroeste, la torre 2)
+p0 = unreal.Vector(6150, 5200, 230)
+p1 = unreal.Vector(6000, 5300, 600)
 p2 = unreal.Vector(10500, 8800, 2600)
 secuencia('LS_Salida', 10, [
     (0.0, p0, mira(p0, salida)),

@@ -24,6 +24,7 @@
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/Light.h"
+#include "Engine/SpotLight.h"
 #include "Components/SpotLightComponent.h"
 #include "Components/PointLightComponent.h"
 #include "HAL/IConsoleManager.h"
@@ -758,6 +759,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	{
 		// en el control, el de la garita levanta la barrera y mira hacia otro lado (sale en el plano de LS_Salida)
 		BarrierT = 0.001f;
+		if (GateLamp && GateLamp->GetLightComponent()) GateLamp->GetLightComponent()->SetVisibility(true);   // que el plano final se vea aunque cortaras la luz
 		ATarsisGuard* Best = nullptr;
 		float BestD = TNumericLimits<float>::Max();
 		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
@@ -1144,7 +1146,7 @@ void ATarsisDirector::CutPower()
 		Repairer->SetFlashlightShadows(true);   // su cono recorta cajas y muros: te puedes esconder detrás
 		Repairer->HearNoise(GeneratorLoc);
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
-		ShowMessage(FString::Printf(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.\nRADIO: \"%s, mira el generador.\""), *Repairer->GuardName), 5.0f);
+		ShowMessage(FString::Printf(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.\nRADIO: \"Se ha ido la luz en toda la base! %s, mira el generador.\""), *Repairer->GuardName), 5.0f);
 	}
 	else
 	{
@@ -1300,6 +1302,27 @@ void ATarsisDirector::SetupBarrier()
 	BarrierPost = AddBlock(ExitBarrierLoc + FVector(0.0f, 0.0f, 55.0f), FVector(0.18f, 0.18f, 1.1f), FLinearColor(0.15f, 0.15f, 0.15f), false);
 	BarrierArm = AddBlock(ExitBarrierLoc, FVector(ExitBarrierLength / 100.0f, 0.08f, 0.08f), FLinearColor(0.75f, 0.08f, 0.06f), false);   // sin colisión: no corta la salida
 	BarrierTick(0.0f);
+	// farol de la garita: el control es un sitio iluminado y vigilado (se cruza por la sombra) y se ve en el final.
+	// Es un ALight del nivel, así que cuenta para LightAt y se apaga con el generador.
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const FVector LampLoc = ExitBarrierLoc + R.RotateVector(FVector(ExitBarrierLength * 0.4f, -60.0f, 0.0f)) + FVector(0.0f, 0.0f, 380.0f);
+	GateLamp = GetWorld()->SpawnActor<ASpotLight>(LampLoc, FRotator(-90.0f, 0.0f, 0.0f), P);
+	if (GateLamp)
+	{
+		if (USceneComponent* Root = GateLamp->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
+		if (USpotLightComponent* L = Cast<USpotLightComponent>(GateLamp->GetLightComponent()))
+		{
+			L->SetIntensityUnits(ELightUnits::Lumens);
+			L->SetIntensity(3000.0f);
+			L->SetAttenuationRadius(1500.0f);
+			L->SetOuterConeAngle(55.0f);
+			L->SetInnerConeAngle(35.0f);
+			L->SetLightColor(FLinearColor(1.0f, 0.78f, 0.5f));
+			L->SetCastShadows(false);
+			L->SetVolumetricScatteringIntensity(1.5f);
+		}
+	}
 }
 
 void ATarsisDirector::BarrierTick(float DeltaSeconds)

@@ -146,13 +146,13 @@ public:
 
 	/** Barrera del control de salida (pie del poste), su orientación y largo: se levanta en el final por la salida. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
-	FVector ExitBarrierLoc = FVector(6700.0f, 5100.0f, 0.0f);
+	FVector ExitBarrierLoc = FVector(6780.0f, 5060.0f, 0.0f);   // atraviesa el pasillo que lleva a G
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
-	float ExitBarrierYaw = 0.0f;
+	float ExitBarrierYaw = 90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
-	float ExitBarrierLength = 400.0f;
+	float ExitBarrierLength = 390.0f;
 
 	/** Cinemáticas de Sequencer (tools/unreal/cinematicas.py las crea en /Game/Tarsis/Cine). Sin ellas, el juego va igual. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
@@ -376,6 +376,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UStaticMeshComponent> BarrierPost;
 	float BarrierT = 0.0f;
+	UPROPERTY()
+	TObjectPtr<class ASpotLight> GateLamp;
 	void SetupBarrier();
 	void BarrierTick(float DeltaSeconds);
 
