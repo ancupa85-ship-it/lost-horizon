@@ -154,6 +154,21 @@ void ATarsisGuard::Alarm(const FVector& Where)
 	SetState(ETarsisGuardState::Alert);
 }
 
+void ATarsisGuard::GoTo(const FVector& Where)
+{
+	PatrolPoints.Reset();
+	PatrolPoints.Add(Where);
+	PatrolWaits.Reset();
+	PointIndex = 0;
+	if (State != ETarsisGuardState::Down) SetState(ETarsisGuardState::Return);
+}
+
+void ATarsisGuard::Hold(float Seconds)
+{
+	HoldT = Seconds;
+	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+}
+
 void ATarsisGuard::HearNoise(const FVector& Where)
 {
 	if (bTowerSentry || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
@@ -213,7 +228,7 @@ void ATarsisGuard::WakeUp()
 
 void ATarsisGuard::LookForBodies()
 {
-	if (State == ETarsisGuardState::Alert) return;
+	if (State == ETarsisGuardState::Alert || bAlly) return;
 	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
@@ -391,7 +406,7 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 
 float ATarsisGuard::Visibility(const AActor* Target) const
 {
-	if (!Target || State == ETarsisGuardState::Down) return 0.0f;
+	if (!Target || State == ETarsisGuardState::Down || bAlly) return 0.0f;
 	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
 	const FVector Aim = Target->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f);
 	const float D = FVector::Dist(Eye, Aim);
@@ -457,6 +472,12 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		return;
 	}
 	UpdateAnim();
+	if (HoldT > 0.0f)
+	{
+		HoldT -= DeltaSeconds;
+		if (HoldT <= 0.0f) MoveDest = FVector(1e9f);   // que vuelva a pedir el camino
+		return;
+	}
 	LookForBodies();
 
 	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);

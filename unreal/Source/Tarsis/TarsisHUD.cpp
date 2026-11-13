@@ -92,11 +92,23 @@ void ATarsisHUD::DrawObjective(ATarsisDirector* D)
 	const float S = Canvas->ClipY / 1080.0f;
 	const float X = 32.0f * S, Y = 28.0f * S;
 	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
-	float W = 0.0f, H = 0.0f;
+	const FString Side = D->SideObjective();
+	const FString SideT = Side.IsEmpty() ? FString() : TEXT("SECUNDARIA: ") + Side;
+	float W = 0.0f, H = 0.0f, W2 = 0.0f;
 	if (F) GetTextSize(O, W, H, F, 0.9f * S);
-	Panel(X, Y, FMath::Max(W, 140.0f * S) + 28.0f * S, 62.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f));
+	if (F && !SideT.IsEmpty()) GetTextSize(SideT, W2, H, F, 0.75f * S);
+	Panel(X, Y, FMath::Max(FMath::Max(W, W2), 140.0f * S) + 28.0f * S, (SideT.IsEmpty() ? 62.0f : 88.0f) * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f));
 	Text(D->bDone ? TEXT("FIN") : TEXT("OBJETIVO"), X + 14.0f * S, Y + 6.0f * S, FLinearColor(0.95f, 0.8f, 0.4f), 0.8f * S);
 	Text(O, X + 14.0f * S, Y + 30.0f * S, FLinearColor(1.0f, 1.0f, 1.0f), 0.9f * S);
+	if (!SideT.IsEmpty()) Text(SideT, X + 14.0f * S, Y + 60.0f * S, FLinearColor(0.7f, 0.85f, 1.0f), 0.75f * S);
+	// pistola de dardos, abajo a la derecha
+	if (D->bVetOpen)
+	{
+		const FString A = FString::Printf(TEXT("DARDOS  %d   (clic izquierdo)"), D->Darts);
+		const float AX = Canvas->ClipX - 332.0f * S, AY = Canvas->ClipY - 76.0f * S;
+		Panel(AX, AY, 300.0f * S, 44.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f));
+		Text(A, AX + 14.0f * S, AY + 10.0f * S, D->Darts > 0 ? FLinearColor(0.85f, 0.95f, 0.75f) : FLinearColor(0.6f, 0.6f, 0.6f), 0.9f * S);
+	}
 }
 
 void ATarsisHUD::DrawPrompt(ATarsisDirector* D)

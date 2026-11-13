@@ -96,6 +96,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void HearNoise(const FVector& Where);
 
+	/** De tu parte (Ramos, si aceptas llevarlo contigo): no te ve ni da la voz por los cuerpos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Estado")
+	bool bAlly = false;
+
+	/** Deja su ronda y se va a Where, donde se queda (Ramos al portillo de la marisma). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void GoTo(const FVector& Where);
+
+	/** Se queda quieto Seconds segundos (mientras habla contigo). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Hold(float Seconds);
+
 	/** Marcado con los prismáticos: el HUD muestra su nombre y estado aunque esté detrás de una pared. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Estado")
 	bool bMarked = false;
@@ -180,6 +192,7 @@ private:
 	bool bNoPath = false;
 	float DownT = 0.0f;
 	bool bInvestigate = false;
+	float HoldT = 0.0f;
 	void WakeUp();
 	void LookForBodies();
 

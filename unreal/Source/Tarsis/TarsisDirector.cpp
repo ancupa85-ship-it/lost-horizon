@@ -46,6 +46,10 @@ void ATarsisDirector::SetupPlayer()
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ATarsisDirector::Interact);
 		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ATarsisDirector::ThrowStone);
 		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
+		{
+			FInputKeyBinding& B = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATarsisDirector::ShootDart);
+			B.bConsumeInput = false;
+		}
 		// teclado del archivo: cifras de arriba y del teclado numérico, y Retroceso para borrar
 		const FKey Keys[] = { EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six,
 			EKeys::Seven, EKeys::Eight, EKeys::Nine, EKeys::NumPadZero, EKeys::NumPadOne, EKeys::NumPadTwo,
@@ -77,6 +81,7 @@ void ATarsisDirector::Captured(APawn* Player)
 	ACharacter* C = Cast<ACharacter>(Player);
 	if (C && C->bIsCrouched) C->UnCrouch();
 	AController* Ctl = Player->GetController();
+	bChoice = false;
 	if (Captures == 1 && !CellSpot.IsZero())
 	{
 		const FRotator R(0.0f, CellYaw, 0.0f);
@@ -202,12 +207,18 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	DragTick();
 	if (bKeypad && !NearPlayer(Cell(6, 17), 260.0f)) { bKeypad = false; KeypadInput.Reset(); }
 	// salida con el expediente
-	if (bFile && !bDone && NearPlayer(Cell(34, 26), 260.0f))
+	if (bFile && !bDone && NearPlayer(Cell(34, 26), 260.0f)) Finish(false);
+	if (DartT > 0.0f) DartT -= DeltaSeconds;
+	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
+	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
 	{
-		bDone = true;
-		const int32 Secs = FMath::FloorToInt(MissionTime);
-		ShowMessage(FString::Printf(TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.\nTiempo %d:%02d   Capturas %d   Derribos %d"),
-			Secs / 60, Secs % 60, Captures, Takedowns), 15.0f);
+		if (bChoice && FVector::Dist2D(R->GetActorLocation(), C->GetActorLocation()) > 300.0f) { bChoice = false; R->Hold(0.1f); MessageT = FMath::Min(MessageT, 1.0f); }
+		if (bRamosAlly && bFile && !bRamosSent && R->State != ETarsisGuardState::Down)
+		{
+			bRamosSent = true;
+			R->GoTo(FVector(310.0f, 4900.0f, R->GetActorLocation().Z));
+			ShowMessage(TEXT("RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, muro oeste del patio suroeste.\""), 6.0f);
+		}
 	}
 	if (CellT > 0.0f)
 	{
@@ -266,6 +277,10 @@ void ATarsisDirector::SetupMission()
 		return P;
 	};
 	NoteProp = AddBlock(Rest(Cell(3, 17)) + FVector(0.0f, 0.0f, 1.0f), FVector(0.21f, 0.30f, 0.01f), FLinearColor(0.9f, 0.88f, 0.8f), false);
+	// carta en la litera de Ramos (barracón oeste) y botiquín del veterinario en el muro norte del patio este
+	LetterProp = AddBlock(Rest(FVector(1130.0f, 2850.0f, 0.0f)) + FVector(0.0f, 0.0f, 1.0f), FVector(0.21f, 0.15f, 0.01f), FLinearColor(0.85f, 0.82f, 0.72f), false);
+	AddBlock(FVector(4660.0f, 205.0f, 145.0f), FVector(0.62f, 0.1f, 0.78f), FLinearColor(0.45f, 0.44f, 0.36f), true);
+	VetDoor = AddBlock(FVector(4660.0f, 213.0f, 145.0f), FVector(0.6f, 0.03f, 0.76f), FLinearColor(0.75f, 0.78f, 0.7f), true);
 	// en el archivo no hay mesa: se pone una (1,2 x 0,6 m, 75 cm de alto) y el expediente encima
 	const FVector Floor = Rest(Cell(9, 17));
 	AddBlock(Floor + FVector(0.0f, 0.0f, 37.5f), FVector(1.2f, 0.6f, 0.75f), FLinearColor(0.16f, 0.11f, 0.07f), true);
@@ -295,16 +310,24 @@ static bool IsIbarra(const ATarsisGuard* G)
 FString ATarsisDirector::InteractPrompt() const
 {
 	if (Dragged) return TEXT("E   SOLTAR EL CUERPO");
-	if (TakedownTarget()) return TEXT("E   DERRIBAR");
+	if (bChoice) return TEXT("1   VENTE CONMIGO        2   DERRIBARLO");
+	if (ATarsisGuard* T = TakedownTarget())
+	{
+		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? TEXT("E   AGARRAR A RAMOS") : TEXT("E   DERRIBAR");
+	}
 	if (ATarsisGuard* G = DownedNear(170.0f))
 	{
 		if (IsIbarra(G) && !bKey) return TEXT("E   QUITARLE LA LLAVE");
+		if (G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bVetKey && !bVetOpen) return TEXT("E   QUITARLE LA LLAVE DEL BOTIQUIN");
 		return TEXT("E   ARRASTRAR (escondelo en la sombra)");
 	}
 	if (!bJefOpen && NearPlayer(Cell(4, 15), 190.0f)) return bKey ? TEXT("E   ABRIR LA JEFATURA") : TEXT("JEFATURA: CERRADA CON LLAVE");
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f)) return bKeypad ? TEXT("") : TEXT("E   TECLADO DEL ARCHIVO");
 	if (bJefOpen && NearPlayer(Cell(3, 17), 150.0f)) return TEXT("E   LEER LA NOTA");
 	if (bVaultOpen && !bFile && NearPlayer(Cell(9, 17), 160.0f)) return TEXT("E   COGER EL EXPEDIENTE LH-07");
+	if (!bLetter && NearPlayer(FVector(1130.0f, 2850.0f, 0.0f), 150.0f)) return TEXT("E   LEER LA CARTA");
+	if (!bVetOpen && NearPlayer(FVector(4660.0f, 300.0f, 0.0f), 170.0f)) return bVetKey ? TEXT("E   ABRIR EL BOTIQUIN") : TEXT("E   BOTIQUIN DEL VETERINARIO");
+	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f)) return TEXT("E   PORTILLO DE LA MARISMA");
 	return FString();
 }
 
@@ -323,9 +346,30 @@ void ATarsisDirector::Interact()
 {
 	if (bDone) return;
 	if (Dragged) { StopDrag(); ShowMessage(TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), 3.0f); return; }
-	if (TakedownTarget()) { Takedown(); return; }
+	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
+	if (ATarsisGuard* T = TakedownTarget())
+	{
+		if (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked)
+		{
+			bRamosTalked = true;
+			bRamosKnown = true;
+			bChoice = true;
+			T->Hold(25.0f);
+			ShowMessage(TEXT("RAMOS, EL CUARTELERO\n\"No me haga nada. El jueves bajo con los partes y no pienso volver.\"\n\"Llevo la llave del botiquin del veterinario: dentro hay una pistola de dardos. Si me saca de aqui, es suya.\"\n1   \"Vente conmigo\"          2   Derribarlo"), 25.0f);
+			return;
+		}
+		Takedown();
+		return;
+	}
 	if (ATarsisGuard* G = DownedNear(170.0f))
 	{
+		if (G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bVetKey && !bVetOpen)
+		{
+			bVetKey = true;
+			bRamosKnown = true;
+			ShowMessage(TEXT("LLAVE DE RAMOS\n\"Botiquin - veterinario\". Esta en el muro norte del patio este."), 4.0f);
+			return;
+		}
 		if (IsIbarra(G) && !bKey)
 		{
 			bKey = true;
@@ -355,6 +399,32 @@ void ATarsisDirector::Interact()
 		ShowMessage(TEXT("MESA DE ALARCON\nUna Vulgata abierta por el salmo CXXIX: \"De profundis clamavi ad te, Domine\".\nEn el margen, a lapiz: \"Ella tambien clama. Nadie la oye. - A.\"\nUna nota: \"Clave: la de siempre. No apuntar.\""), 12.0f);
 		return;
 	}
+	if (!bLetter && NearPlayer(FVector(1130.0f, 2850.0f, 0.0f), 150.0f))
+	{
+		bLetter = true;
+		bRamosKnown = true;
+		if (LetterProp) { LetterProp->DestroyComponent(); LetterProp = nullptr; }
+		ShowMessage(TEXT("LITERA DE RAMOS - CARTA SIN TERMINAR\n\"Padre: el jueves me toca bajar con los partes. No se lo diga a madre.\"\n\"El veterinario se dejo la pistola de dardos en el botiquin y la llave la llevo encima.\"\n\"A veces pienso en dormirlos a todos y salir andando por la marisma.\"\nEn el sobre: Julian Ramos, Trebujena."), 12.0f);
+		return;
+	}
+	if (!bVetOpen && NearPlayer(FVector(4660.0f, 300.0f, 0.0f), 170.0f))
+	{
+		if (!bVetKey) { bRamosKnown = true; ShowMessage(TEXT("BOTIQUIN DEL VETERINARIO\nCandado. La llave la lleva Ramos, el cuartelero del barracon oeste."), 3.5f); return; }
+		bVetOpen = true;
+		Darts = 5;
+		if (VetDoor) { VetDoor->DestroyComponent(); VetDoor = nullptr; }
+		ShowMessage(TEXT("PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres."), 5.0f);
+		return;
+	}
+	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f))
+	{
+		ATarsisGuard* R = FindGuard(TEXT("Ramos"));
+		if (!bRamosAlly) { ShowMessage(TEXT("PORTILLO DE LA MARISMA\nCerrado. La llave la guarda el cuartelero del barracon oeste."), 3.5f); return; }
+		if (!bFile) { ShowMessage(TEXT("PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente."), 3.0f); return; }
+		if (!R || R->State == ETarsisGuardState::Down || FVector::Dist2D(R->GetActorLocation(), FVector(310.0f, 4900.0f, 0.0f)) > 700.0f) { ShowMessage(TEXT("ESPERA A RAMOS\nEl trae la llave del portillo."), 2.5f); return; }
+		Finish(true);
+		return;
+	}
 	if (bVaultOpen && !bFile && NearPlayer(Cell(9, 17), 160.0f))
 	{
 		bFile = true;
@@ -365,6 +435,12 @@ void ATarsisDirector::Interact()
 
 void ATarsisDirector::KeypadKey(FKey Key)
 {
+	if (bChoice)
+	{
+		if (Key == EKeys::One || Key == EKeys::NumPadOne) Choose(1);
+		else if (Key == EKeys::Two || Key == EKeys::NumPadTwo) Choose(2);
+		return;
+	}
 	if (!bKeypad) return;
 	if (Key == EKeys::BackSpace) { KeypadDigit(-1); return; }
 	const FString N = Key.GetFName().ToString();   // "Zero"... o "NumPadZero"...
@@ -525,5 +601,113 @@ void ATarsisDirector::BinocularTick()
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Loc, Head, ECC_Visibility, Q2)) continue;
 		It->bMarked = true;
 		ShowMessage(FString::Printf(TEXT("%s MARCADO\nLo veras aunque haya paredes por medio."), *It->GuardName.ToUpper()), 2.5f);
+	}
+}
+
+// ---------------------------------------------------------------- Ramos y dardos
+
+ATarsisGuard* ATarsisDirector::FindGuard(const TCHAR* Name) const
+{
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->GuardName.Equals(Name, ESearchCase::IgnoreCase)) return *It;
+	}
+	return nullptr;
+}
+
+void ATarsisDirector::Choose(int32 Option)
+{
+	if (!bChoice) return;
+	bChoice = false;
+	ATarsisGuard* R = FindGuard(TEXT("Ramos"));
+	if (!R) return;
+	if (Option == 1)
+	{
+		bRamosAlly = true;
+		bVetKey = true;
+		R->bAlly = true;
+		R->Hold(1.5f);
+		ShowMessage(TEXT("RAMOS ESTA CONTIGO\nTe da la llave del botiquin del veterinario (muro norte del patio este).\nSigue su ronda para que no le echen en falta, y ya no te delatara."), 7.0f);
+	}
+	else
+	{
+		R->Hold(0.0f);
+		R->KnockOut();
+		++Takedowns;
+		ShowMessage(TEXT("RAMOS DERRIBADO\nLleva encima la llave del botiquin."), 3.5f);
+	}
+}
+
+FString ATarsisDirector::SideObjective() const
+{
+	if (bDone || !bRamosKnown) return FString();
+	if (bRamosAlly && bFile) return TEXT("Otra salida: Ramos te espera en el portillo de la marisma (muro oeste, patio suroeste)");
+	if (bVetOpen) return bRamosAlly ? TEXT("Ramos esta contigo: con el expediente, saldra por la marisma") : FString();
+	if (bVetKey) return TEXT("Abre el botiquin del veterinario: muro norte del patio este");
+	return TEXT("Ramos, el cuartelero del barracon oeste, lleva la llave del botiquin: agarralo por la espalda");
+}
+
+void ATarsisDirector::ShootDart()
+{
+	if (Darts <= 0 || DartT > 0.0f || bKeypad || bChoice || bDone || Dragged) return;
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!PC || !Pl) return;
+	FVector Loc; FRotator Rot;
+	PC->GetPlayerViewPoint(Loc, Rot);
+	const FVector Fwd = Rot.Vector();
+	--Darts;
+	DartT = 0.8f;
+	// el guardia más cercano cuyo cuerpo cruza la línea de tiro (a menos de 35 m), sin nada en medio
+	ATarsisGuard* Best = nullptr;
+	float BestT = 3500.0f;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisDardo), true, this);
+	Q.AddIgnoredActor(Pl);
+	const float Heights[] = { -50.0f, 0.0f, 50.0f };
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Down) continue;
+		const FVector Base = It->GetActorLocation();
+		for (const float Hz : Heights)
+		{
+			const FVector P = Base + FVector(0.0f, 0.0f, Hz);
+			const float T = FVector::DotProduct(P - Loc, Fwd);
+			if (T < 0.0f || T > BestT) continue;
+			if (FVector::Dist(Loc + Fwd * T, P) > 32.0f) continue;
+			FCollisionQueryParams Q2 = Q;
+			Q2.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Loc, P, ECC_Visibility, Q2)) continue;
+			Best = *It;
+			BestT = T;
+			break;
+		}
+	}
+	if (!Best)
+	{
+		ShowMessage(FString::Printf(TEXT("FALLASTE\nTe quedan %d dardos."), Darts), 1.8f);
+		return;
+	}
+	Best->KnockOut();
+	++Takedowns;
+	ShowMessage(FString::Printf(TEXT("%s DORMIDO\nTe quedan %d dardos."), *Best->GuardName.ToUpper(), Darts), 2.5f);
+}
+
+void ATarsisDirector::Finish(bool bByMarsh)
+{
+	if (bDone) return;
+	bDone = true;
+	bMarsh = bByMarsh;
+	const int32 Secs = FMath::FloorToInt(MissionTime);
+	const FString Stats = FString::Printf(TEXT("Tiempo %d:%02d   Capturas %d   Derribos %d"), Secs / 60, Secs % 60, Captures, Takedowns);
+	if (bByMarsh)
+	{
+		ShowMessage(FString(TEXT("EL QUE NO ENTREGO\nRamos abre el portillo y rema sin encender la linterna. El expediente sigue en tu chaqueta.\nControl pierde tu rastro en la marisma.\n")) + Stats, 20.0f);
+	}
+	else
+	{
+		FString T = FString(TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.\n")) + Stats;
+		if (bRamosAlly) T += TEXT("\nRamos sale solo por la marisma y os espera en el camino de Trebujena.");
+		ShowMessage(T, 15.0f);
 	}
 }

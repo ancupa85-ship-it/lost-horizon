@@ -133,6 +133,49 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	bool bBinoculars = false;
 
+	// misión secundaria de Ramos: carta en su litera, agarrarlo por la espalda (1 te lo llevas, 2 lo derribas),
+	// llave del botiquín del veterinario con la pistola de dardos, y salida alternativa por el portillo de la marisma
+
+	/** Línea «SECUNDARIA» del HUD (vacía si no hay). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	FString SideObjective() const;
+
+	/** Clic izquierdo: dispara un dardo al guardia que tienes en el centro (lo duerme sin ruido). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void ShootDart();
+
+	/** Respuesta a Ramos: 1 llevarlo contigo, 2 derribarlo. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Choose(int32 Option);
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bChoice = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bRamosKnown = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bRamosTalked = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bRamosAlly = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bVetKey = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bVetOpen = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bLetter = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	int32 Darts = 0;
+
+	/** Saliste por la marisma con Ramos. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
+	bool bMarsh = false;
+
 	/** Guardia caído que vas arrastrando (o nullptr). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	TObjectPtr<class ATarsisGuard> Dragged;
@@ -177,4 +220,12 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<class UStaticMeshComponent>> Stones;
 	void BinocularTick();
+	UPROPERTY()
+	TObjectPtr<class UStaticMeshComponent> VetDoor;
+	UPROPERTY()
+	TObjectPtr<class UStaticMeshComponent> LetterProp;
+	class ATarsisGuard* FindGuard(const TCHAR* Name) const;
+	void Finish(bool bByMarsh);
+	float DartT = 0.0f;
+	bool bRamosSent = false;
 };
