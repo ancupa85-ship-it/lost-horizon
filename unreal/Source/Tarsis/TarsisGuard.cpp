@@ -384,11 +384,9 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	const FVector Aim = Target->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f);
 	const float D = FVector::Dist(Eye, Aim);
 	if (D > ViewDistance) return 0.0f;
-	if (D > NearDistance)
-	{
-		const float CosA = FVector::DotProduct(GetActorForwardVector(), (Aim - Eye).GetSafeNormal2D());
-		if (CosA < FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle))) return 0.0f;
-	}
+	const float CosA = FVector::DotProduct(GetActorForwardVector(), (Aim - Eye).GetSafeNormal2D());
+	const bool bInCone = CosA >= FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle));
+	if (!bInCone && D > NearDistance) return 0.0f;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisVista), true, this);
 	FHitResult Hit;
 	if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Aim, ECC_Visibility, Q) && Hit.GetActor() != Target)
@@ -401,7 +399,16 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	{
 		if (C->bIsCrouched) V *= 0.55f;
 	}
-	if (D < NearDistance) V = FMath::Max(V, 0.6f);
+	if (D < NearDistance)
+	{
+		if (bInCone) V = FMath::Max(V, 0.6f);
+		else
+		{
+			// a su espalda no te ve: te oye. Agachado apenas (da tiempo a derribarlo), de pie algo más
+			const ACharacter* C = Cast<ACharacter>(Target);
+			V = (C && C->bIsCrouched) ? 0.12f : 0.35f;
+		}
+	}
 	return FMath::Clamp(V, 0.0f, 1.0f);
 }
 

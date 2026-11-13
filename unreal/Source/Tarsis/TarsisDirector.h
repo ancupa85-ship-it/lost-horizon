@@ -59,6 +59,10 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	int32 Takedowns = 0;
 
+	/** Lo que hace la E: derriba al guardia a tiro, si lo hay. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Takedown();
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -70,7 +74,6 @@ private:
 	void OpenCell();
 	float LightT = 0.0f;
 	void ToggleCrouch();
-	void Takedown();
 	void SetupPlayer();
 	bool bPlayerReady = false;
 };
