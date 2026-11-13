@@ -48,6 +48,9 @@ void ATarsisHUD::DrawHUD()
 		Panel(0.0f, 0.0f, Canvas->ClipX, H, FLinearColor::Black);
 		Panel(0.0f, Canvas->ClipY - H, Canvas->ClipX, H, FLinearColor::Black);
 		DrawMessage(D);
+		// el final se queda en la cinemática (bPauseAtEnd): el parte y el menú se dibujan también aquí
+		DrawReport(D);
+		DrawMenu(D);
 		return;
 	}
 	DrawBinoculars(D);
@@ -68,22 +71,51 @@ void ATarsisHUD::DrawHUD()
 void ATarsisHUD::DrawReport(ATarsisDirector* D)
 {
 	if (!D || !D->bReport || D->bMenu || D->ReportLines.Num() == 0) return;
+	++D->ReportFrames;   // para las pruebas: el parte se ha dibujado de verdad (no solo tiene datos)
 	const float S = Canvas->ClipY / 1080.0f;   // como el menú: tiene que caber entero
-	const float W = FMath::Min(1100.0f * S, Canvas->ClipX - 40.0f * S), LH = 34.0f * S;
-	const float H = D->ReportLines.Num() * LH + 60.0f * S;
-	const float X = (Canvas->ClipX - W) / 2.0f, Y = (Canvas->ClipY - H) / 2.0f;
-	Panel(0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
-	// hoja de papel: un parte mecanografiado
-	Panel(X, Y, W, H, FLinearColor(0.86f, 0.82f, 0.72f, 0.97f));
-	Panel(X, Y, W, 6.0f * S, FLinearColor(0.55f, 0.12f, 0.1f, 1.0f));
-	const FLinearColor Ink(0.12f, 0.1f, 0.08f, 1.0f);
+	const float W = FMath::Min(1100.0f * S, Canvas->ClipX - 40.0f * S), LH = 38.0f * S;
+	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+	if (!F) return;
+	// las líneas largas («LA PROXIMA NOCHE: ...», la lista de dormidos) se parten por palabras al ancho de la hoja
+	struct FRow { FString T; float Scale; FLinearColor Col; bool bHead; };
+	TArray<FRow> Rows;
+	// colores lineales: 0,12 se veía gris claro sobre el papel; tinta casi negra y papel beige, no blanco
+	const FLinearColor Ink(0.012f, 0.01f, 0.008f, 1.0f), Red(0.32f, 0.025f, 0.015f, 1.0f);
+	const float MaxW = W - 80.0f * S;
 	for (int32 i = 0; i < D->ReportLines.Num(); ++i)
 	{
 		const FString& T = D->ReportLines[i];
 		const bool bHead = i == 0;
 		const bool bKeyLine = T.StartsWith(TEXT("LA PROXIMA NOCHE")) || T.StartsWith(TEXT("SIGILO"));
-		Text(T, bHead ? Canvas->ClipX / 2.0f : X + 40.0f * S, Y + 26.0f * S + i * LH,
-			bKeyLine ? FLinearColor(0.5f, 0.1f, 0.08f, 1.0f) : Ink, (bHead ? 1.3f : (bKeyLine ? 0.85f : 0.78f)) * S, bHead);
+		const float Sc = (bHead ? 1.3f : (bKeyLine ? 1.0f : 0.95f)) * S;   // antes 0,78: pequeño para leer un parte entero
+		const FLinearColor Col = bKeyLine ? Red : Ink;
+		TArray<FString> Words;
+		T.ParseIntoArray(Words, TEXT(" "));
+		if (bHead || Words.Num() == 0) { Rows.Add({ T, Sc, Col, bHead }); continue; }
+		FString Cur;
+		for (const FString& Wd : Words)
+		{
+			const FString Try = Cur.IsEmpty() ? Wd : Cur + TEXT(" ") + Wd;
+			float TW = 0.0f, TH = 0.0f;
+			GetTextSize(Try, TW, TH, F, Sc);
+			if (TW > MaxW && !Cur.IsEmpty()) { Rows.Add({ Cur, Sc, Col, false }); Cur = TEXT("   ") + Wd; }
+			else Cur = Try;
+		}
+		Rows.Add({ Cur, Sc, Col, false });
+	}
+	const float H = Rows.Num() * LH + 60.0f * S;
+	const float X = (Canvas->ClipX - W) / 2.0f, Y = FMath::Max((Canvas->ClipY - H) / 2.0f, 10.0f * S);
+	Panel(0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
+	// hoja de papel: un parte mecanografiado
+	Panel(X, Y, W, H, FLinearColor(0.6f, 0.54f, 0.42f, 0.97f));
+	Panel(X, Y, W, 6.0f * S, FLinearColor(0.55f, 0.12f, 0.1f, 1.0f));
+	for (int32 i = 0; i < Rows.Num(); ++i)
+	{
+		// tinta sin la sombra negra de Text(): sobre el papel la emborronaba
+		float TW = 0.0f, TH = 0.0f;
+		GetTextSize(Rows[i].T, TW, TH, F, Rows[i].Scale);
+		const float TX = Rows[i].bHead ? Canvas->ClipX / 2.0f - TW / 2.0f : X + 40.0f * S;
+		DrawText(Rows[i].T, Rows[i].Col, TX, Y + 26.0f * S + i * LH, F, Rows[i].Scale);
 	}
 }
 

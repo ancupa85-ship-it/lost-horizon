@@ -302,6 +302,10 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
 	TArray<FString> ReportLines;
 
+	/** Fotogramas en que el HUD ha dibujado el parte (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 ReportFrames = 0;
+
 	/** Estado que pasa a la misión 2. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
 	bool bPowerCutOnce = false;

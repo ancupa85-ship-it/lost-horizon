@@ -1639,7 +1639,7 @@ void ATarsisDirector::MenuKey(FKey Key)
 	if (Key == EKeys::P || Key == EKeys::Escape)
 	{
 		if (bKeypad && Key == EKeys::Escape) { bKeypad = false; KeypadInput.Reset(); return; }   // Esc cierra antes el teclado del archivo (y borra lo tecleado)
-		if (!bCine || bMenu) TogglePause();
+		if (!bCine || bMenu || bDone) TogglePause();   // en el final (cinemática parada en su último plano) el parte ofrece P
 		return;
 	}
 	if (!bMenu) return;
@@ -1980,7 +1980,9 @@ void ATarsisDirector::BuildReport()
 	if (Detections == 0) L.Add(TEXT("Nadie llego a verlo. Hay quien duda de que existiera."));
 	else L.Add(FString::Printf(TEXT("Fue visto %d %s, pero las descripciones no coinciden."), Detections, Detections == 1 ? TEXT("vez") : TEXT("veces")));
 	if (Captures > 0) L.Add(TEXT("Estuvo en el calabozo y salio de el. Se abre expediente al cabo Vidal."));
-	if (Downed.Num() > 0) L.Add(FString::Printf(TEXT("Amanecieron en el suelo, aturdidos o dormidos: %s."), *FString::Join(Downed, TEXT(", "))));
+	TArray<FString> DownedList = Downed;
+	if (bRamosDowned) DownedList.RemoveAll([](const FString& N) { return N.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase); });   // ya tiene su línea
+	if (DownedList.Num() > 0) L.Add(FString::Printf(TEXT("Amanecieron en el suelo, aturdidos o dormidos: %s."), *FString::Join(DownedList, TEXT(", "))));
 	if (bVetOpen) L.Add(TEXT("El botiquin del veterinario esta abierto y falta la pistola de dardos."));
 	if (bKey) L.Add(TEXT("Al sargento Ibarra le falta la llave de la jefatura. Se cambiara la cerradura."));
 	if (bLampBroken) L.Add(TEXT("El farol del control aparecio roto de un disparo. Se ha pedido otro a Sevilla."));
