@@ -1151,7 +1151,7 @@ void ATarsisDirector::CutPower()
 	{
 		Repairer->SetFlashlight(true);
 		Repairer->SetFlashlightShadows(true);   // su cono recorta cajas y muros: te puedes esconder detrás
-		Repairer->HearNoise(GeneratorLoc);
+		Repairer->HearNoise(RepairSpot());
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		ShowMessage(FString::Printf(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.\nRADIO: \"Se ha ido la luz en toda la base! %s, mira el generador.\""), *Repairer->GuardName), 5.0f);
 	}
@@ -1236,11 +1236,12 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 	if (Repairer && Repairer->State != ETarsisGuardState::Down && Repairer->State != ETarsisGuardState::Alert)
 	{
 		// tras buscar un rato junto al generador pasaría a volver a su ronda: se le vuelve a mandar (también tras una captura)
-		if (!Repairer->IsRepairing() && (Repairer->State == ETarsisGuardState::Return || Repairer->State == ETarsisGuardState::Patrol)) Repairer->HearNoise(GeneratorLoc);
-		if (FVector::Dist2D(Repairer->GetActorLocation(), GeneratorLoc) < 320.0f)
+		if (!Repairer->IsRepairing() && (Repairer->State == ETarsisGuardState::Return || Repairer->State == ETarsisGuardState::Patrol)) Repairer->HearNoise(RepairSpot());
+		// el guardia da por llegado a menos de 150 de su destino: se mide desde el sitio de reparación
+		if (FVector::Dist2D(Repairer->GetActorLocation(), RepairSpot()) < 250.0f)
 		{
 			if (!Repairer->IsRepairing()) Repairer->StartRepair(GeneratorLoc);   // se queda y barre el patio con la linterna
-			RepairT += DeltaSeconds;
+			if (Repairer->IsRepairing()) RepairT += DeltaSeconds;
 			if (RepairT >= RepairSeconds) RestorePower(true);
 		}
 	}

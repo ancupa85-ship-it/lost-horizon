@@ -466,6 +466,8 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 void ATarsisGuard::StartRepair(const FVector& Center)
 {
 	if (State == ETarsisGuardState::Down || State == ETarsisGuardState::Alert) return;
+	// va a mirar un ruido lejos del generador (segunda piedra): que no lo vuelvan a poner a reparar en el mismo paso
+	if (State == ETarsisGuardState::Suspicious && bInvestigate && FVector::Dist2D(LastSeen, Center) > 320.0f) return;
 	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
 	RepairCenter = Center;
 	SweepT = 0.0f;
@@ -475,6 +477,8 @@ void ATarsisGuard::StartRepair(const FVector& Center)
 void ATarsisGuard::StopRepair()
 {
 	if (!bRepairing) return;
+	// derribado: KnockOut pone Down sin limpiar bRepairing; sacarlo de Down aquí lo levantaba tumbado
+	if (State == ETarsisGuardState::Down) { bRepairing = false; return; }
 	SetState(ETarsisGuardState::Return);
 }
 

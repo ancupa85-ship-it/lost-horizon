@@ -382,6 +382,8 @@ private:
 	float RepairCallT = 0.0f;
 	bool bRepairerSilent = false;
 	bool ShootLamp(const FVector& From, const FVector& Fwd, float MaxT);
+	/** Dónde se pone el reparador: al sur del generador, despejado (encima de la malla el camino sale parcial). */
+	FVector RepairSpot() const { return GeneratorLoc + FVector(0.0f, 280.0f, 0.0f); }
 	void SetupBarrier();
 	void BarrierTick(float DeltaSeconds);
 
