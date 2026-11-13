@@ -129,6 +129,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void SetWeather(int32 NewWeather);
 
+	/** Base en guardia tras una alarma (segundos que quedan): la sospecha sube un 50 % más deprisa. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	float TensionT = 0.0f;
+
+	/** Dónde está el guardia que te oyó por última vez (para la flecha del HUD). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	FVector HeardFrom = FVector::ZeroVector;
+
 	/** Segundos que queda el aviso «TE HAN OIDO». */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	float HeardT = 0.0f;
@@ -289,5 +297,9 @@ private:
 	bool IndoorAt(const FVector& P, const AActor* Ignore) const;
 	void SoundTick(class ACharacter* C, float DeltaSeconds);
 	void RainTick(float DeltaSeconds);
+	void RadioTick(float DeltaSeconds);
+	UPROPERTY()
+	TSet<TObjectPtr<class ATarsisGuard>> Called;
+	FLinearColor BaseFogColor = FLinearColor::Black;
 	bool bRamosSent = false;
 };

@@ -226,6 +226,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	BobTick(C, DeltaSeconds);
 	SoundTick(C, DeltaSeconds);
 	RainTick(DeltaSeconds);
+	RadioTick(DeltaSeconds);
 	if (HeardT > 0.0f) HeardT -= DeltaSeconds;
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
 	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
@@ -775,7 +776,7 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 			{
 				if (FVector::Dist(It->GetActorLocation(), P) > PlayerNoise) continue;
 				if (It->Visibility(C) > 0.0f) continue;   // si ya te ve, manda la vista
-				if (It->State == ETarsisGuardState::Patrol || It->State == ETarsisGuardState::Return) HeardT = 2.0f;
+				if (It->State == ETarsisGuardState::Patrol || It->State == ETarsisGuardState::Return) { HeardT = 2.5f; HeardFrom = It->GetActorLocation(); }
 				It->HearNoise(P);
 			}
 		}
@@ -846,12 +847,12 @@ void ATarsisDirector::SetupSound()
 		RainISM->SetCanEverAffectNavigation(false);
 		if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"))) RainISM->SetMaterial(0, Base);
 		RainISM->RegisterComponent();
-		if (UMaterialInstanceDynamic* M = RainISM->CreateDynamicMaterialInstance(0)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.35f, 0.38f, 0.42f));
+		if (UMaterialInstanceDynamic* M = RainISM->CreateDynamicMaterialInstance(0)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.62f, 0.66f, 0.72f));
 		TArray<FTransform> T;
-		for (int32 i = 0; i < 300; ++i)
+		for (int32 i = 0; i < 450; ++i)
 		{
 			Drops.Add(FVector(FMath::FRandRange(-1200.0f, 1200.0f), FMath::FRandRange(-1200.0f, 1200.0f), FMath::FRandRange(-200.0f, 900.0f)));
-			T.Add(FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(0.004f, 0.004f, 0.35f)));
+			T.Add(FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(0.008f, 0.008f, 0.45f)));
 		}
 		RainISM->AddInstances(T, false, true);
 		RainISM->SetVisibility(false);
@@ -932,7 +933,7 @@ void ATarsisDirector::RainTick(float DeltaSeconds)
 	{
 		D.Z -= 1300.0f * DeltaSeconds;
 		if (D.Z < -250.0f) D = FVector(FMath::FRandRange(-1200.0f, 1200.0f), FMath::FRandRange(-1200.0f, 1200.0f), 900.0f);
-		T.Add(FTransform(FRotator::ZeroRotator, Loc + D, FVector(0.004f, 0.004f, 0.35f)));
+		T.Add(FTransform(FRotator(0.0f, 0.0f, 8.0f), Loc + D, FVector(0.008f, 0.008f, 0.45f)));   // algo inclinadas por el viento
 	}
 	RainISM->BatchUpdateInstancesTransforms(0, T, true, true, true);
 }
@@ -962,10 +963,55 @@ void ATarsisDirector::SetWeather(int32 NewWeather)
 	{
 		UExponentialHeightFogComponent* F = It->GetComponent();
 		if (!F) continue;
-		if (BaseFog < 0.0f) BaseFog = F->FogDensity;
+		if (BaseFog < 0.0f) { BaseFog = F->FogDensity; BaseFogColor = F->FogInscatteringLuminance; }
 		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 6.0f : (Weather == 1 ? 1.8f : 1.0f))));
+		// niebla volumétrica: las farolas y los focos dibujan haces; de noche, sin ella, la niebla casi no se ve
+		F->SetVolumetricFog(Weather != 0);
+		F->SetVolumetricFogScatteringDistribution(Weather == 2 ? 0.6f : 0.4f);
+		F->SetVolumetricFogExtinctionScale(Weather == 2 ? 2.0f : 1.0f);
+		F->SetFogInscatteringColor(Weather == 2 ? FLinearColor(0.10f, 0.11f, 0.13f) : (Weather == 1 ? FLinearColor(0.05f, 0.06f, 0.07f) : BaseFogColor));
 		break;
 	}
 	if (Weather == 1 && !RainComp && RainSnd) RainComp = UGameplayStatics::SpawnSound2D(this, RainSnd, 0.45f, 1.0f, 0.0f, nullptr, false, false);
 	if (Weather != 1 && RainComp) { RainComp->Stop(); RainComp->DestroyComponent(); RainComp = nullptr; }
+}
+
+// ---------------------------------------------------------------- radio y base en guardia
+
+void ATarsisDirector::RadioTick(float DeltaSeconds)
+{
+	// tras una alarma, la base queda en guardia 90 s: la sospecha sube más deprisa
+	bool bAlarm = false;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Alert && !It->bTowerSentry) bAlarm = true;
+	}
+	if (bAlarm) TensionT = 90.0f;
+	else if (TensionT > 0.0f) TensionT -= DeltaSeconds;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		It->AlertBoost = TensionT > 0.0f ? 1.5f : 1.0f;
+	}
+	// radio: a los 40 s de caer un guardia, no contesta y mandan al más cercano a donde cayó.
+	// Si lo has arrastrado y escondido, el que va a mirar no lo encuentra.
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		ATarsisGuard* G = *It;
+		const TObjectPtr<ATarsisGuard> K(G);
+		if (G->State != ETarsisGuardState::Down) { Called.Remove(K); continue; }
+		if (G->bFound || G->bAlly || Called.Contains(K) || G->DownTime() < 40.0f) continue;
+		Called.Add(K);
+		ATarsisGuard* Best = nullptr;
+		float BestD = TNumericLimits<float>::Max();
+		for (TActorIterator<ATarsisGuard> O(GetWorld()); O; ++O)
+		{
+			if (*O == G || O->State == ETarsisGuardState::Down || O->State == ETarsisGuardState::Alert || O->bTowerSentry || O->bAlly) continue;
+			const float D = FVector::Dist(O->GetActorLocation(), G->KnockLoc);
+			if (D < BestD) { BestD = D; Best = *O; }
+		}
+		if (!Best) continue;
+		Best->HearNoise(G->KnockLoc);
+		ShowMessage(FString::Printf(TEXT("RADIO: \"%s, responde.\" ... Nada.\n%s va a ver que pasa donde le toca la ronda."),
+			*G->GuardName, *Best->GuardName), 4.5f);
+	}
 }

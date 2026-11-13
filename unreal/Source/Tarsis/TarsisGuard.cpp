@@ -177,6 +177,7 @@ void ATarsisGuard::HearNoise(const FVector& Where)
 	Meter = FMath::Max(Meter, 0.5f);
 	SetState(ETarsisGuardState::Suspicious);
 	bInvestigate = true;
+	UpdateMark();   // el «?» de un ruido sale azulado: te ha oído, no te ha visto
 }
 
 bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
@@ -195,6 +196,7 @@ void ATarsisGuard::KnockOut()
 	State = ETarsisGuardState::Down;
 	StateT = 0.0f;
 	DownT = KnockOutTime;
+	KnockLoc = GetActorLocation();
 	Meter = 0.0f;
 	bFound = false;
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);   // se le puede pasar por encima
@@ -327,7 +329,7 @@ void ATarsisGuard::UpdateMark()
 	const bool bShow = bAlert || State == ETarsisGuardState::Suspicious || State == ETarsisGuardState::Search;
 	Mark->SetHiddenInGame(!bShow);
 	Mark->SetText(FText::FromString(bAlert ? TEXT("!") : TEXT("?")));
-	Mark->SetTextRenderColor(bAlert ? FColor(255, 59, 47) : FColor(255, 210, 58));
+	Mark->SetTextRenderColor(bAlert ? FColor(255, 59, 47) : (bInvestigate ? FColor(120, 200, 255) : FColor(255, 210, 58)));
 }
 
 bool ATarsisGuard::Near2D(const FVector& Dest, float Radius) const
@@ -488,7 +490,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		LastSeen = Player->GetActorLocation();
 		UnseenT = 0.0f;
 		const float Gain = (State == ETarsisGuardState::Alert || State == ETarsisGuardState::Search) ? 3.0f : 1.0f;
-		Meter = FMath::Min(1.0f, Meter + V * SuspicionRate * Gain * DeltaSeconds);
+		Meter = FMath::Min(1.0f, Meter + V * SuspicionRate * Gain * AlertBoost * DeltaSeconds);
 	}
 	else
 	{

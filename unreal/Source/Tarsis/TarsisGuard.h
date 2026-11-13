@@ -104,6 +104,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void GoTo(const FVector& Where);
 
+	/** Base en guardia tras una alarma: la sospecha sube más deprisa (lo pone el director). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Estado")
+	float AlertBoost = 1.0f;
+
+	/** Dónde cayó derribado (adonde irán a buscarlo por radio si no contesta). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
+	FVector KnockLoc = FVector::ZeroVector;
+
+	/** Segundos que lleva en el suelo. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	float DownTime() const { return State == ETarsisGuardState::Down ? StateT : 0.0f; }
+
+	/** Va a mirar por un ruido (y no por la vista). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	bool IsInvestigating() const { return bInvestigate; }
+
 	/** Se queda quieto Seconds segundos (mientras habla contigo). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Hold(float Seconds);

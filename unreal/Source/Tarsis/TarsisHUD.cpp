@@ -35,6 +35,7 @@ void ATarsisHUD::DrawHUD()
 	const ACharacter* C = Cast<ACharacter>(GetOwningPawn());
 	DrawBinoculars(D);
 	DrawMarked();
+	DrawHeard(D);
 	DrawLight(D, C && C->bIsCrouched);
 	DrawAlert();
 	DrawGuardMarks();
@@ -82,6 +83,28 @@ void ATarsisHUD::DrawMarked()
 		Panel(Scr.X - 3.0f * S, Scr.Y + 4.0f * S, 6.0f * S, 6.0f * S, Col);
 		Text(L, Scr.X, Scr.Y - 20.0f * S, Col, 0.7f * S, true);
 	}
+}
+
+void ATarsisHUD::DrawHeard(ATarsisDirector* D)
+{
+	if (!D || D->HeardT <= 0.0f) return;
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	const float A = FMath::Min(1.0f, D->HeardT);
+	const FLinearColor Col(0.47f, 0.78f, 1.0f, A);   // azul, como el «?» del guardia que te oye
+	const float CX = Canvas->ClipX / 2.0f, Y = Canvas->ClipY * 0.2f;
+	// de qué lado está el guardia que te ha oído
+	FVector CamLoc; FRotator CamRot;
+	PC->GetPlayerViewPoint(CamLoc, CamRot);
+	const FVector Local = CamRot.UnrotateVector(D->HeardFrom - CamLoc);
+	FString Side = TEXT("DELANTE");
+	if (Local.X < 0.0f && FMath::Abs(Local.Y) < -Local.X) Side = TEXT("DETRAS");
+	else if (Local.Y > FMath::Abs(Local.X) * 0.4f) Side = TEXT("A LA DERECHA  >>");
+	else if (Local.Y < -FMath::Abs(Local.X) * 0.4f) Side = TEXT("<<  A LA IZQUIERDA");
+	Panel(CX - 230.0f * S, Y, 460.0f * S, 74.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f * A));
+	Text(TEXT("TE HAN OIDO"), CX, Y + 6.0f * S, Col, 1.35f * S, true);
+	Text(Side, CX, Y + 44.0f * S, Col, 0.85f * S, true);
 }
 
 void ATarsisHUD::DrawObjective(ATarsisDirector* D)
@@ -173,10 +196,10 @@ void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 	{
 		static const TCHAR* Wx[] = { TEXT("DESPEJADO"), TEXT("LLUVIA"), TEXT("NIEBLA") };
 		Text(FString::Printf(TEXT("%s (Y)"), Wx[FMath::Clamp(D->Weather, 0, 2)]), X + W - 120.0f * S, Y + 10.0f * S, FLinearColor(0.6f, 0.7f, 0.8f), 0.7f * S);
-		if (D->HeardT > 0.0f)
+		if (D->TensionT > 0.0f)
 		{
-			Panel(X, Y - 40.0f * S, 200.0f * S, 32.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f * FMath::Min(1.0f, D->HeardT)));
-			Text(TEXT("TE HAN OIDO"), X + 14.0f * S, Y - 36.0f * S, FLinearColor(1.0f, 0.55f, 0.25f, FMath::Min(1.0f, D->HeardT)), 0.95f * S);
+			Panel(X, Y - 36.0f * S, 240.0f * S, 30.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
+			Text(FString::Printf(TEXT("BASE EN GUARDIA  %d s"), FMath::CeilToInt(D->TensionT)), X + 14.0f * S, Y - 32.0f * S, FLinearColor(1.0f, 0.45f, 0.3f), 0.85f * S);
 		}
 	}
 }

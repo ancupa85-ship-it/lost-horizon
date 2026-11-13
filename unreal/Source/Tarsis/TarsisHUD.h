@@ -26,6 +26,7 @@ private:
 	void DrawKeypad(class ATarsisDirector* D);
 	void DrawBinoculars(class ATarsisDirector* D);
 	void DrawMarked();
+	void DrawHeard(class ATarsisDirector* D);
 	void Panel(float X, float Y, float W, float H, const FLinearColor& C);
 	void Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale, bool bCenter = false);
 };
