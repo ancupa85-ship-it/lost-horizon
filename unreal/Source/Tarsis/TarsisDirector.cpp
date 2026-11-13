@@ -235,6 +235,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (RadioT > 0.0f) RadioT -= DeltaSeconds;
 	if (CheckT > 0.0f) CheckT -= DeltaSeconds;
 	if (SubtitleT > 0.0f) SubtitleT -= DeltaSeconds;
+	if (ReportWait > 0.0f) { ReportWait -= DeltaSeconds; if (ReportWait <= 0.0f) { bReport = true; MessageT = 0.0f; } }
 	DetectTick();
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
 	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
@@ -717,6 +718,7 @@ void ATarsisDirector::Choose(int32 Option)
 		R->Hold(0.0f);
 		R->KnockOut();
 		++Takedowns;
+		bRamosDowned = true;
 		ShowMessage(TEXT("RAMOS DERRIBADO\nLleva encima la llave del botiquin."), 3.5f);
 	}
 }
@@ -837,6 +839,8 @@ void ATarsisDirector::Finish(bool bByMarsh)
 		if (bRamosAlly) T += TEXT("\nRamos sale solo por la marisma y os espera en el camino de Trebujena.");
 		ShowMessage(T, 15.0f);
 	}
+	BuildReport();
+	ReportWait = bByMarsh ? 20.0f : 15.0f;
 }
 
 // ---------------------------------------------------------------- pasos, carrera y balanceo
@@ -1167,6 +1171,7 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 void ATarsisDirector::CutPower()
 {
 	bPowerOff = true;
+	bPowerCutOnce = true;
 	PowerT = 60.0f;
 	RepairT = 0.0f;
 	OffLights.Reset();
@@ -1219,6 +1224,7 @@ void ATarsisDirector::CutPower()
 void ATarsisDirector::RestorePower(bool bByGuard)
 {
 	bPowerOff = false;
+	bReserveHalf = !bByGuard;
 	PowerT = 0.0f;
 	// arreglado por el guardia, vuelven todas; con el generador de reserva, solo una de cada dos (las otras se quedan
 	// apagadas el resto de la partida): después del apagón la base queda distinta, con zonas nuevas de sombra
@@ -1952,4 +1958,69 @@ FString ATarsisDirector::Direction(const FVector& Where) const
 	if (FMath::Abs(A) < 75.0f) return FString::Printf(TEXT("DELANTE A LA %s"), Side);
 	if (FMath::Abs(A) > 105.0f) return FString::Printf(TEXT("DETRAS A LA %s"), Side);
 	return FString::Printf(TEXT("A LA %s"), Side);
+}
+
+// ---------------------------------------------------------------- parte del día siguiente
+
+void ATarsisDirector::BuildReport()
+{
+	TArray<FString> Downed;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Down) Downed.Add(It->GuardName);
+		if (It->State == ETarsisGuardState::Down && It->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosAlly) bRamosDowned = true;
+	}
+	TArray<FString>& L = ReportLines;
+	L.Reset();
+	L.Add(TEXT("PARTE DEL DIA SIGUIENTE"));
+	L.Add(TEXT("Base de Tarsis - Del capitan Alarcon al Mando de la Zona Sur"));
+	L.Add(TEXT(""));
+	L.Add(bMarsh ? TEXT("Anoche un intruso huyo por la marisma con el expediente LH-07. Se le perdio el rastro en los canales.")
+		: TEXT("Anoche un intruso salio por el control de salida con el expediente LH-07. El de la garita no vio nada."));
+	if (Detections == 0) L.Add(TEXT("Nadie llego a verlo. Hay quien duda de que existiera."));
+	else L.Add(FString::Printf(TEXT("Fue visto %d %s, pero las descripciones no coinciden."), Detections, Detections == 1 ? TEXT("vez") : TEXT("veces")));
+	if (Captures > 0) L.Add(TEXT("Estuvo en el calabozo y salio de el. Se abre expediente al cabo Vidal."));
+	if (Downed.Num() > 0) L.Add(FString::Printf(TEXT("Amanecieron en el suelo, aturdidos o dormidos: %s."), *FString::Join(Downed, TEXT(", "))));
+	if (bVetOpen) L.Add(TEXT("El botiquin del veterinario esta abierto y falta la pistola de dardos."));
+	if (bKey) L.Add(TEXT("Al sargento Ibarra le falta la llave de la jefatura. Se cambiara la cerradura."));
+	if (bLampBroken) L.Add(TEXT("El farol del control aparecio roto de un disparo. Se ha pedido otro a Sevilla."));
+	if (bReserveHalf) L.Add(TEXT("El generador sigue averiado: con la reserva, media base pasara la noche a oscuras."));
+	else if (bPowerCutOnce) L.Add(TEXT("Alguien corto el generador; se arranco de nuevo antes del alba."));
+	if (bRamosAlly) L.Add(bMarsh ? TEXT("El soldado Ramos no se presento a la diana. Se le da por desertor.")
+		: TEXT("El soldado Ramos no se presento a la diana. Se le busca en Trebujena."));
+	else if (bRamosDowned) L.Add(TEXT("A Ramos lo encontraron sin sentido. No recuerda nada, o eso dice."));
+	L.Add(TEXT(""));
+	// consecuencias para la siguiente noche (las leerá la misión 2)
+	TArray<FString> Cons;
+	if (Detections >= 3 || Captures > 0) Cons.Add(TEXT("se doblan las rondas"));
+	if (bReserveHalf) Cons.Add(TEXT("la zona norte queda a oscuras"));
+	if (bLampBroken) Cons.Add(TEXT("el control sigue sin farol"));
+	if (bRamosAlly) Cons.Add(TEXT("Ramos te espera fuera"));
+	else if (bRamosDowned) Cons.Add(TEXT("Ramos desconfia de todos"));
+	if (bKey) Cons.Add(TEXT("cerradura nueva en la jefatura"));
+	L.Add(Cons.Num() > 0 ? FString::Printf(TEXT("LA PROXIMA NOCHE: %s."), *FString::Join(Cons, TEXT(", "))) : FString(TEXT("LA PROXIMA NOCHE: todo sigue igual. Nadie sabe que estuviste.")));
+	L.Add(FString::Printf(TEXT("SIGILO: %d puntos - %s"), Score, *Rank));
+	L.Add(TEXT(""));
+	L.Add(TEXT("P: menu (salir o cargar el ultimo punto de control)"));
+	// se guarda para la misión 2
+	UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::CreateSaveGameObject(UTarsisSave::StaticClass()));
+	if (!S) return;
+	S->bByMarsh = bMarsh;
+	S->Detections = Detections;
+	S->Takedowns = Takedowns;
+	S->Captures = Captures;
+	S->MissionTime = MissionTime;
+	S->bPowerCut = bPowerCutOnce;
+	S->bReserveHalf = bReserveHalf;
+	S->bLampBroken = bLampBroken;
+	S->bRamosAlly = bRamosAlly;
+	S->bRamosDowned = bRamosDowned;
+	S->bKey = bKey;
+	S->bVetOpen = bVetOpen;
+	S->Score = Score;
+	S->Rank = Rank;
+	S->Downed = Downed;
+	S->Report = L;
+	S->Difficulty = Difficulty;
+	UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisParte"), 0);
 }

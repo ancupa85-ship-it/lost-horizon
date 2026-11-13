@@ -29,6 +29,7 @@ private:
 	void DrawHeard(class ATarsisDirector* D);
 	void DrawExtras(class ATarsisDirector* D);
 	void DrawMenu(class ATarsisDirector* D);
+	void DrawReport(class ATarsisDirector* D);
 	float FpsSmooth = 0.0f;
 	float UiScale() const;
 	void Panel(float X, float Y, float W, float H, const FLinearColor& C);

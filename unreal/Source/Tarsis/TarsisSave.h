@@ -31,6 +31,19 @@ public:
 	UPROPERTY() bool bLampBroken = false;
 	UPROPERTY() int32 Weather = 0;
 
+	// ---- parte del día siguiente (hueco "TarsisParte"): lo que la misión 2 encuentra en la base
+	UPROPERTY() bool bByMarsh = false;
+	UPROPERTY() int32 Detections = 0;
+	UPROPERTY() int32 Takedowns = 0;
+	UPROPERTY() bool bPowerCut = false;
+	UPROPERTY() bool bReserveHalf = false;
+	UPROPERTY() bool bRamosAlly = false;
+	UPROPERTY() bool bRamosDowned = false;
+	UPROPERTY() int32 Score = 0;
+	UPROPERTY() FString Rank;
+	UPROPERTY() TArray<FString> Downed;
+	UPROPERTY() TArray<FString> Report;
+
 	// ---- opciones
 	UPROPERTY() float Sensitivity = 1.0f;
 	UPROPERTY() bool bInvertY = false;

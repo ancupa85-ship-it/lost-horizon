@@ -61,7 +61,30 @@ void ATarsisHUD::DrawHUD()
 	DrawPrompt(D);
 	DrawKeypad(D);
 	DrawExtras(D);
+	DrawReport(D);
 	DrawMenu(D);
+}
+
+void ATarsisHUD::DrawReport(ATarsisDirector* D)
+{
+	if (!D || !D->bReport || D->bMenu || D->ReportLines.Num() == 0) return;
+	const float S = Canvas->ClipY / 1080.0f;   // como el menú: tiene que caber entero
+	const float W = FMath::Min(1100.0f * S, Canvas->ClipX - 40.0f * S), LH = 34.0f * S;
+	const float H = D->ReportLines.Num() * LH + 60.0f * S;
+	const float X = (Canvas->ClipX - W) / 2.0f, Y = (Canvas->ClipY - H) / 2.0f;
+	Panel(0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
+	// hoja de papel: un parte mecanografiado
+	Panel(X, Y, W, H, FLinearColor(0.86f, 0.82f, 0.72f, 0.97f));
+	Panel(X, Y, W, 6.0f * S, FLinearColor(0.55f, 0.12f, 0.1f, 1.0f));
+	const FLinearColor Ink(0.12f, 0.1f, 0.08f, 1.0f);
+	for (int32 i = 0; i < D->ReportLines.Num(); ++i)
+	{
+		const FString& T = D->ReportLines[i];
+		const bool bHead = i == 0;
+		const bool bKeyLine = T.StartsWith(TEXT("LA PROXIMA NOCHE")) || T.StartsWith(TEXT("SIGILO"));
+		Text(T, bHead ? Canvas->ClipX / 2.0f : X + 40.0f * S, Y + 26.0f * S + i * LH,
+			bKeyLine ? FLinearColor(0.5f, 0.1f, 0.08f, 1.0f) : Ink, (bHead ? 1.3f : (bKeyLine ? 0.85f : 0.78f)) * S, bHead);
+	}
 }
 
 void ATarsisHUD::DrawExtras(ATarsisDirector* D)

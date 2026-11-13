@@ -296,6 +296,20 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
 	FString Rank;
 
+	/** Parte del día siguiente: sale tras el mensaje final y resume lo que dejaste en la base (lo leerá la misión 2). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bReport = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	TArray<FString> ReportLines;
+
+	/** Estado que pasa a la misión 2. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bPowerCutOnce = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bReserveHalf = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bRamosDowned = false;
+
 	/** Página del menú: 0 la principal, 1 los controles. Esperando tecla para la acción ActionSel (o -1). */
 	int32 MenuPage = 0;
 	int32 WaitKeyFor = -1;
@@ -510,6 +524,8 @@ private:
 	UPROPERTY()
 	TMap<TObjectPtr<class ATarsisGuard>, uint8> PrevState;
 	void DetectTick();
+	void BuildReport();
+	float ReportWait = -1.0f;
 	FString Direction(const FVector& Where) const;
 	float SubtitleDist = 0.0f;
 
