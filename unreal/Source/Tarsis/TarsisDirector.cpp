@@ -1130,6 +1130,8 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 	// el enviado lo arregla tras RepairSeconds junto al generador; si lo derribas antes, la luz tarda lo que le quede
 	if (Repairer && Repairer->State != ETarsisGuardState::Down && Repairer->State != ETarsisGuardState::Alert)
 	{
+		// tras buscar un rato junto al generador pasaría a volver a su ronda: se le vuelve a mandar (también tras una captura)
+		if (Repairer->State == ETarsisGuardState::Return || Repairer->State == ETarsisGuardState::Patrol) Repairer->HearNoise(GeneratorLoc);
 		if (FVector::Dist2D(Repairer->GetActorLocation(), GeneratorLoc) < 320.0f)
 		{
 			RepairT += DeltaSeconds;

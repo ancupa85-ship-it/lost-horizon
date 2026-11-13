@@ -148,9 +148,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
 	float RepairSeconds = 12.0f;
 
-	/** Trozos del nombre de los materiales de ventana iluminada: con el apagón se cambian por uno oscuro. */
+	/** Trozos del nombre de los materiales de ventana iluminada y bombillas (lh_ventana_on, lh_bombilla): con el apagón se cambian por uno oscuro. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
-	TArray<FString> WindowMaterialKeys = { TEXT("ventana"), TEXT("window"), TEXT("emis") };
+	TArray<FString> WindowMaterialKeys = { TEXT("ventana"), TEXT("window"), TEXT("emis"), TEXT("bombilla") };
 
 	/** Dónde está el guardia que te oyó por última vez (para la flecha del HUD). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")

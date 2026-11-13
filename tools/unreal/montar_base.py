@@ -175,6 +175,19 @@ for i, l in enumerate(DATA['lights']):
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
         c.set_editor_property('intensity', 8000.0)   # con 60000 el suelo bajo las torretas queda quemado con exposición nocturna
         c.set_editor_property('attenuation_radius', 4000.0)
+    elif l['name'] == 'farola':
+        # farola: foco hacia abajo (una puntual no dibuja haz en la niebla). Va 25 cm al lado del poste y 20 cm más
+        # baja: en la posición original queda dentro del poste, que tapa el cono y la traza de LightAt
+        a = spawn(unreal.SpotLight, ue(l['pos']) + unreal.Vector(25, 0, -20), '%s_%d' % (l['name'], i), unreal.Rotator(roll=0, pitch=-90, yaw=0))
+        a.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)   # r.AllowStaticLighting=False con Lumen
+        c = a.get_component_by_class(unreal.SpotLightComponent)
+        c.set_editor_property('outer_cone_angle', 55.0)
+        c.set_editor_property('inner_cone_angle', 35.0)
+        c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
+        c.set_editor_property('intensity', 3000.0)
+        c.set_editor_property('attenuation_radius', 1800.0)
+        c.set_editor_property('cast_shadows', False)
+        c.set_editor_property('volumetric_scattering_intensity', 1.5)
     else:
         a = spawn(unreal.PointLight, ue(l['pos']), '%s_%d' % (l['name'], i))
         c = a.get_component_by_class(unreal.PointLightComponent)
