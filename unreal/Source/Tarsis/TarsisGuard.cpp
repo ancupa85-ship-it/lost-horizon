@@ -214,6 +214,8 @@ void ATarsisGuard::LookForBodies()
 		const float D = FVector::Dist(Eye, P);
 		if (D > ViewDistance * 0.7f) continue;
 		if (D > NearDistance && FVector::DotProduct(GetActorForwardVector(), (P - Eye).GetSafeNormal2D()) < FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle))) continue;
+		// escondido en la sombra: solo lo ve quien pasa muy cerca
+		if (D > 350.0f && LightAt(this, P + FVector(0.0f, 0.0f, 40.0f)) < 0.25f) continue;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisCuerpo), true, this);
 		Q.AddIgnoredActor(O);
 		FHitResult Hit;

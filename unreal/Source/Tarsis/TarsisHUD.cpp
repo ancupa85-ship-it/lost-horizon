@@ -37,13 +37,56 @@ void ATarsisHUD::DrawHUD()
 	DrawAlert();
 	DrawGuardMarks();
 	DrawMessage(D);
-	// aviso de derribo: hay un guardia a tiro por la espalda
-	if (D && D->TakedownTarget())
+	DrawObjective(D);
+	DrawPrompt(D);
+	DrawKeypad(D);
+}
+
+void ATarsisHUD::DrawObjective(ATarsisDirector* D)
+{
+	if (!D) return;
+	const FString O = D->Objective();
+	if (O.IsEmpty()) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	const float X = 32.0f * S, Y = 28.0f * S;
+	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+	float W = 0.0f, H = 0.0f;
+	if (F) GetTextSize(O, W, H, F, 0.9f * S);
+	Panel(X, Y, FMath::Max(W, 140.0f * S) + 28.0f * S, 62.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f));
+	Text(D->bDone ? TEXT("FIN") : TEXT("OBJETIVO"), X + 14.0f * S, Y + 6.0f * S, FLinearColor(0.95f, 0.8f, 0.4f), 0.8f * S);
+	Text(O, X + 14.0f * S, Y + 30.0f * S, FLinearColor(1.0f, 1.0f, 1.0f), 0.9f * S);
+}
+
+void ATarsisHUD::DrawPrompt(ATarsisDirector* D)
+{
+	if (!D) return;
+	const FString P = D->InteractPrompt();
+	if (P.IsEmpty()) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+	float W = 200.0f * S, H = 0.0f;
+	if (F) GetTextSize(P, W, H, F, 1.05f * S);
+	W += 40.0f * S;
+	Panel(Canvas->ClipX / 2.0f - W / 2.0f, Canvas->ClipY * 0.56f, W, 40.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
+	Text(P, Canvas->ClipX / 2.0f, Canvas->ClipY * 0.56f + 6.0f * S, FLinearColor(1.0f, 1.0f, 1.0f), 1.05f * S, true);
+}
+
+void ATarsisHUD::DrawKeypad(ATarsisDirector* D)
+{
+	if (!D || !D->bKeypad) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	const float W = 380.0f * S, H = 150.0f * S;
+	const float X = Canvas->ClipX / 2.0f - W / 2.0f, Y = Canvas->ClipY * 0.36f;
+	Panel(X, Y, W, H, FLinearColor(0.02f, 0.03f, 0.03f, 0.8f));
+	Text(TEXT("ARCHIVO - CLAVE"), Canvas->ClipX / 2.0f, Y + 10.0f * S, FLinearColor(0.6f, 0.9f, 0.7f), 0.9f * S, true);
+	FString Code;
+	for (int32 i = 0; i < 4; ++i)
 	{
-		const float S = Canvas->ClipY / 1080.0f;
-		Panel(Canvas->ClipX / 2.0f - 120.0f * S, Canvas->ClipY * 0.56f, 240.0f * S, 40.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
-		Text(TEXT("E   DERRIBAR"), Canvas->ClipX / 2.0f, Canvas->ClipY * 0.56f + 6.0f * S, FLinearColor(1.0f, 1.0f, 1.0f), 1.05f * S, true);
+		Code += i < D->KeypadInput.Len() ? D->KeypadInput.Mid(i, 1) : TEXT("_");
+		if (i < 3) Code += TEXT("  ");
 	}
+	Text(Code, Canvas->ClipX / 2.0f, Y + 44.0f * S, FLinearColor(0.45f, 1.0f, 0.55f), 1.8f * S, true);
+	Text(TEXT("Teclea 4 cifras   Retroceso borra   E cierra"), Canvas->ClipX / 2.0f, Y + 112.0f * S, FLinearColor(0.75f, 0.75f, 0.75f), 0.75f * S, true);
 }
 
 void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
