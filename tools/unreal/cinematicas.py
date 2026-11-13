@@ -48,7 +48,8 @@ def secuencia(nombre, seg, claves, focal=24.0, fundido=None):
 
     cam = seq.add_spawnable_from_class(unreal.CineCameraActor)
     plantilla = cam.get_object_template()
-    cc = plantilla.get_cine_camera_component()
+    # en 5.8 get_cine_camera_component() da None sobre la plantilla del spawnable
+    cc = plantilla.get_cine_camera_component() or plantilla.get_editor_property('camera_component')
     cc.set_editor_property('current_focal_length', focal)
     fs = cc.get_editor_property('focus_settings')
     fs.set_editor_property('focus_method', unreal.CameraFocusMethod.DISABLE)
@@ -98,8 +99,9 @@ puntos = [
     (8.0, unreal.Vector(9200, 4200, 1600)),
 ]
 claves = [(t, p, mira(p, CENTRO)) for t, p in puntos]
-# acercamiento: a 6 m del jugador, por detrás y por encima, mirando hacia donde él mira
-atras = unreal.MathLibrary.get_forward_vector(rot_ojo) * -600 + unreal.Vector(0, 0, 350)
+# acercamiento: a 3,5 m del jugador, por detrás y por encima, mirando hacia donde él mira
+# (a 6 m y +350 caía sobre la esquina del muro perimetral, base_muro z 465)
+atras = unreal.MathLibrary.get_forward_vector(rot_ojo) * -350 + unreal.Vector(0, 0, 300)
 cerca = ojo + atras
 claves.append((11.5, cerca, mira(cerca, ojo + unreal.MathLibrary.get_forward_vector(rot_ojo) * 400)))
 claves.append((14.0, ojo, unreal.Rotator(roll=0, pitch=rot_ojo.pitch, yaw=rot_ojo.yaw)))
@@ -116,9 +118,9 @@ secuencia('LS_Salida', 10, [
     (10.0, p2, mira(p2, CENTRO)),
 ], focal=28.0, fundido=(6.0, 0.7))
 
-# ---- marisma (portillo en 310, 4900): desde el agua, la cámara se aleja hacia el oeste a ras de cañas
+# ---- marisma (portillo en 310, 4900): desde el agua, la cámara se aleja hacia el oeste
 portillo = unreal.Vector(310, 4900, 100)
-m0 = unreal.Vector(-350, 4950, 140)
+m0 = unreal.Vector(-900, 5200, 400)   # más cerca, el muro exterior llena el plano de negro
 m1 = unreal.Vector(-1500, 5300, 320)
 m2 = unreal.Vector(-4200, 5900, 1100)
 secuencia('LS_Marisma', 10, [

@@ -462,7 +462,7 @@ void ATarsisGuard::SetFlashlight(bool bOn)
 		Flashlight->SetRelativeLocationAndRotation(FVector(35.0f, 18.0f, 55.0f), FRotator(-12.0f, 0.0f, 0.0f));   // a la altura del pecho, algo hacia abajo
 		Flashlight->SetIntensityUnits(ELightUnits::Lumens);
 		Flashlight->SetIntensity(2500.0f);
-		Flashlight->SetAttenuationRadius(1400.0f);
+		Flashlight->SetAttenuationRadius(2600.0f);   // más que la vista normal (ViewDistance 2000): de frente te ve antes
 		Flashlight->SetInnerConeAngle(10.0f);
 		Flashlight->SetOuterConeAngle(20.0f);
 		Flashlight->SetLightColor(FLinearColor(1.0f, 0.93f, 0.8f));
