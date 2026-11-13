@@ -114,7 +114,7 @@ void ATarsisGuard::SetupBody()
 void ATarsisGuard::UpdateAnim()
 {
 	USkeletalMeshComponent* M = GetMesh();
-	if (!BodyMesh || !M) return;
+	if (!BodyMesh || !M || State == ETarsisGuardState::Down) return;
 	const float Speed = GetVelocity().Size2D();
 	UAnimationAsset* Want = IdleAnim;
 	if (Speed > 15.0f && WalkAnim) Want = WalkAnim;
@@ -147,11 +147,88 @@ void ATarsisGuard::BeginPlay()
 
 void ATarsisGuard::Alarm(const FVector& Where)
 {
-	if (bTowerSentry || State == ETarsisGuardState::Alert) return;
+	if (bTowerSentry || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
 	LastSeen = Where;
 	UnseenT = 0.0f;
 	Meter = 1.0f;
 	SetState(ETarsisGuardState::Alert);
+}
+
+bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
+{
+	if (!Who || bTowerSentry || State == ETarsisGuardState::Down) return false;
+	const FVector D = Who->GetActorLocation() - GetActorLocation();
+	if (D.Size2D() > 160.0f || FMath::Abs(D.Z) > 120.0f) return false;
+	// por la espalda: el jugador queda detrás de él (o de lado-atrás); de frente solo si no te ve venir
+	return FVector::DotProduct(GetActorForwardVector(), D.GetSafeNormal2D()) < -0.2f;
+}
+
+void ATarsisGuard::KnockOut()
+{
+	if (State == ETarsisGuardState::Down) return;
+	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+	State = ETarsisGuardState::Down;
+	StateT = 0.0f;
+	DownT = KnockOutTime;
+	Meter = 0.0f;
+	bFound = false;
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);   // se le puede pasar por encima
+	USkeletalMeshComponent* M = GetMesh();
+	if (BodyMesh && M)
+	{
+		if (DownAnim) { M->PlayAnimation(DownAnim, false); CurrentAnim = DownAnim; }
+		M->SetPlayRate(1.0f);
+	}
+	else
+	{
+		Body->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));   // cilindro tumbado
+	}
+	UpdateMark();
+}
+
+void ATarsisGuard::WakeUp()
+{
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+	Body->SetRelativeRotation(FRotator::ZeroRotator);
+	CurrentAnim = nullptr;   // UpdateAnim vuelve a poner la que toque
+	LastSeen = GetActorLocation();
+	Meter = 0.6f;
+	bFound = false;
+	SetState(ETarsisGuardState::Search);   // se levanta buscando a quien le ha tumbado
+	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It)
+	{
+		It->ShowMessage(FString::Printf(TEXT("%s SE HA DESPERTADO\nBusca a quien le ha tumbado."), *GuardName.ToUpper()), 4.0f);
+		break;
+	}
+}
+
+void ATarsisGuard::LookForBodies()
+{
+	if (State == ETarsisGuardState::Alert) return;
+	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		ATarsisGuard* O = *It;
+		if (O == this || O->State != ETarsisGuardState::Down || O->bFound) continue;
+		const FVector P = O->GetActorLocation();
+		const float D = FVector::Dist(Eye, P);
+		if (D > ViewDistance * 0.7f) continue;
+		if (D > NearDistance && FVector::DotProduct(GetActorForwardVector(), (P - Eye).GetSafeNormal2D()) < FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle))) continue;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisCuerpo), true, this);
+		Q.AddIgnoredActor(O);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, P, ECC_Visibility, Q)) continue;
+		// lo ha visto: da la voz, va corriendo y el caído se despierta pronto
+		O->bFound = true;
+		O->DownT = FMath::Min(O->DownT, 6.0f);
+		Alarm(P);
+		for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
+		{
+			Dt->ShowMessage(FString::Printf(TEXT("%s HA ENCONTRADO A %s EN EL SUELO\nToda la base te busca."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 5.0f);
+			break;
+		}
+		break;
+	}
 }
 
 void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
@@ -302,7 +379,7 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 
 float ATarsisGuard::Visibility(const AActor* Target) const
 {
-	if (!Target) return 0.0f;
+	if (!Target || State == ETarsisGuardState::Down) return 0.0f;
 	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
 	const FVector Aim = Target->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f);
 	const float D = FVector::Dist(Eye, Aim);
@@ -344,6 +421,7 @@ void ATarsisGuard::Caught(APawn* Player)
 	}
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
+		if (It->State == ETarsisGuardState::Down) continue;
 		It->Meter = 0.0f;
 		It->SetState(ETarsisGuardState::Return);
 	}
@@ -353,7 +431,14 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	StateT += DeltaSeconds;
+	if (State == ETarsisGuardState::Down)
+	{
+		DownT -= DeltaSeconds;
+		if (DownT <= 0.0f) WakeUp();
+		return;
+	}
 	UpdateAnim();
+	LookForBodies();
 
 	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
 	const float V = Visibility(Player);

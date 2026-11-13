@@ -40,6 +40,7 @@ void ATarsisDirector::SetupPlayer()
 	{
 		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
 		InputComponent->BindKey(EKeys::LeftControl, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
+		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ATarsisDirector::Takedown);
 	}
 	bPlayerReady = true;
 	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado."), 7.0f);
@@ -112,6 +113,30 @@ void ATarsisDirector::OpenCell()
 	}
 	Bars.Empty();
 	ShowMessage(TEXT("CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia."), 8.0f);
+}
+
+ATarsisGuard* ATarsisDirector::TakedownTarget() const
+{
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P) return nullptr;
+	ATarsisGuard* Best = nullptr;
+	float BestD = TNumericLimits<float>::Max();
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (!It->CanBeTakenDown(P)) continue;
+		const float D = FVector::DistSquared(It->GetActorLocation(), P->GetActorLocation());
+		if (D < BestD) { BestD = D; Best = *It; }
+	}
+	return Best;
+}
+
+void ATarsisDirector::Takedown()
+{
+	ATarsisGuard* G = TakedownTarget();
+	if (!G) return;
+	G->KnockOut();
+	++Takedowns;
+	ShowMessage(FString::Printf(TEXT("%s DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma."), *G->GuardName.ToUpper()), 4.0f);
 }
 
 void ATarsisDirector::ToggleCrouch()

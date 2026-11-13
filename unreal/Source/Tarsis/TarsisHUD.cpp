@@ -37,6 +37,13 @@ void ATarsisHUD::DrawHUD()
 	DrawAlert();
 	DrawGuardMarks();
 	DrawMessage(D);
+	// aviso de derribo: hay un guardia a tiro por la espalda
+	if (D && D->TakedownTarget())
+	{
+		const float S = Canvas->ClipY / 1080.0f;
+		Panel(Canvas->ClipX / 2.0f - 120.0f * S, Canvas->ClipY * 0.56f, 240.0f * S, 40.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
+		Text(TEXT("E   DERRIBAR"), Canvas->ClipX / 2.0f, Canvas->ClipY * 0.56f + 6.0f * S, FLinearColor(1.0f, 1.0f, 1.0f), 1.05f * S, true);
+	}
 }
 
 void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
@@ -96,7 +103,7 @@ void ATarsisHUD::DrawGuardMarks()
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		const ETarsisGuardState St = It->State;
-		if (St == ETarsisGuardState::Patrol || St == ETarsisGuardState::Return) continue;
+		if (St == ETarsisGuardState::Patrol || St == ETarsisGuardState::Return || St == ETarsisGuardState::Down) continue;
 		const bool bAlert = St == ETarsisGuardState::Alert;
 		const FLinearColor Col = bAlert ? FLinearColor(1.0f, 0.23f, 0.18f) : FLinearColor(1.0f, 0.82f, 0.23f);
 		const FVector P = It->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f);

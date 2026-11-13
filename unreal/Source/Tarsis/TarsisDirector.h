@@ -52,6 +52,13 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	int32 Captures = 0;
 
+	/** Guardia que se puede derribar ahora con la E (o nullptr). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	class ATarsisGuard* TakedownTarget() const;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	int32 Takedowns = 0;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -63,6 +70,7 @@ private:
 	void OpenCell();
 	float LightT = 0.0f;
 	void ToggleCrouch();
+	void Takedown();
 	void SetupPlayer();
 	bool bPlayerReady = false;
 };

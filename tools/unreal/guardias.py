@@ -42,7 +42,7 @@ def cuerpo(g, nombre):
     if not p:
         return
     g.set_editor_property('body_mesh', p['malla'])
-    for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim')):
+    for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim'), ('down_anim', 'down')):
         if p.get(k):
             g.set_editor_property(prop, p[k])
     # set_editor_property ya avisa al actor del cambio (OnConstruction -> SetupBody); rerun_construction_scripts
@@ -83,6 +83,7 @@ def centinelas(eas, cls):
         yaw = math.degrees(math.atan2(-d[1], d[0]))   # Blender -> Unreal: Y cambia de signo
         g = eas.spawn_actor_from_class(cls, loc, unreal.Rotator(roll=0, pitch=0, yaw=yaw))
         g.set_actor_label('Centinela_' + t['name'])
+        g.set_editor_property('guard_name', 'centinela de la torre %d' % (i + 1))
         g.set_folder_path('Guardias')
         g.set_editor_property('tower_sentry', True)
         g.set_editor_property('tower_yaw', yaw)
@@ -116,6 +117,7 @@ def colocar():
         pts = [casilla(c, r) for c, r in ronda]
         g = eas.spawn_actor_from_class(cls, pts[0], unreal.Rotator(0, 0, 0))
         g.set_actor_label('Guardia_' + nombre)
+        g.set_editor_property('guard_name', nombre)
         g.set_folder_path('Guardias')
         g.set_editor_property('patrol_points', pts)
         if isinstance(espera, list):

@@ -19,7 +19,8 @@ enum class ETarsisGuardState : uint8
 	Suspicious UMETA(DisplayName = "Mosqueado"),
 	Alert      UMETA(DisplayName = "Alerta"),
 	Search     UMETA(DisplayName = "Buscando"),
-	Return     UMETA(DisplayName = "Volviendo")
+	Return     UMETA(DisplayName = "Volviendo"),
+	Down       UMETA(DisplayName = "Derribado")
 };
 
 UCLASS()
@@ -91,6 +92,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Alarm(const FVector& Where);
 
+	/** Derribado por la espalda: cae y duerme KnockOutTime segundos; si otro guardia lo ve, da la alarma. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void KnockOut();
+
+	/** Se le puede derribar ahora desde la posición de Who (cerca, por la espalda, sin ser centinela ni estar ya caído). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	bool CanBeTakenDown(const AActor* Who) const;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	float KnockOutTime = 100.0f;
+
+	/** Nombre para los avisos («Ibarra»...). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	FString GuardName;
+
+	/** Ya lo ha encontrado otro guardia. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
+	bool bFound = false;
+
 	/** Cuerpo con esqueleto (personas del juego web, importadas por tools/unreal/personas.py). Sin él se ve el cilindro provisional. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	TObjectPtr<USkeletalMesh> BodyMesh;
@@ -104,6 +124,10 @@ public:
 	/** Apuntando (en alerta cuando se para). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	TObjectPtr<UAnimationAsset> AimAnim;
+
+	/** Caer al suelo (derribado). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	TObjectPtr<UAnimationAsset> DownAnim;
 
 	/** Velocidad (cm/s) a la que la animación de andar no patina; con más velocidad se reproduce más rápido. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
@@ -146,6 +170,9 @@ private:
 	FVector Home = FVector::ZeroVector;
 	FVector MoveDest = FVector(1e9f);
 	bool bNoPath = false;
+	float DownT = 0.0f;
+	void WakeUp();
+	void LookForBodies();
 
 	void SetState(ETarsisGuardState NewState);
 	void Walk(const FVector& Dest, float Speed);
