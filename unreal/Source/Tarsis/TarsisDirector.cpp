@@ -234,6 +234,8 @@ UStaticMeshComponent* ATarsisDirector::AddBlock(const FVector& Loc, const FVecto
 	B->SetWorldLocation(Loc);
 	B->SetWorldScale3D(Scale);
 	B->SetCanEverAffectNavigation(false);
+	// el cubo del motor trae WorldGridMaterial (cuadros, sin parámetro Color): se usa el material de formas básicas
+	if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"))) B->SetMaterial(0, Base);
 	B->SetCollisionProfileName(bCollide ? TEXT("BlockAll") : TEXT("NoCollision"));
 	B->RegisterComponent();
 	if (UMaterialInstanceDynamic* M = B->CreateDynamicMaterialInstance(0)) M->SetVectorParameterValue(TEXT("Color"), Color);
