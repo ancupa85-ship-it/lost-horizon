@@ -44,6 +44,8 @@ void ATarsisDirector::SetupPlayer()
 		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
 		InputComponent->BindKey(EKeys::LeftControl, IE_Pressed, this, &ATarsisDirector::ToggleCrouch);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ATarsisDirector::Interact);
+		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ATarsisDirector::ThrowStone);
+		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
 		// teclado del archivo: cifras de arriba y del teclado numérico, y Retroceso para borrar
 		const FKey Keys[] = { EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six,
 			EKeys::Seven, EKeys::Eight, EKeys::Nine, EKeys::NumPadZero, EKeys::NumPadOne, EKeys::NumPadTwo,
@@ -56,7 +58,7 @@ void ATarsisDirector::SetupPlayer()
 		}
 	}
 	bPlayerReady = true;
-	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra."), 9.0f);
+	ShowMessage(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (C) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\nQ lanza una piedra para distraer. B prismaticos: marca a los guardias que mires."), 10.0f);
 }
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
@@ -70,6 +72,7 @@ void ATarsisDirector::Captured(APawn* Player)
 	if (!Player) return;
 	StopDrag();
 	bKeypad = false;
+	if (bBinoculars) ToggleBinoculars();
 	++Captures;
 	ACharacter* C = Cast<ACharacter>(Player);
 	if (C && C->bIsCrouched) C->UnCrouch();
@@ -193,6 +196,8 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 
 	if (MessageT > 0.0f) MessageT -= DeltaSeconds;
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
+	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
+	BinocularTick();
 	if (!bDone) MissionTime += DeltaSeconds;
 	DragTick();
 	if (bKeypad && !NearPlayer(Cell(6, 17), 260.0f)) { bKeypad = false; KeypadInput.Reset(); }
@@ -261,7 +266,10 @@ void ATarsisDirector::SetupMission()
 		return P;
 	};
 	NoteProp = AddBlock(Rest(Cell(3, 17)) + FVector(0.0f, 0.0f, 1.0f), FVector(0.21f, 0.30f, 0.01f), FLinearColor(0.9f, 0.88f, 0.8f), false);
-	FileProp = AddBlock(Rest(Cell(9, 17)) + FVector(0.0f, 0.0f, 2.5f), FVector(0.24f, 0.32f, 0.04f), FLinearColor(0.55f, 0.42f, 0.2f), false);
+	// en el archivo no hay mesa: se pone una (1,2 x 0,6 m, 75 cm de alto) y el expediente encima
+	const FVector Floor = Rest(Cell(9, 17));
+	AddBlock(Floor + FVector(0.0f, 0.0f, 37.5f), FVector(1.2f, 0.6f, 0.75f), FLinearColor(0.16f, 0.11f, 0.07f), true);
+	FileProp = AddBlock(Floor + FVector(0.0f, 0.0f, 77.0f), FVector(0.24f, 0.32f, 0.04f), FLinearColor(0.55f, 0.42f, 0.2f), false);
 }
 
 ATarsisGuard* ATarsisDirector::DownedNear(float Radius) const
@@ -428,4 +436,83 @@ void ATarsisDirector::DragTick()
 	if (FVector::Dist2D(Want, Dragged->GetActorLocation()) > 400.0f) { StopDrag(); return; }   // se ha quedado enganchado
 	Dragged->SetActorLocation(Want, true);
 	Dragged->SetActorRotation(FRotator(0.0f, Back.Rotation().Yaw, 0.0f));
+}
+
+// ---------------------------------------------------------------- piedras y prismáticos
+
+void ATarsisDirector::ThrowStone()
+{
+	if (StoneT > 0.0f || bKeypad || bDone || Dragged) return;
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!PC || !Pl) return;
+	FVector Loc; FRotator Rot;
+	PC->GetPlayerViewPoint(Loc, Rot);
+	// tiro parabólico a unos 11 m/s hacia donde miras, por tramos de 50 ms hasta que choca con algo
+	FVector P = Loc + Rot.Vector() * 40.0f;
+	FVector Vel = Rot.Vector() * 1100.0f + FVector(0.0f, 0.0f, 250.0f);
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisPiedra), true, this);
+	Q.AddIgnoredActor(Pl);
+	bool bHit = false;
+	for (int32 i = 0; i < 80 && !bHit; ++i)
+	{
+		const FVector N = P + Vel * 0.05f;
+		Vel.Z -= 980.0f * 0.05f;
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, P, N, ECC_Visibility, Q)) { bHit = true; P = Hit.ImpactPoint; }
+		else P = N;
+	}
+	StoneT = 1.2f;
+	LastStone = P;
+	if (UStaticMeshComponent* S = AddBlock(P + FVector(0.0f, 0.0f, 3.0f), FVector(0.06f, 0.05f, 0.05f), FLinearColor(0.3f, 0.29f, 0.27f), false))
+	{
+		Stones.Add(S);
+		if (Stones.Num() > 6) { if (Stones[0]) Stones[0]->DestroyComponent(); Stones.RemoveAt(0); }
+	}
+	int32 Heard = 0;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (FVector::Dist(It->GetActorLocation(), P) < NoiseRadius && It->State != ETarsisGuardState::Alert && It->State != ETarsisGuardState::Down && !It->bTowerSentry)
+		{
+			It->HearNoise(P);
+			++Heard;
+		}
+	}
+	if (Heard == 0) ShowMessage(TEXT("CLAC\nNadie lo ha oido."), 1.5f);
+}
+
+void ATarsisDirector::ToggleBinoculars()
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	UCameraComponent* Cam = C ? C->FindComponentByClass<UCameraComponent>() : nullptr;
+	if (!Cam) return;
+	if (!bBinoculars && (bKeypad || Dragged)) return;
+	bBinoculars = !bBinoculars;
+	if (bBinoculars) { SavedFov = Cam->FieldOfView; Cam->SetFieldOfView(18.0f); }
+	else Cam->SetFieldOfView(SavedFov > 0.0f ? SavedFov : 90.0f);
+}
+
+void ATarsisDirector::BinocularTick()
+{
+	if (!bBinoculars) return;
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC) return;
+	FVector Loc; FRotator Rot;
+	PC->GetPlayerViewPoint(Loc, Rot);
+	const FVector Fwd = Rot.Vector();
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisPrismaticos), true, this);
+	if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->bMarked) continue;
+		const FVector Head = It->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+		const FVector D = Head - Loc;
+		if (D.Size() > 6000.0f || FVector::DotProduct(Fwd, D.GetSafeNormal()) < FMath::Cos(FMath::DegreesToRadians(7.0f))) continue;
+		FCollisionQueryParams Q2 = Q;
+		Q2.AddIgnoredActor(*It);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Loc, Head, ECC_Visibility, Q2)) continue;
+		It->bMarked = true;
+		ShowMessage(FString::Printf(TEXT("%s MARCADO\nLo veras aunque haya paredes por medio."), *It->GuardName.ToUpper()), 2.5f);
+	}
 }

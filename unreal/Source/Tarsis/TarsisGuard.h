@@ -92,6 +92,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Alarm(const FVector& Where);
 
+	/** Ha oído un ruido (una piedra): se acerca despacio a mirar y busca un rato; luego vuelve a su ronda. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void HearNoise(const FVector& Where);
+
+	/** Marcado con los prismáticos: el HUD muestra su nombre y estado aunque esté detrás de una pared. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Estado")
+	bool bMarked = false;
+
 	/** Derribado por la espalda: cae y duerme KnockOutTime segundos; si otro guardia lo ve, da la alarma. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void KnockOut();
@@ -171,6 +179,7 @@ private:
 	FVector MoveDest = FVector(1e9f);
 	bool bNoPath = false;
 	float DownT = 0.0f;
+	bool bInvestigate = false;
 	void WakeUp();
 	void LookForBodies();
 

@@ -24,6 +24,8 @@ private:
 	void DrawObjective(class ATarsisDirector* D);
 	void DrawPrompt(class ATarsisDirector* D);
 	void DrawKeypad(class ATarsisDirector* D);
+	void DrawBinoculars(class ATarsisDirector* D);
+	void DrawMarked();
 	void Panel(float X, float Y, float W, float H, const FLinearColor& C);
 	void Text(const FString& S, float X, float Y, const FLinearColor& C, float Scale, bool bCenter = false);
 };

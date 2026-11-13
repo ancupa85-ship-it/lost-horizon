@@ -154,6 +154,15 @@ void ATarsisGuard::Alarm(const FVector& Where)
 	SetState(ETarsisGuardState::Alert);
 }
 
+void ATarsisGuard::HearNoise(const FVector& Where)
+{
+	if (bTowerSentry || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
+	LastSeen = Where;
+	Meter = FMath::Max(Meter, 0.5f);
+	SetState(ETarsisGuardState::Suspicious);
+	bInvestigate = true;
+}
+
 bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
 {
 	if (!Who || bTowerSentry || State == ETarsisGuardState::Down) return false;
@@ -285,6 +294,7 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 {
 	State = NewState;
 	StateT = 0.0f;
+	if (NewState != ETarsisGuardState::Suspicious) bInvestigate = false;
 	WaitT = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = (State == ETarsisGuardState::Alert) ? RunSpeed : WalkSpeed;
 	if (AAIController* AI = Cast<AAIController>(GetController()))
@@ -495,6 +505,13 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		// se para, mira hacia donde vio algo y, si sigue, se acerca despacio
 		if (Meter >= 1.0f) { SetState(ETarsisGuardState::Alert); break; }
 		FaceTowards(LastSeen, DeltaSeconds);
+		if (bInvestigate)
+		{
+			// un ruido: va a mirar (aunque se le pase la sospecha) y allí busca; si no llega, lo deja a los 25 s
+			if (StateT > 1.0f && !Near2D(LastSeen, 150.0f)) Walk(LastSeen, WalkSpeed * 0.8f);
+			if (Near2D(LastSeen, 150.0f) || StateT > 25.0f) { bInvestigate = false; SetState(ETarsisGuardState::Search); }
+			break;
+		}
 		if (StateT > 1.5f && !Near2D(LastSeen, 120.0f)) Walk(LastSeen, WalkSpeed * 0.7f);
 		if (Meter <= 0.0f && StateT > 3.0f) SetState(ETarsisGuardState::Return);
 		break;

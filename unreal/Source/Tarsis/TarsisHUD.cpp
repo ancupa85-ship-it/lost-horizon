@@ -33,6 +33,8 @@ void ATarsisHUD::DrawHUD()
 	ATarsisDirector* D = nullptr;
 	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { D = *It; break; }
 	const ACharacter* C = Cast<ACharacter>(GetOwningPawn());
+	DrawBinoculars(D);
+	DrawMarked();
 	DrawLight(D, C && C->bIsCrouched);
 	DrawAlert();
 	DrawGuardMarks();
@@ -40,6 +42,46 @@ void ATarsisHUD::DrawHUD()
 	DrawObjective(D);
 	DrawPrompt(D);
 	DrawKeypad(D);
+}
+
+void ATarsisHUD::DrawBinoculars(ATarsisDirector* D)
+{
+	if (!D || !D->bBinoculars) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	const float W = Canvas->ClipX, H = Canvas->ClipY;
+	// dos círculos de los prismáticos, aproximados con franjas negras arriba, abajo y a los lados
+	const FLinearColor K(0.0f, 0.0f, 0.0f, 0.92f);
+	Panel(0.0f, 0.0f, W, H * 0.12f, K);
+	Panel(0.0f, H * 0.88f, W, H * 0.12f, K);
+	Panel(0.0f, 0.0f, W * 0.1f, H, K);
+	Panel(W * 0.9f, 0.0f, W * 0.1f, H, K);
+	Panel(W / 2.0f - 1.0f * S, H * 0.12f, 2.0f * S, H * 0.76f, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
+	Panel(W / 2.0f - 30.0f * S, H / 2.0f - 1.0f * S, 60.0f * S, 2.0f * S, FLinearColor(1.0f, 1.0f, 1.0f, 0.35f));
+	Text(TEXT("PRISMATICOS  x5   -   mira a un guardia para marcarlo   -   B para bajar"), W / 2.0f, H * 0.9f, FLinearColor(0.8f, 0.8f, 0.8f), 0.85f * S, true);
+}
+
+void ATarsisHUD::DrawMarked()
+{
+	APlayerController* PC = GetOwningPlayerController();
+	const APawn* Pl = GetOwningPawn();
+	if (!PC || !Pl) return;
+	const float S = Canvas->ClipY / 1080.0f;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (!It->bMarked) continue;
+		FVector2D Scr;
+		if (!PC->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.0f, 0.0f, 135.0f), Scr, true)) continue;
+		if (Scr.X < 0.0f || Scr.Y < 0.0f || Scr.X > Canvas->ClipX || Scr.Y > Canvas->ClipY) continue;
+		const ETarsisGuardState St = It->State;
+		FLinearColor Col(0.85f, 0.9f, 1.0f, 0.85f);
+		if (St == ETarsisGuardState::Alert) Col = FLinearColor(1.0f, 0.23f, 0.18f);
+		else if (St == ETarsisGuardState::Suspicious || St == ETarsisGuardState::Search) Col = FLinearColor(1.0f, 0.82f, 0.23f);
+		else if (St == ETarsisGuardState::Down) Col = FLinearColor(0.55f, 0.55f, 0.55f, 0.8f);
+		const int32 M = FMath::RoundToInt(FVector::Dist(It->GetActorLocation(), Pl->GetActorLocation()) / 100.0f);
+		const FString L = FString::Printf(TEXT("%s  %dm%s"), *It->GuardName.ToUpper(), M, St == ETarsisGuardState::Down ? TEXT("  (KO)") : TEXT(""));
+		Panel(Scr.X - 3.0f * S, Scr.Y + 4.0f * S, 6.0f * S, 6.0f * S, Col);
+		Text(L, Scr.X, Scr.Y - 20.0f * S, Col, 0.7f * S, true);
+	}
 }
 
 void ATarsisHUD::DrawObjective(ATarsisDirector* D)

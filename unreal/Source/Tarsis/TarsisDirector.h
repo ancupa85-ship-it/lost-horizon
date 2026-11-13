@@ -115,6 +115,24 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
 	float MissionTime = 0.0f;
 
+	/** Q: lanza una piedra hacia donde miras; los guardias a menos de NoiseRadius van a mirar. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void ThrowStone();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	float NoiseRadius = 900.0f;
+
+	/** Dónde cayó la última piedra (para pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	FVector LastStone = FVector::ZeroVector;
+
+	/** B: prismáticos (zoom); el guardia al que miras queda marcado. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void ToggleBinoculars();
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	bool bBinoculars = false;
+
 	/** Guardia caído que vas arrastrando (o nullptr). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	TObjectPtr<class ATarsisGuard> Dragged;
@@ -154,4 +172,9 @@ private:
 	float SavedWalk = 0.0f;
 	float SavedCrouch = 0.0f;
 	float KeypadErrT = 0.0f;
+	float StoneT = 0.0f;
+	float SavedFov = 0.0f;
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> Stones;
+	void BinocularTick();
 };
