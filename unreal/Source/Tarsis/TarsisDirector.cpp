@@ -27,6 +27,7 @@
 #include "Components/SpotLightComponent.h"
 #include "Components/PointLightComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "Algo/Sort.h"
 #include "LevelSequence.h"
 #include "LevelSequencePlayer.h"
 #include "LevelSequenceActor.h"
@@ -42,6 +43,7 @@ void ATarsisDirector::BeginPlay()
 {
 	Super::BeginPlay();
 	SetupMission();
+	SetupBarrier();
 	SetupSound();
 	SetupPlayer();
 	SetWeather(Weather);
@@ -248,6 +250,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	RainTick(DeltaSeconds);
 	RadioTick(DeltaSeconds);
 	PowerTick(DeltaSeconds);
+	BarrierTick(DeltaSeconds);
 	if (HeardT > 0.0f) HeardT -= DeltaSeconds;
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
 	if (ATarsisGuard* R = FindGuard(TEXT("Ramos")))
@@ -750,6 +753,29 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	bMarsh = bByMarsh;
 	StopDrag();
 	if (bBinoculars) ToggleBinoculars();
+	FString GateLine;
+	if (!bByMarsh)
+	{
+		// en el control, el de la garita levanta la barrera y mira hacia otro lado (sale en el plano de LS_Salida)
+		BarrierT = 0.001f;
+		ATarsisGuard* Best = nullptr;
+		float BestD = TNumericLimits<float>::Max();
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			if (It->State == ETarsisGuardState::Down || It->bTowerSentry || It->bAlly) continue;
+			const float D = FVector::Dist(It->GetActorLocation(), ExitBarrierLoc);
+			if (D < BestD) { BestD = D; Best = *It; }
+		}
+		if (Best)
+		{
+			const FRotator R(0.0f, ExitBarrierYaw, 0.0f);
+			const FVector Spot = ExitBarrierLoc + R.RotateVector(FVector(-60.0f, -110.0f, 0.0f));
+			Best->SetActorLocationAndRotation(FVector(Spot.X, Spot.Y, Best->GetActorLocation().Z), FRotator(0.0f, ExitBarrierYaw + 150.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+			Best->SetFlashlight(false);
+			Best->Hold(3600.0f);
+			GateLine = FString::Printf(TEXT("\nEn la garita, %s levanta la barrera y mira hacia la marisma."), *Best->GuardName);
+		}
+	}
 	PlayCine(bByMarsh ? TEXT("LS_Marisma") : TEXT("LS_Salida"), false);
 	const int32 Secs = FMath::FloorToInt(MissionTime);
 	const FString Stats = FString::Printf(TEXT("Tiempo %d:%02d   Capturas %d   Derribos %d"), Secs / 60, Secs % 60, Captures, Takedowns);
@@ -759,7 +785,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	}
 	else
 	{
-		FString T = FString(TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.\n")) + Stats;
+		FString T = FString(TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.")) + GateLine + TEXT("\n") + Stats;
 		if (bRamosAlly) T += TEXT("\nRamos sale solo por la marisma y os espera en el camino de Trebujena.");
 		ShowMessage(T, 15.0f);
 	}
@@ -1083,14 +1109,18 @@ void ATarsisDirector::CutPower()
 	PowerT = 60.0f;
 	RepairT = 0.0f;
 	OffLights.Reset();
-	// se apagan farolas, focos de las torres y luces de dentro (el cielo y la luna siguen)
+	PendingOff.Reset();
+	OffClock = 0.0f;
+	// se apagan farolas, focos de las torres y luces de dentro (el cielo y la luna siguen), en cadena desde el
+	// generador hacia fuera en unos 2,5 s, cada una con su chasquido: ves venir la oscuridad
 	for (TActorIterator<ALight> It(GetWorld()); It; ++It)
 	{
 		ULocalLightComponent* L = Cast<ULocalLightComponent>(It->GetLightComponent());
 		if (!L || !L->IsVisible()) continue;
-		L->SetVisibility(false);
-		OffLights.Add(L);
+		PendingOff.Add(L);
 	}
+	const FVector G = GeneratorLoc;
+	Algo::Sort(PendingOff, [G](const TObjectPtr<ULightComponent>& A, const TObjectPtr<ULightComponent>& B) { return FVector::DistSquared(A->GetComponentLocation(), G) < FVector::DistSquared(B->GetComponentLocation(), G); });
 	if (HumComp) HumComp->Stop();
 	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, GeneratorLoc + FVector(0.0f, 0.0f, 80.0f), 1.0f, 0.6f, 0.0f, Atten);
 	TensionT = FMath::Max(TensionT, 60.0f);
@@ -1131,7 +1161,9 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 		if (L) L->SetVisibility(true);
 	}
 	OffLights.Reset();
+	PendingOff.Reset();
 	WindowsDark(false);
+	if (Repairer) Repairer->StopRepair();
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) { It->SetFlashlightShadows(false); It->SetFlashlight(false); }
 	if (HumComp) HumComp->Play();
 	ShowMessage(bByGuard && Repairer
@@ -1143,6 +1175,21 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 void ATarsisDirector::PowerTick(float DeltaSeconds)
 {
 	if (!bPowerOff) return;
+	// apagado en cadena
+	if (PendingOff.Num() > 0)
+	{
+		OffClock += DeltaSeconds;
+		const float Step = 2.5f / FMath::Max(1, PendingOff.Num() + OffLights.Num());
+		while (PendingOff.Num() > 0 && OffClock >= 0.2f + OffLights.Num() * Step)
+		{
+			ULightComponent* L = PendingOff[0];
+			PendingOff.RemoveAt(0);
+			if (!L) continue;
+			L->SetVisibility(false);
+			OffLights.Add(L);
+			if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, L->GetComponentLocation(), 0.45f, 0.45f, 0.0f, Atten);
+		}
+	}
 	// sin luz, los guardias de suelo sacan la linterna (también el que se despierta)
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) It->SetFlashlight(true);
 	PowerT -= DeltaSeconds;
@@ -1151,9 +1198,10 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 	if (Repairer && Repairer->State != ETarsisGuardState::Down && Repairer->State != ETarsisGuardState::Alert)
 	{
 		// tras buscar un rato junto al generador pasaría a volver a su ronda: se le vuelve a mandar (también tras una captura)
-		if (Repairer->State == ETarsisGuardState::Return || Repairer->State == ETarsisGuardState::Patrol) Repairer->HearNoise(GeneratorLoc);
+		if (!Repairer->IsRepairing() && (Repairer->State == ETarsisGuardState::Return || Repairer->State == ETarsisGuardState::Patrol)) Repairer->HearNoise(GeneratorLoc);
 		if (FVector::Dist2D(Repairer->GetActorLocation(), GeneratorLoc) < 320.0f)
 		{
+			if (!Repairer->IsRepairing()) Repairer->StartRepair(GeneratorLoc);   // se queda y barre el patio con la linterna
 			RepairT += DeltaSeconds;
 			if (RepairT >= RepairSeconds) RestorePower(true);
 		}
@@ -1242,4 +1290,24 @@ void ATarsisDirector::OnCineFinished()
 	if (CinePlayer) { CinePlayer->Stop(); CinePlayer = nullptr; }
 	MessageT = 0.0f;
 	IntroText();
+}
+
+// ---------------------------------------------------------------- barrera del control de salida
+
+void ATarsisDirector::SetupBarrier()
+{
+	const FRotator R(0.0f, ExitBarrierYaw, 0.0f);
+	BarrierPost = AddBlock(ExitBarrierLoc + FVector(0.0f, 0.0f, 55.0f), FVector(0.18f, 0.18f, 1.1f), FLinearColor(0.15f, 0.15f, 0.15f), false);
+	BarrierArm = AddBlock(ExitBarrierLoc, FVector(ExitBarrierLength / 100.0f, 0.08f, 0.08f), FLinearColor(0.75f, 0.08f, 0.06f), false);   // sin colisión: no corta la salida
+	BarrierTick(0.0f);
+}
+
+void ATarsisDirector::BarrierTick(float DeltaSeconds)
+{
+	if (!BarrierArm) return;
+	if (BarrierT > 0.0f && BarrierT < 1.0f) BarrierT = FMath::Min(1.0f, BarrierT + DeltaSeconds / 2.5f);
+	const float Pitch = 80.0f * FMath::SmoothStep(0.0f, 1.0f, BarrierT);
+	const FRotator R(Pitch, ExitBarrierYaw, 0.0f);
+	const FVector Pivot = ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f);
+	BarrierArm->SetWorldLocationAndRotation(Pivot + R.RotateVector(FVector(ExitBarrierLength * 0.5f, 0.0f, 0.0f)), R);
 }

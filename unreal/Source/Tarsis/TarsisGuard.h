@@ -193,6 +193,11 @@ public:
 	bool HasFlashlightOn() const;
 	void SetFlashlightShadows(bool bOn);
 
+	/** Arreglando el generador: se queda junto a él barriendo la zona con la linterna (si te ve, deja de arreglar). */
+	void StartRepair(const FVector& Center);
+	void StopRepair();
+	bool IsRepairing() const { return bRepairing; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -221,6 +226,9 @@ private:
 	float DownT = 0.0f;
 	bool bInvestigate = false;
 	float BlendPos = 0.0f;
+	bool bRepairing = false;
+	FVector RepairCenter = FVector::ZeroVector;
+	float SweepT = 0.0f;
 	float HoldT = 0.0f;
 	void WakeUp();
 	void LookForBodies();

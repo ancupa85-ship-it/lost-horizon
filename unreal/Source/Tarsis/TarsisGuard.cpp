@@ -331,6 +331,7 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 {
 	State = NewState;
 	StateT = 0.0f;
+	bRepairing = false;
 	if (NewState == ETarsisGuardState::Down && Flashlight) Flashlight->SetVisibility(false);
 	if (NewState != ETarsisGuardState::Suspicious) bInvestigate = false;
 	WaitT = 0.0f;
@@ -438,6 +439,21 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->Flashlight, Point, *It, Q);
 	}
 	return FMath::Clamp(Sum, 0.0f, 1.0f);
+}
+
+void ATarsisGuard::StartRepair(const FVector& Center)
+{
+	if (State == ETarsisGuardState::Down || State == ETarsisGuardState::Alert) return;
+	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+	RepairCenter = Center;
+	SweepT = 0.0f;
+	bRepairing = true;
+}
+
+void ATarsisGuard::StopRepair()
+{
+	if (!bRepairing) return;
+	SetState(ETarsisGuardState::Return);
 }
 
 void ATarsisGuard::SetFlashlightShadows(bool bOn)
@@ -578,6 +594,19 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	if (bTowerSentry)
 	{
 		TowerTick(DeltaSeconds, Player, V);
+		return;
+	}
+
+	// arreglando el generador: quieto, barre a un lado y otro con la linterna; si te ve del todo, va a por ti
+	if (bRepairing)
+	{
+		if (Meter >= 1.0f) { SetState(ETarsisGuardState::Alert); return; }
+		SweepT += DeltaSeconds;
+		FVector Dir = RepairCenter - GetActorLocation();
+		Dir.Z = 0.0f;
+		const float BaseYaw = Dir.IsNearlyZero() ? GetActorRotation().Yaw : Dir.Rotation().Yaw;
+		const float Want = BaseYaw + 180.0f + 75.0f * FMath::Sin(SweepT * 0.7f);   // de espaldas al generador, mirando el patio
+		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.0f, Want, 0.0f), DeltaSeconds, 90.0f));
 		return;
 	}
 
