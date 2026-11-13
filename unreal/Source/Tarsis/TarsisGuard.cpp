@@ -181,7 +181,7 @@ void ATarsisGuard::HearNoise(const FVector& Where)
 
 bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
 {
-	if (!Who || bTowerSentry || State == ETarsisGuardState::Down) return false;
+	if (!Who || bTowerSentry || bAlly || State == ETarsisGuardState::Down) return false;   // a un aliado (Ramos) no se le derriba por error
 	const FVector D = Who->GetActorLocation() - GetActorLocation();
 	if (D.Size2D() > 160.0f || FMath::Abs(D.Z) > 120.0f) return false;
 	// por la espalda: el jugador queda detrás de él (o de lado-atrás); de frente solo si no te ve venir
