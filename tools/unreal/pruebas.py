@@ -26,8 +26,9 @@ except NameError:   # ejecutado sin archivo (pegado en la consola)
 V = unreal.Vector
 GEN = V(4300, 1700, 0)          # GeneratorLoc
 SITIO = V(4300, 1980, 0)        # RepairSpot (GeneratorLoc + 0,280)
-FAROL = V(6840, 5216, 380)      # farol de la garita
-SALIDA = V(6900, 5300, 0)       # celda G (34, 26)
+FAROL = V(8660, 5640, 380)      # farol de la garita de salida (lo pone SetupBarrier bajo la luminaria del báculo)
+SALIDA = V(9050, 5700, 0)       # ExitLoc: portón de salida del muro nuevo (tanda 20)
+PORTILLO = V(310, 7390, 0)      # WicketLoc: portillo de la marisma, en el muro sur
 
 
 def sin_freno():
@@ -726,17 +727,20 @@ def prueba_reserva():
 
 def prueba_farol():
     d = director()
-    antes = luz_en(V(6800, 5250, 130))
-    tp(6350, 5250, 0); yield 0.1
+    antes = luz_en(V(8620, 5600, 130))
+    tp(8150, 5700, 0); yield 0.1
     mirar(FAROL); yield 0.2
     d.shoot_dart(); yield 0.2
     aparte(); yield 0.3
-    despues = luz_en(V(6800, 5250, 130))
+    despues = luz_en(V(8620, 5600, 130))
     check('el dardo rompe el farol', 'FAROL ROTO' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     check('el control queda a oscuras', despues < antes, '%.2f -> %.2f' % (antes, despues))
 
 def prueba_final():
     d = director()
+    # sin el expediente, el portón de salida no te deja irte: aviso y la misión sigue
+    tp(SALIDA.x, SALIDA.y, 0); yield 0.4
+    check('sin el expediente la salida avisa y no acaba', not d.get_editor_property('done') and 'NO PUEDES IRTE' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
     tp(1300, 3500, 90); yield 0.2
     d.interact(); yield 0.2
     for c in str(d.get_editor_property('vault_code')):
@@ -761,6 +765,35 @@ def prueba_final():
     if 'musica_t0' in R:
         capas = capas_musica()
         check('la música sigue en bucle pasados 32 s', len(capas) == 3 and all(c.is_playing() for c in capas.values()) and time.time() - R['musica_t0'] > 32, '%d s, %s' % (time.time() - R['musica_t0'], {k: c.is_playing() for k, c in capas.items()}))
+
+
+def prueba_perimetro():
+    """Tanda 20: muro 20 m más afuera, camino de portón a portón, portillo en el muro sur y la salida en el portón este."""
+    d = director()
+    w = mundo()
+    def traza(a, b):
+        h = unreal.SystemLibrary.line_trace_single(w, a, b, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [jugador()], unreal.DrawDebugTrace.NONE, True)
+        return h.to_tuple()[4].x if h else None
+    # desde la franja nueva (dentro del muro nuevo), hacia fuera: el muro está 20 m más allá del antiguo
+    xo = traza(V(-1000, 2800, 150), V(-4000, 2800, 150))
+    xe = traza(V(8500, 1500, 150), V(12000, 1500, 150))
+    check('el muro nuevo está al oeste (x -1855) y al este (x 9055)', xo is not None and xe is not None and abs(xo + 1855) < 120 and abs(xe - 9055) < 120, (xo, xe))
+    # los guardias pueden ir por el camino de un portón al otro
+    ruta = unreal.NavigationSystemV1.find_path_to_location_synchronously(w, V(-1000, 5700, 100), V(8500, 5700, 100))
+    pts = list(ruta.get_editor_property('path_points')) if ruta else []
+    check('hay ruta de navegación por el camino', len(pts) > 1 and dist2d(pts[-1], V(8500, 5700, 0)) < 150 and not ruta.is_partial(), '%d puntos%s' % (len(pts), ', parcial' if ruta and ruta.is_partial() else ''))
+    # el tope invisible tras el portón de salida
+    topes = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor) if a.actor_has_tag('Tope_Salida')]
+    check('tope invisible fuera del portón de salida', len(topes) == 1 and topes[0].get_editor_property('hidden') and dist2d(topes[0].get_actor_location(), V(9280, 5700, 0)) < 50, len(topes))
+    # el portillo avisa en su sitio nuevo (sin Ramos, cerrado)
+    tp(PORTILLO.x, PORTILLO.y - 120, 90); yield 0.2
+    check('el aviso del portillo sale en el muro sur', 'PORTILLO' in d.interact_prompt(), d.interact_prompt()[:30])
+    d.interact(); yield 0.2
+    check('el portillo sin Ramos está cerrado', 'PORTILLO DE LA MARISMA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
+    # la partida sigue empezando donde siempre
+    ps = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.PlayerStart)
+    check('el jugador sigue empezando en (500, 500)', ps and dist2d(ps[0].get_actor_location(), V(500, 500, 0)) < 150, [ps[0].get_actor_location() if ps else None])
+    aparte()
 
 
 def capas_musica():
@@ -863,7 +896,7 @@ def prueba_opciones():
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
-            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva]]
+            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro]]
 PRUEBAS = []
 
 

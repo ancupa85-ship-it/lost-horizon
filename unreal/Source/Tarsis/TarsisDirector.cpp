@@ -262,8 +262,17 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (!bDone && !bCine) MissionTime += DeltaSeconds;
 	DragTick();
 	if (bKeypad && !NearPlayer(Cell(6, 17), 260.0f)) { bKeypad = false; KeypadInput.Reset(); }
-	// salida con el expediente
-	if (bFile && !bDone && NearPlayer(Cell(34, 26), 260.0f)) Finish(false);
+	// salida con el expediente; sin él, un aviso (con enfriamiento para no repetirlo en cada fotograma)
+	if (ExitMsgT > 0.0f) ExitMsgT -= DeltaSeconds;
+	if (!bDone && NearPlayer(ExitLoc, ExitRadius))
+	{
+		if (bFile) Finish(false);
+		else if (ExitMsgT <= 0.0f)
+		{
+			ExitMsgT = 6.0f;
+			ShowMessage(Tx(TEXT("salida_sin_expediente"), TEXT("NO PUEDES IRTE TODAVIA\nFalta el expediente de la jefatura.")), 3.0f);
+		}
+	}
 	if (DartT > 0.0f) DartT -= DeltaSeconds;
 	NoiseTick(C, DeltaSeconds);
 	BobTick(C, DeltaSeconds);
@@ -300,8 +309,8 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		if (bRamosAlly && bFile && !bRamosSent && R->State != ETarsisGuardState::Down)
 		{
 			bRamosSent = true;
-			R->GoTo(FVector(310.0f, 4900.0f, R->GetActorLocation().Z));
-			ShowMessage(Tx(TEXT("ramos_radio"), TEXT("RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, muro oeste del patio suroeste.\"")), 6.0f);
+			R->GoTo(FVector(WicketLoc.X, WicketLoc.Y, R->GetActorLocation().Z));
+			ShowMessage(Tx(TEXT("ramos_radio"), TEXT("RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, en el muro sur, junto al agua.\"")), 6.0f);
 		}
 	}
 	if (CellT > 0.0f)
@@ -426,7 +435,7 @@ FString ATarsisDirector::InteractPrompt() const
 		return K.IsNone() ? FString() : Tx(K, *K.ToString());
 	}
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f)) return bKeypad ? FString() : Tx(TEXT("p_teclado"), TEXT("E   TECLADO DEL ARCHIVO"));
-	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f)) return Tx(TEXT("p_portillo"), TEXT("E   PORTILLO DE LA MARISMA"));
+	if (NearPlayer(WicketLoc, 220.0f)) return Tx(TEXT("p_portillo"), TEXT("E   PORTILLO DE LA MARISMA"));
 	if (NearPlayer(GeneratorLoc, 230.0f)) return bPowerOff ? Tx(TEXT("p_generador_parado"), TEXT("GENERADOR: PARADO")) : Tx(TEXT("p_generador"), TEXT("E   CORTAR EL GENERADOR (apaga las luces)"));
 	if (HideSpotNear() >= 0) return Tx(TEXT("p_taquilla"), TEXT("E   ESCONDERTE EN LA TAQUILLA"));
 	return FString();
@@ -514,13 +523,13 @@ void ATarsisDirector::Interact()
 		PlaySfx(TEXT("tecla"), Cell(6, 17, 120.0f), 0.6f);
 		return;
 	}
-	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f))
+	if (NearPlayer(WicketLoc, 220.0f))
 	{
 		ATarsisGuard* R = FindGuard(TEXT("Ramos"));
 		if (!bRamosAlly) { ShowMessage(Tx(TEXT("portillo_cerrado"), TEXT("PORTILLO DE LA MARISMA\nCerrado. La llave la guarda el cuartelero del barracon oeste.")), 3.5f); return; }
 		if (!bFile) { ShowMessage(Tx(TEXT("portillo_sin_expediente"), TEXT("PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente.")), 3.0f); return; }
-		if (!R || R->State == ETarsisGuardState::Down || FVector::Dist2D(R->GetActorLocation(), FVector(310.0f, 4900.0f, 0.0f)) > 700.0f) { ShowMessage(Tx(TEXT("portillo_espera"), TEXT("ESPERA A RAMOS\nEl trae la llave del portillo.")), 2.5f); return; }
-		PlaySfx(TEXT("reja"), FVector(310.0f, 4900.0f, 100.0f), 0.8f);
+		if (!R || R->State == ETarsisGuardState::Down || FVector::Dist2D(R->GetActorLocation(), WicketLoc) > 700.0f) { ShowMessage(Tx(TEXT("portillo_espera"), TEXT("ESPERA A RAMOS\nEl trae la llave del portillo.")), 2.5f); return; }
+		PlaySfx(TEXT("reja"), WicketLoc + FVector(0.0f, 0.0f, 100.0f), 0.8f);
 		Finish(true);
 		return;
 	}

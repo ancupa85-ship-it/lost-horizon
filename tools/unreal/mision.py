@@ -67,6 +67,14 @@ def objetivo(o):
 
 def ajustar(actor, props):
     for k, v in props.items():
+        # [x, y, z] en el .json: si la propiedad es un FVector (exit_loc, wicket_loc...) se pasa como Vector;
+        # si es una lista de verdad (TArray), entra tal cual
+        if isinstance(v, list) and len(v) == 3 and all(isinstance(x, (int, float)) for x in v):
+            try:
+                if isinstance(actor.get_editor_property(k), unreal.Vector):
+                    v = unreal.Vector(*[float(x) for x in v])
+            except Exception:
+                pass
         poner(actor, k, v)
 
 def aplicar(director=None):

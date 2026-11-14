@@ -107,23 +107,25 @@ claves.append((11.5, cerca, mira(cerca, ojo + unreal.MathLibrary.get_forward_vec
 claves.append((14.0, ojo, unreal.Rotator(roll=0, pitch=rot_ojo.pitch, yaw=rot_ojo.yaw)))
 secuencia('LS_Entrada', 14, claves, focal=22.0)
 
-# ---- salida (G, celda 34,26): de cerca del control a un plano alto de la base que se oscurece
-salida = unreal.Vector(6900, 5300, 120)
-# desde dentro, por el pasillo de la fila 26 hacia la barrera (fuera, el muro perimetral z 465 tapa; desde el noroeste, la torre 2)
-p0 = unreal.Vector(6150, 5200, 230)
-p1 = unreal.Vector(6300, 5150, 500)   # en y 4950 la torre 2 corta la vista a la barrera
-p2 = unreal.Vector(10500, 8800, 2600)
+# ---- salida (portón de salida del muro nuevo, tanda 20): por el camino hacia la garita, la barrera y el portón
+# abierto, y al final un plano alto que abarca el muro nuevo (112 x 96 m) mientras se oscurece
+salida = unreal.Vector(9050, 5700, 120)
+barrera = unreal.Vector(8600, 5400, 120)
+p0 = unreal.Vector(7700, 5750, 230)    # sobre el camino (y 5700), mirando al portón
+p1 = unreal.Vector(8050, 6150, 520)    # algo al sur y más alto: garita, barrera y portón en el mismo plano
+p2 = unreal.Vector(15500, 12500, 4200) # fuera del muro nuevo (x1 9200, y1 7600), alto: entra toda la base
 secuencia('LS_Salida', 10, [
     (0.0, p0, mira(p0, salida)),
-    (4.0, p1, mira(p1, unreal.Vector(6780, 5060, 120))),   # a la barrera
+    (4.0, p1, mira(p1, barrera)),
     (10.0, p2, mira(p2, CENTRO)),
 ], focal=28.0, fundido=(6.0, 0.7))
 
-# ---- marisma (portillo en 310, 4900): desde el agua, la cámara se aleja hacia el oeste
-portillo = unreal.Vector(310, 4900, 100)
-m0 = unreal.Vector(-900, 5200, 400)   # más cerca, el muro exterior llena el plano de negro
-m1 = unreal.Vector(-1500, 5300, 320)
-m2 = unreal.Vector(-4200, 5900, 1100)
+# ---- marisma (portillo en el muro sur, 310 7390): desde el agua, la cámara se aleja hacia el sur
+# (valores de partida; se ajustan en la fase B viendo el plano)
+portillo = unreal.Vector(310, 7390, 100)
+m0 = unreal.Vector(700, 8600, 400)
+m1 = unreal.Vector(800, 9200, 320)
+m2 = unreal.Vector(1500, 11900, 1100)
 secuencia('LS_Marisma', 10, [
     (0.0, m0, mira(m0, portillo)),
     (4.0, m1, mira(m1, portillo)),

@@ -204,6 +204,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
 	float ExitBarrierLength = 390.0f;
 
+	/** Punto de salida de la base (portón de salida): llegar con el expediente acaba la misión (final por la salida). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	FVector ExitLoc = FVector(6900.0f, 5300.0f, 0.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	float ExitRadius = 260.0f;
+
+	/** Portillo de la marisma (final con Ramos). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	FVector WicketLoc = FVector(310.0f, 4900.0f, 0.0f);
+
 	/** Cinemáticas de Sequencer (tools/unreal/cinematicas.py las crea en /Game/Tarsis/Cine). Sin ellas, el juego va igual. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
 	bool bPlayIntro = true;
@@ -671,6 +682,8 @@ private:
 	void Shove(class ATarsisGuard* G);
 	class ATarsisGuard* FacingAlertGuard() const;
 	float FrontMsgT = 0.0f;
+	/** Enfriamiento del aviso «no puedes irte todavía» en la salida. */
+	float ExitMsgT = 0.0f;
 	void SetupHiding();
 	void EnterHide(int32 Index);
 	void ExitHide();

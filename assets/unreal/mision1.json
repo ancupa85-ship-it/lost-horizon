@@ -5,7 +5,25 @@
    "vault_code": "0129",
    "cell_time": 25.0,
    "repair_seconds": 12.0,
-   "noise_radius": 900.0
+   "noise_radius": 900.0,
+   "exit_loc": [
+    9050,
+    5700,
+    0
+   ],
+   "exit_radius": 420.0,
+   "wicket_loc": [
+    310,
+    7390,
+    0
+   ],
+   "exit_barrier_loc": [
+    8600,
+    5400,
+    0
+   ],
+   "exit_barrier_yaw": 90.0,
+   "exit_barrier_length": 600.0
   },
   "guardias": {
    "*": {
@@ -143,7 +161,7 @@
   "cogido_entrada": "TE HAN COGIDO\nVuelves a la entrada de la base.",
   "celda_abierta": "CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia.",
   "ensena_derribo": "{0} DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma.",
-  "ramos_radio": "RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, muro oeste del patio suroeste.\"",
+  "ramos_radio": "RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, en el muro sur, junto al agua.\"",
   "p_taquilla_salir": "E   SALIR DE LA TAQUILLA",
   "p_soltar": "E   SOLTAR EL CUERPO",
   "p_ramos_eleccion": "1   VENTE CONMIGO        2   DERRIBARLO",
@@ -177,7 +195,7 @@
   "ensena_marcado": "{0} MARCADO\nLo veras aunque haya paredes por medio.",
   "ramos_contigo": "RAMOS ESTA CONTIGO\nTe da la llave del botiquin del veterinario (muro norte del patio este).\nSigue su ronda para que no le echen en falta, y ya no te delatara.",
   "ramos_derribado": "RAMOS DERRIBADO\nLleva encima la llave del botiquin.",
-  "sec_portillo": "Otra salida: Ramos te espera en el portillo de la marisma (muro oeste, patio suroeste)",
+  "sec_portillo": "Otra salida: Ramos te espera en el portillo de la marisma (muro sur)",
   "sec_ramos_contigo": "Ramos esta contigo: con el expediente, saldra por la marisma",
   "sec_botiquin": "Abre el botiquin del veterinario: muro norte del patio este",
   "sec_ramos": "Ramos, el cuartelero del barracon oeste, lleva la llave del botiquin: agarralo por la espalda",
@@ -242,13 +260,14 @@
   "pistola_dardos": "PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres.",
   "cp_botiquin": "EL BOTIQUIN",
   "p_expediente": "E   COGER EL EXPEDIENTE LH-07",
-  "expediente_cogido": "EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base por el control de salida, al sureste.",
+  "expediente_cogido": "EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base por el porton de salida, al este.",
   "cp_expediente": "EL EXPEDIENTE",
-  "obj_salir": "Sal por el control de salida (esquina sureste)",
+  "obj_salir": "Sal por el porton de salida (muro este, por el camino)",
   "obj_expediente": "Coge el expediente LH-07 del archivo",
   "obj_archivo": "Abre el archivo con la clave de la nota",
   "obj_mesa": "Registra la mesa de Alarcon en la jefatura",
   "obj_jefatura": "Abre la jefatura (se entra por el barracon oeste)",
-  "obj_llave": "Consigue la llave de la jefatura: la lleva Ibarra (patio norte)"
+  "obj_llave": "Consigue la llave de la jefatura: la lleva Ibarra (patio norte)",
+  "salida_sin_expediente": "NO PUEDES IRTE TODAVIA\nFalta el expediente de la jefatura."
  }
 }

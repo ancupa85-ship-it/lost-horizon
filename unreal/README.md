@@ -33,6 +33,8 @@ Ojo: el esqueleto es el mismo en los tres cuerpos y no coincide con las mallas (
 
 Dentro del muro antiguo no se mueve nada: el plano (`map`) y sus coordenadas son los mismos. Donde un edificio se apoyaba en el muro (barracón y jefatura del oeste) queda su pared trasera, con la cara interior donde estaba. Todo lo nuevo está descrito en `base.json` → `ext`, en metros del plano (x al este, y al sur; en Unreal, × 100): límites `x0 x1 y0 y1`, `entrada` y `salida` (`pos`, `garita`, `farol`, `barrera`, `meta`), `camino`, `portillo`, `vallas` y `tabiques`. Materiales nuevos: `lh_camino` (losa de hormigón) y `lh_tierra` (grava del anillo).
 
+En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin el expediente sale el aviso «NO PUEDES IRTE TODAVIA») y el portillo de la marisma está en el muro sur (`WicketLoc` 310, 7390). Los dos, la barrera de la garita de salida y su farol se ponen desde `mision1.json` → `ajustes.director` (`exit_loc`, `exit_radius`, `wicket_loc`, `exit_barrier_*`; `mision.py` pasa los `[x, y, z]` a vectores). `tools/unreal/perimetro.py` pone el tope invisible fuera del portón de salida (`Tope_Salida`, 1 × 8 × 4 m en 9280, 5700) para que no se salga andando por el terraplén sin acabar la misión.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.
