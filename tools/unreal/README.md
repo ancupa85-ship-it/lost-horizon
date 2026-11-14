@@ -26,5 +26,6 @@ Con el editor abierto y el nivel Tarsis cargado, en este orden (cada uno se pued
 
 Para comprobar: `py tools/unreal/medir.py` (fps y VRAM en tres sitios; tabla en `docs/rendimiento.md`),
 `py tools/unreal/capturas.py <prefijo>` (tres cámaras fijas, en `Saved/Capturas`) y `py tools/unreal/pruebas.py`.
+`py tools/unreal/memoria.py` hace el inventario de la memoria de vídeo que piden las texturas (no cambia nada).
 Los sonidos nuevos salen de `python tools/sonido/generar_sonidos.py` (fluorescente, radio_barracon, gotera) y se importan
 con `py tools/unreal/sonidos.py`.

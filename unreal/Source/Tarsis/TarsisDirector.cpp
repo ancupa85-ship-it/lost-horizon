@@ -256,6 +256,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	HintTick();
 	HideTick();
 	RideTick();
+	RideFeelTick(DeltaSeconds);
 	CaptureTick(DeltaSeconds);
 	ChangesTick(DeltaSeconds);
 	if (FrontMsgT > 0.0f) FrontMsgT -= DeltaSeconds;
@@ -1581,9 +1582,11 @@ void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
 	}
 	// viento y lluvia: más bajos bajo techo. Grillos con buen tiempo (con lluvia callan, con niebla pocos); el rumor
 	// lejano sube con la lluvia (tormenta a lo lejos)
-	if (WindComp) WindComp->SetVolumeMultiplier(bIndoor ? 0.12f : (Weather == 1 ? 0.2f : (Weather == 2 ? 0.16f : 0.3f)));
-	if (RainComp) RainComp->SetVolumeMultiplier(bIndoor ? 0.15f : 0.45f);
-	const float In = bIndoor ? 0.3f : 1.0f;
+	// bajo la lona del camión (tanda 23) todo lo de fuera llega a la mitad; la lluvia, menos: repica en la lona
+	const float Box = 1.0f - 0.5f * RideMuffleK;
+	if (WindComp) WindComp->SetVolumeMultiplier((bIndoor ? 0.12f : (Weather == 1 ? 0.2f : (Weather == 2 ? 0.16f : 0.3f))) * Box);
+	if (RainComp) RainComp->SetVolumeMultiplier((bIndoor ? 0.15f : 0.45f) * (1.0f - 0.2f * RideMuffleK));
+	const float In = (bIndoor ? 0.3f : 1.0f) * Box;
 	if (CricketComp) CricketComp->SetVolumeMultiplier(FMath::Max(0.001f, In * (Weather == 1 ? 0.0f : (Weather == 2 ? 0.07f : 0.2f))));
 	if (RumbleComp) RumbleComp->SetVolumeMultiplier(FMath::Max(0.001f, In * (Weather == 1 ? 0.3f : 0.14f)));
 }
@@ -2220,8 +2223,10 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 	// frena a tiempo para parar justo en su sitio
 	const float Left = StopX - TruckX;
 	if (TruckState != 5 && Want > 0.0f) Want = FMath::Min(Want, FMath::Sqrt(2.0f * 240.0f * FMath::Max(0.0f, Left)) + 25.0f);
+	const float PrevX = TruckX, PrevV = TruckV;
 	TruckV = FMath::FInterpConstantTo(TruckV, Want, DeltaSeconds, Want > TruckV ? 170.0f : (bBlocked ? 900.0f : 420.0f));
 	TruckX += TruckV * DeltaSeconds;
+	TruckFeel(PrevX, PrevV, DeltaSeconds);
 	if (TruckState == 1 && Left < 10.0f)
 	{
 		// ante el portón: se para, la hoja empieza a correr
@@ -2454,12 +2459,114 @@ void ATarsisDirector::RidePlace()
 	// Se coloca el actor de modo que su cámara caiga ahí, esté donde esté respecto a la cápsula
 	float CamUp = 64.0f;
 	if (const UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>()) CamUp = Cam->GetComponentLocation().Z - C->GetActorLocation().Z;
-	// el traqueteo: con el camión en marcha la vista tiembla un poco
+	// el traqueteo: con el camión en marcha la vista tiembla un poco. Desde la tanda 23 se le suman el temblor del motor
+	// al ralentí (parado en el control también se nota que el camión está vivo), el golpe de cada junta de la losa y la
+	// inercia del cuerpo al frenar y al arrancar (TruckFeel)
 	const float K = FMath::Clamp(TruckV / FMath::Max(1.0f, TruckSpeed), 0.0f, 1.6f);
 	const float T = GetWorld()->GetTimeSeconds();
-	const FVector Shake(0.0f, FMath::Sin(T * 9.1f) * 0.5f * K, (FMath::Sin(T * 13.7f) * 0.9f + FMath::Sin(T * 23.3f) * 0.4f) * K);
-	const FVector Eye = FVector(TruckX - 125.0f, TruckStart.Y, TruckStart.Z + 113.0f + 82.0f) + Shake;
+	RideShake = FVector(RideLurch, FMath::Sin(T * 9.1f) * 0.5f * K, (FMath::Sin(T * 13.7f) * 0.9f + FMath::Sin(T * 23.3f) * 0.4f) * K + FMath::Sin(T * 61.0f) * 0.1f + RideKick);
+	const FVector Eye = FVector(TruckX - 125.0f, TruckStart.Y, TruckStart.Z + 113.0f + 82.0f) + RideShake;
 	C->SetActorLocation(Eye - FVector(0.0f, 0.0f, CamUp), false, nullptr, ETeleportType::TeleportPhysics);
+	if (RideLight) RideLight->SetWorldLocation(Eye + FVector(0.0f, 0.0f, 6.0f));
+}
+
+// ---------------------------------------------------------------- la caja del camión por dentro (tanda 23)
+// Lo que nota quien viaja en la caja. Cada eje que pisa una junta de la losa da un golpe: se oye también desde fuera (es
+// el «ta-tac» del camión por el camino, que avisa de por dónde va) y dentro sacude la vista. El cuerpo se va hacia la
+// cabina al frenar y hacia el portalón al arrancar. El mundo de fuera suena apagado por la lona, y dentro crujen las
+// tablas y bate la lona. Una luz de relleno muy tenue deja ver la caja sin alumbrar nada de fuera.
+
+void ATarsisDirector::TruckFeel(float PrevX, float PrevV, float DeltaSeconds)
+{
+	const float K = FMath::Clamp(TruckV / FMath::Max(1.0f, TruckSpeed), 0.0f, 1.5f);
+	if (TruckJointPitch > 1.0f && TruckV > 40.0f)
+	{
+		// primero el eje de delante (x + 112) y luego el de atrás (x - 118), sobre el que vas sentado
+		static const float Axles[2] = { 112.0f, -118.0f };
+		for (int32 i = 0; i < 2; ++i)
+		{
+			const int32 A = FMath::FloorToInt((PrevX + Axles[i] - TruckJointPhase) / TruckJointPitch);
+			const int32 B = FMath::FloorToInt((TruckX + Axles[i] - TruckJointPhase) / TruckJointPitch);
+			if (A == B) continue;
+			++TruckJoints;
+			if (USoundBase* S = Sfx(TEXT("camion_junta")))
+			{
+				UGameplayStatics::PlaySoundAtLocation(this, S, FVector(TruckX + Axles[i], TruckStart.Y, TruckStart.Z + 50.0f), (bRiding ? 0.8f : 0.5f) * FMath::Max(0.35f, K),
+					FMath::FRandRange(0.93f, 1.07f), 0.0f, TruckAtten ? TruckAtten.Get() : Atten.Get());
+			}
+			if (bRiding) RideKickV += (i == 1 ? 34.0f : 14.0f) * FMath::Max(0.35f, K);
+		}
+	}
+	// el golpe es un muelle amortiguado (5 Hz); el paso se acota para que un tirón de fotogramas no lo dispare
+	const float Dt = FMath::Min(DeltaSeconds, 0.033f);
+	const float W = 34.0f, Z = 0.32f;
+	RideKickV += (-W * W * RideKick - 2.0f * Z * W * RideKickV) * Dt;
+	RideKickV = FMath::Clamp(RideKickV, -120.0f, 120.0f);
+	RideKick = FMath::Clamp(RideKick + RideKickV * Dt, -3.0f, 3.0f);
+	// inercia: frenar (aceleración negativa) te echa hacia la cabina (+X); arrancar, hacia el portalón
+	const float Acc = DeltaSeconds > KINDA_SMALL_NUMBER ? (TruckV - PrevV) / DeltaSeconds : 0.0f;
+	RideLurch = FMath::FInterpTo(RideLurch, FMath::Clamp(-Acc * 0.012f, -3.0f, 7.0f), DeltaSeconds, 5.0f);
+}
+
+bool ATarsisDirector::RideLightOn() const
+{
+	return RideLight && RideLight->IsVisible();
+}
+
+void ATarsisDirector::RideFeelTick(float DeltaSeconds)
+{
+	RideMuffleK = FMath::FInterpTo(RideMuffleK, bRiding ? 1.0f : 0.0f, DeltaSeconds, 3.0f);
+	if (!bRiding) { RideKick = RideKickV = RideLurch = 0.0f; RideShake = FVector::ZeroVector; }
+	// luz de relleno: se crea la primera vez que subes; pertenece al director (no es un ALight: no cuenta para LightAt)
+	const bool bLight = bRiding && RideFillLumens > 0.0f;
+	if (bLight && !RideLight)
+	{
+		RideLight = NewObject<UPointLightComponent>(this);
+		RideLight->SetMobility(EComponentMobility::Movable);
+		RideLight->SetWorldLocation(TruckLocation() + FVector(-125.0f, 0.0f, 201.0f));
+		RideLight->SetIntensityUnits(ELightUnits::Lumens);
+		RideLight->SetAttenuationRadius(300.0f);
+		RideLight->SetSourceRadius(12.0f);
+		RideLight->SetLightColor(FLinearColor(0.7f, 0.82f, 1.0f));
+		RideLight->SetCastShadows(false);
+		RideLight->SetVolumetricScatteringIntensity(0.0f);
+		RideLight->RegisterComponent();
+	}
+	if (RideLight)
+	{
+		if (bLight) RideLight->SetIntensity(RideFillLumens);
+		if (RideLight->IsVisible() != bLight) RideLight->SetVisibility(bLight);
+	}
+	// el ambiente pierde los agudos bajo la lona (la música no: no es de este mundo); el motor se oye a través de la cabina
+	const bool bLow = RideMuffleK > 0.02f;
+	const float Cut = FMath::Lerp(16000.0f, 1300.0f, RideMuffleK);
+	for (UAudioComponent* A : { WindComp.Get(), RainComp.Get(), CricketComp.Get(), RumbleComp.Get(), HumComp.Get() })
+	{
+		if (!A) continue;
+		A->SetLowPassFilterEnabled(bLow);
+		if (bLow) A->SetLowPassFilterFrequency(Cut);
+	}
+	if (TruckAudio)
+	{
+		TruckAudio->SetLowPassFilterEnabled(bLow);
+		if (bLow) TruckAudio->SetLowPassFilterFrequency(FMath::Lerp(16000.0f, 2400.0f, RideMuffleK));
+	}
+	// lo de dentro: tablas, lona y hebillas, más fuerte cuanto más corre el camión
+	if (bLow && !RideAudio)
+	{
+		if (USoundBase* S = Sfx(TEXT("camion_caja")))
+		{
+			if (USoundWave* Wv = Cast<USoundWave>(S)) Wv->bLooping = true;
+			RideAudio = UGameplayStatics::SpawnSound2D(this, S, 0.001f, 1.0f, 0.0f, nullptr, false, false);
+		}
+	}
+	if (RideAudio)
+	{
+		const float V = RideMuffleK * FMath::Clamp(TruckV / FMath::Max(1.0f, TruckSpeed), 0.0f, 1.4f) * 0.5f;
+		RideAudio->SetVolumeMultiplier(FMath::Max(0.001f, V));
+		if (bLow && !RideAudio->IsPlaying()) RideAudio->Play();
+		else if (!bLow && RideAudio->IsPlaying()) RideAudio->Stop();
+	}
 }
 
 bool ATarsisDirector::LeaveTruck(bool bForced)

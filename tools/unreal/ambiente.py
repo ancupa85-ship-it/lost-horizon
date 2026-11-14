@@ -292,6 +292,170 @@ def material_mancha():
     return m
 
 
+# ---------------------------------------------------------------- tanda 23: charcos y chorretones (calcomanías)
+
+class Grafo:
+    """Los nodos de un material, con las conexiones contadas: los nombres de las entradas cambian entre versiones del
+    motor (en 5.8 la del ruido es «World Position»), y una conexión que no entra deja el material a medias sin decir
+    nada. Aquí cada una que falla se apunta y fin() avisa con el nombre del material y de los nodos."""
+    def __init__(self, ruta, nombre, version):
+        self.nombre, self.version, self.fallos, self.hecho = nombre, version, [], False
+        if eal.does_asset_exist(ruta):
+            self.m = unreal.load_asset(ruta)
+            if any(e.get_editor_property('desc') == version for e in mel.get_material_expressions(self.m)):
+                self.hecho = True        # ya está en esta versión: no se toca
+                return
+            mel.delete_all_material_expressions(self.m)
+            for e in list(mel.get_material_expressions(self.m)):
+                mel.delete_material_expression(self.m, e)
+        else:
+            self.m = tools.create_asset(nombre, ruta.rsplit('/', 1)[0], unreal.Material, unreal.MaterialFactoryNew())
+
+    def E(self, cls, x, y, **props):
+        e = mel.create_material_expression(self.m, cls, x, y)
+        for k, v in props.items():
+            e.set_editor_property(k, v)
+        return e
+
+    def esc(self, nombre, valor, x, y):
+        return self.E(unreal.MaterialExpressionScalarParameter, x, y, parameter_name=nombre, default_value=valor)
+
+    def une(self, a, b, ent, sal=''):
+        for n in (ent if isinstance(ent, (tuple, list)) else (ent,)):
+            if mel.connect_material_expressions(a, sal, b, n):
+                return True
+        self.fallos.append('%s > %s.%s' % (a.get_name(), b.get_name(), ent if isinstance(ent, str) else ent[0]))
+        return False
+
+    def uno(self, a, b):                 # la entrada única se llama «Input» o «» según el nodo
+        return self.une(a, b, ('Input', ''))
+
+    def op(self, cls, a, b, x, y, **props):
+        """Nodo de dos entradas (A, B). b puede ser otro nodo o un número (va a const_b)."""
+        if isinstance(b, (int, float)):
+            n = self.E(cls, x, y, const_b=float(b), **props)
+        else:
+            n = self.E(cls, x, y, **props)
+            self.une(b, n, 'B')
+        self.une(a, n, 'A')
+        return n
+
+    def sat(self, a, x, y):
+        n = self.E(unreal.MaterialExpressionSaturate, x, y)
+        self.uno(a, n)
+        return n
+
+    def canal(self, src, k, x, y):
+        n = self.E(unreal.MaterialExpressionComponentMask, x, y, **{q: q == k for q in 'rgba'})
+        self.uno(src, n)
+        return n
+
+    def ruido(self, x, y, escala, niveles, lo, hi, pos=None, rapido=False):
+        """Ruido de gradiente por textura. rapido: el de textura 3D (una lectura por nivel en vez de ocho; se repite cada
+        16 unidades de ruido, así que solo para dibujos lentos, donde la repetición queda a decenas de metros)."""
+        fn = unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX
+        if rapido:
+            fn = getattr(unreal.NoiseFunction, 'NOISEFUNCTION_GRADIENT_TEX3D', fn)
+        n = self.E(unreal.MaterialExpressionNoise, x, y, scale=escala, levels=niveles, noise_function=fn, quality=1,
+                   output_min=lo, output_max=hi)
+        if pos is not None:
+            self.une(pos, n, ('World Position', 'Position'))
+        return n
+
+    def sale(self, a, prop, sal=''):
+        if not mel.connect_material_property(a, sal, prop):
+            self.fallos.append('%s > %s' % (a.get_name(), prop))
+
+    def fin(self):
+        self.E(unreal.MaterialExpressionConstant, -1800, -600, r=0.0, desc=self.version)      # la marca de versión
+        mel.recompile_material(self.m)
+        eal.save_loaded_asset(self.m)
+        if self.fallos:
+            log('AVISO: %s: %d conexiones sin hacer: %s' % (self.nombre, len(self.fallos), '; '.join(self.fallos)))
+        else:
+            log(self.nombre, 'hecho (%s)' % self.version)
+        return self.m
+
+
+CHARCO_NORMAL = True     # el charco aplana el relieve del suelo (agua quieta). Si en el PC saliera un rectángulo, a False
+
+
+def material_charco():
+    """M_Charco: agua quieta sobre el suelo. Contorno irregular y nítido (máscara redonda x ruido del mundo, con umbral),
+    color oscuro del suelo mojado, casi sin rugosidad y con el relieve plano: lo que se ve de noche es el reflejo de la
+    farola y del cielo. Parámetros: Color, Fuerza y Rugosidad.
+    Con CHARCO_NORMAL la mezcla es «translúcida»: es la única de las calcomanías que deja escribir el relieve (con alfa
+    compuesto el motor solo mezcla color y rugosidad, y el agua saldría con los granos de la losa); el color va entonces sin
+    multiplicar, lo mezcla el motor con la opacidad. Sin CHARCO_NORMAL, alfa compuesto como M_Mancha: color multiplicado
+    por la opacidad y el relieve que haya debajo."""
+    g = Grafo(DM + '/M_Charco', 'M_Charco', 'charco v2' + (' plano' if CHARCO_NORMAL else ''))
+    if g.hecho:
+        return g.m
+    g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT if CHARCO_NORMAL else unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
+    col = g.E(unreal.MaterialExpressionVectorParameter, -700, -300, parameter_name='Color', default_value=unreal.LinearColor(0.012, 0.012, 0.011, 1))
+    uv = g.E(unreal.MaterialExpressionTextureCoordinate, -1500, 200)
+    c05 = g.E(unreal.MaterialExpressionConstant2Vector, -1500, 320, r=0.5, g=0.5)
+    sm = g.E(unreal.MaterialExpressionSphereMask, -1300, 200, attenuation_radius=0.5, hardness_percent=25.0)
+    g.une(uv, sm, 'A'); g.une(c05, sm, 'B')
+    ruido = g.ruido(-1300, 400, 0.018, 2, 0.0, 1.0, rapido=True)
+    forma = g.op(unreal.MaterialExpressionMultiply, sm, g.op(unreal.MaterialExpressionAdd, ruido, 0.38, -1100, 400), -950, 300)
+    borde = g.sat(g.op(unreal.MaterialExpressionMultiply, g.op(unreal.MaterialExpressionSubtract, forma, 0.4, -800, 300), 9.0, -650, 300), -500, 300)
+    opa = g.sat(g.op(unreal.MaterialExpressionMultiply, borde, g.esc('Fuerza', 1.0, -650, 480), -350, 350), -200, 350)
+    g.sale(opa, unreal.MaterialProperty.MP_OPACITY)
+    rug = g.esc('Rugosidad', 0.05, -350, 560)
+    if CHARCO_NORMAL:
+        g.sale(col, unreal.MaterialProperty.MP_BASE_COLOR)
+        g.sale(rug, unreal.MaterialProperty.MP_ROUGHNESS)
+    else:
+        g.sale(g.op(unreal.MaterialExpressionMultiply, col, opa, -100, -200, desc='premultiplicado'), unreal.MaterialProperty.MP_BASE_COLOR)
+        g.sale(g.op(unreal.MaterialExpressionMultiply, rug, opa, -100, 500), unreal.MaterialProperty.MP_ROUGHNESS)
+    if CHARCO_NORMAL:
+        g.sale(g.E(unreal.MaterialExpressionConstant3Vector, -350, 700, constant=unreal.LinearColor(0, 0, 1, 0)), unreal.MaterialProperty.MP_NORMAL)
+    return g.fin()
+
+
+def material_chorreton():
+    """M_Chorreton: los regueros oscuros que deja el agua al escurrir por un muro. No usa las UV de la calcomanía sino la
+    posición en el mundo (vale para un muro que mire a cualquier lado): hilos verticales finos (ruido muy estirado en
+    vertical), que salen a grupos y cada uno baja una distancia distinta desde lo alto del muro (Techo, en cm del mundo).
+    Parámetros: Color, Fuerza, Techo, Largo y Contraste. La caja de la calcomanía solo limita dónde puede haberlos."""
+    g = Grafo(DM + '/M_Chorreton', 'M_Chorreton', 'chorreton v1')
+    if g.hecho:
+        return g.m
+    g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
+    M, A, S, D, AP = (unreal.MaterialExpressionMultiply, unreal.MaterialExpressionAdd, unreal.MaterialExpressionSubtract,
+                      unreal.MaterialExpressionDivide, unreal.MaterialExpressionAppendVector)
+    col = g.E(unreal.MaterialExpressionVectorParameter, -500, -400, parameter_name='Color', default_value=unreal.LinearColor(0.03, 0.027, 0.022, 1))
+    wp = g.E(unreal.MaterialExpressionWorldPosition, -2300, 0)
+    mx, my, mz = g.canal(wp, 'r', -2100, -80), g.canal(wp, 'g', -2100, 20), g.canal(wp, 'b', -2100, 120)
+    h = g.op(A, mx, my, -1950, -40)                       # a lo largo del muro, mire a donde mire
+    cero = g.E(unreal.MaterialExpressionConstant, -1950, 260, r=0.0)
+    hc = g.op(AP, h, cero, -1800, 0)
+    # los hilos: 17 cm de ancho medio, y cada uno dura metros en vertical
+    p1 = g.op(AP, hc, g.op(M, mz, 0.03, -1950, 140), -1650, 60)
+    n1 = g.ruido(-1500, 60, 0.06, 2, -0.4, 1.0, pos=p1)
+    hilo = g.sat(g.op(M, n1, g.esc('Contraste', 1.8, -1500, 240), -1300, 100), -1150, 100)
+    # los grupos: tramos de muro con regueros y tramos limpios
+    n2 = g.ruido(-1500, 380, 0.0045, 1, 0.0, 1.0, pos=g.op(AP, hc, cero, -1650, 380), rapido=True)
+    grupo = g.sat(g.op(M, g.op(S, n2, 0.38, -1300, 380), 3.5, -1150, 380), -1000, 380)
+    # lo que baja cada hilo: Largo x (0,12 + 1,9 x ruido²)
+    p3 = g.op(AP, g.op(AP, h, g.E(unreal.MaterialExpressionConstant, -1950, 600, r=40.0), -1800, 600), cero, -1650, 600)
+    n3 = g.ruido(-1500, 600, 0.021, 1, 0.0, 1.0, pos=p3, rapido=True)
+    largo = g.op(M, g.op(A, g.op(M, g.op(M, n3, n3, -1300, 600), 1.9, -1150, 600), 0.12, -1000, 600), g.esc('Largo', 280.0, -1150, 760), -850, 640)
+    dz = g.op(S, g.esc('Techo', 462.0, -1300, 900), mz, -1100, 900)
+    baja = g.E(unreal.MaterialExpressionOneMinus, -700, 800)
+    g.uno(g.op(D, dz, largo, -850, 800), baja)
+    f = g.sat(baja, -560, 800)
+    arriba = g.sat(g.op(M, dz, 0.25, -850, 980), -700, 980)          # nada por encima de lo alto del muro
+    o = g.op(M, g.op(M, g.op(M, hilo, grupo, -850, 200), f, -420, 400), arriba, -300, 500)
+    opa = g.sat(g.op(M, o, g.esc('Fuerza', 0.8, -300, 660), -160, 500), -40, 500)
+    g.sale(opa, unreal.MaterialProperty.MP_OPACITY)
+    g.sale(g.op(M, col, opa, 100, -200, desc='premultiplicado'), unreal.MaterialProperty.MP_BASE_COLOR)
+    return g.fin()
+
+
 def mancha(nombre, pos, ancho, alto, hacia, fuerza=0.85, color_=None, rug=0.35, giro=0.0):
     """hacia: 'abajo' (suelo), 'arriba' (techo) o el yaw al que mira la pared que recibe la mancha (la calcomanía
     proyecta a lo largo de su X)."""

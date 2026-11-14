@@ -208,6 +208,10 @@ def tela_mat(actor):
         c.set_editor_property('cast_shadow', False)   # miles de rombos dando sombra no compensan en una GTX 1050
 
 HIERBA_PNG = os.path.join(ROOT, 'assets', 'unreal', 'texturas_propias', 'hierbajo.png')
+# tinte: lo que multiplica al color de la textura (lineal); rodales: cuánto oscurecen los rodales más secos (0 = todas iguales)
+HIERBA_AJUSTES = {'tinte': (0.66, 0.64, 0.56), 'rodales': 0.5}
+
+_HIERBA = []     # la huella del material en uso (para borrar los de otras versiones al final)
 
 def hierbajo_material():
     """Tanda 22: material de los hierbajos (malla «hierbajos» de exportar_base.py). Recortado, con las UV de la malla sobre la
@@ -216,8 +220,10 @@ def hierbajo_material():
     mel = unreal.MaterialEditingLibrary
     tools = unreal.AssetToolsHelpers.get_asset_tools()
     dm = '/Game/Tarsis/Materiales'
-    huella = hashlib.md5(open(HIERBA_PNG, 'rb').read()).hexdigest()[:8]
+    # la huella lleva también los ajustes del material: al cambiarlos se rehace aunque el PNG sea el mismo
+    huella = hashlib.md5(open(HIERBA_PNG, 'rb').read() + repr(HIERBA_AJUSTES).encode()).hexdigest()[:8]
     ruta = '%s/M_Hierbajo_%s' % (dm, huella)
+    _HIERBA[:] = [huella]
     if eal.does_asset_exist(ruta):
         return eal.load_asset(ruta)
     t = unreal.AssetImportTask()
@@ -245,9 +251,51 @@ def hierbajo_material():
     E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
     ts = E(unreal.MaterialExpressionTextureSample, -400, 0)
     ts.set_editor_property('texture', tx)
-    mel.connect_material_property(ts, 'RGB', unreal.MaterialProperty.MP_BASE_COLOR)
+    # tanda 23: color = textura x tinte x (rodales). Las matas reciben la luz como el suelo (normal hacia arriba) y con el
+    # color de la textura a secas quedaban más claras que el hormigón bajo una farola: parecían recortes pegados. El tinte
+    # las deja por debajo del suelo, y un dibujo lento en el mundo (dos senos, sin texturas) hace que unos rodales estén
+    # más secos y oscuros que otros. Si algo no conecta, se quedan con textura x tinte
+    tinte = E(unreal.MaterialExpressionConstant3Vector, -400, -220)
+    tinte.set_editor_property('constant', unreal.LinearColor(*HIERBA_AJUSTES['tinte'], 1))
+    cbase = E(unreal.MaterialExpressionMultiply, -200, -120)
+    mel.connect_material_expressions(ts, 'RGB', cbase, 'A')
+    mel.connect_material_expressions(tinte, '', cbase, 'B')
+    color = cbase
+    try:
+        ok = []
+        def U(a, sal, b, ent):
+            ok.append(bool(mel.connect_material_expressions(a, sal, b, ent)))
+        def U1(a, b):
+            if not mel.connect_material_expressions(a, '', b, 'Input'):
+                ok.append(bool(mel.connect_material_expressions(a, '', b, '')))
+        wpc = E(unreal.MaterialExpressionWorldPosition, -1500, -700)
+        def eje(k, y):
+            c = E(unreal.MaterialExpressionComponentMask, -1320, y)
+            for q in 'rgba':
+                c.set_editor_property(q, q == k)
+            U1(wpc, c)
+            return c
+        ex, ey = eje('r', -760), eje('g', -640)
+        def onda(kx, ky, y):       # seno((x * kx + y * ky)), periodo 1
+            a = E(unreal.MaterialExpressionMultiply, -1150, y); a.set_editor_property('const_b', kx); U(ex, '', a, 'A')
+            b = E(unreal.MaterialExpressionMultiply, -1150, y + 60); b.set_editor_property('const_b', ky); U(ey, '', b, 'A')
+            c = E(unreal.MaterialExpressionAdd, -1000, y); U(a, '', c, 'A'); U(b, '', c, 'B')
+            sn = E(unreal.MaterialExpressionSine, -860, y); U1(c, sn)
+            return sn
+        s1, s2 = onda(1.0 / 730.0, 1.0 / 1150.0, -820), onda(1.0 / 1900.0, -1.0 / 1300.0, -640)
+        pr = E(unreal.MaterialExpressionMultiply, -720, -740); U(s1, '', pr, 'A'); U(s2, '', pr, 'B')      # -1..1, a rodales de 4 a 10 m
+        esc = E(unreal.MaterialExpressionMultiply, -600, -740); esc.set_editor_property('const_b', HIERBA_AJUSTES['rodales'] / 2.0); U(pr, '', esc, 'A')
+        mas = E(unreal.MaterialExpressionAdd, -480, -740); mas.set_editor_property('const_b', 1.0 - HIERBA_AJUSTES['rodales'] / 2.0); U(esc, '', mas, 'A')
+        cvar = E(unreal.MaterialExpressionMultiply, -60, -200); U(cbase, '', cvar, 'A'); U(mas, '', cvar, 'B')
+        if all(ok):
+            color = cvar
+        else:
+            log('AVISO: hierbajos sin rodales de color (no conectaron', ok.count(False), 'nodos)')
+    except Exception as e:
+        log('AVISO: hierbajos sin rodales de color:', repr(e))
+    mel.connect_material_property(color, '', unreal.MaterialProperty.MP_BASE_COLOR)
     mel.connect_material_property(ts, 'A', unreal.MaterialProperty.MP_OPACITY_MASK)
-    for prop, val, y in ((unreal.MaterialProperty.MP_ROUGHNESS, 0.9, 250), (unreal.MaterialProperty.MP_SPECULAR, 0.15, 350)):
+    for prop, val, y in ((unreal.MaterialProperty.MP_ROUGHNESS, 0.95, 250), (unreal.MaterialProperty.MP_SPECULAR, 0.05, 350)):
         c = E(unreal.MaterialExpressionConstant, -400, y)
         c.set_editor_property('r', val)
         mel.connect_material_property(c, '', prop)
@@ -509,3 +557,17 @@ for d in eal.list_assets(BASE, recursive=False, include_folder=True):
     if d != DEST and eal.does_directory_exist(d):
         eal.delete_directory(d)
 log('versión', VER, '- borrados', len(viejas), 'recursos de importaciones anteriores')
+# y los materiales y texturas de hierbajos de otras versiones (llevan la huella en el nombre): ya no los usa nadie y
+# ocupan memoria de vídeo mientras el editor los tenga cargados
+try:
+    actual = _HIERBA[0] if _HIERBA else None
+    if actual:
+        n = 0
+        for p in eal.list_assets('/Game/Tarsis/Materiales', recursive=False, include_folder=False):
+            nombre = p.split('/')[-1].split('.')[0]
+            if nombre.startswith(('M_Hierbajo_', 'T_Hierbajo_')) and not nombre.endswith('_' + actual):
+                n += bool(eal.delete_asset(p.split('.')[0]))
+        if n:
+            log('borrados', n, 'recursos de hierbajos de versiones anteriores')
+except Exception as e:
+    log('AVISO: no se limpiaron los hierbajos antiguos:', repr(e))

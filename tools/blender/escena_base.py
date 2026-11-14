@@ -662,6 +662,23 @@ def truck(pos, rotz):
     C('oliva', 0.2, 0.62, (0.66, 0.78, zc + 0.31), 'Z', 0.03, 18); C('oscuro', 0.03, 0.02, (0.72, 0.74, zc + 0.625), 'Z', 0.004, 8)   # bidón
     for sx_, sy_, sz_, rz_, k in ((-0.05, 0.86, 0.1, 0.25, 1.0), (0.12, 0.9, 0.27, -0.2, 0.92), (-0.62, 0.9, 0.1, 1.4, 0.9)):               # sacos
         ell('lona', V((sx_, sy_, zc + sz_)), (0.33 * k, 0.21 * k, 0.11), M0, Matrix.Rotation(rz_, 4, 'Z'))
+    # tanda 23: la caja por dentro, para quien viaja en ella (los ojos quedan en x 0, y 1,25, z 1,95, mirando a la trasera).
+    # Bancos de listones a los lados, con su respaldo en los arcos; correas que cuelgan del último arco y se recortan contra
+    # el camino; un farol apagado en el arco central; un rollo de cuerda y un cajón con una lona doblada junto al portalón
+    for s in (-1, 1):
+        for k in range(3): B('madera', (0.085, 0.78, 0.022), (s * (0.93 - k * 0.1), 1.5, zc + 0.4), 0.004)
+        for yy in (1.16, 1.84):
+            B('bajos', (0.3, 0.03, 0.03), (s * 0.83, yy, zc + 0.375), 0.004); B('bajos', (0.03, 0.03, 0.38), (s * 0.7, yy, zc + 0.19), 0.004)
+        B('madera', (0.02, 0.78, 0.1), (s * 0.985, 1.5, 1.68), 0.004)
+        B('oscuro', (0.03, 0.008, 0.36), (s * 0.5, 1.9, 2.24), 0.002, Matrix.Rotation(s * 0.07, 4, 'Y'))
+        B('metal', (0.034, 0.012, 0.03), (s * 0.512, 1.9, 2.07), 0.003)                                         # hebilla
+        C('oscuro', 0.007, 0.5, (s * 0.97, 1.955, 1.86), 'Z', 0, 6)                                              # cabo de atar la lona
+    C('oscuro', 0.005, 0.1, (0, 1.0, 2.39), 'Z', 0, 6); C('oscuro', 0.05, 0.03, (0, 1.0, 2.335), 'Z', 0.008, 12)  # farol de petróleo
+    C('cristal', 0.038, 0.1, (0, 1.0, 2.27), 'Z', 0.004, 12); C('oscuro', 0.052, 0.035, (0, 1.0, 2.205), 'Z', 0.008, 12)
+    for k, rr in enumerate((0.17, 0.162, 0.148)): C('lona', rr, 0.034, (-0.42, 1.62, zc + 0.018 + k * 0.032), 'Z', 0.014, 18)   # cuerda
+    Rz = Matrix.Rotation(0.12, 4, 'Z'); c0 = V((0.4, 1.66, zc + 0.15))
+    B('madera', (0.5, 0.38, 0.3), c0, 0.012, Rz); B('lona', (0.46, 0.34, 0.07), c0 + V((0, 0, 0.185)), 0.03, Rz)
+    for q in (-0.3, 0.3): B('oscuro', (0.03, 0.392, 0.312), c0 + Rz @ V((q * 0.5, 0, 0)), 0.003, Rz)
     if has_ph('metal_jerrycan_green'):
         for k in (0, 1): put('metal_jerrycan_green', M0 @ V((1.0 if not k else -1.0, -0.62 + 0.0, 0.745)), rotz + math.pi / 2)
 

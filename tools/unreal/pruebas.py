@@ -846,6 +846,85 @@ def prueba_desgaste():
     yield 0.1
 
 
+def prueba_charcos():
+    """Tanda 23 (arte): el suelo y los muros tienen agua. Charcos de verdad (M_Charco, agua lisa que refleja) junto a cada
+    farola del camino, en el anillo y en los patios; más charcos cuando llueve; regueros de humedad que bajan por las cuatro
+    caras de dentro del muro y por las garitas; juntas de la losa que rezuman justo donde hay junta; y un solo material de
+    hierbajos (los de tandas anteriores se borran)."""
+    d = director()
+    w = mundo()
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    def mat(a):
+        try:
+            m = a.decal.get_decal_material()
+        except Exception:
+            m = a.decal.get_editor_property('decal_material')
+        return m.get_name() if m else ''
+    por = {}
+    for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DecalActor):
+        if a.actor_has_tag('mancha_perimetro'):
+            por.setdefault(mat(a), []).append(a)
+    agua = por.get('MI_Per_Agua', []) + por.get('MI_Per_AguaBarro', [])
+    fijos = [a for a in agua if not a.actor_has_tag('lluvia')]
+    lluvia = [a for a in agua if a.actor_has_tag('lluvia')]
+    check('charcos fijos en el camino, el anillo y los patios', len(fijos) >= 12 and len(por.get('MI_Per_AguaBarro', [])) >= 5,
+          '%d fijos, %d con lluvia, %d turbios' % (len(fijos), len(lluvia), len(por.get('MI_Per_AguaBarro', []))))
+    lejos = [f for f in ((1070, 5770), (3600, 5770), (6130, 5770), (-1460, 5640), (8660, 5640))
+             if not any(dist2d(a.get_actor_location(), V(f[0], f[1], 0)) < 520 for a in fijos)]
+    check('cada farola del camino tiene un charco al lado que la refleja', not lejos, lejos)
+    patio = [a for a in fijos if 0 < a.get_actor_location().x < 7200 and 0 < a.get_actor_location().y < 5300]
+    check('y hay charcos en los patios de la base', len(patio) >= 3, len(patio))
+    mi = unreal.load_asset('/Game/Tarsis/Materiales/Manchas/MI_Per_Agua')
+    padre = mi.get_editor_property('parent') if mi else None
+    rug = unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(mi, 'Rugosidad') if mi else 9.0
+    check('el agua es un material propio, liso (refleja)', padre is not None and padre.get_name() == 'M_Charco' and rug < 0.15
+          and padre.get_editor_property('material_domain') == unreal.MaterialDomain.MD_DEFERRED_DECAL, '%s, rugosidad %.2f' % (padre.get_name() if padre else None, rug))
+    # con lluvia salen más
+    w0 = d.get_editor_property('weather')
+    while d.get_editor_property('weather') != 0:
+        d.simulate_key('Y'); yield 0.2
+    yield 0.3
+    seco = [a.decal.is_visible() for a in lluvia]
+    while d.get_editor_property('weather') != 1:
+        d.simulate_key('Y'); yield 0.2
+    yield 0.3
+    mojado = [a.decal.is_visible() for a in lluvia]
+    check('con lluvia salen más charcos (%d) y sin ella no están' % len(lluvia), len(lluvia) >= 14 and not any(seco) and all(mojado),
+          '%d visibles en seco, %d con lluvia' % (sum(seco), sum(mojado)))
+    check('los fijos están siempre', all(a.decal.is_visible() for a in fijos))
+    while d.get_editor_property('weather') != w0:
+        d.simulate_key('Y'); yield 0.2
+    # regueros en el muro: en las cuatro caras de dentro, de arriba abajo
+    reg = por.get('MI_Per_Chorreton', [])
+    caras = {'sur': 0, 'norte': 0, 'oeste': 0, 'este': 0}
+    for a in reg:
+        l = a.get_actor_location()
+        c = 'sur' if abs(l.y - 7455) < 30 else 'norte' if abs(l.y + 1855) < 30 else 'oeste' if abs(l.x + 1855) < 30 else 'este' if abs(l.x - 9055) < 30 else None
+        if c:
+            caras[c] += 1
+    altos = [a.decal.get_editor_property('decal_size').z for a in reg]
+    check('regueros de humedad en las cuatro caras del muro', all(v >= 4 for v in caras.values()) and sum(caras.values()) == len(reg), caras)
+    check('cogen el muro de arriba abajo (4,6 m)', altos and all(abs(z - 230) < 2 for z in altos) and all(abs(a.get_actor_location().z - 230) < 5 for a in reg), sorted(set(altos))[:4])
+    check('ninguno tapa el portillo', not [a for a in reg if abs(a.get_actor_location().y - 7455) < 30 and 100 < a.get_actor_location().x < 520])
+    gar = por.get('MI_Per_ChorretonGarita', [])
+    cerca = lambda a, k: dist2d(a.get_actor_location(), V(ext[k]['garita'][0] * 100, ext[k]['garita'][1] * 100, 0)) < 200
+    check('y dos en cada garita', len(gar) == 4 and sum(1 for a in gar if cerca(a, 'entrada')) == 2 and sum(1 for a in gar if cerca(a, 'salida')) == 2, len(gar))
+    # juntas que rezuman: cada una encima de una junta de verdad, y las juntas donde el director cree que están
+    juntas = sorted(x * 100.0 for x in (ext.get('desgaste') or {}).get('juntas', []))
+    rez = por.get('MI_Per_Junta', [])
+    fuera = [int(a.get_actor_location().x) for a in rez if not any(abs(a.get_actor_location().x - x) < 10 for x in juntas)]
+    check('juntas de la losa que rezuman, cada una sobre su junta', len(rez) >= 6 and not fuera, '%d, fuera de sitio %s' % (len(rez), fuera))
+    paso, fase = d.get_editor_property('truck_joint_pitch'), d.get_editor_property('truck_joint_phase')
+    desfase = [x for x in juntas if abs((x - fase + paso / 2.0) % paso - paso / 2.0) > 1.0]
+    check('el camión sabe dónde están las juntas (golpe de cada eje)', len(juntas) >= 15 and paso > 1 and not desfase and abs(juntas[1] - juntas[0] - paso) < 1.0,
+          'paso %s, fase %s, %d fuera' % (paso, fase, len(desfase)))
+    # hierbajos: un solo material (los de tandas anteriores se borran al montar)
+    viejos = [str(p).split('/')[-1].split('.')[0] for p in unreal.EditorAssetLibrary.list_assets('/Game/Tarsis/Materiales', False, False)]
+    viejos = sorted(n for n in viejos if n.startswith('M_Hierbajo_'))
+    check('un solo material de hierbajos (el de esta tanda)', len(viejos) == 1, viejos)
+    check('sonidos de la caja del camión importados', all(unreal.EditorAssetLibrary.does_asset_exist('/Game/Tarsis/Sonidos/' + n) for n in ('camion_junta', 'camion_caja')))
+
+
 def prueba_anillo():
     """Tanda 21: el anillo deja de estar vacío y a oscuras: farolas en el camino, aplique en el portillo, la tela de las
     vallas como malla de verdad y tres guardias (uno en cada garita y la ronda del sur)."""
@@ -1026,11 +1105,16 @@ def prueba_viaje():
     if not d.can_board_truck():
         a_la_trasera(); yield 0.05
     check('detrás del camión, al paso: aviso "E SUBIR"', d.can_board_truck() and 'SUBIR' in d.interact_prompt(), d.interact_prompt()[:32])
+    n_luces = len(unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Light))
     d.interact(); yield 0.3
     check('subes a la caja y quedas oculto', d.get_editor_property('riding') and jugador().get_editor_property('hidden') and d.get_editor_property('truck_rides') == r0 + 1,
           '%s, %s' % (d.get_editor_property('riding'), d.get_editor_property('truck_rides')))
     check('aviso "E BAJAR"', 'BAJAR' in d.interact_prompt(), d.interact_prompt()[:28])
-    x1 = jugador().get_actor_location().x; yield 1.0
+    x1 = jugador().get_actor_location().x
+    mov = []
+    for _ in range(10):      # un segundo de viaje, mirando cuánto se mueve la vista (tanda 23)
+        yield 0.1
+        o = d.ride_offset(); mov.append((o.x, o.y, o.z))
     x2 = jugador().get_actor_location().x
     cam = jugador().get_component_by_class(unreal.CameraComponent).get_world_location()
     check('el camión te lleva', x2 - x1 > 200 and abs(x2 - (cx() - 125)) < 60, '%d cm en 1 s, a %d del centro' % (x2 - x1, x2 - cx()))
@@ -1039,19 +1123,33 @@ def prueba_viaje():
     check('la caja está hueca: por la trasera se ve el interior', h is None, h.to_tuple()[4] if h else '')
     ven = [g.get_actor_label()[8:] for g in guardias() if g.visibility(jugador()) > 0]
     check('ningún guardia te ve ahí dentro', not ven, ven)
+    # tanda 23: la caja por dentro
+    check('la vista traquetea, sin marear', max(abs(m[2]) for m in mov) > 0.2 and max(abs(c) for m in mov for c in m) < 12.0,
+          'hasta %.1f cm de alto y %.1f a lo largo' % (max(abs(m[2]) for m in mov), max(abs(m[0]) for m in mov)))
+    check('dentro hay una luz tenue y lo de fuera suena apagado', d.ride_light_on() and d.ride_muffle() > 0.8 and 0 < d.get_editor_property('ride_fill_lumens') < 60,
+          '%s, %.2f, %s lm' % (d.ride_light_on(), d.ride_muffle(), d.get_editor_property('ride_fill_lumens')))
+    check('esa luz es solo para tus ojos: no es una luz del nivel (los guardias no la cuentan)', len(unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Light)) == n_luces, n_luces)
     # --- bajar en marcha
     d.interact(); yield 0.25
     l = jugador().get_actor_location()
     check('E: saltas por detrás', not d.get_editor_property('riding') and not jugador().get_editor_property('hidden') and jugador().get_actor_enable_collision()
           and -500 < l.x - (cx() - 200) < 0 and abs(l.y - 5700) < 30 and l.z < 180, 'a %d de la trasera, z %d' % (l.x - (cx() - 200), l.z))
+    check('al bajar se apaga la luz de la caja', not d.ride_light_on())
     # --- otra vez arriba, hasta el control. Sin el expediente: Sanz mira los papeles sin verte y, al levantarse la barrera, te bajas
     a_la_trasera(); yield 0.05
     if not d.can_board_truck():
         a_la_trasera(); yield 0.05
     d.interact(); yield 0.3
     check('vuelves a subir', d.get_editor_property('riding') and d.get_editor_property('truck_rides') == r0 + 2, d.get_editor_property('truck_rides'))
+    j0, xj = d.get_editor_property('truck_joints'), cx()
     yield ('hasta', lambda: estado_c() == 4, 45.0)
+    j1 = d.get_editor_property('truck_joints')
+    quiere = 2 * int((cx() - xj) // d.get_editor_property('truck_joint_pitch'))     # dos ejes por junta
+    check('cada eje golpea en cada junta de la losa', quiere >= 8 and abs(j1 - j0 - quiere) <= 3, '%d golpes en %d m (se esperan %d)' % (j1 - j0, (cx() - xj) / 100, quiere))
     yield ('hasta', lambda: director().get_editor_property('truck_check') >= 2, 26.0)
+    o = d.ride_offset()
+    check('parado en el control solo queda el temblor del motor', math.sqrt(o.x ** 2 + o.y ** 2 + o.z ** 2) < 0.5 and d.get_editor_property('truck_joints') == j1,
+          '%.2f cm, %d golpes de más' % (math.sqrt(o.x ** 2 + o.y ** 2 + o.z ** 2), d.get_editor_property('truck_joints') - j1))
     check('en el control miran los papeles contigo dentro', d.get_editor_property('riding') and d.truck_inspector_name() == 'Sanz' and d.get_editor_property('truck_check') == 2,
           '%s, fase %s' % (d.truck_inspector_name(), d.get_editor_property('truck_check')))
     check('y Sanz, a dos pasos, no te ve', sanz and sanz.visibility(jugador()) == 0 and estado(sanz) == 'PATROL', estado(sanz) if sanz else '')
@@ -1065,6 +1163,7 @@ def prueba_viaje():
     yield ('hasta', lambda: estado_c() == 5 and cx() > 8400, 8.0)
     tp(cx() - 265, 5700, 0); yield 0.05
     check('y ya en marcha hacia fuera no te deja subir', estado_c() == 5 and not d.can_board_truck(), estado_c())
+    check('fuera de la caja el mundo vuelve a sonar entero', d.ride_muffle() < 0.15 and not d.ride_light_on(), '%.2f' % d.ride_muffle())
     aparte()
     yield ('hasta', lambda: estado_c() == 0, 30.0)
     # --- base en guardia: después de los papeles, Sanz rodea el camión, mira la caja y te saca
@@ -1201,7 +1300,7 @@ def prueba_opciones():
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
-            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste], [prueba_anillo, prueba_camion, prueba_viaje]]
+            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje]]
 PRUEBAS = []
 
 

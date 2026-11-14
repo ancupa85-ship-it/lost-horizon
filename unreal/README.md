@@ -63,6 +63,29 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 - **Voces y sonido.** Tres frases nuevas por guardia (`papeles`, `pase`, `registro`) y el sonido `camion_subir`.
 - **Pruebas.** `prueba_desgaste` (losa, hierbajos, manchas y materiales del camión), el control en `prueba_camion` y `prueba_viaje` (subir, viajar, saltar, papeles sin que te vean, bajarte sin el expediente, registro con la base en guardia y final en la caja). La prueba del perímetro ya no llama a `find_path_to_location_synchronously`, que hacía saltar un aviso del motor con ventana de informe de errores.
 
+### Agua en el suelo y en los muros, y la caja del camión por dentro (tanda 23)
+
+**Arte: suelo y muros con vida.**
+
+- **Charcos.** `ambiente.py` → `material_charco()` crea `M_Charco`: una calcomanía de agua quieta (contorno irregular hecho con ruido del mundo, color oscuro, rugosidad 0,05 y relieve plano), que es la que refleja las farolas. Usa mezcla translúcida, la única de las calcomanías que deja escribir el relieve; con `CHARCO_NORMAL = False` vuelve al alfa compuesto de `M_Mancha` y conserva el relieve de la losa. `perimetro.py` pone 18 fijos (uno o dos al lado de cada farola del camino, en cuatro de los cercos de los bordillos, tres turbios en la grava del anillo sur y uno junto a cada farola de los patios, en una casilla despejada del plano) y 22 más con la etiqueta `lluvia`, que el director solo enseña cuando llueve (`RainDecals`).
+- **Regueros en el muro.** `material_chorreton()` → `M_Chorreton`: hilos verticales oscuros que bajan desde lo alto del muro, a grupos y cada uno con su largo. El dibujo sale de la posición en el mundo, no de las UV de la calcomanía, así que vale para un muro que mire a cualquier lado y no se repite. 40 cajas en las cuatro caras de dentro del muro y dos en cada garita (parámetros `Techo`, `Largo`, `Contraste` por instancia).
+- **Juntas que rezuman.** Ocho bandas oscuras (`MI_Per_Junta`) sobre juntas de verdad de la losa (una cada 6 m).
+- **Hierbajos.** Paleta más apagada y briznas muertas en `tools/texturas/hierbajo.py`; `hierbajo_material()` añade un tinte y rodales (zonas más secas y más verdes según la posición), sube la rugosidad y borra los `M_Hierbajo_*` de tandas anteriores. Los ajustes están en `HIERBA_AJUSTES` (`montar_base.py`).
+- **Suciedad por superficie.** `SUCIEDAD` en `materiales.py` da a cada instancia su dosis (el camino, más). `RUIDO_RAPIDO` hace que el ruido del maestro `M_LH` use la variante de una sola lectura por nivel.
+- La clase `Grafo` de `ambiente.py` monta estos materiales nodo a nodo, con una marca de versión: si el material ya está en esa versión no se toca, y las conexiones que fallen salen en el registro como `AVISO`.
+
+**Sensación: el viaje en la caja.**
+
+- **Interior.** `truck()` en `escena_base.py` añade bancos de tablas a los lados, respaldo, correas colgando del último arco, un farol apagado, un rollo de cuerda y un cajón con una lona doblada.
+- **Juntas.** Cada eje del camión que pisa una junta de la losa (`TruckJointPitch`, `TruckJointPhase`) da un golpe (`camion_junta`): se oye desde fuera, que avisa de por dónde va el camión, y dentro sacude la vista (un muelle amortiguado). `TruckJoints` las cuenta.
+- **Inercia.** Al frenar el cuerpo se va hacia la cabina y al arrancar hacia el portalón (`TruckFeel()`); parado en el control queda el temblor del motor. `RideOffset()` da lo que se mueve la vista.
+- **Sonido.** Bajo la lona el viento, la lluvia, los grillos y el generador bajan a la mitad y pierden los agudos (filtro paso bajo), el motor se oye a través de la cabina y suena un bucle propio de tablas, lona y hebillas (`camion_caja`), más fuerte cuanto más corre el camión. `RideMuffle()` va de 0 (fuera) a 1 (dentro).
+- **Luz.** Una luz de relleno muy tenue (`RideFillLumens`, 18 lm, sin sombras, radio 3 m) deja ver la caja. Es un componente del director, no una luz del nivel: no cuenta para `LightAt` y solo existe mientras viajas.
+
+**Memoria de vídeo.** `py tools/unreal/memoria.py` hace el inventario de las texturas de `/Game` (tamaño, formato, lo que ocupan con todos sus niveles, quién las usa y lo que se ahorraría limitándolas a 1K). No cambia nada: resumen en el registro y lista completa en `Saved/Tarsis/memoria.json`.
+
+**Pruebas.** `prueba_charcos` (charcos fijos y de lluvia, regueros en las cuatro caras, juntas en su sitio, un solo material de hierbajos) y, en `prueba_viaje`, el traqueteo, la luz, el sonido apagado y el golpe de cada eje en cada junta.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

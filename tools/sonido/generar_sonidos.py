@@ -400,6 +400,44 @@ def camion_subir():
     o = int(0.62 * SR); x[o:] += golpe(n - o, 130, 0.05, 0.45)
     return x
 
+def camion_junta():
+    # tanda 23: un eje del camión pasa por una junta de la losa: golpe sordo de la rueda, el chasis que responde y la
+    # chapa de la caja que tintinea. Se oye desde fuera (el «ta-tac» del camión por el camino) y, sobre todo, desde dentro
+    n = int(0.42 * SR); t = np.arange(n) / SR
+    x = golpe(n, 62, 0.07, 1.0)
+    o = int(0.018 * SR); x[o:] += golpe(n - o, 118, 0.045, 0.45)
+    x += lp(rng.normal(0, 1, n), 0.8) * env(n, 0.002, 0.06) * 0.5
+    o = int(0.03 * SR); m = n - o
+    x[o:] += (0.1 * np.sin(2 * np.pi * 1740 * t[:m]) + 0.07 * np.sin(2 * np.pi * 2630 * t[:m])) * np.exp(-t[:m] / 0.05)
+    return x
+
+def camion_caja(sec=8):
+    # tanda 23: lo que se oye dentro de la caja con el camión en marcha (en bucle; en el juego su volumen va con la
+    # velocidad): las tablas y los bancos que crujen, la lona que bate contra los arcos y las hebillas de las correas
+    n = int((sec + 1) * SR); t = np.arange(n) / SR
+    x = lp(rng.normal(0, 1, n), 0.992) * 5.0 * (0.75 + 0.25 * np.sin(2 * np.pi * 0.7 * t))             # retumbar de la caja
+    p = 0.3
+    while p < sec + 0.6:                                                                             # la lona
+        o = int(p * SR); m = int(rng.uniform(0.07, 0.2) * SR)
+        if o + m < n: x[o:o + m] += hp(lp(rng.normal(0, 1, m), 0.72), 0.95) * env(m, 0.012, m / SR / 3.0) * rng.uniform(0.5, 1.3)
+        p += rng.uniform(0.18, 0.75)
+    p = 0.5
+    while p < sec + 0.4:                                                                             # crujidos de madera
+        o = int(p * SR); m = int(rng.uniform(0.09, 0.26) * SR)
+        if o + m < n:
+            tt = np.arange(m) / SR; f = rng.uniform(260, 520)
+            fase = 2 * np.pi * np.cumsum(f * (1 + 0.35 * np.sin(2 * np.pi * rng.uniform(5, 11) * tt))) / SR
+            x[o:o + m] += np.sign(np.sin(fase)) * np.abs(np.sin(fase)) ** 3 * np.sin(np.pi * tt / tt[-1]) ** 2 * rng.uniform(0.12, 0.3)
+        p += rng.uniform(0.6, 1.9)
+    p = 0.2
+    while p < sec + 0.6:                                                                             # hebillas y cadenas
+        o = int(p * SR); m = int(0.07 * SR)
+        if o + m < n:
+            tt = np.arange(m) / SR; f = rng.uniform(2100, 3900)
+            x[o:o + m] += (np.sin(2 * np.pi * f * tt) + 0.5 * np.sin(2 * np.pi * f * 1.52 * tt)) * np.exp(-tt / 0.012) * rng.uniform(0.04, 0.12)
+        p += rng.uniform(0.25, 1.3)
+    return bucle(x)
+
 if __name__ == '__main__':
     for k in range(3):
         save('paso_grava_%d' % (k + 1), grava(k), 0.7)
@@ -433,3 +471,6 @@ if __name__ == '__main__':
     save('porton', porton(), 0.7)
     # tanda 22: subirse a la caja del camión
     save('camion_subir', camion_subir(), 0.6)
+    # tanda 23: el camión por las juntas de la losa y la caja por dentro
+    save('camion_junta', camion_junta(), 0.75)
+    save('camion_caja', camion_caja(), 0.5)

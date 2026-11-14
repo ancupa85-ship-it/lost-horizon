@@ -60,6 +60,15 @@ VALORES = {
     'contenedor_2': (0x94c48a, 0.62, 0.15), 'contenedor_3': (0xe8cf70, 0.62, 0.15),
 }
 
+# tanda 23: cuánta suciedad lleva cada instancia (parámetro Suciedad del maestro; las demás se quedan con 0,6). Con más,
+# las manchas grandes de ruido oscurecen más el color y, sobre todo, abren más la rugosidad: bajo una farola el brillo de
+# la losa deja de ser un óvalo liso y sale a parches, unos mates y otros como recién mojados. En los muros sube además
+# el zócalo oscuro del pie. No cuesta nada: el ruido ya se calculaba.
+SUCIEDAD = {'camino': 1.25, 'tierra': 1.0, 'muro': 1.0, 'suelo': 0.85}
+# ruido del maestro por textura 3D (una lectura por nivel en vez de ocho). Se repite cada 40 m, que en manchas difusas no
+# se nota. Para medir lo que ahorra en la GTX 1050 Ti: False lo deja como hasta la tanda 22.
+RUIDO_RAPIDO = True
+
 def lin(c):
     c /= 255.0
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -156,7 +165,12 @@ def maestro(defecto):
     ruido = E(unreal.MaterialExpressionNoise, -1000, -800)
     ruido.set_editor_property('scale', 0.004); ruido.set_editor_property('levels', 2)
     # ruido de textura (barato): el de cálculo en cada píxel de toda la base costaba ~8 fps en una GTX 1050 Ti
-    ruido.set_editor_property('noise_function', unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX)
+    fn = unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX
+    if RUIDO_RAPIDO:
+        fn = getattr(unreal.NoiseFunction, 'NOISEFUNCTION_GRADIENT_TEX3D', fn)
+        if fn == unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX:
+            log('AVISO: M_LH: este motor no tiene el ruido de textura 3D; se queda el de siempre')
+    ruido.set_editor_property('noise_function', fn)
     ruido.set_editor_property('quality', 1)
     ruido.set_editor_property('output_min', 0.0); ruido.set_editor_property('output_max', 1.0)
     wp = E(unreal.MaterialExpressionWorldPosition, -1200, -1000)
@@ -502,6 +516,8 @@ def instancias():
         if clave == 'pared':   # zócalo pintado de cuartel: verde grisáceo hasta 1,15 m
             mel.set_material_instance_scalar_parameter_value(mi, 'ZocaloAltura', 115.0)
             mel.set_material_instance_vector_parameter_value(mi, 'ZocaloTinte', unreal.LinearColor(0.42, 0.55, 0.47, 1))
+        if clave in SUCIEDAD:
+            mel.set_material_instance_scalar_parameter_value(mi, 'Suciedad', SUCIEDAD[clave])
         if clave == 'suelo_int':   # hormigón mate: el brillo uniforme del fluorescente en el suelo parecía plástico
             mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', 1.6)
         eal.save_loaded_asset(mi)

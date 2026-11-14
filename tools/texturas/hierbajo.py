@@ -15,7 +15,8 @@ SS = 4             # sobremuestreo
 C = N // 2 * SS    # lado de una mata, sobremuestreado
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets', 'unreal', 'texturas_propias')
 
-PAJA, OLIVA, VERDE, OSCURO, PARDO = (158, 142, 86), (96, 108, 56), (70, 98, 44), (38, 52, 26), (104, 84, 52)
+# tanda 23: paleta más apagada (bajo una farola las matas de paja salían como recortes claros) y briznas muertas, grises
+PAJA, OLIVA, VERDE, OSCURO, PARDO, MUERTA = (138, 122, 80), (88, 98, 54), (60, 86, 42), (32, 44, 24), (96, 78, 50), (104, 98, 82)
 
 def mezcla(a, b, t):
     return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
@@ -45,14 +46,16 @@ def mata(variante, rng):
         hoja(d, bx + rng.uniform(-raiz, raiz) * C, by, x1, y1, rng.uniform(-curva, curva) * h, ancho * SS * rng.uniform(0.7, 1.3), c0, c1)
     if variante == 0:      # hierba seca alta
         for _ in range(70):
-            k = rng.random(); brizna(C * 0.9, 0.3, 2.4, mezcla(OSCURO, PARDO, k), mezcla(OLIVA, PAJA, min(1.0, k + 0.3)), 0.3, 0.08)
+            k = rng.random(); punta = MUERTA if rng.random() < 0.3 else mezcla(OLIVA, PAJA, min(1.0, k + 0.3))
+            brizna(C * 0.9, 0.3, 2.4, mezcla(OSCURO, PARDO, k), punta, 0.3, 0.08)
         for _ in range(7):   # espigas
             a = rng.gauss(0, 0.2); h = C * rng.uniform(0.7, 0.9); x1 = min(C - M * 1.5, max(M * 1.5, bx + math.sin(a) * h)); y1 = max(M * 1.6, by - math.cos(a) * h)
             hoja(d, bx + rng.uniform(-0.04, 0.04) * C, by, x1, y1, rng.uniform(-0.15, 0.15) * h, 1.6 * SS, PARDO, PAJA)
             d.ellipse([x1 - 2.2 * SS, y1 - 7 * SS, x1 + 2.2 * SS, y1 + 5 * SS], fill=mezcla(PAJA, (190, 170, 110), rng.random()) + (255,))
     elif variante == 1:    # mata baja y verde
         for _ in range(90):
-            k = rng.random(); brizna(C * 0.62, 0.55, 3.0, mezcla(OSCURO, VERDE, k * 0.6), mezcla(VERDE, OLIVA, k), 0.35, 0.16)
+            k = rng.random(); punta = mezcla(PARDO, MUERTA, rng.random()) if rng.random() < 0.18 else mezcla(VERDE, OLIVA, k)
+            brizna(C * 0.62, 0.55, 3.0, mezcla(OSCURO, VERDE, k * 0.6), punta, 0.35, 0.16)
         for _ in range(4):
             a = rng.gauss(0, 0.3); h = C * rng.uniform(0.55, 0.8); x1 = min(C - M * 1.5, max(M * 1.5, bx + math.sin(a) * h)); y1 = max(M * 1.6, by - math.cos(a) * h)
             hoja(d, bx, by, x1, y1, rng.uniform(-0.12, 0.12) * h, 1.4 * SS, OLIVA, PAJA)
@@ -94,8 +97,8 @@ def generar():
     rgb = np.where(alfa[..., None] > 0.004, pre / np.maximum(alfa[..., None], 1e-6), 0.0)
     # sombreado: más oscuro hacia la raíz de cada mata (las briznas se tapan unas a otras) y algo de mota
     yy = (np.arange(N) % (N // 2)) / (N // 2)
-    rgb *= (0.55 + 0.45 * (1.0 - yy) ** 0.6)[:, None, None]
-    rgb *= 0.9 + 0.2 * np.random.default_rng(22).random((N, N, 1))
+    rgb *= (0.4 + 0.6 * (1.0 - yy) ** 0.7)[:, None, None]
+    rgb *= 0.86 + 0.28 * np.random.default_rng(22).random((N, N, 1))
     # el color se extiende a los huecos (alfa 0): al reducir la textura no entra negro por los bordes de las briznas
     lleno = alfa > 0.02; col = rgb.copy()
     for _ in range(24):

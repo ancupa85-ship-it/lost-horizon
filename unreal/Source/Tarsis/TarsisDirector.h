@@ -334,6 +334,38 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
 	bool bLeftByTruck = false;
 
+	// ---- la caja del camión por dentro (tanda 23)
+	/** Luz de relleno dentro de la caja mientras viajas en ella, en lúmenes (0 = sin ella). Sin sombras y de radio corto:
+	 *  deja ver los arcos, la lona, los bancos y la carga. Es una luz para tus ojos: no es un ALight (no cuenta para
+	 *  LightAt) y fuera de la caja está apagada. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float RideFillLumens = 18.0f;
+
+	/** Juntas de la losa del camino: una cada TruckJointPitch cm, con una de ellas en x = TruckJointPhase (las pone
+	 *  desgaste_camino en tools/blender/escena_base.py; en base.json, ext.desgaste.juntas). Cada eje del camión que pisa
+	 *  una da un golpe: se oye desde fuera y, dentro de la caja, sacude la vista. 0 = sin juntas. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckJointPitch = 600.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckJointPhase = 100.0f;
+
+	/** Juntas que han pisado los ejes del camión desde que empezó la partida. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckJoints = 0;
+
+	/** Cuánto de «dentro de la caja» suena el mundo: 0 fuera, 1 dentro (el ambiente baja y pierde los agudos). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	float RideMuffle() const { return RideMuffleK; }
+
+	/** ¿Está encendida la luz de relleno de la caja? */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	bool RideLightOn() const;
+
+	/** Lo que se mueve la vista dentro de la caja respecto a su sitio (traqueteo, golpe de junta e inercia), en cm. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	FVector RideOffset() const { return RideShake; }
+
 	/** Punto de salida de la base (portón de salida): llegar con el expediente acaba la misión (final por la salida). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
 	FVector ExitLoc = FVector(6900.0f, 5300.0f, 0.0f);
@@ -945,6 +977,18 @@ private:
 	void TruckControlTick(float DeltaSeconds);
 	void RidePlace();
 	void RideTick();
+	// la caja por dentro (tanda 23)
+	UPROPERTY()
+	TObjectPtr<class UPointLightComponent> RideLight;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> RideAudio;
+	float RideMuffleK = 0.0f;
+	float RideKick = 0.0f;      // golpe vertical al pisar una junta (cm): un muelle amortiguado
+	float RideKickV = 0.0f;
+	float RideLurch = 0.0f;     // el cuerpo se va hacia la cabina al frenar y hacia el portalón al arrancar (cm)
+	FVector RideShake = FVector::ZeroVector;
+	void TruckFeel(float PrevX, float PrevV, float DeltaSeconds);
+	void RideFeelTick(float DeltaSeconds);
 	UPROPERTY()
 	TObjectPtr<class ASpotLight> GateLamp;
 	bool bLampBroken = false;
