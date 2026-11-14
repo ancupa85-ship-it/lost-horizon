@@ -17,8 +17,10 @@ GUARDIAS = {
     'Ibarra': ([[13, 4], [13, 9], [9, 9], [9, 4]], 2.5, 'ibarra'),   # patio norte, con la llave de la jefatura
     'Moya': ([[20, 19], [33, 19], [33, 20], [20, 20]], 3.0, 'moya'),   # patio central
     'Peris': ([[28, 7], [28, 8], [23, 8], [28, 8]], [9.0, 0.5, 16.0, 0.5], 'peris'),   # cuartelero: sale a fumar a la puerta y vuelve a la mesa
-    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], 2.5, 'moya'),   # portón
-    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], 2.5, 'peris'),   # barracón
+    # Vega y Ramos se asoman a un rincón y vuelven: allí se paran a mirar (6 s); en la esquina de paso, apenas.
+    # Con la misma espera en todos los puntos, ese ir y volver de pocos metros parecía un guardia en bucle.
+    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], [2.5, 1.0, 6.0, 1.0], 'moya'),   # portón
+    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], [3.0, 1.0, 6.0, 1.0], 'peris'),   # barracón
 }
 
 def log(*a):

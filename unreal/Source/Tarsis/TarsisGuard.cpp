@@ -5,6 +5,7 @@
 
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/PoseableMeshComponent.h"
 #include "Animation/AnimationAsset.h"
 #include "Engine/SkeletalMesh.h"
 #include "Components/LocalLightComponent.h"
@@ -144,7 +145,9 @@ void ATarsisGuard::UpdateAnim()
 		// idle (arrastraría los pies): se anda más despacio; entre andar y trotar se mezcla; por encima se acelera.
 		const float Vw = FMath::Max(WalkAnimSpeed, 1.0f);
 		const float Vtop = RunAnimSpeed > Vw ? RunAnimSpeed : Vw;
-		const float Target = Speed < 8.0f ? 0.0f : FMath::Clamp(FMath::Max(Speed, Vw * FMath::Min(Speed / 40.0f, 1.0f)), 0.0f, Vtop);
+		// girando en el sitio (más de ~40 grados por segundo, parado): da pasos cortos en vez de rotar rígido
+		bTurnStepping = Speed < 25.0f && YawRate > 40.0f;
+		const float Target = bTurnStepping ? Vw : (Speed < 8.0f ? 0.0f : FMath::Clamp(FMath::Max(Speed, Vw * FMath::Min(Speed / 40.0f, 1.0f)), 0.0f, Vtop));
 		if (UAnimSingleNodeInstance* SI = M->GetSingleNodeInstance())
 		{
 			// la posición en la mezcla se suaviza: aunque la cápsula frene en seco, las piernas no saltan de pose
@@ -152,7 +155,8 @@ void ATarsisGuard::UpdateAnim()
 			SI->SetBlendSpacePosition(FVector(BlendPos, 0.0f, 0.0f));
 		}
 		// ritmo = velocidad de la cápsula / velocidad de la pose de la mezcla, para que el pie apoyado no patine
-		M->SetPlayRate(BlendPos > 20.0f && Speed >= 8.0f ? FMath::Clamp(Speed / BlendPos, 0.4f, RunAnimSpeed > Vw ? 1.6f : 2.6f) : 1.0f);
+		if (bTurnStepping) M->SetPlayRate(FMath::Clamp(YawRate / 200.0f, 0.35f, 0.7f));
+		else M->SetPlayRate(BlendPos > 20.0f && Speed >= 8.0f ? FMath::Clamp(Speed / BlendPos, 0.4f, RunAnimSpeed > Vw ? 1.6f : 2.6f) : 1.0f);
 		return;
 	}
 	UAnimationAsset* Want = IdleAnim;
@@ -166,10 +170,125 @@ void ATarsisGuard::UpdateAnim()
 	M->SetPlayRate(Want == WalkAnim ? FMath::Clamp(Speed / FMath::Max(WalkAnimSpeed, 1.0f), 0.5f, 2.6f) : 1.0f);
 }
 
+void ATarsisGuard::SetupPose()
+{
+	USkeletalMeshComponent* M = GetMesh();
+	if (!BodyMesh || !M || Pose || !GetWorld() || !GetWorld()->IsGameWorld()) return;
+	const FReferenceSkeleton& Ref = BodyMesh->GetRefSkeleton();
+	auto Pick = [&Ref](std::initializer_list<const TCHAR*> Names) -> FName
+	{
+		for (const TCHAR* N : Names) { if (Ref.FindBoneIndex(FName(N)) != INDEX_NONE) return FName(N); }
+		return NAME_None;
+	};
+	HeadBone = Pick({ TEXT("head") });
+	NeckBone = Pick({ TEXT("neck_01"), TEXT("neck") });
+	SpineBone = Pick({ TEXT("spine_03"), TEXT("spine_02"), TEXT("spine_01") });
+	Pose = NewObject<UPoseableMeshComponent>(this, TEXT("CuerpoVisible"));
+	Pose->SetupAttachment(M);
+	Pose->SetSkinnedAssetAndUpdate(BodyMesh);
+	Pose->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Pose->RegisterComponent();
+	Pose->CopyPoseFromSkeletalComponent(M);
+	// la malla animada ya no se ve, pero sigue evaluando: de ella salen la pose (copiada cada tick) y los pasos
+	M->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	M->SetHiddenInGame(true);
+	M->SetCastShadow(false);
+}
+
+void ATarsisGuard::LookTick(float DeltaSeconds)
+{
+	// cuánto gira el cuerpo por segundo (UpdateAnim da pasos al girar en el sitio)
+	const float Yaw = GetActorRotation().Yaw;
+	if (DeltaSeconds > 0.0f)
+	{
+		YawRate = FMath::FInterpTo(YawRate, FMath::Abs(FMath::FindDeltaAngleDegrees(PrevYaw, Yaw)) / DeltaSeconds, DeltaSeconds, 8.0f);
+	}
+	PrevYaw = Yaw;
+	if (!Pose) return;
+	Pose->CopyPoseFromSkeletalComponent(GetMesh());
+	// adónde mira la cabeza, respecto al cuerpo: el cuerpo gira despacio y la cabeza se adelanta
+	auto Toward = [this](const FVector& P) -> float
+	{
+		FVector D = P - GetActorLocation();
+		D.Z = 0.0f;
+		return D.IsNearlyZero() ? 0.0f : FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, D.Rotation().Yaw);
+	};
+	float Want = 0.0f;
+	float WantLean = 0.0f;
+	switch (State)
+	{
+	case ETarsisGuardState::Suspicious:
+	case ETarsisGuardState::Alert:
+		Want = Toward(LastSeen);
+		break;
+	case ETarsisGuardState::Search:
+		// buscando: barre con la cabeza a un lado y a otro, algo agachado hacia delante
+		Want = 55.0f * FMath::Sin(StateT * 1.7f);
+		WantLean = 12.0f;
+		break;
+	case ETarsisGuardState::Patrol:
+		if (!bTowerSentry && WaitT > 0.6f) Want = 45.0f * FMath::Sin((WaitT - 0.6f) * 0.9f);   // parado en su punto: echa un vistazo
+		break;
+	default:
+		break;
+	}
+	if (bRepairing && RepairLookT > 0.0f) Want = Toward(RepairLook);
+	if (State == ETarsisGuardState::Down) { Want = 0.0f; LookYaw = 0.0f; Lean = 0.0f; }
+	LookTarget = FMath::Clamp(Want, -75.0f, 75.0f);
+	LookYaw = FMath::FInterpTo(LookYaw, LookTarget, DeltaSeconds, 4.0f);
+	Lean = FMath::FInterpTo(Lean, WantLean, DeltaSeconds, 2.5f);
+	if (FMath::Abs(LookYaw) < 0.2f && Lean < 0.2f) return;
+	// ejes del guardia en el espacio de la malla (que va girada respecto al actor)
+	const FTransform CT = Pose->GetComponentTransform();
+	const FVector Up = CT.InverseTransformVectorNoScale(FVector::UpVector);
+	const FVector Right = CT.InverseTransformVectorNoScale(GetActorRightVector());
+	auto Turn = [this](FName Bone, const FQuat& Q)
+	{
+		if (Bone.IsNone()) return;
+		const FQuat Cur = Pose->GetBoneRotationByName(Bone, EBoneSpaces::ComponentSpace).Quaternion();
+		Pose->SetBoneRotationByName(Bone, (Q * Cur).Rotator(), EBoneSpaces::ComponentSpace);
+	};
+	if (Lean > 0.2f) Turn(SpineBone, FQuat(Right, FMath::DegreesToRadians(Lean)));
+	Turn(NeckBone, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.4f)));
+	Turn(HeadBone, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.6f)));
+}
+
+void ATarsisGuard::FootTick(float DeltaSeconds)
+{
+	// un paso cuando un pie llega al suelo según la animación: el sonido va a compás de las piernas
+	if (!Pose || State == ETarsisGuardState::Down) { bFootInit = false; return; }
+	USkeletalMeshComponent* M = GetMesh();
+	const float Speed = GetVelocity().Size2D();
+	const bool bMoving = Speed > 40.0f || bTurnStepping;
+	static const FName Feet[2] = { FName(TEXT("ball_l")), FName(TEXT("ball_r")) };
+	for (int32 i = 0; i < 2; ++i)
+	{
+		const float Z = M->GetBoneLocation(Feet[i], EBoneSpaces::ComponentSpace).Z;
+		if (!bFootInit) { FootMin[i] = Z; bFootUp[i] = false; continue; }
+		FootMin[i] = FMath::Min(FootMin[i] + 3.0f * DeltaSeconds, Z);   // el suelo de la animación (sube despacio por si cambia)
+		if (bFootUp[i] && Z < FootMin[i] + 2.5f)
+		{
+			bFootUp[i] = false;
+			if (bMoving)
+			{
+				++StepsTaken;
+				for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { It->GuardStep(this, Speed > 300.0f); break; }
+			}
+		}
+		else if (!bFootUp[i] && Z > FootMin[i] + 6.0f)
+		{
+			bFootUp[i] = true;
+		}
+	}
+	bFootInit = true;
+}
+
 void ATarsisGuard::BeginPlay()
 {
 	Super::BeginPlay();
 	SetupBody();
+	SetupPose();
+	PrevYaw = GetActorRotation().Yaw;
 	Home = GetActorLocation();
 	if (PatrolPoints.Num() == 0)
 	{
@@ -226,6 +345,7 @@ void ATarsisGuard::HearNoise(const FVector& Where)
 		}
 		LastRepairNoise = -100.0f;
 		bRepairing = false;
+		bNoiseSearch = true;
 		LastSeen = Where;
 		Meter = FMath::Max(Meter, 0.6f);
 		SetState(ETarsisGuardState::Suspicious);
@@ -234,6 +354,7 @@ void ATarsisGuard::HearNoise(const FVector& Where)
 		return;
 	}
 	if (State == ETarsisGuardState::Suspicious && bInvestigate) { LastSeen = Where; return; }   // ya va a mirar: sigue el ruido
+	bNoiseSearch = true;
 	LastSeen = Where;
 	Meter = FMath::Max(Meter, 0.5f);
 	SetState(ETarsisGuardState::Suspicious);
@@ -257,6 +378,7 @@ void ATarsisGuard::KnockOut()
 	State = ETarsisGuardState::Down;
 	StateT = 0.0f;
 	DownT = KnockOutTime;
+	bNoiseSearch = false;
 	KnockLoc = GetActorLocation();
 	Meter = 0.0f;
 	bFound = false;
@@ -315,6 +437,7 @@ void ATarsisGuard::LookForBodies()
 		Alarm(P);
 		for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
 		{
+			Dt->GuardSay(this, TEXT("suelo"), true);
 			Dt->ShowMessage(FString::Printf(TEXT("%s HA ENCONTRADO A %s EN EL SUELO\nToda la base te busca."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 5.0f);
 			break;
 		}
@@ -373,6 +496,7 @@ void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
 void ATarsisGuard::SetState(ETarsisGuardState NewState)
 {
 	if (NewState != ETarsisGuardState::Alert) bRadioCall = false;
+	if (NewState == ETarsisGuardState::Alert || NewState == ETarsisGuardState::Patrol || NewState == ETarsisGuardState::Down) bNoiseSearch = false;
 	State = NewState;
 	StateT = 0.0f;
 	bRepairing = false;
@@ -608,11 +732,14 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	StateT += DeltaSeconds;
 	if (State == ETarsisGuardState::Down)
 	{
+		LookTick(DeltaSeconds);   // el cuerpo visible sigue copiando la caída
 		DownT -= DeltaSeconds;
 		if (DownT <= 0.0f) WakeUp();
 		return;
 	}
 	UpdateAnim();
+	LookTick(DeltaSeconds);
+	FootTick(DeltaSeconds);
 	if (HoldT > 0.0f)
 	{
 		HoldT -= DeltaSeconds;
@@ -685,11 +812,18 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	case ETarsisGuardState::Suspicious:
 		// se para, mira hacia donde vio algo y, si sigue, se acerca despacio
 		if (Meter >= 1.0f) { SetState(ETarsisGuardState::Alert); break; }
-		FaceTowards(LastSeen, DeltaSeconds);
+		// primero se para y se vuelve hacia allí con calma (la cabeza se adelanta: LookTick); luego va
+		if (StateT < 1.4f)
+		{
+			FVector Dir = LastSeen - GetActorLocation();
+			Dir.Z = 0.0f;
+			if (!Dir.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, Dir.Rotation().Yaw, 0.0f), DeltaSeconds, 3.5f));
+		}
+		else FaceTowards(LastSeen, DeltaSeconds);
 		if (bInvestigate)
 		{
 			// un ruido: va a mirar (aunque se le pase la sospecha) y allí busca; si no llega, lo deja a los 25 s
-			if (StateT > 1.0f && !Near2D(LastSeen, 150.0f)) Walk(LastSeen, WalkSpeed * 0.8f);
+			if (StateT > 1.4f && !Near2D(LastSeen, 150.0f)) Walk(LastSeen, WalkSpeed * 0.8f);
 			if (Near2D(LastSeen, 150.0f) || StateT > 25.0f) { bInvestigate = false; SetState(ETarsisGuardState::Search); }
 			break;
 		}

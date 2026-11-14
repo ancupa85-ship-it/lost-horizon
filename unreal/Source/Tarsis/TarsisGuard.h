@@ -45,8 +45,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
 	TArray<float> PatrolWaits;
 
+	/** Paso de ronda (cm/s). 175 con las animaciones del maniquí (andar a ~280): zancada natural sin parecer cámara lenta. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
-	float WalkSpeed = 140.0f;
+	float WalkSpeed = 175.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
 	float RunSpeed = 430.0f;
@@ -185,6 +186,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	float RunAnimSpeed = 0.0f;
 
+	/** Giro actual de cabeza y cuello respecto al cuerpo (grados, + a la derecha): mira hacia un ruido, barre al buscar. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	float LookYaw = 0.0f;
+
+	/** Pasos que ha dado (pie que apoya, según la animación): para las pruebas y el sonido de sus pasos. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 StepsTaken = 0;
+
+	/** Gira en el sitio dando pasos (la animación de andar despacio mientras rota). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	bool bTurnStepping = false;
+
+	/** Tiene cuerpo con esqueleto y sus pasos salen de la animación (si no, el director los cuenta por distancia). */
+	bool HasFootSync() const { return Pose != nullptr; }
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
 	ETarsisGuardState State = ETarsisGuardState::Patrol;
 
@@ -232,7 +248,25 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class USpotLightComponent> Flashlight;
 
+	/** Cuerpo que se ve en el juego: copia la pose de la malla animada (oculta) y le añade el giro de cabeza y cuello y
+	 *  la inclinación al buscar. Con SingleNode no hay grafo de animación donde meter un LookAt. */
+	UPROPERTY()
+	TObjectPtr<class UPoseableMeshComponent> Pose;
+
 private:
+	void SetupPose();
+	void LookTick(float DeltaSeconds);
+	void FootTick(float DeltaSeconds);
+	float LookTarget = 0.0f;
+	float Lean = 0.0f;
+	float PrevYaw = 0.0f;
+	float YawRate = 0.0f;
+	float FootMin[2] = { 0.0f, 0.0f };
+	bool bFootUp[2] = { true, true };
+	bool bFootInit = false;
+	/** Fue a mirar un ruido (para la frase al volver: «habrá sido el viento»). */
+	bool bNoiseSearch = false;
+	FName HeadBone, NeckBone, SpineBone;
 	int32 PointIndex = 0;
 	float WaitT = 0.0f;
 	float StateT = 0.0f;

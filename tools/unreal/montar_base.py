@@ -80,6 +80,13 @@ try:
     materiales.aplicar(meshes)
 except Exception as e:
     log('AVISO: materiales realistas no aplicados:', repr(e))
+# materiales físicos (grava, cemento, metal, madera, hierba): el sonido de los pasos según lo que pisas
+try:
+    import superficies
+    importlib.reload(superficies)
+    superficies.aplicar()
+except Exception as e:
+    log('AVISO: materiales físicos no aplicados:', repr(e))
 
 # ------------------------------------------------------------------ 2. nivel nuevo
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)

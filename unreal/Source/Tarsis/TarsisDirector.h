@@ -352,6 +352,67 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	TObjectPtr<class ATarsisGuard> Dragged;
 
+	// ---- sonido del mundo: superficies, pasos de los guardias y voces
+
+	/** Lo que hay bajo ese punto: "grava", "cemento", "metal", "madera" o "hierba" (material físico PM_*, o el nombre de
+	 *  la malla o del material). De ello salen el sonido de los pasos y lo lejos que se oyen los tuyos. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sonido")
+	FString SurfaceAt(FVector Where) const;
+
+	/** Superficie de tu último paso y pasos dados (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	FString LastStepSurface;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	int32 PlayerSteps = 0;
+
+	/** Pasos de guardias que han sonado (cerca de ti). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	int32 GuardStepsPlayed = 0;
+
+	/** Un guardia apoya un pie (lo llama ATarsisGuard a compás de su animación): suena en 3D según el suelo. */
+	void GuardStep(class ATarsisGuard* G, bool bRun);
+
+	/** Un guardia dice una frase (voz_<guardia>_<clave>, tools/sonido/generar_voces.py): en 3D sobre él, con subtítulo
+	 *  si están activados. Claves: quien, ruido, viento, alto, nadie, suelo (por radio). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sonido")
+	void GuardSay(class ATarsisGuard* G, const FString& Key, bool bRadio = false);
+
+	/** Última frase dicha («moya_ruido») y cuántas van (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	FString LastVoice;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	int32 VoicesPlayed = 0;
+
+	/** Subtítulos de sonido (opción del menú); para las pruebas. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sonido")
+	void SetSubtitles(bool bOn) { bSubtitles = bOn; }
+
+	// ---- tus brazos en primera persona (maniquí de la plantilla) con la pistola de dardos
+
+	/** Se ven los brazos con la pistola (cuando tienes dardos y nada te ocupa las manos). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
+	bool bArmsVisible = false;
+
+	/** Animación de los brazos sosteniendo la pistola y momento en que se congela (-1 = en bucle). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FString ArmsAnimPath = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS.MF_Pistol_Idle_ADS");
+
+	/** Dónde quedan los brazos respecto a la cámara (cm: delante, derecha, arriba), con la cabeza del maniquí en la cámara. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FVector ArmsOffset = FVector(16.0f, 5.0f, -8.0f);
+
+	/** Malla de la pistola de dardos (la pistola de la plantilla) y su colocación en la mano (socket HandGrip_R). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FString PistolMeshPath = TEXT("/Game/Weapons/Pistol/Meshes/SM_Pistol.SM_Pistol");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FTransform PistolGrip;
+
+	/** Componentes de los brazos y la pistola (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
+	TObjectPtr<class USkeletalMeshComponent> Arms;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
+	TObjectPtr<class UStaticMeshComponent> Pistol;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -412,10 +473,6 @@ private:
 
 	// sonido (tools/unreal/sonidos.py los importa en /Game/Tarsis/Sonidos)
 	UPROPERTY()
-	TArray<TObjectPtr<class USoundBase>> StepGravel;
-	UPROPERTY()
-	TArray<TObjectPtr<class USoundBase>> StepConcrete;
-	UPROPERTY()
 	TObjectPtr<class USoundBase> StoneSnd;
 	UPROPERTY()
 	TObjectPtr<class USoundBase> DartSnd;
@@ -443,7 +500,32 @@ private:
 	float BaseFog = -1.0f;
 	float PlayerStride = 0.0f;
 	void SetupSound();
-	void StepSound(const FVector& Where, bool bIndoorStep, float Volume, bool b3D);
+	/** Surface: 0 grava, 1 cemento, 2 metal, 3 madera, 4 hierba. */
+	void StepSound(const FVector& Where, int32 Surface, float Volume, bool b3D);
+	int32 SurfaceIndex(const FVector& P, const AActor* Ignore) const;
+	/** Pasos por superficie: 5 superficies x 3 variantes (paso_<superficie>_N). */
+	UPROPERTY()
+	TArray<TObjectPtr<class USoundBase>> StepSnds;
+	/** Efectos sueltos cargados la primera vez que suenan (puertas, teclado, objetos, voces...). */
+	UPROPERTY()
+	TMap<FName, TObjectPtr<class USoundBase>> SfxCache;
+	class USoundBase* Sfx(const FString& Name);
+	void PlaySfx(const FString& Name, const FVector& Where, float Volume = 1.0f, bool b3D = true);
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> CricketComp;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> RumbleComp;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, float> VoiceNext;
+	float VoiceSubT = 0.0f;
+	int32 PlayerSurface = 0;
+	// brazos
+	void SetupArms(class ACharacter* C);
+	void ArmsTick(class ACharacter* C, float DeltaSeconds);
+	float ArmsShow = 0.0f;
+	float RecoilT = 0.0f;
+	FRotator LastViewRot = FRotator::ZeroRotator;
+	FVector Sway = FVector::ZeroVector;
 	bool IndoorAt(const FVector& P, const AActor* Ignore) const;
 	void SoundTick(class ACharacter* C, float DeltaSeconds);
 	void RainTick(float DeltaSeconds);

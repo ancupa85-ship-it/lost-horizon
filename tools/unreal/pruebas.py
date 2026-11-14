@@ -122,6 +122,104 @@ def prueba_intro():
     check('E salta la cinemática', not d.get_editor_property('cine'))
     check('salen las instrucciones', 'TARSIS' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
 
+def encima_de(malla):
+    """Un punto sobre una malla de la base (las de la base van una por material y juntan muchas piezas)."""
+    for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.StaticMeshActor):
+        sm = a.static_mesh_component.static_mesh
+        if not sm or sm.get_name() != malla:
+            continue
+        o, e = a.get_actor_bounds(False)
+        for i in range(1, 12):
+            for j in range(1, 12):
+                p = V(o.x - e.x + 2 * e.x * i / 12, o.y - e.y + 2 * e.y * j / 12, o.z + e.z + 50)
+                h = unreal.SystemLibrary.line_trace_single(mundo(), p, V(p.x, p.y, p.z - 600), unreal.TraceTypeQuery.ECC_VISIBILITY, True, [], unreal.DrawDebugTrace.NONE, True)
+                if h and h.to_tuple()[9] == a:
+                    return V(p.x, p.y, h.to_tuple()[4].z + 5)
+    return None
+
+def prueba_guardias():
+    d = director()
+    suelo = [g for g in guardias() if not g.get_editor_property('tower_sentry')]
+    check('ronda a 175 cm/s', all(abs(g.get_editor_property('walk_speed') - 175) < 1 for g in suelo), {g.get_actor_label()[8:]: round(g.get_editor_property('walk_speed')) for g in suelo})
+    # nadie va y viene entre dos puntos muy juntos (solo Peris, de la mesa a la puerta) ni se queda andando sin avanzar
+    # (ida y vuelta A -> B -> A a menos de 4,5 m sin pararse de verdad en B: parece que se ha quedado en bucle)
+    juntos = []
+    for g in suelo:
+        pts = list(g.get_editor_property('patrol_points'))
+        esperas = list(g.get_editor_property('patrol_waits'))
+        n = len(pts)
+        for i in range(n):
+            a, b, c = pts[i], pts[(i + 1) % n], pts[(i + 2) % n]
+            if n > 2 and dist2d(a, c) < 50 and 0 < dist2d(a, b) < 450 and not g.get_actor_label().endswith('Peris'):
+                espera_b = esperas[(i + 1) % n] if (i + 1) % n < len(esperas) else g.get_editor_property('wait_at_point')
+                if espera_b < 4.0:
+                    juntos.append('%s (%.1f s en %d)' % (g.get_actor_label()[8:], espera_b, (i + 1) % n))
+    check('ninguna ronda en bucle entre puntos juntos', not juntos, juntos)
+    pos0 = {g.get_actor_label(): g.get_actor_location() for g in suelo}
+    andando = {g.get_actor_label(): 0 for g in suelo}
+    for _ in range(16):
+        yield 0.5
+        for g in suelo:
+            if estado(g) == 'PATROL' and g.get_velocity().length() > 40:
+                andando[g.get_actor_label()] += 1
+    atascados = [k[8:] for k in andando if andando[k] >= 14 and dist2d(guardia(k[8:]).get_actor_location(), pos0[k]) < 300]
+    check('nadie anda sin avanzar', not atascados, atascados)
+    # pasos a compás de la animación (pie que apoya) y suenan cerca de ti
+    m = guardia('Moya')
+    s0 = m.get_editor_property('steps_taken'); g0 = d.get_editor_property('guard_steps_played')
+    l = m.get_actor_location(); tp(l.x + 500, l.y + 500, 0)
+    yield 3.0
+    check('los pasos de los guardias salen de la animación', m.get_editor_property('steps_taken') > s0, '%d -> %d' % (s0, m.get_editor_property('steps_taken')))
+    check('y suenan cerca de ti', d.get_editor_property('guard_steps_played') > g0, '%d -> %d' % (g0, d.get_editor_property('guard_steps_played')))
+    tp(500, 500, 0)
+    # un ruido (lo mismo que llama la piedra): se para, gira el cuerpo con suavidad y la cabeza por delante, y lo dice
+    d.set_subtitles(True)
+    while estado(m) != 'PATROL':
+        yield 0.5
+    l = m.get_actor_location(); r = m.get_actor_right_vector()
+    ruido = V(l.x + r.x * 700, l.y + r.y * 700, l.z)
+    m.hear_noise(ruido)
+    cabeza, pasos_giro, vmin = 0.0, False, 1e9
+    for _ in range(12):
+        yield 0.1
+        cabeza = max(cabeza, abs(m.get_editor_property('look_yaw')))
+        pasos_giro = pasos_giro or m.get_editor_property('turn_stepping')
+        if estado(m) == 'SUSPICIOUS': vmin = min(vmin, m.get_velocity().length())
+    l = m.get_actor_location()
+    quiere = math.degrees(math.atan2(ruido.y - l.y, ruido.x - l.x))
+    error = abs((quiere - m.get_actor_rotation().yaw + 540) % 360 - 180)
+    check('se para al oír el ruido', vmin < 40, round(vmin))
+    check('se gira hacia el ruido', error < 30, '%.0f grados de error' % error)
+    check('la cabeza se adelanta al cuerpo', cabeza > 10, '%.0f grados' % cabeza)
+    check('gira en el sitio dando pasos', pasos_giro)
+    check('dice "¿qué ha sido eso?"', d.get_editor_property('last_voice') == 'moya_ruido', d.get_editor_property('last_voice'))
+    check('con subtítulo', 'Que ha sido eso' in str(d.get_editor_property('subtitle')), d.get_editor_property('subtitle'))
+    v = guardia('Vega')
+    lv = v.get_actor_location()
+    v.alarm(V(lv.x + 300, lv.y, lv.z)); yield 0.3   # a su lado, lejos de ti: que no te capture (la 1.ª captura es al calabozo)
+    check('al dar la alarma: "¡alto!"', d.get_editor_property('last_voice') == 'vega_alto' and 'Alto' in str(d.get_editor_property('subtitle')), '%s | %s' % (d.get_editor_property('last_voice'), d.get_editor_property('subtitle')))
+    faltan = ['%s_%s' % (g, k) for g in ('ibarra', 'moya', 'peris', 'vega', 'ramos', 'centinela') for k in ('quien', 'ruido', 'viento', 'alto', 'nadie', 'suelo')
+              if not unreal.load_object(None, '/Game/Tarsis/Sonidos/voz_%s_%s.voz_%s_%s' % (g, k, g, k))]
+    check('voces de los seis guardias importadas', not faltan, faltan)
+    d.set_subtitles(False)
+    # superficies: lo que pisas decide el sonido y lo lejos que se oyen tus pasos
+    t1 = guardia('torre1').get_actor_location()
+    sup = {'grava': V(4300, 2400, 100), 'madera': V(t1.x, t1.y, t1.z), 'metal': encima_de('contenedor_0'),
+           'cemento': encima_de('base_suelo_int'), 'hierba': encima_de('base_marisma')}
+    malas = {k: (d.surface_at(p) if p else None) for k, p in sup.items() if not p or d.surface_at(p) != k}
+    check('superficies: grava, cemento, metal, madera, hierba', not malas, malas)
+    # tus pasos dentro del barracón suenan a cemento
+    p = jugador()
+    p.set_actor_location(V(1130, 2850, p.get_actor_location().z), False, True)   # barracón oeste, junto a la litera de Ramos
+    n0 = d.get_editor_property('player_steps')
+    t0 = time.time()
+    while time.time() - t0 < 3.0:
+        # de un lado a otro del pasillo (0,3 s en cada sentido) sin salir del barracón
+        p.add_movement_input(V(1 if int((time.time() - t0) / 0.3) % 2 == 0 else -1, 0, 0), 1.0); yield 0.03
+    check('tus pasos suenan según el suelo', d.get_editor_property('player_steps') > n0 and d.get_editor_property('last_step_surface') == 'cemento',
+          '%d pasos, %s' % (d.get_editor_property('player_steps') - n0, d.get_editor_property('last_step_surface')))
+    tp(500, 500, 0)
+
 def prueba_menu():
     d = director()
     pc = unreal.GameplayStatics.get_player_controller(mundo(), 0)
@@ -162,6 +260,12 @@ def prueba_dardos():
     tp(4660, 420, -90); yield 0.2
     d.interact(); yield 0.3
     check('el botiquín da 5 dardos', d.get_editor_property('darts') == 5, d.get_editor_property('darts'))
+    # con la pistola, los brazos suben a la vista (unos 0,3 s) con la pistola en la mano derecha
+    yield ('hasta', lambda: director().get_editor_property('arms_visible'), 3.0)
+    arms, pistola = d.get_editor_property('arms'), d.get_editor_property('pistol')
+    check('brazos en primera persona visibles', d.get_editor_property('arms_visible') and arms and arms.is_visible(), arms)
+    check('pistola en la mano (HandGrip_R)', pistola is not None and pistola.is_visible() and pistola.get_attach_parent() == arms
+          and str(pistola.get_attach_socket_name()) == 'HandGrip_R', pistola.get_attach_socket_name() if pistola else None)
     v = guardia('Vega')
     l = v.get_actor_location(); f = v.get_actor_forward_vector()
     p = jugador(); p.set_actor_location(V(l.x - f.x * 500, l.y - f.y * 500, p.get_actor_location().z), False, True)
@@ -371,7 +475,7 @@ def prueba_opciones():
     check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < 100 %' in ' '.join(lineas(d)))
 
 
-PRUEBAS = [prueba_intro, prueba_menu, prueba_musica, prueba_controles, prueba_opciones, prueba_dardos, prueba_punto_control,
+PRUEBAS = [prueba_intro, prueba_guardias, prueba_menu, prueba_musica, prueba_controles, prueba_opciones, prueba_dardos, prueba_punto_control,
            prueba_generador, prueba_reserva, prueba_farol, prueba_final]
 
 

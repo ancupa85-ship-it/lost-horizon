@@ -39,6 +39,10 @@
 #include "GameFramework/InputSettings.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "AudioDevice.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimationAsset.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -64,6 +68,7 @@ void ATarsisDirector::SetupPlayer()
 	C->GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
 	C->GetCharacterMovement()->MaxWalkSpeedCrouched = 200.0f;
 	BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
+	SetupArms(C);
 	PC->ClientSetHUD(ATarsisHUD::StaticClass());
 	EnableInput(PC);
 	DefaultKeys();
@@ -111,6 +116,7 @@ void ATarsisDirector::Captured(APawn* Player)
 		Player->TeleportTo(CellSpot, R);
 		if (Ctl) Ctl->SetControlRotation(R);
 		CloseCell();
+		PlaySfx(TEXT("reja"), CellDoor + FVector(0.0f, 0.0f, 100.0f));
 		CellT = CellTime;
 		ShowMessage(TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas."), 8.0f);
 		return;
@@ -167,6 +173,7 @@ void ATarsisDirector::OpenCell()
 		if (B) B->DestroyComponent();
 	}
 	Bars.Empty();
+	PlaySfx(TEXT("reja"), CellDoor + FVector(0.0f, 0.0f, 100.0f));
 	ShowMessage(TEXT("CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia."), 8.0f);
 }
 
@@ -248,6 +255,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (DartT > 0.0f) DartT -= DeltaSeconds;
 	NoiseTick(C, DeltaSeconds);
 	BobTick(C, DeltaSeconds);
+	ArmsTick(C, DeltaSeconds);
 	SoundTick(C, DeltaSeconds);
 	RainTick(DeltaSeconds);
 	RadioTick(DeltaSeconds);
@@ -433,12 +441,14 @@ void ATarsisDirector::Interact()
 		{
 			bVetKey = true;
 			bRamosKnown = true;
+			PlaySfx(TEXT("llaves"), G->GetActorLocation(), 0.8f);
 			ShowMessage(TEXT("LLAVE DE RAMOS\n\"Botiquin - veterinario\". Esta en el muro norte del patio este."), 4.0f);
 			return;
 		}
 		if (IsIbarra(G) && !bKey)
 		{
 			bKey = true;
+			PlaySfx(TEXT("llaves"), G->GetActorLocation(), 0.8f);
 			ShowMessage(TEXT("LLAVE DE LA JEFATURA\nSe la quitas a Ibarra del cinturon. Ahora puedes arrastrarlo a la sombra (E)."), 5.0f);
 			Checkpoint(TEXT("LA LLAVE DE IBARRA"));
 			return;
@@ -447,6 +457,7 @@ void ATarsisDirector::Interact()
 		{
 			G->bDarted = false;
 			++Darts;
+			PlaySfx(TEXT("recoger"), G->GetActorLocation(), 0.6f);
 			ShowMessage(FString::Printf(TEXT("DARDO RECUPERADO\nSe lo sacas del cuello a %s. Tienes %d."), *G->GuardName, Darts), 3.0f);
 			return;
 		}
@@ -455,9 +466,10 @@ void ATarsisDirector::Interact()
 	}
 	if (!bJefOpen && NearPlayer(Cell(4, 15), 190.0f))
 	{
-		if (!bKey) { ShowMessage(TEXT("JEFATURA CERRADA\nHace falta la llave. La lleva el sargento Ibarra."), 3.5f); return; }
+		if (!bKey) { PlaySfx(TEXT("candado"), Cell(4, 15, 100.0f), 0.5f); ShowMessage(TEXT("JEFATURA CERRADA\nHace falta la llave. La lleva el sargento Ibarra."), 3.5f); return; }
 		bJefOpen = true;
 		if (DoorL) { DoorL->DestroyComponent(); DoorL = nullptr; }
+		PlaySfx(TEXT("puerta_madera"), Cell(4, 15, 100.0f));
 		ShowMessage(TEXT("JEFATURA ABIERTA\nEl despacho de Alarcon. Al fondo, la puerta blindada del archivo."), 4.0f);
 		Checkpoint(TEXT("LA JEFATURA"));
 		return;
@@ -466,11 +478,13 @@ void ATarsisDirector::Interact()
 	{
 		bKeypad = !bKeypad;
 		KeypadInput.Reset();
+		PlaySfx(TEXT("tecla"), Cell(6, 17, 120.0f), 0.6f);
 		return;
 	}
 	if (bJefOpen && NearPlayer(Cell(3, 17), 150.0f))
 	{
 		bNoteRead = true;
+		PlaySfx(TEXT("recoger"), Cell(3, 17, 80.0f), 0.7f);
 		ShowMessage(TEXT("MESA DE ALARCON\nUna Vulgata abierta por el salmo CXXIX: \"De profundis clamavi ad te, Domine\".\nEn el margen, a lapiz: \"Ella tambien clama. Nadie la oye. - A.\"\nUna nota: \"Clave: la de siempre. No apuntar.\""), 12.0f);
 		return;
 	}
@@ -478,16 +492,19 @@ void ATarsisDirector::Interact()
 	{
 		bLetter = true;
 		bRamosKnown = true;
+		PlaySfx(TEXT("recoger"), FVector(1130.0f, 2850.0f, 60.0f), 0.7f);
 		if (LetterProp) { LetterProp->DestroyComponent(); LetterProp = nullptr; }
 		ShowMessage(TEXT("LITERA DE RAMOS - CARTA SIN TERMINAR\n\"Padre: el jueves me toca bajar con los partes. No se lo diga a madre.\"\n\"El veterinario se dejo la pistola de dardos en el botiquin y la llave la llevo encima.\"\n\"A veces pienso en dormirlos a todos y salir andando por la marisma.\"\nEn el sobre: Julian Ramos, Trebujena."), 12.0f);
 		return;
 	}
 	if (!bVetOpen && NearPlayer(FVector(4660.0f, 300.0f, 0.0f), 170.0f))
 	{
-		if (!bVetKey) { bRamosKnown = true; ShowMessage(TEXT("BOTIQUIN DEL VETERINARIO\nCandado. La llave la lleva Ramos, el cuartelero del barracon oeste."), 3.5f); return; }
+		if (!bVetKey) { bRamosKnown = true; PlaySfx(TEXT("candado"), FVector(4660.0f, 160.0f, 145.0f), 0.5f); ShowMessage(TEXT("BOTIQUIN DEL VETERINARIO\nCandado. La llave la lleva Ramos, el cuartelero del barracon oeste."), 3.5f); return; }
 		bVetOpen = true;
 		Darts = 5;
 		if (VetDoor) { VetDoor->DestroyComponent(); VetDoor = nullptr; }
+		PlaySfx(TEXT("candado"), FVector(4660.0f, 160.0f, 145.0f));
+		PlaySfx(TEXT("recoger"), FVector(4660.0f, 160.0f, 145.0f), 0.7f);
 		ShowMessage(TEXT("PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres."), 5.0f);
 		Checkpoint(TEXT("EL BOTIQUIN"));
 		return;
@@ -498,6 +515,7 @@ void ATarsisDirector::Interact()
 		if (!bRamosAlly) { ShowMessage(TEXT("PORTILLO DE LA MARISMA\nCerrado. La llave la guarda el cuartelero del barracon oeste."), 3.5f); return; }
 		if (!bFile) { ShowMessage(TEXT("PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente."), 3.0f); return; }
 		if (!R || R->State == ETarsisGuardState::Down || FVector::Dist2D(R->GetActorLocation(), FVector(310.0f, 4900.0f, 0.0f)) > 700.0f) { ShowMessage(TEXT("ESPERA A RAMOS\nEl trae la llave del portillo."), 2.5f); return; }
+		PlaySfx(TEXT("reja"), FVector(310.0f, 4900.0f, 100.0f), 0.8f);
 		Finish(true);
 		return;
 	}
@@ -510,6 +528,7 @@ void ATarsisDirector::Interact()
 	{
 		bFile = true;
 		if (FileProp) { FileProp->DestroyComponent(); FileProp = nullptr; }
+		PlaySfx(TEXT("recoger"), Cell(9, 17, 80.0f), 0.8f);
 		ShowMessage(TEXT("EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base por el control de salida, al sureste."), 5.0f);
 		Checkpoint(TEXT("EL EXPEDIENTE"));
 	}
@@ -536,20 +555,24 @@ void ATarsisDirector::KeypadKey(FKey Key)
 void ATarsisDirector::KeypadDigit(int32 Digit)
 {
 	if (!bKeypad || bVaultOpen) return;
-	if (Digit < 0) { KeypadInput.LeftChopInline(1); return; }
+	if (Digit < 0) { KeypadInput.LeftChopInline(1); PlaySfx(TEXT("tecla"), Cell(6, 17, 120.0f), 0.4f); return; }
 	if (KeypadInput.Len() >= 4) KeypadInput.Reset();
 	KeypadInput.AppendInt(FMath::Clamp(Digit, 0, 9));
+	PlaySfx(TEXT("tecla"), Cell(6, 17, 120.0f), 0.6f);
 	if (KeypadInput.Len() < 4) return;
 	if (KeypadInput == VaultCode)
 	{
 		bVaultOpen = true;
 		bKeypad = false;
 		if (DoorV) { DoorV->DestroyComponent(); DoorV = nullptr; }
+		PlaySfx(TEXT("clave_ok"), Cell(6, 17, 120.0f), 0.8f);
+		PlaySfx(TEXT("puerta_blindada"), Cell(6, 17, 110.0f));
 		ShowMessage(TEXT("ARCHIVO ABIERTO\nLa puerta blindada se abre con un chasquido."), 4.0f);
 	}
 	else
 	{
 		KeypadErrT = 1.2f;
+		PlaySfx(TEXT("clave_mal"), Cell(6, 17, 120.0f), 0.8f);
 		KeypadInput.Reset();
 		ShowMessage(TEXT("CLAVE INCORRECTA"), 1.5f);
 	}
@@ -744,6 +767,9 @@ void ATarsisDirector::ShootDart()
 	--Darts;
 	DartT = 0.8f;
 	if (DartSnd) UGameplayStatics::PlaySound2D(this, DartSnd, 0.7f);
+	// retroceso: la pistola salta hacia arriba y atrás, y la vista sube un poco
+	RecoilT = 1.0f;
+	PC->SetControlRotation(PC->GetControlRotation() + FRotator(0.7f, 0.0f, 0.0f));
 	// el guardia más cercano cuyo cuerpo cruza la línea de tiro (a menos de 35 m), sin nada en medio
 	ATarsisGuard* Best = nullptr;
 	float BestT = 3500.0f;
@@ -793,6 +819,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	{
 		// en el control, el de la garita levanta la barrera y mira hacia otro lado (sale en el plano de LS_Salida)
 		BarrierT = 0.001f;
+		PlaySfx(TEXT("barrera"), ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f));
 		if (GateLamp && GateLamp->GetLightComponent())
 		{
 			// que el plano final se vea aunque cortaras la luz; si rompiste el farol, solo la bombilla de dentro de la garita
@@ -876,8 +903,11 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 		Q.AddIgnoredActor(C);
 		const FVector P = C->GetActorLocation();
 		bIndoor = IndoorAt(P, C);
-		// dentro suena menos; con lluvia, el agua tapa los pasos
-		const float Surf = (bIndoor ? 0.6f : 1.0f) * (Weather == 1 && !bIndoor ? 0.6f : 1.0f);
+		PlayerSurface = SurfaceIndex(P, C);
+		// según lo que pisas: la chapa y la madera se oyen de lejos, el cemento menos que la grava, la hierba casi nada;
+		// con lluvia, el agua tapa los pasos de fuera
+		static const float SurfNoise[] = { 1.0f, 0.6f, 1.3f, 1.1f, 0.55f };
+		const float Surf = SurfNoise[FMath::Clamp(PlayerSurface, 0, 4)] * (Weather == 1 && !bIndoor ? 0.6f : 1.0f);
 		static const float DiffHear[] = { 0.75f, 1.0f, 1.25f };
 		PlayerNoise = (C->bIsCrouched || bAir || Speed < 60.0f) ? 0.0f : Speed * 1.15f * Surf * DiffHear[FMath::Clamp(Difficulty, 0, 2)];
 		if (PlayerNoise > 0.0f)
@@ -892,6 +922,79 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 		}
 	}
 	if (C->bIsCrouched || Speed < 60.0f) PlayerNoise = 0.0f;   // al pararte o agacharte, el HUD lo ve enseguida
+}
+
+// ---------------------------------------------------------------- tus brazos con la pistola de dardos
+
+void ATarsisDirector::SetupArms(ACharacter* C)
+{
+	if (Arms || !C) return;
+	// la cámara de la plantilla cuelga de la cabeza del cuerpo en primera persona, que sin arma lleva los brazos
+	// caídos (fuera de la vista). Para la pistola se pone otro maniquí pegado a la cámara, con la cabeza en ella,
+	// solo para ti y con el campo de visión de primera persona (no se mete en las paredes)
+	UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>();
+	USkeletalMesh* SK = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
+	if (!Cam || !SK) return;
+	Arms = NewObject<USkeletalMeshComponent>(C, TEXT("BrazosTarsis"));
+	Arms->SetSkeletalMeshAsset(SK);
+	Arms->SetupAttachment(Cam);
+	Arms->SetOnlyOwnerSee(true);
+	Arms->SetCastShadow(false);
+	Arms->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Arms->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+	Arms->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	Arms->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));   // el maniquí mira hacia +Y
+	Arms->RegisterComponent();
+	// sin cabeza ni piernas: solo se ven los brazos (y algo del pecho si miras abajo)
+	for (const TCHAR* B : { TEXT("neck_01"), TEXT("thigh_l"), TEXT("thigh_r") }) Arms->HideBoneByName(FName(B), PBO_None);
+	if (UAnimationAsset* A = LoadObject<UAnimationAsset>(nullptr, *ArmsAnimPath))
+	{
+		Arms->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		Arms->PlayAnimation(A, true);
+	}
+	if (UStaticMesh* PM = LoadObject<UStaticMesh>(nullptr, *PistolMeshPath))
+	{
+		Pistol = NewObject<UStaticMeshComponent>(C, TEXT("PistolaDardos"));
+		Pistol->SetStaticMesh(PM);
+		Pistol->SetupAttachment(Arms, TEXT("HandGrip_R"));
+		Pistol->SetRelativeTransform(PistolGrip);
+		Pistol->SetOnlyOwnerSee(true);
+		Pistol->SetCastShadow(false);
+		Pistol->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Pistol->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+		Pistol->RegisterComponent();
+	}
+	Arms->SetVisibility(false, true);
+}
+
+void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
+{
+	if (!Arms) return;
+	// con dardos y las manos libres, la pistola sube a la vista; si no, baja y se oculta
+	const bool bWant = Darts > 0 && !bCine && !bDone && !bBinoculars && !bKeypad && !Dragged && !bMenu && !bReport && !bChoice;
+	ArmsShow = FMath::FInterpConstantTo(ArmsShow, bWant ? 1.0f : 0.0f, DeltaSeconds, 3.5f);
+	const bool bVis = ArmsShow > 0.01f;
+	if (Arms->IsVisible() != bVis) Arms->SetVisibility(bVis, true);
+	bArmsVisible = ArmsShow > 0.99f;
+	if (!bVis) return;
+	// balanceo: al girar la vista, los brazos se quedan un poco atrás y vuelven
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	const FRotator VR = PC ? PC->GetControlRotation() : FRotator::ZeroRotator;
+	const float DYaw = FMath::FindDeltaAngleDegrees(LastViewRot.Yaw, VR.Yaw);
+	const float DPitch = FMath::FindDeltaAngleDegrees(LastViewRot.Pitch, VR.Pitch);
+	LastViewRot = VR;
+	const FVector SwayWant(0.0f, FMath::Clamp(-DYaw * 0.5f, -3.0f, 3.0f), FMath::Clamp(-DPitch * 0.5f, -2.5f, 2.5f));
+	Sway = FMath::VInterpTo(Sway, SwayWant, DeltaSeconds, 6.0f);
+	// al andar suben y bajan a compás del paso (más suave agachado, más corriendo); y el retroceso del disparo
+	const float Speed = C->GetCharacterMovement()->IsFalling() ? 0.0f : C->GetVelocity().Size2D();
+	const float Amp = Speed > 40.0f ? (C->bIsCrouched ? 0.35f : (bSprint ? 1.3f : 0.7f)) : 0.0f;
+	const FVector Bob(0.0f, FMath::Sin(BobPhase * 0.5f) * Amp * 0.8f, -FMath::Abs(FMath::Sin(BobPhase)) * Amp);
+	RecoilT = FMath::Max(0.0f, RecoilT - DeltaSeconds * 5.0f);
+	const FQuat Rel = FRotator(7.0f * RecoilT, 0.0f, 0.0f).Quaternion() * FRotator(0.0f, -90.0f, 0.0f).Quaternion();
+	// la cabeza del maniquí, en la cámara: así la pistola queda donde la llevaría alguien de tu altura
+	const FVector Head = Arms->GetBoneLocation(TEXT("head"), EBoneSpaces::ComponentSpace);
+	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + Bob + Sway + FVector(-5.0f * RecoilT, 0.0f, -30.0f * (1.0f - ArmsShow));
+	Arms->SetRelativeLocationAndRotation(Loc, Rel);
 }
 
 void ATarsisDirector::BobTick(ACharacter* C, float DeltaSeconds)
@@ -921,10 +1024,17 @@ static USoundBase* LoadSnd(const TCHAR* Name)
 
 void ATarsisDirector::SetupSound()
 {
-	for (int32 i = 1; i <= 3; ++i)
+	// pasos: 5 superficies x 3 variantes; si falta alguna (sonidos sin regenerar), se usa la grava o el cemento
+	static const TCHAR* Surf[] = { TEXT("grava"), TEXT("cemento"), TEXT("metal"), TEXT("madera"), TEXT("hierba") };
+	StepSnds.SetNum(15);
+	for (int32 s = 0; s < 5; ++s)
 	{
-		if (USoundBase* S = LoadSnd(*FString::Printf(TEXT("paso_grava_%d"), i))) StepGravel.Add(S);
-		if (USoundBase* S = LoadSnd(*FString::Printf(TEXT("paso_cemento_%d"), i))) StepConcrete.Add(S);
+		for (int32 i = 0; i < 3; ++i)
+		{
+			USoundBase* S = LoadSnd(*FString::Printf(TEXT("paso_%s_%d"), Surf[s], i + 1));
+			if (!S && s >= 2) S = StepSnds[(s == 3 ? 1 : 0) * 3 + i];
+			StepSnds[s * 3 + i] = S;
+		}
 	}
 	StoneSnd = LoadSnd(TEXT("piedra"));
 	DartSnd = LoadSnd(TEXT("dardo"));
@@ -955,6 +1065,15 @@ void ATarsisDirector::SetupSound()
 	if (WindSnd)
 	{
 		WindComp = UGameplayStatics::SpawnSound2D(this, WindSnd, 0.3f, 1.0f, 0.0f, nullptr, false, false);
+	}
+	// noche: grillos y un rumor lejano, en bucle; su volumen va con el clima y con estar dentro (SoundTick)
+	for (const TCHAR* N : { TEXT("grillos"), TEXT("rumor") })
+	{
+		USoundBase* S = LoadSnd(N);
+		if (!S) continue;
+		if (USoundWave* W = Cast<USoundWave>(S)) W->bLooping = true;
+		UAudioComponent* A = UGameplayStatics::SpawnSound2D(this, S, 0.01f, 1.0f, 0.0f, nullptr, false, false);
+		if (FCString::Strcmp(N, TEXT("grillos")) == 0) CricketComp = A; else RumbleComp = A;
 	}
 	SetupMusic();
 	// zumbido del generador, en 3D: te guía hasta él y se calla cuando lo cortas
@@ -1001,19 +1120,150 @@ bool ATarsisDirector::IndoorAt(const FVector& P, const AActor* Ignore) const
 	return false;
 }
 
-void ATarsisDirector::StepSound(const FVector& Where, bool bIndoorStep, float Volume, bool b3D)
+static const TCHAR* SurfaceNames[] = { TEXT("grava"), TEXT("cemento"), TEXT("metal"), TEXT("madera"), TEXT("hierba") };
+
+// superficie por un nombre (material físico PM_*, malla o material): -1 si no dice nada
+static int32 SurfaceFromName(FString N)
 {
-	const TArray<TObjectPtr<USoundBase>>& Set = bIndoorStep ? StepConcrete : StepGravel;
-	if (Set.Num() == 0) return;
-	USoundBase* S = Set[FMath::RandRange(0, Set.Num() - 1)];
+	N.ToLowerInline();
+	if (N.StartsWith(TEXT("pm_")))
+	{
+		for (int32 i = 0; i < 5; ++i) { if (N.Contains(SurfaceNames[i])) return i; }
+		return -1;
+	}
+	if (N.Contains(TEXT("madera")) || N.Contains(TEXT("veta")) || N.Contains(TEXT("wood"))) return 3;
+	if (N.Contains(TEXT("hierro")) || N.Contains(TEXT("metal")) || N.Contains(TEXT("tejado")) || N.Contains(TEXT("contenedor")) || N.Contains(TEXT("oliva")) || N.Contains(TEXT("chapa"))) return 2;
+	if (N.Contains(TEXT("hierba")) || N.Contains(TEXT("cesped")) || N.Contains(TEXT("marisma")) || N.Contains(TEXT("grass"))) return 4;
+	if (N.Contains(TEXT("suelo_int")) || N.Contains(TEXT("hormigon")) || N.Contains(TEXT("cemento")) || N.Contains(TEXT("muro")) || N.Contains(TEXT("pared"))) return 1;
+	if (N.Contains(TEXT("suelo")) || N.Contains(TEXT("grava")) || N.Contains(TEXT("tierra"))) return 0;
+	return -1;
+}
+
+int32 ATarsisDirector::SurfaceIndex(const FVector& P, const AActor* Ignore) const
+{
+	FHitResult Hit;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisPisada), true, this);
+	Q.bReturnPhysicalMaterial = true;
+	if (Ignore) Q.AddIgnoredActor(Ignore);
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, P + FVector(0.0f, 0.0f, 30.0f), P - FVector(0.0f, 0.0f, 250.0f), ECC_Visibility, Q)) return 0;
+	// 1) material físico del triángulo pisado (tools/unreal/superficies.py los pone en los materiales)
+	if (Hit.PhysMaterial.IsValid())
+	{
+		const int32 S = SurfaceFromName(Hit.PhysMaterial->GetName());
+		if (S >= 0) return S;
+	}
+	// 2) la malla (las de la base van una por material: base_suelo, torre1_madera...) y luego sus materiales
+	if (const UStaticMeshComponent* SM = Cast<UStaticMeshComponent>(Hit.GetComponent()))
+	{
+		if (SM->GetStaticMesh())
+		{
+			const int32 S = SurfaceFromName(SM->GetStaticMesh()->GetName());
+			if (S >= 0) return S;
+		}
+		for (int32 i = 0; i < SM->GetNumMaterials(); ++i)
+		{
+			if (const UMaterialInterface* M = SM->GetMaterial(i))
+			{
+				const int32 S = SurfaceFromName(M->GetName());
+				if (S >= 0) return S;
+			}
+		}
+	}
+	return 0;
+}
+
+FString ATarsisDirector::SurfaceAt(FVector Where) const
+{
+	return SurfaceNames[FMath::Clamp(SurfaceIndex(Where, UGameplayStatics::GetPlayerPawn(this, 0)), 0, 4)];
+}
+
+void ATarsisDirector::StepSound(const FVector& Where, int32 Surface, float Volume, bool b3D)
+{
+	if (StepSnds.Num() < 15) return;
+	USoundBase* S = StepSnds[FMath::Clamp(Surface, 0, 4) * 3 + FMath::RandRange(0, 2)];
+	if (!S) return;
+	// la chapa y la madera suenan más; la hierba, menos
+	static const float Loud[] = { 1.0f, 0.85f, 1.25f, 1.1f, 0.6f };
 	const float Pitch = FMath::FRandRange(0.9f, 1.1f);
+	Volume *= Loud[FMath::Clamp(Surface, 0, 4)];
 	if (b3D) UGameplayStatics::PlaySoundAtLocation(this, S, Where, Volume, Pitch, 0.0f, Atten);
 	else UGameplayStatics::PlaySound2D(this, S, Volume, Pitch);
 }
 
+USoundBase* ATarsisDirector::Sfx(const FString& Name)
+{
+	const FName K(*Name);
+	if (TObjectPtr<USoundBase>* Found = SfxCache.Find(K)) return *Found;
+	USoundBase* S = LoadSnd(*Name);
+	SfxCache.Add(K, S);   // también si falta: no se vuelve a buscar
+	return S;
+}
+
+void ATarsisDirector::PlaySfx(const FString& Name, const FVector& Where, float Volume, bool b3D)
+{
+	USoundBase* S = Sfx(Name);
+	if (!S) return;
+	if (b3D) UGameplayStatics::PlaySoundAtLocation(this, S, Where, Volume, 1.0f, 0.0f, Atten);
+	else UGameplayStatics::PlaySound2D(this, S, Volume);
+}
+
+void ATarsisDirector::GuardStep(ATarsisGuard* G, bool bRun)
+{
+	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!G || !P || bCine) return;
+	const float Dm = FVector::Dist(G->GetActorLocation(), P->GetActorLocation());
+	if (Dm > 1600.0f) return;
+	++GuardStepsPlayed;
+	StepSound(G->GetActorLocation(), SurfaceIndex(G->GetActorLocation(), G), bRun ? 1.0f : (G->bTurnStepping ? 0.4f : 0.75f), true);
+	if (bSubtitles && VoiceSubT <= 0.0f)
+	{
+		const float D2 = FVector::Dist2D(G->GetActorLocation(), P->GetActorLocation()) / 100.0f;
+		if (SubtitleT <= 0.0f || D2 < SubtitleDist)
+		{
+			SubtitleDist = D2;
+			Subtitle = FString::Printf(TEXT("[%s - %s, %s, %d m]"), bRun ? TEXT("CORRE") : TEXT("PASOS"), *G->GuardName.ToUpper(), *Direction(G->GetActorLocation()), FMath::RoundToInt(D2));
+			SubtitleT = 1.2f;
+		}
+	}
+}
+
+void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
+{
+	if (!G || bCine || bDone || G->bAlly) return;
+	const float Now = GetWorld()->GetTimeSeconds();
+	const TObjectPtr<ATarsisGuard> K(G);
+	float& Next = VoiceNext.FindOrAdd(K, 0.0f);
+	if (Now < Next) return;   // no repite frase enseguida (al cambiar de estado varias veces seguidas)
+	Next = Now + 3.5f;
+	FString Who = G->bTowerSentry ? TEXT("centinela") : G->GuardName.ToLower();
+	USoundBase* S = Sfx(FString::Printf(TEXT("voz_%s_%s"), *Who, *Key));
+	if (!S) { Who = TEXT("moya"); S = Sfx(FString::Printf(TEXT("voz_moya_%s"), *Key)); }
+	if (S) UGameplayStatics::PlaySoundAtLocation(this, S, G->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), bRadio ? 1.0f : 1.2f, 1.0f, 0.0f, Atten);
+	if (bRadio && RadioSnd) UGameplayStatics::PlaySound2D(this, RadioSnd, 0.35f);   // la radio la oyes tú también, lejos o no
+	LastVoice = Who + TEXT("_") + Key;
+	++VoicesPlayed;
+	if (!bSubtitles) return;
+	// texto en ASCII (la fuente del HUD no lleva tildes)
+	FString T;
+	if (Key == TEXT("quien")) T = TEXT("Quien anda ahi?");
+	else if (Key == TEXT("ruido")) T = TEXT("Que ha sido eso?");
+	else if (Key == TEXT("viento")) T = TEXT("Bah. Habra sido el viento.");
+	else if (Key == TEXT("alto")) T = TEXT("Alto! Quieto ahi!");
+	else if (Key == TEXT("nadie")) T = TEXT("Aqui no hay nadie.");
+	else if (Key == TEXT("suelo")) T = TEXT("Central, aqui patio. He encontrado a uno en el suelo.");
+	else T = Key;
+	const FString Name = G->bTowerSentry ? FString(TEXT("CENTINELA")) : G->GuardName.ToUpper();
+	Subtitle = bRadio ? FString::Printf(TEXT("%s (RADIO): \"%s\""), *Name, *T)
+		: FString::Printf(TEXT("%s (%s): \"%s\""), *Name, *Direction(G->GetActorLocation()), *T);
+	SubtitleT = 3.0f;
+	VoiceSubT = 3.0f;
+	SubtitleDist = 0.0f;
+}
+
 void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
 {
-	// tus pasos: uno cada ~1,4 m (agachado, flojito)
+	if (VoiceSubT > 0.0f) VoiceSubT -= DeltaSeconds;
+	// tus pasos: uno cada ~1,4 m (agachado, flojito; corriendo, fuerte), con el sonido de lo que pisas
 	const float Speed = C->GetCharacterMovement()->IsFalling() ? 0.0f : C->GetVelocity().Size2D();
 	if (Speed > 40.0f)
 	{
@@ -1022,13 +1272,16 @@ void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
 		if (PlayerStride >= Stride)
 		{
 			PlayerStride = 0.0f;
-			StepSound(C->GetActorLocation(), bIndoor, C->bIsCrouched ? 0.15f : (bSprint ? 0.8f : 0.45f), false);
+			++PlayerSteps;
+			LastStepSurface = SurfaceNames[FMath::Clamp(PlayerSurface, 0, 4)];
+			StepSound(C->GetActorLocation(), PlayerSurface, C->bIsCrouched ? 0.15f : (bSprint ? 0.8f : 0.45f), false);
 		}
 	}
-	// pasos de los guardias, en 3D: los oyes acercarse aunque haya una pared
+	// pasos de los guardias, en 3D: los oyes acercarse aunque haya una pared. Los que tienen cuerpo animado los
+	// mandan ellos al apoyar cada pie (GuardStep); los demás (cilindro provisional), por distancia recorrida
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
-		if (It->State == ETarsisGuardState::Down || It->bTowerSentry) continue;
+		if (It->State == ETarsisGuardState::Down || It->bTowerSentry || It->HasFootSync()) continue;
 		const float GS = It->GetVelocity().Size2D();
 		if (GS < 40.0f) continue;
 		const TObjectPtr<ATarsisGuard> K(*It);
@@ -1036,22 +1289,15 @@ void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
 		D += GS * DeltaSeconds;
 		if (D < (GS > 300.0f ? 170.0f : 120.0f)) continue;
 		D = 0.0f;
-		if (FVector::Dist(It->GetActorLocation(), C->GetActorLocation()) > 1600.0f) continue;
-		StepSound(It->GetActorLocation(), IndoorAt(It->GetActorLocation(), *It), GS > 300.0f ? 1.0f : 0.75f, true);
-		if (bSubtitles)
-		{
-			const float Dm = FVector::Dist2D(It->GetActorLocation(), C->GetActorLocation()) / 100.0f;
-			if (SubtitleT <= 0.0f || Dm < SubtitleDist)
-			{
-				SubtitleDist = Dm;
-				Subtitle = FString::Printf(TEXT("[%s - %s, %s, %d m]"), GS > 300.0f ? TEXT("CORRE") : TEXT("PASOS"), *It->GuardName.ToUpper(), *Direction(It->GetActorLocation()), FMath::RoundToInt(Dm));
-				SubtitleT = 1.2f;
-			}
-		}
+		GuardStep(*It, GS > 300.0f);
 	}
-	// viento y lluvia: más bajos bajo techo
-	if (WindComp) WindComp->SetVolumeMultiplier(bIndoor ? 0.12f : (Weather == 1 ? 0.2f : 0.3f));
+	// viento y lluvia: más bajos bajo techo. Grillos con buen tiempo (con lluvia callan, con niebla pocos); el rumor
+	// lejano sube con la lluvia (tormenta a lo lejos)
+	if (WindComp) WindComp->SetVolumeMultiplier(bIndoor ? 0.12f : (Weather == 1 ? 0.2f : (Weather == 2 ? 0.16f : 0.3f)));
 	if (RainComp) RainComp->SetVolumeMultiplier(bIndoor ? 0.15f : 0.45f);
+	const float In = bIndoor ? 0.3f : 1.0f;
+	if (CricketComp) CricketComp->SetVolumeMultiplier(FMath::Max(0.001f, In * (Weather == 1 ? 0.0f : (Weather == 2 ? 0.07f : 0.2f))));
+	if (RumbleComp) RumbleComp->SetVolumeMultiplier(FMath::Max(0.001f, In * (Weather == 1 ? 0.3f : 0.14f)));
 }
 
 void ATarsisDirector::RainTick(float DeltaSeconds)
@@ -1939,7 +2185,16 @@ void ATarsisDirector::DetectTick()
 		const TObjectPtr<ATarsisGuard> K(*It);
 		uint8& Prev = PrevState.FindOrAdd(K, (uint8)It->State);
 		const uint8 Now = (uint8)It->State;
-		if (Now != Prev && It->State == ETarsisGuardState::Alert && !It->bRadioCall && !It->bAlly) ++Detections;
+		if (Now != Prev)
+		{
+			const ETarsisGuardState Before = (ETarsisGuardState)Prev;
+			if (It->State == ETarsisGuardState::Alert && !It->bRadioCall && !It->bAlly) ++Detections;
+			// lo que dicen: «¡alto!» al verte, «¿quién anda ahí?» o «¿qué ha sido eso?» al mosquearse, y al dejarlo
+			// «aquí no hay nadie» o, si fue por un ruido, «habrá sido el viento»
+			if (It->State == ETarsisGuardState::Alert && !It->bRadioCall) GuardSay(*It, TEXT("alto"));
+			else if (It->State == ETarsisGuardState::Suspicious && Before != ETarsisGuardState::Alert) GuardSay(*It, It->bInvestigate ? TEXT("ruido") : TEXT("quien"));
+			else if (It->State == ETarsisGuardState::Return && Before == ETarsisGuardState::Search) GuardSay(*It, It->bNoiseSearch ? TEXT("viento") : TEXT("nadie"));
+		}
 		Prev = Now;
 	}
 }
