@@ -686,6 +686,8 @@ public:
 	/** Pruebas: componentes que parpadean, que callan sin luz y que suenan con lluvia. */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
 	FIntVector ZoneCounts() const { return FIntVector(FlickerLights.Num(), PowerSounds.Num(), RainSounds.Num()); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	int32 RainDecalCount() const { return RainDecals.Num(); }
 private:
 	void AddChange(const FVector& Where, const TCHAR* Key);
 	void ChangesTick(float DeltaSeconds);
@@ -727,6 +729,7 @@ private:
 	TArray<float> FlickerT;
 	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> PowerSounds;
 	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> RainSounds;
+	UPROPERTY() TArray<TObjectPtr<class UDecalComponent>> RainDecals;   // charco y pisadas mojadas: solo con lluvia
 	void RadioTick(float DeltaSeconds);
 	UPROPERTY()
 	TSet<TObjectPtr<class ATarsisGuard>> Called;

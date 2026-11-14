@@ -1,5 +1,5 @@
 {
- "_leeme": "Atrezo de Poly Haven (CC0). tools/unreal/atrezo.py descarga los modelos (no van a git), los importa en /Game/Tarsis/Atrezo (una malla SM_<id> por modelo, o «parte» para una sola pieza) y coloca las piezas: pos en cm, giro en grados, escala. Se apoya solo: baja desde pos hasta lo que haya debajo (suelo, mesa, caja), salvo «colgar» (se queda en pos). pequeno: sin colision. Ojo con la ronda de Ramos, que cruza el barracon por y=2700: ese pasillo, libre.",
+ "_leeme": "Atrezo de Poly Haven (CC0). tools/unreal/atrezo.py descarga los modelos (no van a git), los importa en /Game/Tarsis/Atrezo (una malla SM_<id> por modelo, o «parte» para una sola pieza) y coloca las piezas: pos en cm, giro en grados, escala. Se apoya solo: baja desde pos hasta lo que haya debajo (suelo, mesa, caja), salvo «colgar» (se queda en pos). pequeno: sin colision. Ojo con la ronda de Ramos, que cruza el barracon por y=2700: ese pasillo, libre. Las literas, colchones, mantas, baules y botas del dormitorio los genera una vez un script con variaciones fijas (semilla 19); las piezas repetidas usan la misma malla y el motor las dibuja instanciadas.",
  "modelos": [
   "old_bed_frame",
   "metal_office_desk",
@@ -33,48 +33,6 @@
  ],
  "piezas": [
   {
-   "nombre": "litera_1",
-   "modelo": "old_bed_frame",
-   "pos": [
-    300,
-    2897,
-    60
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "litera_2",
-   "modelo": "old_bed_frame",
-   "pos": [
-    530,
-    2897,
-    60
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "litera_ramos",
-   "modelo": "old_bed_frame",
-   "pos": [
-    1130,
-    2897,
-    60
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "mascara",
-   "modelo": "old_gas_mask",
-   "pos": [
-    415,
-    2992,
-    175
-   ],
-   "giro": 180,
-   "colgar": true,
-   "pequeno": true
-  },
-  {
    "nombre": "estanteria",
    "modelo": "steel_frame_shelves_01",
    "pos": [
@@ -105,91 +63,6 @@
    ],
    "giro": 8,
    "pequeno": true
-  },
-  {
-   "nombre": "mesa",
-   "modelo": "metal_office_desk",
-   "pos": [
-    1000,
-    2470,
-    60
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "radio",
-   "modelo": "vintage_radio_transceiver",
-   "pos": [
-    925,
-    2455,
-    140
-   ],
-   "giro": 180,
-   "pequeno": true
-  },
-  {
-   "nombre": "termo",
-   "modelo": "modified_thermos",
-   "pos": [
-    1060,
-    2430,
-    140
-   ],
-   "giro": 30,
-   "pequeno": true
-  },
-  {
-   "nombre": "tabaco",
-   "modelo": "cigarette_pack",
-   "pos": [
-    1095,
-    2500,
-    140
-   ],
-   "giro": -20,
-   "pequeno": true
-  },
-  {
-   "nombre": "partes",
-   "modelo": "clipboard",
-   "pos": [
-    1150,
-    2465,
-    140
-   ],
-   "giro": 12,
-   "pequeno": true
-  },
-  {
-   "nombre": "linterna",
-   "modelo": "vintage_flashlight",
-   "pos": [
-    1035,
-    2505,
-    140
-   ],
-   "giro": 70,
-   "pequeno": true
-  },
-  {
-   "nombre": "taburete_1",
-   "modelo": "metal_stool_01",
-   "pos": [
-    1010,
-    2580,
-    60
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "taburete_2",
-   "modelo": "metal_stool_01",
-   "pos": [
-    870,
-    2385,
-    60
-   ],
-   "giro": 25
   },
   {
    "nombre": "reloj",
@@ -302,91 +175,6 @@
    "giro": 12
   },
   {
-   "nombre": "colchon_1",
-   "modelo": "colchon",
-   "pos": [
-    300,
-    2897,
-    140
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "colchon_2",
-   "modelo": "colchon",
-   "pos": [
-    530,
-    2897,
-    140
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "colchon_ramos",
-   "modelo": "colchon",
-   "pos": [
-    1130,
-    2897,
-    140
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "manta_1",
-   "modelo": "manta",
-   "pos": [
-    300,
-    2960,
-    160
-   ],
-   "giro": 0,
-   "pequeno": true
-  },
-  {
-   "nombre": "manta_2",
-   "modelo": "manta",
-   "pos": [
-    530,
-    2960,
-    160
-   ],
-   "giro": 4,
-   "pequeno": true
-  },
-  {
-   "nombre": "manta_ramos",
-   "modelo": "manta",
-   "pos": [
-    1110,
-    2840,
-    160
-   ],
-   "giro": -25,
-   "pequeno": true
-  },
-  {
-   "nombre": "botas_1",
-   "modelo": "rubber_boots",
-   "pos": [
-    300,
-    2790,
-    40
-   ],
-   "giro": 90,
-   "pequeno": true
-  },
-  {
-   "nombre": "botas_ramos",
-   "modelo": "rubber_boots",
-   "pos": [
-    1175,
-    2785,
-    40
-   ],
-   "giro": 70,
-   "pequeno": true
-  },
-  {
    "nombre": "estufa",
    "modelo": "barrel_stove",
    "pos": [
@@ -416,29 +204,6 @@
     150
    ],
    "giro": 0,
-   "pequeno": true
-  },
-  {
-   "nombre": "flexo",
-   "modelo": "desk_lamp_arm_01",
-   "pos": [
-    1195,
-    2430,
-    140
-   ],
-   "giro": 200,
-   "pequeno": true,
-   "sin_sombra": true
-  },
-  {
-   "nombre": "carpeta",
-   "modelo": "binder_notebook",
-   "pos": [
-    990,
-    2510,
-    140
-   ],
-   "giro": -10,
    "pequeno": true
   },
   {
@@ -483,6 +248,610 @@
     60
    ],
    "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_n1",
+   "modelo": "old_bed_frame",
+   "pos": [
+    752.1255099216032,
+    2303,
+    60
+   ],
+   "giro": 180.85473406826134
+  },
+  {
+   "nombre": "colchon_n1",
+   "modelo": "colchon",
+   "pos": [
+    752.1255099216032,
+    2303,
+    46
+   ],
+   "giro": 180.08186462881233,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_n1",
+   "modelo": "manta",
+   "pos": [
+    752.1255099216032,
+    2243,
+    59
+   ],
+   "giro": 180.09193361994608,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_n1",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    748.2965546068154,
+    2421,
+    60
+   ],
+   "giro": 3.974535496783192,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_n1",
+   "modelo": "rubber_boots",
+   "pos": [
+    735.9303917273878,
+    2279.107857456556,
+    40
+   ],
+   "giro": 93.75738969647844,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_n2",
+   "modelo": "old_bed_frame",
+   "pos": [
+    947.9284041793353,
+    2303,
+    60
+   ],
+   "giro": 179.30373253303415
+  },
+  {
+   "nombre": "colchon_n2",
+   "modelo": "colchon",
+   "pos": [
+    947.9284041793353,
+    2303,
+    46
+   ],
+   "giro": 178.43057575146258,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_n2",
+   "modelo": "manta",
+   "pos": [
+    942.6933964530538,
+    2328,
+    59
+   ],
+   "giro": 166.7745549350995,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_n2",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    951.1078402540211,
+    2421,
+    60
+   ],
+   "giro": -2.3869525266202993,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_n2",
+   "modelo": "rubber_boots",
+   "pos": [
+    938.1020811539565,
+    2307.244259339278,
+    40
+   ],
+   "giro": 139.88225304926982,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_n3",
+   "modelo": "old_bed_frame",
+   "pos": [
+    1152.8016468948456,
+    2303,
+    60
+   ],
+   "giro": 180.9091786019167
+  },
+  {
+   "nombre": "colchon_n3",
+   "modelo": "colchon",
+   "pos": [
+    1152.8016468948456,
+    2303,
+    46
+   ],
+   "giro": 179.65775036861905,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_n3",
+   "modelo": "manta",
+   "pos": [
+    1152.8016468948456,
+    2243,
+    59
+   ],
+   "giro": 176.79486731166227,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_n3",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    1153.6479181555724,
+    2421,
+    60
+   ],
+   "giro": 2.045305124091896,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_n3",
+   "modelo": "rubber_boots",
+   "pos": [
+    1156.3315719333923,
+    2282.905078240288,
+    40
+   ],
+   "giro": 329.3616508009161,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_n4",
+   "modelo": "old_bed_frame",
+   "pos": [
+    1764.00568239318,
+    2303,
+    60
+   ],
+   "giro": 180.87588906967056
+  },
+  {
+   "nombre": "colchon_n4",
+   "modelo": "colchon",
+   "pos": [
+    1764.00568239318,
+    2303,
+    46
+   ],
+   "giro": 181.8156600715635,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_n4",
+   "modelo": "manta",
+   "pos": [
+    1764.00568239318,
+    2243,
+    59
+   ],
+   "giro": 177.86273037044364,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_n4",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    1760.7240309210538,
+    2421,
+    60
+   ],
+   "giro": 1.85101789878117,
+   "escala": 0.6
+  },
+  {
+   "nombre": "litera_n5",
+   "modelo": "old_bed_frame",
+   "pos": [
+    1958.6833612792057,
+    2303,
+    60
+   ],
+   "giro": 178.91563050749872
+  },
+  {
+   "nombre": "colchon_n5",
+   "modelo": "colchon",
+   "pos": [
+    1958.6833612792057,
+    2303,
+    46
+   ],
+   "giro": 180.50526924411363,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_n5",
+   "modelo": "manta",
+   "pos": [
+    1958.6833612792057,
+    2243,
+    59
+   ],
+   "giro": 176.83713487072083,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_n5",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    1963.2857577154718,
+    2421,
+    60
+   ],
+   "giro": -3.944360795201498,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_n5",
+   "modelo": "rubber_boots",
+   "pos": [
+    1959.1901786905923,
+    2264.9798738659733,
+    40
+   ],
+   "giro": 172.8696311775711,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_s1",
+   "modelo": "old_bed_frame",
+   "pos": [
+    300.0007959449889,
+    2897,
+    60
+   ],
+   "giro": -0.39278542783185566
+  },
+  {
+   "nombre": "colchon_s1",
+   "modelo": "colchon",
+   "pos": [
+    300.0007959449889,
+    2897,
+    46
+   ],
+   "giro": 1.5850925607080204,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_s1",
+   "modelo": "manta",
+   "pos": [
+    300.0007959449889,
+    2957,
+    59
+   ],
+   "giro": 2.9285613407790336,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_s1",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    306.24855554138026,
+    2779,
+    60
+   ],
+   "giro": -2.0409315769951872,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_s1",
+   "modelo": "rubber_boots",
+   "pos": [
+    295.06446553820416,
+    2858.365817245696,
+    40
+   ],
+   "giro": 253.88313081022847,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_s2",
+   "modelo": "old_bed_frame",
+   "pos": [
+    527.1552526893084,
+    2897,
+    60
+   ],
+   "giro": -1.114850175180524
+  },
+  {
+   "nombre": "colchon_s2",
+   "modelo": "colchon",
+   "pos": [
+    527.1552526893084,
+    2897,
+    46
+   ],
+   "giro": -0.8651684984788859,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_s2",
+   "modelo": "manta",
+   "pos": [
+    524.2579522581275,
+    2872,
+    59
+   ],
+   "giro": 16.477971836724805,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_s2",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    529.3766382263557,
+    2779,
+    60
+   ],
+   "giro": -1.5905804450325993,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_s2",
+   "modelo": "rubber_boots",
+   "pos": [
+    511.8130675188541,
+    2867.920606189429,
+    40
+   ],
+   "giro": 247.48923351916918,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_ramos",
+   "modelo": "old_bed_frame",
+   "pos": [
+    1133.0245633501352,
+    2897,
+    60
+   ],
+   "giro": -1.1960732311836368
+  },
+  {
+   "nombre": "colchon_ramos",
+   "modelo": "colchon",
+   "pos": [
+    1133.0245633501352,
+    2897,
+    46
+   ],
+   "giro": -1.7341282526040733,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_ramos",
+   "modelo": "manta",
+   "pos": [
+    1133.1984548612247,
+    2872,
+    59
+   ],
+   "giro": 10.951506472788388,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_ramos",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    1122.2578513831108,
+    2779,
+    60
+   ],
+   "giro": -0.5057912678148995,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_ramos",
+   "modelo": "rubber_boots",
+   "pos": [
+    1113.4042027969278,
+    2864.113913171076,
+    40
+   ],
+   "giro": 102.90261594885011,
+   "pequeno": true
+  },
+  {
+   "nombre": "litera_s4",
+   "modelo": "old_bed_frame",
+   "pos": [
+    1309.6044795660653,
+    2897,
+    60
+   ],
+   "giro": -1.163332427975814
+  },
+  {
+   "nombre": "colchon_s4",
+   "modelo": "colchon",
+   "pos": [
+    1309.6044795660653,
+    2897,
+    46
+   ],
+   "giro": 0.4813738009234889,
+   "colgar": true
+  },
+  {
+   "nombre": "manta_s4",
+   "modelo": "manta",
+   "pos": [
+    1309.6044795660653,
+    2957,
+    59
+   ],
+   "giro": 3.0300384758784817,
+   "pequeno": true,
+   "colgar": true
+  },
+  {
+   "nombre": "baul_s4",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    1312.943622089722,
+    2779,
+    60
+   ],
+   "giro": -3.4561909181567225,
+   "escala": 0.6
+  },
+  {
+   "nombre": "botas_s4",
+   "modelo": "rubber_boots",
+   "pos": [
+    1315.354708776831,
+    2847.87696379284,
+    40
+   ],
+   "giro": 138.49165308088197,
+   "pequeno": true
+  },
+  {
+   "nombre": "mesa",
+   "modelo": "metal_office_desk",
+   "pos": [
+    350,
+    2520,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "radio",
+   "modelo": "vintage_radio_transceiver",
+   "pos": [
+    275,
+    2505,
+    140
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "termo",
+   "modelo": "modified_thermos",
+   "pos": [
+    410,
+    2480,
+    140
+   ],
+   "giro": 30,
+   "pequeno": true
+  },
+  {
+   "nombre": "tabaco",
+   "modelo": "cigarette_pack",
+   "pos": [
+    445,
+    2550,
+    140
+   ],
+   "giro": -20,
+   "pequeno": true
+  },
+  {
+   "nombre": "partes",
+   "modelo": "clipboard",
+   "pos": [
+    340,
+    2545,
+    140
+   ],
+   "giro": 12,
+   "pequeno": true
+  },
+  {
+   "nombre": "linterna",
+   "modelo": "vintage_flashlight",
+   "pos": [
+    385,
+    2555,
+    140
+   ],
+   "giro": 70,
+   "pequeno": true
+  },
+  {
+   "nombre": "flexo",
+   "modelo": "desk_lamp_arm_01",
+   "pos": [
+    430,
+    2485,
+    140
+   ],
+   "giro": 200,
+   "pequeno": true,
+   "sin_sombra": true
+  },
+  {
+   "nombre": "carpeta",
+   "modelo": "binder_notebook",
+   "pos": [
+    310,
+    2560,
+    140
+   ],
+   "giro": -10,
+   "pequeno": true
+  },
+  {
+   "nombre": "taburete_1",
+   "modelo": "metal_stool_01",
+   "pos": [
+    360,
+    2625,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "taburete_2",
+   "modelo": "metal_stool_01",
+   "pos": [
+    470,
+    2440,
+    60
+   ],
+   "giro": 25
+  },
+  {
+   "nombre": "mascara",
+   "modelo": "old_gas_mask",
+   "pos": [
+    1855,
+    2210,
+    180
+   ],
+   "giro": 0,
+   "colgar": true,
    "pequeno": true
   }
  ],

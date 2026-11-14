@@ -46,6 +46,7 @@
 #include "InputKeyEventArgs.h"
 #include "TimerManager.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Components/DecalComponent.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -2838,6 +2839,11 @@ void ATarsisDirector::SetupZones()
 		}
 		const bool bPower = It->ActorHasTag(Power), bRain = It->ActorHasTag(Rain);
 		if (!bPower && !bRain) continue;
+		if (bRain)
+		{
+			TInlineComponentArray<UDecalComponent*> Ds(*It);
+			for (UDecalComponent* D : Ds) RainDecals.Add(D);
+		}
 		TInlineComponentArray<UAudioComponent*> As(*It);
 		for (UAudioComponent* A : As) (bRain ? RainSounds : PowerSounds).Add(A);
 	}
@@ -2865,6 +2871,10 @@ void ATarsisDirector::ZonesTick(float DeltaSeconds)
 		if (!A) continue;
 		if (bPowerOff && A->IsPlaying()) A->Stop();
 		else if (!bPowerOff && !A->IsPlaying()) A->Play();
+	}
+	for (UDecalComponent* D : RainDecals)
+	{
+		if (D && D->IsVisible() != (Weather == 1)) D->SetVisibility(Weather == 1);
 	}
 	for (UAudioComponent* A : RainSounds)
 	{

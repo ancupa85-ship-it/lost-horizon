@@ -85,7 +85,9 @@ def luces():
     c.set_editor_property('attenuation_radius', 1300.0)
     c.set_editor_property('source_length', 90.0)
     c.set_editor_property('source_radius', 2.0)
-    c.set_editor_property('cast_shadows', True)
+    # sin sombra (0019): con cerchas, literas y baúles debajo, su sombra costaba 1,3-1,6 fps en el barracón
+    # (A/B en una sesión, tools/unreal/medir.py) y lo dejaba por debajo de 30. La sombra dura la pone el flexo.
+    c.set_editor_property('cast_shadows', False)
     c.set_editor_property('volumetric_scattering_intensity', 0.4)
     # sobre la puerta norte, fuera: lámpara enjaulada de luz cálida (sodio), que recorta al que entra
     p = poner(unreal.SpotLight, 'Luz_PuertaNorte', PUERTA_NORTE, unreal.Rotator(0, -70, -90))   # hacia abajo y algo hacia fuera (-Y)
@@ -102,7 +104,7 @@ def luces():
     c.set_editor_property('volumetric_scattering_intensity', 1.2)
     # dentro, contra el azul del fluorescente, dos fuentes cálidas pequeñas: el flexo de la mesa del cuartelero (foco
     # corto hacia la mesa, con sombra: recorta la radio y el termo) y el resplandor de la estufa (sin sombra)
-    fx = poner(unreal.SpotLight, 'Luz_Flexo', V(1172, 2448, 152), unreal.Rotator(0, -80, 200), tags=('electrico_luz',))
+    fx = poner(unreal.SpotLight, 'Luz_Flexo', V(420, 2495, 150), unreal.Rotator(0, -80, 200), tags=('electrico_luz',))   # la mesa, al fondo oeste
     c = fx.spot_light_component
     c.set_mobility(unreal.ComponentMobility.MOVABLE)
     c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
@@ -355,6 +357,160 @@ def mallas():
     telas()
 
 
+# ---------------------------------------------------------------- tanda 19: techo, instalación, detalles, luz de ventana
+
+CUBO = '/Engine/BasicShapes/Cube.Cube'
+CILINDRO = '/Engine/BasicShapes/Cylinder.Cylinder'
+
+
+def pieza(nombre, malla, pos, tam, material, rot=unreal.Rotator(0, 0, 0), sombra=True, tags=()):
+    """Pieza hecha con las formas básicas del motor (cubo/cilindro de 100 uu, centrados): tam en cm."""
+    m = unreal.load_asset(malla)
+    a = eas().spawn_actor_from_object(m, pos, rot)
+    a.set_actor_label(nombre)
+    a.set_folder_path(CARPETA)
+    a.set_actor_scale3d(V(tam[0] / 100.0, tam[1] / 100.0, tam[2] / 100.0))
+    if tags:
+        a.tags = [unreal.Name(t) for t in tags]
+    c = a.static_mesh_component
+    c.set_mobility(unreal.ComponentMobility.STATIC)
+    c.set_collision_profile_name('NoCollision')
+    c.set_editor_property('cast_shadow', sombra)
+    mi = unreal.load_asset(material) if isinstance(material, str) else material
+    if mi:
+        c.set_material(0, mi)
+    return a
+
+
+def material_emisivo():
+    """M_TuboEncendido: el tubo del fluorescente que está encendido (emisivo frío; no ilumina, la luz es la del foco)."""
+    ruta = DM + '/M_TuboEncendido'
+    if eal.does_asset_exist(ruta):
+        return unreal.load_asset(ruta)
+    m = tools.create_asset('M_TuboEncendido', DM, unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_UNLIT)
+    c = mel.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -300, 0)
+    c.set_editor_property('constant', unreal.LinearColor(7.0, 8.5, 9.5, 1))
+    mel.connect_material_property(c, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    eal.save_loaded_asset(m)
+    return m
+
+
+def material_barrotes():
+    """M_Barrotes: función de luz con franjas cada 12 cm a lo largo de X (los barrotes de la ventana sobre el suelo)."""
+    ruta = DM + '/M_Barrotes'
+    if eal.does_asset_exist(ruta):
+        return unreal.load_asset(ruta)
+    m = tools.create_asset('M_Barrotes', DM, unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property('material_domain', unreal.MaterialDomain.MD_LIGHT_FUNCTION)
+    E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
+    wp = E(unreal.MaterialExpressionWorldPosition, -900, 0)
+    mx = E(unreal.MaterialExpressionComponentMask, -750, 0)
+    for k, v in (('r', True), ('g', False), ('b', False), ('a', False)):
+        mx.set_editor_property(k, v)
+    uno(wp, mx)
+    dv = E(unreal.MaterialExpressionDivide, -600, 0)
+    dv.set_editor_property('const_b', 12.0)
+    mel.connect_material_expressions(mx, '', dv, 'A')
+    fr = E(unreal.MaterialExpressionFrac, -480, 0)
+    uno(dv, fr)
+    st = E(unreal.MaterialExpressionStep, -360, 0)   # luz donde frac > 0,22 (el 22 % es barrote)
+    st.set_editor_property('const_y', 0.22)
+    if not mel.connect_material_expressions(fr, '', st, 'X'):
+        mel.connect_material_expressions(fr, '', st, '')
+    mel.connect_material_property(st, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    eal.save_loaded_asset(m)
+    return m
+
+
+def techo():
+    """Cerchas de madera a la vista cada 2,5 m, tres correas a lo largo, las pantallas de los fluorescentes (una
+    encendida, con su tubo emisivo; las otras apagadas), el tubo del cable hasta el interruptor junto a la puerta
+    y la salida de humos de la estufa hasta el techo. Sin colisión y fuera del paso."""
+    madera = DM + '/MI_madera'
+    hierro = DM + '/MI_hierro'
+    for i, x in enumerate(range(270, 2200, 250)):
+        pieza('Techo_Cercha_%d' % i, CUBO, V(x, 2600, 345), (15, 800, 22), madera)
+    for i, y in enumerate((2400, 2600, 2800)):
+        pieza('Techo_Correa_%d' % i, CUBO, V(1172, y, 329), (2055, 8, 10), madera, sombra=False)
+    fluor = unreal.load_asset('/Game/Tarsis/Atrezo/mounted_fluorescent_lights/mounted_fluorescent_lights/StaticMeshes/mounted_fluorescent_lights_a')
+    for i, x in enumerate((450, 1750)):
+        a = eas().spawn_actor_from_object(fluor, V(x, 2570, 324), unreal.Rotator(0, 0, 0)) if fluor else None
+        if a:
+            a.set_actor_label('Techo_FluorescenteApagado_%d' % i); a.set_folder_path(CARPETA)
+            a.static_mesh_component.set_collision_profile_name('NoCollision')
+    pieza('Techo_TuboEncendido', CUBO, V(1150, 2600, 351), (86, 2.5, 2.5), material_emisivo(), sombra=False)
+    # cable: por el techo hasta el muro norte y bajando hasta el interruptor, al lado de la puerta
+    pieza('Cable_Techo', CUBO, V(1300, 2400, 352), (3, 400, 3), hierro, sombra=False)
+    pieza('Cable_Pared', CUBO, V(1300, 2206, 245), (3, 3, 215), hierro, sombra=False)
+    pieza('Interruptor', CUBO, V(1300, 2208, 132), (8, 4, 12), hierro, sombra=False)
+    # salida de humos de la estufa (la estufa de bidón mide 86 cm)
+    pieza('Estufa_Chimenea', CILINDRO, V(560, 2260, 86 + 135), (15, 15, 270), hierro)
+
+
+def ventanas_luz():
+    """La luna por las ventanas del muro norte: un foco frío sin sombra por ventana que pinta en el suelo la franja
+    de luz con los barrotes (función de luz M_Barrotes). El muro es macizo: el foco va dentro y no proyecta sombra."""
+    lf = material_barrotes()
+    for i, x in enumerate((1120, 1700)):
+        a = poner(unreal.SpotLight, 'Luz_Ventana_%d' % i, V(x, 2215, 230), unreal.Rotator(0, -55, 90))
+        c = a.spot_light_component
+        c.set_mobility(unreal.ComponentMobility.MOVABLE)
+        c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
+        c.set_editor_property('intensity', 260.0)
+        c.set_editor_property('light_color', color(0.55, 0.7, 1.0))
+        # 400 cm: el haz llega al suelo a unos 2,8 m; con más radio la función de luz se calcula en más pantalla
+        c.set_editor_property('attenuation_radius', 400.0)
+        c.set_editor_property('outer_cone_angle', 22.0)
+        c.set_editor_property('inner_cone_angle', 14.0)
+        c.set_editor_property('cast_shadows', False)
+        c.set_editor_property('light_function_material', lf)
+
+
+def detalles():
+    """Tablón de avisos con papeles en el muro este y una toalla colgada de una litera."""
+    madera = DM + '/MI_madera'
+    papel = DM + '/MI_colchon'
+    pieza('Tablon', CUBO, V(2197, 2420, 170), (3, 100, 70), madera)
+    import random
+    r = random.Random(7)
+    for i in range(6):
+        pieza('Tablon_Papel_%d' % i, CUBO, V(2194.5, 2420 + r.uniform(-38, 38), 170 + r.uniform(-24, 24)),
+              (0.3, r.choice((21, 15)), r.choice((29.7, 21))), papel, rot=unreal.Rotator(r.uniform(-6, 6), 0, 0), sombra=False)
+    pieza('Toalla', CUBO, V(750, 2412, 98), (40, 2, 55), papel, sombra=False)
+
+
+def interior():
+    """Exposición propia del barracón por dentro (el interior se lee sin aclarar la captura)."""
+    v = poner(unreal.PostProcessVolume, 'PP_BarraconDentro', V(1172, 2600, 180))
+    v.set_actor_scale3d(V(10.3, 4.0, 1.8))
+    v.set_editor_property('unbound', False)
+    v.set_editor_property('priority', 2.0)
+    v.set_editor_property('blend_radius', 150.0)
+    s = v.settings
+    s.set_editor_property('override_auto_exposure_bias', True)
+    s.set_editor_property('auto_exposure_bias', 1.4)
+    v.settings = s
+
+
+def manchas_19():
+    # humedad bajo las ventanas del muro norte (apunta a -Y) y desconchones en el zócalo (manchas claras pequeñas)
+    for i, x in enumerate((1120, 1700)):
+        mancha('Mancha_Ventana_%d' % i, V(x, 2210, 120), 150, 160, -90, 0.8, (0.05, 0.045, 0.035))
+    for i, (pos, hacia) in enumerate(((V(400, 2990, 60), 90), (V(1650, 2990, 45), 90), (V(2190, 2350, 70), 0), (V(155, 2900, 50), 180))):
+        mancha('Desconchon_%d' % i, pos, 34, 26, hacia, 0.9, (0.42, 0.40, 0.34))
+    # el camino gastado del pasillo central
+    mancha('Mancha_Pasillo', V(1200, 2600, 6), 1900, 260, 'abajo', 0.3, (0.03, 0.028, 0.024))
+    # cuando llueve: charco y pisadas mojadas desde la puerta norte (etiqueta «lluvia»: solo se ven con lluvia)
+    a = mancha('Charco_Puerta', V(1500, 2275, 6), 170, 120, 'abajo', 0.85, (0.015, 0.015, 0.014))
+    a.tags = [unreal.Name('lluvia')]
+    for i in range(6):
+        a = mancha('Pisada_%d' % i, V(1490 + (18 if i % 2 else -18), 2340 + i * 55, 6), 26, 12, 'abajo', 0.6, (0.02, 0.02, 0.018), giro=90)
+        a.tags = [unreal.Name('lluvia')]
+
+
 def todo():
     mallas()
     limpiar()
@@ -362,6 +518,11 @@ def todo():
     sonidos()
     posproceso()
     manchas()
+    techo()
+    ventanas_luz()
+    detalles()
+    interior()
+    manchas_19()
 
 
 if __name__ == '__main__':

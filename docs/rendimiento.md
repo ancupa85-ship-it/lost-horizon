@@ -42,3 +42,38 @@ cuadrante, zócalo pintado y suelo mate; 42 piezas): 35,1 / 30,3 fps en la entra
 Las luces de la zona son **móviles** (dinámicas), con radio corto: fluorescente, lámpara de la puerta y flexo con sombra (focos), estufa sin ella. El apagón del generador y
 el farol roto las apagan en juego, el fluorescente titila, y con dinámicas no hay que construir la iluminación
 (Lightmass) cada vez que se toca el nivel. Lo que cuestan está medido arriba (1,8 fps) y no justifica hornear.
+
+## 0019: barracón lleno (literas, baúles, techo, luz de ventana, calcomanías de lluvia)
+
+Medido con `tools/unreal/medir.py` (calidad Media, ventana 1080p del PIE, guardias quietos), con el editor recién
+abierto, dos pasadas (medio / peor 1 %). VRAM de toda la tarjeta con el editor abierto (nvidia-smi).
+
+| Sitio | Pasada 1 | Pasada 2 | VRAM (MB) |
+|---|---|---|---|
+| Entrada | 34,7 / 26,2 | 34,9 / 30,6 | 3784 / 3712 |
+| Patio central | 34,3 / 32,8 | 32,3 / 29,8 | 3784 / 3712 |
+| Barracón oeste | 30,6 / 28,4 | 29,7 / 27,4 | 3784 / 3712 |
+
+Antes de recortar, el barracón daba 28,7 y 30,3 fps (editor recién abierto) y 28,0–28,5 con el editor cargado.
+Comparación dentro de una misma sesión (barracón oeste, fps medios):
+
+| Cambio | fps |
+|---|---|
+| Todo | 28,4 |
+| Fluorescente sin sombra | 30,3 |
+| Sin las dos luces de ventana | 29,1 |
+| Flexo sin sombra | 28,9 |
+| Sin el atrezo | 29,5 |
+| Sin el techo (cerchas, correas, pantallas, chimenea) | 29,2 |
+| Sin manchas, charco y pisadas | 29,0 |
+| Sombra del fluorescente a media resolución | sin cambio |
+| Sin niebla volumétrica / Lumen con menos sondas | sin cambio |
+
+Qué se quitó:
+- **La sombra del fluorescente** (1,3–1,9 fps): con cerchas, literas y baúles debajo era lo más caro. La sombra dura
+  dentro la pone el flexo; Lumen sigue oscureciendo bajo las literas.
+- **Radio de las luces de ventana de 520 a 400 cm** (la función de luz de los barrotes se calcula en menos pantalla;
+  el haz llega al suelo a 2,8 m, no se ve diferencia).
+
+El barracón queda justo en el límite de 30 fps de media con el editor abierto; la VRAM, por debajo de 3,8 GB salvo
+algún pico de 3823 MB en la primera medida tras abrir el editor (texturas aún cargándose).

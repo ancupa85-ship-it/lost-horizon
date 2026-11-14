@@ -187,6 +187,9 @@ def prueba_zona():
     yield 0.3
     sin = gotera and gotera[0].get_component_by_class(unreal.AudioComponent).is_playing()
     check('la gotera suena con lluvia y calla sin ella', con and not sin, (con, sin))
+    charcos = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.DecalActor) if a.actor_has_tag('lluvia')]
+    vis = lambda: [a.decal.is_visible() for a in charcos]
+    check('charco y pisadas mojadas solo con lluvia', d.rain_decal_count() == len(charcos) > 0 and not any(vis()), (d.rain_decal_count(), len(charcos), vis()))
     while d.get_editor_property('weather') != w0:
         d.simulate_key('Y'); yield 0.2
 
@@ -517,18 +520,25 @@ def prueba_guardias():
     p = jugador()
     if agachado():   # de pie: agachado los pasos casi no suenan y la zancada es otra
         d.simulate_key('C'); yield 0.3
-    p.set_actor_location(V(1700, 2350, max(p.get_actor_location().z, 100)), False, True)   # barracón oeste, lejos de la ronda de Ramos
+    # Ramos hace la ronda por este barracón: si ve al jugador lo coge y la escena de captura bloquea el movimiento
+    # (por eso esta comprobación fallaba a veces). Quietos todos mientras se anda
+    for g in guardias():
+        g.hold(6.0)
+    if d.get_editor_property('capturing'):
+        yield ('hasta', lambda: not director().get_editor_property('capturing'), 5.0)
+    p.set_actor_location(V(700, 2600, 110), False, True)   # al oeste del pasillo central del barracón
     # por si una prueba anterior lo dejó cayendo o con el movimiento bloqueado (cinemática, menú)
     p.get_component_by_class(unreal.CharacterMovementComponent).set_movement_mode(unreal.MovementMode.MOVE_WALKING)
     unreal.GameplayStatics.get_player_controller(mundo(), 0).reset_ignore_move_input()
     yield 0.2
     n0 = d.get_editor_property('player_steps')
     t0 = time.time()
-    while time.time() - t0 < 3.0:
-        # de un lado a otro del pasillo (0,3 s en cada sentido) sin salir del barracón
-        p.add_movement_input(V(1 if int((time.time() - t0) / 0.3) % 2 == 0 else -1, 0, 0), 1.0); yield 0.03
+    while time.time() - t0 < 2.0 and p.get_actor_location().x < 2000:
+        # por el pasillo central del barracón, en un solo sentido. La entrada se da en CADA fotograma: si se da
+        # cada 0,03 s y el juego va a más de 60 fps, entre medias frena y el jugador apenas avanza (17 cm/s)
+        p.add_movement_input(V(1, 0, 0), 1.0); yield 0.0
     check('tus pasos suenan según el suelo', d.get_editor_property('player_steps') > n0 and d.get_editor_property('last_step_surface') == 'cemento',
-          '%d pasos, %s, en %s, agachado %s' % (d.get_editor_property('player_steps') - n0, d.get_editor_property('last_step_surface'), p.get_actor_location(), agachado()))
+          '%d pasos, %s, en x %.0f, agachado %s' % (d.get_editor_property('player_steps') - n0, d.get_editor_property('last_step_surface'), p.get_actor_location().x, agachado()))
     aparte()
 
 def prueba_menu():
