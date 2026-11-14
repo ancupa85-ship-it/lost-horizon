@@ -795,10 +795,9 @@ def prueba_perimetro():
     xo = traza(V(-1000, 2800, 150), V(-4000, 2800, 150))
     xe = traza(V(8500, 1500, 150), V(12000, 1500, 150))
     check('el muro nuevo está al oeste (x -1855) y al este (x 9055)', xo is not None and xe is not None and abs(xo + 1855) < 120 and abs(xe - 9055) < 120, (xo, xe))
-    # los guardias pueden ir por el camino de un portón al otro
-    ruta = unreal.NavigationSystemV1.find_path_to_location_synchronously(w, V(-1000, 5700, 100), V(8500, 5700, 100))
-    pts = list(ruta.get_editor_property('path_points')) if ruta else []
-    check('hay ruta de navegación por el camino', len(pts) > 1 and dist2d(pts[-1], V(8500, 5700, 0)) < 150 and not ruta.is_partial(), '%d puntos%s' % (len(pts), ', parcial' if ruta and ruta.is_partial() else ''))
+    # (la ruta de navegación por el camino ya no se pide desde aquí: find_path_to_location_synchronously llamado desde Python
+    # hace saltar un «ensure» del motor que abre la ventana de informe de errores. Que se puede andar por el camino lo
+    # prueban la ronda de Carmona en prueba_anillo y el guardia que va a la cabina del camión en prueba_camion)
     # el tope invisible tras el portón de salida
     topes = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor) if a.actor_has_tag('Tope_Salida')]
     check('tope invisible fuera del portón de salida', len(topes) == 1 and topes[0].get_editor_property('hidden') and dist2d(topes[0].get_actor_location(), V(9280, 5700, 0)) < 50, len(topes))
@@ -813,6 +812,38 @@ def prueba_perimetro():
     ps = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.PlayerStart)
     check('el jugador sigue empezando en (500, 500)', ps and dist2d(ps[0].get_actor_location(), V(500, 500, 0)) < 150, [ps[0].get_actor_location() if ps else None])
     aparte()
+
+
+def prueba_desgaste():
+    """Tanda 22 (arte): el camino y el anillo dejan de parecer recién puestos. Juntas y grietas selladas en la losa, hierbajos
+    al pie de vallas y muros, manchas en el suelo y en el muro, y el camión con su textura pegada (no proyectada desde el
+    mundo) y barro en los bajos."""
+    w = mundo()
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    des = ext.get('desgaste') or {}
+    check('la losa tiene juntas, grietas y parches', len(des.get('juntas', [])) >= 15 and len(des.get('grietas', [])) >= 10 and len(des.get('parches', [])) >= 3,
+          {k: len(v) for k, v in des.items()})
+    mallas = {}
+    for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor):
+        c = a.get_component_by_class(unreal.StaticMeshComponent)
+        if c and c.get_num_materials():
+            mallas[a.get_actor_label()] = (a, c, c.get_material(0).get_name() if c.get_material(0) else '')
+    check('el alquitrán de las juntas está en el nivel', any(n.startswith('base_alquitran') for n in mallas), [n for n in mallas if 'alquitran' in n])
+    h = next((v for n, v in mallas.items() if n.startswith('hierbajos')), None)
+    check('hay hierbajos (%s matas en base.json)' % ext.get('hierbajos'), h is not None and (ext.get('hierbajos') or 0) > 300, sorted(mallas)[:0])
+    if h:
+        a, c, mat = h
+        check('los hierbajos llevan su material recortado', mat.startswith('M_Hierbajo_') and not a.get_editor_property('hidden'), mat)
+        check('y no estorban: sin colisión ni sombra', not a.get_actor_enable_collision() and not c.get_editor_property('cast_shadow'),
+              '%s, %s' % (a.get_actor_enable_collision(), c.get_editor_property('cast_shadow')))
+    manchas = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DecalActor) if a.actor_has_tag('mancha_perimetro')]
+    en_camino = [a for a in manchas if abs(a.get_actor_location().y - 5700) < 320]
+    check('manchas en el camino (rodadas, aceite, barro) y al pie del muro', len(en_camino) >= 20 and len(manchas) - len(en_camino) >= 8, '%d en el camino, %d en el muro' % (len(en_camino), len(manchas) - len(en_camino)))
+    quiere = {'camionmovil_oliva': 'MI_oliva_camion', 'camionmovil_bajos': 'MI_bajos_camion', 'camionmovil_goma': 'MI_goma_camion',
+              'camionmovil_lona': 'MI_lona_camion', 'hojaentrada_oliva': 'MI_oliva_hoja', 'camiones_oliva': 'MI_oliva_camion'}
+    tiene = {n: next((v[2] for k, v in mallas.items() if k.startswith(n)), None) for n in quiere}
+    check('el camión y la hoja del portón llevan la textura pegada, con barro', all(tiene[n] == m for n, m in quiere.items()), {n: m for n, m in tiene.items() if m != quiere[n]})
+    yield 0.1
 
 
 def prueba_anillo():
@@ -924,17 +955,141 @@ def prueba_camion():
                 g.set_actor_location(V(l.x, 6400, l.z), False, True)
     yield 1.5
     check('y sigue cuando te apartas', cx() > x2 + 50, '%d -> %d' % (x2, cx()))
+    # tanda 22: en el control ya no abre nadie desde lejos. Sanz, que es el de allí, sigue con su ronda (los demás, quietos)
+    sanz = guardia('Sanz')
+    if sanz:
+        sanz.hold(0.0)
+    c0 = d.get_editor_property('truck_checks')
     yield ('hasta', lambda: estado_c() == 4, 40.0)
     check('para en el control de salida', estado_c() == 4 and abs(cx() - 8270) < 40, '%s en x %d' % (estado_c(), cx()))
     check('el portón de entrada ya está cerrado', d.get_editor_property('entry_gate_t') < 0.02 and abs(hoja[0].get_actor_location().y) < 5, d.get_editor_property('entry_gate_t'))
-    yield ('hasta', lambda: director().get_editor_property('barrier_t') > 0.95, 12.0)
-    check('le levantan la barrera', d.get_editor_property('barrier_t') > 0.95, d.get_editor_property('barrier_t'))
+    yield ('hasta', lambda: director().truck_inspector_name() != '', 4.0)
+    check('Sanz deja la ronda y va hacia la cabina', d.truck_inspector_name() == 'Sanz' and d.get_editor_property('truck_check') >= 1,
+          '%s, fase %s' % (d.truck_inspector_name(), d.get_editor_property('truck_check')))
+    check('la barrera sigue bajada mientras tanto', d.get_editor_property('barrier_t') < 0.05, d.get_editor_property('barrier_t'))
+    yield ('hasta', lambda: director().get_editor_property('truck_check') >= 2, 22.0)
+    cab = V(cx() + 62, 5700 - 185, 0)
+    check('llega a la puerta del conductor y pide los papeles', sanz and d.get_editor_property('truck_checks') == c0 + 1 and dist2d(sanz.get_actor_location(), cab) < 120
+          and 'sanz_papeles' in list(d.get_editor_property('voice_log')), '%d cm, %s' % (dist2d(sanz.get_actor_location(), cab) if sanz else -1, list(d.get_editor_property('voice_log'))[-2:]))
+    yield ('hasta', lambda: director().get_editor_property('barrier_t') > 0.95, 14.0)
+    check('mira los papeles y le levanta la barrera', d.get_editor_property('barrier_t') > 0.95 and 'sanz_pase' in list(d.get_editor_property('voice_log')),
+          '%.2f, %s' % (d.get_editor_property('barrier_t'), list(d.get_editor_property('voice_log'))[-2:]))
+    check('con la base tranquila no registra la caja', d.get_editor_property('truck_searches') == 0, d.get_editor_property('truck_searches'))
     yield ('hasta', lambda: director().get_editor_property('truck_passes') >= 1, 30.0)
     check('sale por el portón del este y desaparece', d.get_editor_property('truck_passes') == 1 and estado_c() == 0 and all(a.get_editor_property('hidden') for a in piezas),
           '%d pasadas, estado %s' % (d.get_editor_property('truck_passes'), estado_c()))
     yield ('hasta', lambda: director().get_editor_property('barrier_t') < 0.05, 6.0)
     check('la barrera vuelve a bajar', d.get_editor_property('barrier_t') < 0.05, d.get_editor_property('barrier_t'))
     check('la misión sigue (nadie te ha cogido ni has salido)', not d.get_editor_property('done') and not d.get_editor_property('capturing'))
+    if sanz:
+        yield ('hasta', lambda: estado(sanz) == 'PATROL' and min(dist2d(sanz.get_actor_location(), V(8500, 5300, 0)), dist2d(sanz.get_actor_location(), V(8100, 5300, 0))) < 450, 12.0)
+        check('Sanz vuelve a su ronda', estado(sanz) == 'PATROL' and abs(sanz.get_actor_location().y - 5300) < 200, '%s en y %d' % (estado(sanz), sanz.get_actor_location().y))
+
+
+def prueba_viaje():
+    """Tanda 22 (juego): subirse a la caja del camión por detrás y viajar escondido. Sin el expediente te bajas en el control;
+    con la base en guardia registran la caja y te sacan; con el expediente, el camión te saca de la base. Va detrás de
+    prueba_camion, en la misma partida: el camión ya hace la pasada corta y los guardias, menos Sanz, están quietos."""
+    d = director()
+    w = mundo()
+    estado_c = lambda: director().get_editor_property('truck_state')
+    cx = lambda: director().truck_location().x
+    sanz = guardia('Sanz')
+    if sanz:
+        sanz.hold(0.0)
+    def a_la_trasera():
+        tp(cx() - 265, 5700, 0)
+    def dentro(maximo=40.0):
+        """Espera a que el camión cruce el portón y sube por detrás."""
+        yield ('hasta', lambda: estado_c() == 3 and cx() > -1000, maximo)
+        a_la_trasera(); yield 0.05
+        if not d.can_board_truck():
+            a_la_trasera(); yield 0.05
+        d.interact(); yield 0.3
+    aparte()
+    check('con el camión fuera no hay a qué subirse', not d.can_board_truck() and not d.get_editor_property('riding'))
+    r0, c0, s0 = d.get_editor_property('truck_rides'), d.get_editor_property('captures'), d.get_editor_property('truck_searches')
+    yield ('hasta', lambda: estado_c() == 0, 40.0)
+    d.truck_skip_wait()
+    yield ('hasta', lambda: estado_c() == 3 and cx() > -1000, 40.0)
+    # --- en marcha, por detrás
+    a_la_trasera(); yield 0.05
+    if not d.can_board_truck():
+        a_la_trasera(); yield 0.05
+    check('detrás del camión, al paso: aviso "E SUBIR"', d.can_board_truck() and 'SUBIR' in d.interact_prompt(), d.interact_prompt()[:32])
+    d.interact(); yield 0.3
+    check('subes a la caja y quedas oculto', d.get_editor_property('riding') and jugador().get_editor_property('hidden') and d.get_editor_property('truck_rides') == r0 + 1,
+          '%s, %s' % (d.get_editor_property('riding'), d.get_editor_property('truck_rides')))
+    check('aviso "E BAJAR"', 'BAJAR' in d.interact_prompt(), d.interact_prompt()[:28])
+    x1 = jugador().get_actor_location().x; yield 1.0
+    x2 = jugador().get_actor_location().x
+    cam = jugador().get_component_by_class(unreal.CameraComponent).get_world_location()
+    check('el camión te lleva', x2 - x1 > 200 and abs(x2 - (cx() - 125)) < 60, '%d cm en 1 s, a %d del centro' % (x2 - x1, x2 - cx()))
+    check('la vista queda dentro de la caja, bajo la lona', 180 < cam.z < 225 and abs(cam.y - 5700) < 12, '%d, %d' % (cam.z, cam.y))
+    h = unreal.SystemLibrary.line_trace_single(w, V(cx() - 290, 5700, cam.z), V(cx() - 135, 5700, cam.z), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [jugador()], unreal.DrawDebugTrace.NONE, True)
+    check('la caja está hueca: por la trasera se ve el interior', h is None, h.to_tuple()[4] if h else '')
+    ven = [g.get_actor_label()[8:] for g in guardias() if g.visibility(jugador()) > 0]
+    check('ningún guardia te ve ahí dentro', not ven, ven)
+    # --- bajar en marcha
+    d.interact(); yield 0.25
+    l = jugador().get_actor_location()
+    check('E: saltas por detrás', not d.get_editor_property('riding') and not jugador().get_editor_property('hidden') and jugador().get_actor_enable_collision()
+          and -500 < l.x - (cx() - 200) < 0 and abs(l.y - 5700) < 30 and l.z < 180, 'a %d de la trasera, z %d' % (l.x - (cx() - 200), l.z))
+    # --- otra vez arriba, hasta el control. Sin el expediente: Sanz mira los papeles sin verte y, al levantarse la barrera, te bajas
+    a_la_trasera(); yield 0.05
+    if not d.can_board_truck():
+        a_la_trasera(); yield 0.05
+    d.interact(); yield 0.3
+    check('vuelves a subir', d.get_editor_property('riding') and d.get_editor_property('truck_rides') == r0 + 2, d.get_editor_property('truck_rides'))
+    yield ('hasta', lambda: estado_c() == 4, 45.0)
+    yield ('hasta', lambda: director().get_editor_property('truck_check') >= 2, 26.0)
+    check('en el control miran los papeles contigo dentro', d.get_editor_property('riding') and d.truck_inspector_name() == 'Sanz' and d.get_editor_property('truck_check') == 2,
+          '%s, fase %s' % (d.truck_inspector_name(), d.get_editor_property('truck_check')))
+    check('y Sanz, a dos pasos, no te ve', sanz and sanz.visibility(jugador()) == 0 and estado(sanz) == 'PATROL', estado(sanz) if sanz else '')
+    yield ('hasta', lambda: not director().get_editor_property('riding'), 16.0)
+    msg = str(d.get_editor_property('message'))
+    l = jugador().get_actor_location()
+    check('sin el expediente te bajas antes de que salga', not d.get_editor_property('riding') and 'TE BAJAS DEL CAMION' in msg and not jugador().get_editor_property('hidden')
+          and dist2d(l, V(8270 - 295, 5700, 0)) < 80, '%s / a %d cm' % (msg[:22], dist2d(l, V(8270 - 295, 5700, 0))))
+    check('no han registrado la caja ni te han cogido', d.get_editor_property('truck_searches') == s0 and d.get_editor_property('captures') == c0 and not d.get_editor_property('done'))
+    aparte()
+    yield ('hasta', lambda: estado_c() == 5 and cx() > 8400, 8.0)
+    tp(cx() - 265, 5700, 0); yield 0.05
+    check('y ya en marcha hacia fuera no te deja subir', estado_c() == 5 and not d.can_board_truck(), estado_c())
+    aparte()
+    yield ('hasta', lambda: estado_c() == 0, 30.0)
+    # --- base en guardia: después de los papeles, Sanz rodea el camión, mira la caja y te saca
+    d.set_editor_property('tension_t', 120.0)
+    d.truck_skip_wait()
+    yield from dentro()
+    check('subes con la base en guardia', d.get_editor_property('riding') and d.base_state() >= 1, d.base_state())
+    yield ('hasta', lambda: estado_c() == 4, 45.0)
+    yield ('hasta', lambda: director().get_editor_property('truck_check') >= 3 or director().get_editor_property('capturing'), 30.0)
+    check('con la base en guardia, registro de la caja', d.get_editor_property('truck_searches') == s0 + 1 and 'sanz_registro' in list(d.get_editor_property('voice_log')),
+          '%d, %s' % (d.get_editor_property('truck_searches'), list(d.get_editor_property('voice_log'))[-2:]))
+    yield ('hasta', lambda: director().get_editor_property('capturing'), 16.0)
+    check('levanta la lona y te coge', d.get_editor_property('capturing') and not d.get_editor_property('riding') and not jugador().get_editor_property('hidden'),
+          '%s, %s' % (d.get_editor_property('capturing'), d.get_editor_property('riding')))
+    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 5.0)
+    check('el aviso dice de dónde te sacan', d.get_editor_property('captures') == c0 + 1 and 'LEVANTA LA LONA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
+    yield ('hasta', lambda: not director().get_editor_property('capturing'), 5.0)
+    aparte()
+    d.set_editor_property('tension_t', 0.0)
+    yield ('hasta', lambda: estado_c() == 0, 40.0)
+    # --- con el expediente: el camión te saca de la base
+    d.set_flag('expediente')
+    check('expediente en la chaqueta', d.get_editor_property('file'))
+    d.truck_skip_wait()
+    yield from dentro()
+    check('subes con el expediente', d.get_editor_property('riding') and d.base_state() == 0, d.base_state())
+    yield ('hasta', lambda: estado_c() == 4, 45.0)
+    yield ('hasta', lambda: director().get_editor_property('done'), 45.0)
+    msg = str(d.get_editor_property('message'))
+    check('final en la caja del camión', d.get_editor_property('done') and d.get_editor_property('left_by_truck') and 'MISION CUMPLIDA' in msg and 'camion' in msg, msg[:60].replace('\n', ' / '))
+    check('sigues dentro mientras se aleja', d.get_editor_property('riding') and jugador().get_editor_property('hidden') and estado_c() == 5, '%s, estado %s' % (d.get_editor_property('riding'), estado_c()))
+    yield ('hasta', lambda: director().get_editor_property('report'), 25.0)
+    rl = list(d.get_editor_property('report_lines'))
+    check('el parte cuenta que saliste en el camión', any('camion de suministros' in x for x in rl) and any('registran todos los camiones' in x for x in rl), ' | '.join(rl[3:5]))
 
 
 def capas_musica():
@@ -1037,7 +1192,7 @@ def prueba_opciones():
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
-            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro], [prueba_anillo, prueba_camion]]
+            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste], [prueba_anillo, prueba_camion, prueba_viaje]]
 PRUEBAS = []
 
 
@@ -1072,9 +1227,9 @@ def _limpieza(siguiente):
     # si la prueba anterior acabó con una captura, su escena (unos 2 s sin control y con la E ignorada) termina antes
     if d and d.get_editor_property('capturing'):
         yield ('hasta', lambda: not director().get_editor_property('capturing'), 5.0)
-    # el camión (tanda 21) solo en su prueba: en las demás cruzaría la base a mitad de una medida de luz o de una captura
+    # el camión (tanda 21) solo en sus pruebas: en las demás cruzaría la base a mitad de una medida de luz o de una captura
     if d:
-        d.set_editor_property('truck', siguiente is prueba_camion)
+        d.set_editor_property('truck', siguiente in (prueba_camion, prueba_viaje))
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 

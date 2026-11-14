@@ -74,6 +74,8 @@ PAL.setdefault('hormigon', PAL.get('muro', {}))
 # materiales del anillo exterior, que el visor no tiene: losa de hormigón del camino y tierra con grava
 PAL.setdefault('camino', {'color': [lin(c) for c in (0x6e, 0x6d, 0x69)], 'roughness': 0.7})
 PAL.setdefault('tierra', {'color': [lin(c) for c in (0x5a, 0x52, 0x46)], 'roughness': 0.9})
+# tanda 22: alquitrán de las juntas y grietas selladas del camino (negro y algo brillante: de noche devuelve el reflejo de las farolas)
+PAL.setdefault('alquitran', {'color': [lin(c) for c in (0x17, 0x17, 0x18)], 'roughness': 0.34})
 
 for mat in bpy.data.materials:
     key = mat.name.split('.')[0][3:] if mat.name.startswith('lh_') else None
@@ -329,6 +331,93 @@ for i, k in enumerate(KONT):
 for c, L in enumerate(kont):
     if L:
         malla('contenedor_%d' % c, L, None, mat_rgb('lh_contenedor_%d' % c, KC[c], 0.62, 0.35))
+
+# 4d) tanda 22: hierbajos al pie de las vallas y del muro, en los bordes del camino y en alguna junta de la losa. Una sola malla
+#     («hierbajos») de planos cruzados con sus propias UV sobre la textura de cuatro matas (tools/texturas/hierbajo.py); cada plano
+#     va por las dos caras y con la normal hacia arriba, para que la luz le dé como al suelo que pisa. En Unreal lleva el material
+#     recortado M_Hierbajo, sin colisión, sin sombra y sin contar para la navegación (tools/unreal/montar_base.py).
+import random
+def hierbajos():
+    rs = random.Random(2207); V, F, UV = [], [], []
+    TAM = (0.78, 0.6, 0.92, 0.56)     # lado del plano de cada mata (m): hierba seca alta, mata verde, cardo, roseta
+    def mata(px, py, z=0.0, k=1.0, var=None):
+        v = var if var is not None else rs.choices((0, 1, 2, 3), (35, 35, 12, 18))[0]
+        s = TAM[v] * k * rs.uniform(0.72, 1.25); w, h = s * rs.uniform(0.9, 1.15), s * rs.uniform(0.9, 1.1)
+        a0 = rs.uniform(0, PI); c, r = v % 2, v // 2; pad = 0.004
+        u0, u1 = c * 0.5 + pad, (c + 1) * 0.5 - pad
+        vb, vt = 1 - (r + 1) * 0.5 + pad, 1 - r * 0.5 - pad
+        lx, ly = rs.uniform(-0.07, 0.07) * h, rs.uniform(-0.07, 0.07) * h     # ninguna sale a plomo
+        for a in (a0, a0 + PI / 2 + rs.uniform(-0.25, 0.25)):
+            dx, dy = math.cos(a) * w / 2, math.sin(a) * w / 2
+            if rs.random() < 0.5: u0, u1 = u1, u0
+            q = [(px - dx, py - dy, z - 0.025), (px + dx, py + dy, z - 0.025), (px + dx + lx, py + dy + ly, z + h - 0.025), (px - dx + lx, py - dy + ly, z + h - 0.025)]
+            uv = [(u0, vb), (u1, vb), (u1, vt), (u0, vt)]
+            for orden in ((0, 1, 2, 3), (3, 2, 1, 0)):
+                n = len(V); V.extend((q[i][0], -q[i][1], q[i][2]) for i in orden); UV.extend(uv[i] for i in orden); F.append((n, n + 1, n + 2, n + 3))
+    def linea(xa, ya, xb, yb, nx, ny, dens, z=0.0, k=1.0, saltos=()):
+        """Matas al pie de una línea (muro, bordillo). (nx, ny): hacia dónde se separan de ella; saltos: tramos, en metros desde
+        el principio, que se dejan limpios. Salen a rodales, no repartidas por igual."""
+        L = math.hypot(xb - xa, yb - ya); f = rs.uniform(0, 6.28); s = rs.uniform(0, 0.5)
+        while s < L:
+            rodal = 0.5 + 0.5 * math.sin(s * 0.41 + f) * math.sin(s * 0.13 + f * 2.7)
+            if rs.random() < dens * (0.15 + 1.7 * rodal) and not any(a <= s <= b for a, b in saltos):
+                d = rs.uniform(0.04, 0.2); t = s / L; mata(xa + (xb - xa) * t + nx * d, ya + (yb - ya) * t + ny * d, z, k)
+            s += rs.uniform(0.3, 0.7)
+    def corro(px, py, r0, r1, n, k=1.0, z=0.0):
+        for _ in range(n):
+            a = rs.uniform(0, 2 * PI); r = rs.uniform(r0, r1); mata(px + math.cos(a) * r, py + math.sin(a) * r, z, k)
+    # 1) las vallas: las del anillo, tupidas (nadie las desbroza); las de dentro, alguna mata suelta. Los huecos de pasar agachado, limpios
+    for qx, qz, rot in arms:
+        fuera = qx < 0 or qx > COLS * TT or qz < 0 or qz > ROWS * TT
+        for _ in range(2 if fuera else 1):
+            if rs.random() < (0.62 if fuera else 0.3):
+                u = rs.uniform(-0.48, 0.48); d = rs.choice((-1, 1)) * rs.uniform(0.04, 0.16)
+                mata(qx + (u if rot == 0 else d), qz + (d if rot == 0 else u), 0.0, 1.0 if fuera else 0.8)
+    if JEXT:
+        X0, X1, Y0, Y1 = JEXT['x0'], JEXT['x1'], JEXT['y0'], JEXT['y1']; cam = JEXT['camino']
+        ya, yb = cam['y'] - cam['ancho'] / 2, cam['y'] + cam['ancho'] / 2; zl = cam['alto']
+        xi0, xi1, yi0, yi1 = X0 + 1.45, X1 - 1.45, Y0 + 1.45, Y1 - 1.45          # caras de dentro del muro
+        # 2) pie del muro por dentro. Sin matas en los portones ni en el carril de las hojas correderas (al sur de cada portón), ni en el portillo
+        px = JEXT['portillo'][0]; carril = (ya - 1.0 - yi0, yb + 7.6 - yi0)
+        linea(xi0, yi0, xi1, yi0, 0, 1, 0.22)
+        linea(xi0, yi1, xi1, yi1, 0, -1, 0.24, saltos=((px - 1.0 - xi0, px + 1.0 - xi0),))
+        linea(xi0, yi0, xi0, yi1, 1, 0, 0.22, saltos=(carril,))
+        linea(xi1, yi0, xi1, yi1, -1, 0, 0.22, saltos=(carril,))
+        # 3) bordes del camino por fuera del bordillo: dentro de la base y los primeros 45 m del terraplén (más crecidos: ahí no pisa nadie)
+        for yy, s in ((ya - 0.22, -1), (yb + 0.22, 1)):
+            linea(X0 + 2.2, yy, X1 - 2.2, yy, 0, s, 0.2)
+            linea(X0 - 45.0, yy, X0 - 0.7, yy, 0, s, 0.42, z=-0.02, k=1.15)
+            linea(X1 + 0.7, yy, X1 + 45.0, yy, 0, s, 0.42, z=-0.02, k=1.15)
+        for k in range(8):       # y al pie de los hitos del terraplén
+            for q in (-5.6, 5.6):
+                for xh in (X0 - 3 - k * 6, X1 + 3 + k * 6):
+                    if rs.random() < 0.6: corro(xh, cam['y'] + q, 0.14, 0.3, rs.randint(1, 3), 1.1, -0.02)
+        # 4) al pie de las farolas, de los báculos de los portones y de las garitas (por los lados que no dan al camino)
+        for fx, fy, _ in JEXT.get('farolas', []): corro(fx, yb + 0.5, 0.24, 0.42, rs.randint(2, 4))
+        for key in ('entrada', 'salida'):
+            g = JEXT[key]; corro(g['baculo'][0], g['baculo'][1] - 0.1, 0.24, 0.4, 2, 0.8)
+            gx, gy = g['garita']
+            linea(gx - 1.35, gy - 1.38, gx + 1.35, gy - 1.38, 0, -1, 0.5)
+            lado = -1 if key == 'entrada' else 1       # el lado contrario a la puerta
+            linea(gx + lado * 1.38, gy - 1.3, gx + lado * 1.38, gy + 1.0, lado, 0, 0.45)
+        # 5) en la losa: una mata pequeña donde alguna junta llega al bordillo y en la punta de alguna grieta
+        for xj in JEXT['desgaste']['juntas']:
+            for yy, s in ((ya, 1), (yb, -1)):
+                if rs.random() < 0.5: mata(xj + rs.uniform(-0.05, 0.05), yy + s * rs.uniform(0.05, 0.16), zl, rs.uniform(0.38, 0.55), rs.choice((1, 1, 3, 0)))
+        for gx0, gy0, gx1, gy1 in JEXT['desgaste']['grietas']:
+            if X0 + 2 < gx1 < X1 - 2 and rs.random() < 0.5 and abs(gy1 - cam['y']) > 1.3:
+                mata(gx1, gy1, zl, rs.uniform(0.32, 0.46), rs.choice((1, 3)))
+    me = bpy.data.meshes.new('hierbajos'); me.from_pydata(V, [], F)
+    uvl = me.uv_layers.new(name='UVMap')
+    for poly in me.polygons:
+        for li, vi in zip(poly.loop_indices, poly.vertices): uvl.data[li].uv = UV[vi]
+    me.normals_split_custom_set([(0.0, 0.0, 1.0)] * len(me.loops))
+    me.materials.append(mat_rgb('lh_hierbajo', (84, 98, 52), 0.85, 0.0))
+    bpy.context.scene.collection.objects.link(bpy.data.objects.new('hierbajos', me))
+    return len(F) // 4
+N_MATAS = hierbajos()
+if JEXT: JEXT['hierbajos'] = N_MATAS
+print('HIERBAJOS', N_MATAS, 'matas')
 
 glb = os.path.join(OUT, 'base.glb')
 kw = dict(filepath=glb, export_format='GLB', export_yup=True, export_cameras=False, export_lights=False,

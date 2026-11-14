@@ -127,6 +127,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Hold(float Seconds);
 
+	/** Recado del director (tanda 22: mirar los papeles del camión en el control): deja la ronda, va a Where, se queda allí
+	 *  mirando hacia Face y, a los Seconds segundos como mucho (o con EndErrand), vuelve a su ronda. Solo lo acepta si está
+	 *  de ronda o volviendo a ella; en cuanto ve u oye algo, el recado se acaba (manda la sospecha, como siempre). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	bool Errand(const FVector& Where, const FVector& Face, float Seconds);
+
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void EndErrand();
+
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	bool IsOnErrand() const { return bErrand; }
+
+	/** Ya ha llegado al sitio del recado. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	bool AtErrand() const { return bErrand && bErrandThere; }
+
 	/** Marcado con los prismáticos: el HUD muestra su nombre y estado aunque esté detrás de una pared. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Estado")
 	bool bMarked = false;
@@ -305,6 +321,11 @@ private:
 	float LastRepairNoise = -100.0f;
 	FVector RepairLook = FVector::ZeroVector;
 	float HoldT = 0.0f;
+	bool bErrand = false;
+	bool bErrandThere = false;
+	FVector ErrandLoc = FVector::ZeroVector;
+	FVector ErrandFace = FVector::ZeroVector;
+	float ErrandT = 0.0f;
 	void WakeUp();
 	void LookForBodies();
 

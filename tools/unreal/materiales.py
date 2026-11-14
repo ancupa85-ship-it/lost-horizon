@@ -7,6 +7,9 @@ Se ejecuta dentro del editor después de montar_base.py (montar_base lo llama al
    color = textura x tinte, relieve (normal), rugosidad, metal; tamaño de la textura en cm como parámetro.
 3. Crea una instancia MI_<clave> por cada material del visor que tiene textura (muro, pared, suelo, madera...)
    con el tinte, la rugosidad y el metal de escenario/visor.js, y la pone en las mallas en lugar de lh_<clave>.
+4. Tanda 22: un segundo maestro, M_LH_Movil, para las piezas que se mueven (el camión de suministros, la hoja del portón)
+   y los camiones aparcados: usa las UV de la malla (con el maestro alineado al mundo la textura se quedaba quieta y la
+   pieza pasaba por debajo) y añade barro en la parte baja. Instancias MI_<clave>_camion y MI_<clave>_hoja.
 """
 import os, json
 import unreal
@@ -259,7 +262,204 @@ def maestro(defecto):
     eal.save_loaded_asset(m)
     return m
 
+# ------------------------------------------------------------------ 2b. maestro de las piezas que se mueven (tanda 22)
+# prefijo de la malla -> juego de instancias
+PREFIJOS_MOVIL = {'camionmovil': 'camion', 'camiones': 'camion', 'hojaentrada': 'hoja'}
+# juego -> clave del material -> (textura, metros por repetición, tinte sRGB, escala de rugosidad, metal, barro 0-1, altura del barro en cm)
+MOVIL = {
+    'camion': {
+        'oliva': ('green_metal_rust', 2.2, 0x6f8a4c, 1.0, 0.1, 0.85, 120.0),       # cabina, laterales y portalón: chapa verde con óxido
+        'lona': ('rough_linen', 0.9, 0x6a6844, 1.0, 0.0, 0.0, 110.0),              # el toldo queda por encima de las salpicaduras
+        'bajos': ('rusty_metal_02', 1.4, 0x4a4338, 1.1, 0.3, 1.0, 130.0),          # chasis y bajos: óxido oscuro y barro
+        'goma': ('concrete_floor_worn_001', 1.0, 0x1c1c1e, 1.3, 0.0, 1.0, 110.0),  # neumáticos: negro con el polvo del camino
+        'metal': ('rusty_metal_02', 1.4, 0x8d949a, 0.9, 0.6, 0.8, 120.0),          # parachoques y llantas
+        'madera': ('wood_planks_dirt', 1.6, 0xb09a80, 1.0, 0.0, 0.0, 110.0),       # suelo de la caja y cajones
+    },
+    'hoja': {
+        'oliva': ('green_metal_rust', 2.2, 0x6f8a4c, 1.0, 0.1, 0.7, 45.0),
+        'hierro': ('rusty_metal_02', 1.4, 0x999999, 1.0, 0.55, 0.7, 45.0),
+    },
+}
+
+def maestro_movil(defecto):
+    """M_LH_Movil: como M_LH pero con las UV de la malla (las mallas de la base llevan UV en metros, por proyección en caja:
+    tools/blender/escena_base.py, box_uv), de modo que la textura viaja con la pieza. Barro: una franja desde el suelo hasta
+    BarroAltura cm (por altura en el mundo: estas piezas solo se mueven en horizontal), rota por un ruido que sale de las UV
+    para que tampoco resbale; tiñe el color, quita el metal y deja la superficie mate."""
+    ruta = DM + '/M_LH_Movil'
+    if eal.does_asset_exist(ruta):
+        m = eal.load_asset(ruta)
+        mel.delete_all_material_expressions(m)
+        for e in list(mel.get_material_expressions(m)):
+            mel.delete_material_expression(m, e)
+    else:
+        m = tools.create_asset('M_LH_Movil', DM, unreal.Material, unreal.MaterialFactoryNew())
+    E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
+    def esc(nombre, valor, x, y):
+        p = E(unreal.MaterialExpressionScalarParameter, x, y)
+        p.set_editor_property('parameter_name', nombre); p.set_editor_property('default_value', valor)
+        return p
+    SAMPLER = {'diff': unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, 'nor': unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
+               'rough': unreal.MaterialSamplerType.SAMPLERTYPE_MASKS}
+    uv0 = E(unreal.MaterialExpressionTextureCoordinate, -1500, 0)
+    rep = esc('Repite', 0.5, -1500, 150)          # repeticiones por metro (1 / tamaño de la textura en metros)
+    uv = E(unreal.MaterialExpressionMultiply, -1300, 50)
+    mel.connect_material_expressions(uv0, '', uv, 'A')
+    mel.connect_material_expressions(rep, '', uv, 'B')
+    def muestra(nombre, y, tipo):
+        p = E(unreal.MaterialExpressionTextureSampleParameter2D, -1050, y)
+        p.set_editor_property('parameter_name', nombre)
+        p.set_editor_property('texture', defecto[tipo])
+        p.set_editor_property('sampler_type', SAMPLER[tipo])
+        if not mel.connect_material_expressions(uv, '', p, 'UVs'):
+            mel.connect_material_expressions(uv, '', p, 'Coordinates')
+        return p
+    col = muestra('Color', -300, 'diff')
+    tint = E(unreal.MaterialExpressionVectorParameter, -1050, -520)
+    tint.set_editor_property('parameter_name', 'Tinte'); tint.set_editor_property('default_value', unreal.LinearColor(1, 1, 1, 1))
+    mul = E(unreal.MaterialExpressionMultiply, -750, -350)
+    mel.connect_material_expressions(col, 'RGB', mul, 'A')
+    mel.connect_material_expressions(tint, '', mul, 'B')
+    # barro: franja = saturar((BarroAltura - z) / BarroAltura)², x (0,2 + 1,3 x ruido) x Barro x 2
+    alt = esc('BarroAltura', 110.0, -1500, -900)
+    barro = esc('Barro', 0.0, -1500, -760)
+    wp = E(unreal.MaterialExpressionWorldPosition, -1500, -1050)
+    zm = E(unreal.MaterialExpressionComponentMask, -1320, -1050)
+    for k in 'rgba':
+        zm.set_editor_property(k, k == 'b')
+    uno(wp, zm)
+    res = E(unreal.MaterialExpressionSubtract, -1150, -1000)
+    mel.connect_material_expressions(alt, '', res, 'A')
+    mel.connect_material_expressions(zm, '', res, 'B')
+    div = E(unreal.MaterialExpressionDivide, -1000, -1000)
+    mel.connect_material_expressions(res, '', div, 'A')
+    mel.connect_material_expressions(alt, '', div, 'B')
+    franja = E(unreal.MaterialExpressionSaturate, -860, -1000)
+    uno(div, franja)
+    franja2 = E(unreal.MaterialExpressionMultiply, -720, -1000)
+    mel.connect_material_expressions(franja, '', franja2, 'A')
+    mel.connect_material_expressions(franja, '', franja2, 'B')
+    ruido = E(unreal.MaterialExpressionNoise, -1000, -800)
+    ruido.set_editor_property('scale', 3.0); ruido.set_editor_property('levels', 2)      # las UV van en metros: manchas de ~35 cm
+    ruido.set_editor_property('noise_function', unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX)
+    ruido.set_editor_property('quality', 1)
+    ruido.set_editor_property('output_min', 0.0); ruido.set_editor_property('output_max', 1.0)
+    cero = E(unreal.MaterialExpressionConstant, -1320, -700)
+    cero.set_editor_property('r', 0.0)
+    p3 = E(unreal.MaterialExpressionAppendVector, -1150, -780)
+    mel.connect_material_expressions(uv0, '', p3, 'A')
+    mel.connect_material_expressions(cero, '', p3, 'B')
+    if not mel.connect_material_expressions(p3, '', ruido, 'Position'):
+        log('AVISO: M_LH_Movil: el ruido del barro va por la posición del mundo (resbala un poco al moverse la pieza)')
+    rk = E(unreal.MaterialExpressionMultiply, -860, -800)
+    rk.set_editor_property('const_b', 1.3)
+    mel.connect_material_expressions(ruido, '', rk, 'A')
+    rk2 = E(unreal.MaterialExpressionAdd, -720, -800)
+    rk2.set_editor_property('const_b', 0.2)
+    mel.connect_material_expressions(rk, '', rk2, 'A')
+    m1 = E(unreal.MaterialExpressionMultiply, -580, -900)
+    mel.connect_material_expressions(franja2, '', m1, 'A')
+    mel.connect_material_expressions(rk2, '', m1, 'B')
+    m2 = E(unreal.MaterialExpressionMultiply, -440, -900)
+    mel.connect_material_expressions(m1, '', m2, 'A')
+    mel.connect_material_expressions(barro, '', m2, 'B')
+    m3 = E(unreal.MaterialExpressionMultiply, -300, -900)
+    m3.set_editor_property('const_b', 2.0)
+    mel.connect_material_expressions(m2, '', m3, 'A')
+    masc = E(unreal.MaterialExpressionSaturate, -160, -900)
+    uno(m3, masc)
+    btin = E(unreal.MaterialExpressionVectorParameter, -750, -560)
+    btin.set_editor_property('parameter_name', 'BarroTinte'); btin.set_editor_property('default_value', unreal.LinearColor(0.105, 0.085, 0.06, 1))
+    cfin = E(unreal.MaterialExpressionLinearInterpolate, -450, -400)
+    mel.connect_material_expressions(mul, '', cfin, 'A')
+    mel.connect_material_expressions(btin, '', cfin, 'B')
+    mel.connect_material_expressions(masc, '', cfin, 'Alpha')
+    mel.connect_material_property(cfin, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    nor = muestra('Normal', 0, 'nor')
+    mel.connect_material_property(nor, 'RGB', unreal.MaterialProperty.MP_NORMAL)
+    rt = muestra('Rugosidad', 300, 'rough')
+    rs = esc('RugosidadEscala', 1.0, -1050, 520)
+    rm = E(unreal.MaterialExpressionMultiply, -750, 350)
+    mel.connect_material_expressions(rt, 'R', rm, 'A')
+    mel.connect_material_expressions(rs, '', rm, 'B')
+    rl = E(unreal.MaterialExpressionLinearInterpolate, -450, 350)
+    rl.set_editor_property('const_b', 0.93)
+    mel.connect_material_expressions(rm, '', rl, 'A')
+    mel.connect_material_expressions(masc, '', rl, 'Alpha')
+    rsat = E(unreal.MaterialExpressionSaturate, -300, 350)
+    uno(rl, rsat)
+    mel.connect_material_property(rsat, '', unreal.MaterialProperty.MP_ROUGHNESS)
+    met = esc('Metal', 0.0, -750, 620)
+    seco = E(unreal.MaterialExpressionOneMinus, -600, 700)
+    uno(masc, seco)
+    mm = E(unreal.MaterialExpressionMultiply, -450, 620)
+    mel.connect_material_expressions(met, '', mm, 'A')
+    mel.connect_material_expressions(seco, '', mm, 'B')
+    mel.connect_material_property(mm, '', unreal.MaterialProperty.MP_METALLIC)
+    mel.recompile_material(m)
+    eal.save_loaded_asset(m)
+    return m
+
+def instancias_movil(tex, defecto):
+    """{juego: {clave: instancia}} de MOVIL. tex: {textura: {'diff', 'nor', 'rough'}} ya importadas."""
+    base = maestro_movil(defecto)
+    out = {}
+    for juego, claves in MOVIL.items():
+        for clave, (nombre, rep, hexc, rough, metal, barro, alto) in claves.items():
+            if nombre not in tex:
+                tex[nombre] = {t: textura(nombre, t) for t in ('diff', 'nor', 'rough')}
+            c, n, r = tex[nombre]['diff'], tex[nombre]['nor'], tex[nombre]['rough']
+            if c is None:
+                continue
+            nom = 'MI_%s_%s' % (clave, juego)
+            ruta = DM + '/' + nom
+            mi = eal.load_asset(ruta) if eal.does_asset_exist(ruta) else tools.create_asset(
+                nom, DM, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+            mel.set_material_instance_parent(mi, base)
+            mel.set_material_instance_texture_parameter_value(mi, 'Color', c)
+            if n:
+                mel.set_material_instance_texture_parameter_value(mi, 'Normal', n)
+            if r:
+                mel.set_material_instance_texture_parameter_value(mi, 'Rugosidad', r)
+            mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', rough if r else 0.7)
+            mel.set_material_instance_scalar_parameter_value(mi, 'Metal', metal)
+            mel.set_material_instance_scalar_parameter_value(mi, 'Repite', 1.0 / rep)
+            mel.set_material_instance_scalar_parameter_value(mi, 'Barro', barro)
+            mel.set_material_instance_scalar_parameter_value(mi, 'BarroAltura', alto)
+            mel.set_material_instance_vector_parameter_value(mi, 'Tinte', unreal.LinearColor(*[lin((hexc >> s) & 255) for s in (16, 8, 0)], 1))
+            eal.save_loaded_asset(mi)
+            out.setdefault(juego, {})[clave] = mi
+    return out
+
+def aplicar_movil(meshes, mov):
+    """Cada malla de PREFIJOS_MOVIL lleva un solo material y su clave va en el nombre (camionmovil_oliva): se le pone la
+    instancia de su juego. Las claves sin instancia (cristal, faro, piloto, oscuro) se quedan con su color liso."""
+    n = 0
+    for m in meshes:
+        nombre = m.get_name()
+        juego = next((j for pre, j in PREFIJOS_MOVIL.items() if nombre.startswith(pre + '_')), None)
+        if not juego:
+            continue
+        clave = nombre.split('_', 1)[1]
+        mi = next((v for k, v in mov.get(juego, {}).items() if clave == k or clave.startswith(k + '_') or clave.startswith(k + '.')), None)
+        if not mi:
+            continue
+        mats = m.get_editor_property('static_materials')
+        cambia = False
+        for idx in range(len(mats)):
+            sm = mats[idx]
+            if sm.get_editor_property('material_interface') != mi:
+                sm.set_editor_property('material_interface', mi); mats[idx] = sm; cambia = True
+        if cambia:
+            m.set_editor_property('static_materials', mats)
+            eal.save_loaded_asset(m)
+        n += 1
+    log('materiales de piezas móviles en', n, 'mallas')
+    return n
+
 # ------------------------------------------------------------------ 3. instancias y asignación
+_PARA_MOVIL = []   # (texturas, valores por defecto) que deja instancias() para el maestro de las piezas móviles
+
 def instancias():
     # primero las texturas: el maestro usa unas de ellas como valor por defecto de sus parámetros
     tex = {}
@@ -272,6 +472,7 @@ def instancias():
     if None in defecto.values():
         return {}
     base = maestro(defecto)
+    _PARA_MOVIL[:] = [tex, defecto]
     out = {}
     for clave, (nombre, rep) in TEXTURAS.items():
         c, n, r = tex[nombre]['diff'], tex[nombre]['nor'], tex[nombre]['rough']
@@ -331,6 +532,11 @@ def aplicar(meshes):
             m.set_editor_property('static_materials', mats)
             eal.save_loaded_asset(m)
     log('materiales realistas en', n, 'huecos de material,', len(mis), 'instancias')
+    try:      # después: si algo falla aquí, el camión se queda con los materiales de siempre
+        if _PARA_MOVIL:
+            aplicar_movil(meshes, instancias_movil(*_PARA_MOVIL))
+    except Exception as e:
+        log('AVISO: materiales de las piezas móviles no aplicados:', repr(e))
     return n
 
 if __name__ == '__main__':

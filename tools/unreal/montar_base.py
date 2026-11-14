@@ -8,7 +8,8 @@ Qué hace (se puede repetir: rehace el nivel cada vez):
 1. Importa base.glb en /Game/Tarsis/Base/v<huella> (mallas y materiales); al final borra las versiones anteriores.
 2. Crea el nivel /Game/Tarsis/Mapas/Tarsis y coloca todas las mallas en el origen (vienen con la posición aplicada).
    Las torres de vigilancia (torre1_*, torre2_*) van a la carpeta «Torres»; vallas y contenedores, a «Recintos»
-   (la tela de las vallas con un material recortado de malla metálica, M_TelaMalla).
+   (la tela de las vallas con un material recortado de malla metálica, M_TelaMalla; los hierbajos, con M_Hierbajo,
+   sin colisión ni sombra).
    El camión que circula (camionmovil_*) y la hoja del portón de entrada (hojaentrada_*) quedan móviles y con etiqueta.
 3. Deduce cómo quedaron los ejes con las marcas lh_marca_* y coloca con esa conversión las luces del visor,
    la luna, el cielo nocturno, la niebla y la salida de Cuttlas.
@@ -65,7 +66,7 @@ for m in meshes:
     bs = m.get_editor_property('body_setup')
     if bs:
         bs.set_editor_property('collision_trace_flag', unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
-    if m.get_name().startswith('valla_tela'):   # Nanite no admite materiales translúcidos (M_Tela)
+    if m.get_name().startswith(('valla_tela', 'hierbajos')):   # ni translúcidos (M_Tela) ni recortados que se mueven con el viento
         ns = m.get_editor_property('nanite_settings')
         if ns.get_editor_property('enabled'):
             ns.set_editor_property('enabled', False)
@@ -206,6 +207,130 @@ def tela_mat(actor):
         c.set_material(0, _TELA[0])
         c.set_editor_property('cast_shadow', False)   # miles de rombos dando sombra no compensan en una GTX 1050
 
+HIERBA_PNG = os.path.join(ROOT, 'assets', 'unreal', 'texturas_propias', 'hierbajo.png')
+
+def hierbajo_material():
+    """Tanda 22: material de los hierbajos (malla «hierbajos» de exportar_base.py). Recortado, con las UV de la malla sobre la
+    textura de cuatro matas (tools/texturas/hierbajo.py), mate y sin brillo. Las matas se mecen un poco: la punta se mueve
+    unos 2 cm con una onda lenta que recorre la base (la raíz no se mueve: el peso sale de la UV). Se rehace si cambia el PNG."""
+    mel = unreal.MaterialEditingLibrary
+    tools = unreal.AssetToolsHelpers.get_asset_tools()
+    dm = '/Game/Tarsis/Materiales'
+    huella = hashlib.md5(open(HIERBA_PNG, 'rb').read()).hexdigest()[:8]
+    ruta = '%s/M_Hierbajo_%s' % (dm, huella)
+    if eal.does_asset_exist(ruta):
+        return eal.load_asset(ruta)
+    t = unreal.AssetImportTask()
+    t.set_editor_property('filename', HIERBA_PNG)
+    t.set_editor_property('destination_path', dm)
+    t.set_editor_property('destination_name', 'T_Hierbajo_' + huella)
+    t.set_editor_property('automated', True)
+    t.set_editor_property('replace_existing', True)
+    t.set_editor_property('save', False)
+    tools.import_asset_tasks([t])
+    tx = eal.load_asset('%s/T_Hierbajo_%s' % (dm, huella))
+    if tx is None:
+        raise RuntimeError('no se importó ' + HIERBA_PNG)
+    # las briznas son finas: al reducirse la textura con la distancia se conserva lo que cubren, o las matas se deshacen
+    for prop, val in (('do_scale_mips_for_alpha_coverage', True), ('alpha_coverage_thresholds', unreal.Vector4(0.0, 0.0, 0.0, 0.35))):
+        try:
+            tx.set_editor_property(prop, val)
+        except Exception as e:
+            log('AVISO: textura de hierbajos sin', prop, repr(e))
+    eal.save_loaded_asset(tx)
+    m = tools.create_asset('M_Hierbajo_' + huella, dm, unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MASKED)
+    m.set_editor_property('two_sided', False)     # cada plano ya viene por las dos caras, con la normal hacia arriba
+    m.set_editor_property('opacity_mask_clip_value', 0.35)
+    E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
+    ts = E(unreal.MaterialExpressionTextureSample, -400, 0)
+    ts.set_editor_property('texture', tx)
+    mel.connect_material_property(ts, 'RGB', unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(ts, 'A', unreal.MaterialProperty.MP_OPACITY_MASK)
+    for prop, val, y in ((unreal.MaterialProperty.MP_ROUGHNESS, 0.9, 250), (unreal.MaterialProperty.MP_SPECULAR, 0.15, 350)):
+        c = E(unreal.MaterialExpressionConstant, -400, y)
+        c.set_editor_property('r', val)
+        mel.connect_material_property(c, '', prop)
+    # viento: desplazamiento = dirección x 2,2 cm x peso² x seno(tiempo x 0,3 + posición / 5 m). Si algún nodo no conecta
+    # (cambian de nombre entre versiones), las matas se quedan quietas: no se enchufa nada a medias
+    try:
+        bien = []
+        def une(a, sal, b, ent):
+            ok = mel.connect_material_expressions(a, sal, b, ent)
+            bien.append(bool(ok))
+            return ok
+        def une1(a, b):
+            if not mel.connect_material_expressions(a, '', b, 'Input'):
+                bien.append(bool(mel.connect_material_expressions(a, '', b, '')))
+        def canal(src, k, x, y):
+            c = E(unreal.MaterialExpressionComponentMask, x, y)
+            for q in 'rgba':
+                c.set_editor_property(q, q == k)
+            une1(src, c)
+            return c
+        uv = E(unreal.MaterialExpressionTextureCoordinate, -1500, 600)
+        v2 = E(unreal.MaterialExpressionMultiply, -1150, 600)
+        v2.set_editor_property('const_b', 2.0)
+        une(canal(uv, 'g', -1320, 600), '', v2, 'A')
+        fr = E(unreal.MaterialExpressionFrac, -1000, 600)
+        une1(v2, fr)
+        peso = E(unreal.MaterialExpressionOneMinus, -860, 600)     # 0 en la raíz (abajo de cada casilla), 1 en la punta
+        une1(fr, peso)
+        peso2 = E(unreal.MaterialExpressionMultiply, -720, 600)
+        une(peso, '', peso2, 'A'); une(peso, '', peso2, 'B')
+        wp = E(unreal.MaterialExpressionWorldPosition, -1500, 800)
+        suma = E(unreal.MaterialExpressionAdd, -1150, 800)
+        une(canal(wp, 'r', -1320, 760), '', suma, 'A'); une(canal(wp, 'g', -1320, 860), '', suma, 'B')
+        fase = E(unreal.MaterialExpressionMultiply, -1000, 800)
+        fase.set_editor_property('const_b', 1.0 / 500.0)
+        une(suma, '', fase, 'A')
+        tm = E(unreal.MaterialExpressionTime, -1150, 980)
+        tk = E(unreal.MaterialExpressionMultiply, -1000, 980)
+        tk.set_editor_property('const_b', 0.3)
+        une(tm, '', tk, 'A')
+        arg = E(unreal.MaterialExpressionAdd, -860, 880)
+        une(fase, '', arg, 'A'); une(tk, '', arg, 'B')
+        seno = E(unreal.MaterialExpressionSine, -720, 880)       # periodo 1: una onda por unidad
+        une1(arg, seno)
+        amp = E(unreal.MaterialExpressionMultiply, -560, 740)
+        une(seno, '', amp, 'A'); une(peso2, '', amp, 'B')
+        dire = E(unreal.MaterialExpressionConstant3Vector, -560, 920)
+        dire.set_editor_property('constant', unreal.LinearColor(2.2, 0.8, 0.0, 0.0))
+        wpo = E(unreal.MaterialExpressionMultiply, -400, 800)
+        une(amp, '', wpo, 'A'); une(dire, '', wpo, 'B')
+        if all(bien):
+            mel.connect_material_property(wpo, '', unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+        else:
+            log('AVISO: hierbajos sin viento (no conectaron', bien.count(False), 'nodos)')
+    except Exception as e:
+        log('AVISO: hierbajos sin viento:', repr(e))
+    mel.recompile_material(m)
+    eal.save_loaded_asset(m)
+    log('material de hierbajos', ruta)
+    return m
+
+def hierbajos(actor):
+    """Las matas no estorban: ni colisión (no paran al jugador, ni las balas, ni la vista de los guardias), ni navegación, ni sombra."""
+    c = actor.get_component_by_class(unreal.StaticMeshComponent)
+    actor.set_actor_enable_collision(False)
+    if not c:
+        return
+    c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    c.set_editor_property('can_ever_affect_navigation', False)
+    c.set_editor_property('cast_shadow', False)
+    # las manchas del suelo no se pintan en las hojas; y unas briznas no cuentan para la luz indirecta ni para los campos
+    # de distancia (con Lumen dejarían borrones oscuros alrededor de cada mata)
+    for prop in ('receives_decals', 'affect_distance_field_lighting', 'affect_dynamic_indirect_lighting', 'visible_in_ray_tracing'):
+        try:
+            c.set_editor_property(prop, False)
+        except Exception as e:
+            log('AVISO: hierbajos sin', prop, repr(e))
+    try:
+        c.set_material(0, hierbajo_material())
+    except Exception as e:
+        log('AVISO: material de hierbajos no creado (se quedan con el color liso):', repr(e))
+        actor.set_actor_hidden_in_game(True)     # sin el recorte serían rectángulos verdes: mejor no verlos
+
 marks = {}
 # tanda 21: piezas que el director mueve en el juego (las busca por su etiqueta de actor, «tag»). Todas tienen el origen
 # en el origen del mundo: la hoja del portón de entrada se corre hacia el sur y el camión (modelado en el origen, con el
@@ -226,8 +351,15 @@ for m in meshes:
             a.tags = [unreal.Name(tag)]
             a.set_folder_path(carpeta)
             moviles.setdefault(clave, []).append(a)
+            try:
+                c.set_editor_property('receives_decals', False)   # las manchas del camino no se pintan en los bajos del camión
+            except Exception as e:
+                log('AVISO:', name, 'sin receives_decals:', repr(e))
     if name.startswith('valla_tela'):
         tela_mat(a)
+    if name.startswith('hierbajos'):
+        a.set_folder_path('Recintos')
+        hierbajos(a)
     for k in ('lh_marca_o', 'lh_marca_x', 'lh_marca_y', 'lh_marca_z'):
         if name.startswith(k):
             o, _ = a.get_actor_bounds(False)

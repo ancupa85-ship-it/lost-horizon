@@ -108,6 +108,7 @@ void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
 void ATarsisDirector::Captured(APawn* Player)
 {
 	if (!Player) return;
+	if (bRiding) LeaveTruck(true);
 	ExitHide();
 	StopDrag();
 	bKeypad = false;
@@ -187,7 +188,7 @@ void ATarsisDirector::OpenCell()
 ATarsisGuard* ATarsisDirector::TakedownTarget() const
 {
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
-	if (!P) return nullptr;
+	if (!P || bRiding) return nullptr;   // desde la caja del camión no se llega a nadie
 	ATarsisGuard* Best = nullptr;
 	float BestD = TNumericLimits<float>::Max();
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
@@ -212,7 +213,7 @@ void ATarsisDirector::Takedown()
 void ATarsisDirector::ToggleCrouch()
 {
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	if (!C) return;
+	if (!C || bRiding) return;   // en la caja del camión ya vas encogido
 	if (C->bIsCrouched) C->UnCrouch(); else C->Crouch();
 }
 
@@ -254,6 +255,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	DetectTick();
 	HintTick();
 	HideTick();
+	RideTick();
 	CaptureTick(DeltaSeconds);
 	ChangesTick(DeltaSeconds);
 	if (FrontMsgT > 0.0f) FrontMsgT -= DeltaSeconds;
@@ -415,6 +417,7 @@ FString ATarsisDirector::InteractPrompt() const
 {
 	if (bCapturing) return FString();
 	if (bHiding) return Tx(TEXT("p_taquilla_salir"), TEXT("E   SALIR DE LA TAQUILLA"));
+	if (bRiding) return bDone ? FString() : Tx(TEXT("p_camion_bajar"), TEXT("E   BAJAR DEL CAMION"));
 	if (Dragged) return Tx(TEXT("p_soltar"), TEXT("E   SOLTAR EL CUERPO"));
 	if (bChoice) return Tx(TEXT("p_ramos_eleccion"), TEXT("1   VENTE CONMIGO        2   DERRIBARLO"));
 	if (ATarsisGuard* T = TakedownTarget())
@@ -430,6 +433,7 @@ FString ATarsisDirector::InteractPrompt() const
 		if (G->bDarted) return Tx(TEXT("p_dardo"), TEXT("E   RECUPERAR EL DARDO"));
 		return Tx(TEXT("p_arrastrar"), TEXT("E   ARRASTRAR (escondelo en la sombra)"));
 	}
+	if (CanBoardTruck()) return Tx(TEXT("p_camion_subir"), TEXT("E   SUBIR A LA CAJA DEL CAMION"));
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear())
 	{
@@ -459,6 +463,7 @@ void ATarsisDirector::Interact()
 	if (bCine) { SkipCine(); return; }
 	if (bDone || bCapturing) return;
 	if (bHiding) { ExitHide(); return; }
+	if (bRiding) { LeaveTruck(false); return; }
 	if (Dragged) { StopDrag(); Teach(TEXT("ensena_cuerpo"), TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), {}, 3.0f); return; }
 	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
 	if (ATarsisGuard* T = TakedownTarget())
@@ -516,6 +521,7 @@ void ATarsisDirector::Interact()
 		StartDrag(G);
 		return;
 	}
+	if (CanBoardTruck()) { BoardTruck(); return; }
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear()) { UsePoint(*Pt); return; }
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))
@@ -771,7 +777,7 @@ FString ATarsisDirector::SideObjective() const
 
 void ATarsisDirector::ShootDart()
 {
-	if (Darts <= 0 || DartT > 0.0f || bKeypad || bChoice || bDone || Dragged) return;
+	if (Darts <= 0 || DartT > 0.0f || bKeypad || bChoice || bDone || Dragged || bRiding) return;
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!PC || !Pl) return;
@@ -822,6 +828,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	if (bDone) return;
 	bDone = true;
 	bMarsh = bByMarsh;
+	bLeftByTruck = bRiding && !bByMarsh;   // sales en la caja del camión: sigue contigo dentro hasta el final del terraplén
 	StopDrag();
 	if (bBinoculars) ToggleBinoculars();
 	FString GateLine;
@@ -872,7 +879,8 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	}
 	else
 	{
-		FString T = Tx(TEXT("final_salida"), TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.")) + GateLine + TEXT("\n") + Stats;
+		FString T = (bLeftByTruck ? Tx(TEXT("final_salida_camion"), TEXT("MISION CUMPLIDA\nSales de Tarsis bajo la lona del camion de suministros, con el expediente LH-07 en la chaqueta."))
+			: Tx(TEXT("final_salida"), TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07."))) + GateLine + TEXT("\n") + Stats;
 		if (bRamosAlly) T += TEXT("\n") + Tx(TEXT("final_ramos"), TEXT("Ramos sale solo por la marisma y os espera en el camino de Trebujena."));
 		ShowMessage(T, 15.0f);
 	}
@@ -885,7 +893,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 void ATarsisDirector::SprintOn()
 {
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	if (!C || Dragged || bDone) return;
+	if (!C || Dragged || bDone || bRiding) return;
 	if (BaseWalk <= 0.0f) BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
 	bSprint = true;
 	C->GetCharacterMovement()->MaxWalkSpeed = BaseWalk * 1.5f;
@@ -951,7 +959,7 @@ void ATarsisDirector::HintTick()
 ATarsisGuard* ATarsisDirector::ShoveTarget() const
 {
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
-	if (!P || bHiding) return nullptr;
+	if (!P || bHiding || bRiding) return nullptr;
 	ATarsisGuard* Best = nullptr;
 	float BestD = 170.0f;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
@@ -1225,7 +1233,7 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 {
 	if (!Arms) return;
 	// con dardos y las manos libres, la pistola sube a la vista; si no, baja y se oculta
-	const bool bWant = Darts > 0 && !bCine && !bDone && !bBinoculars && !bKeypad && !Dragged && !bMenu && !bReport && !bChoice && !bHiding;
+	const bool bWant = Darts > 0 && !bCine && !bDone && !bBinoculars && !bKeypad && !Dragged && !bMenu && !bReport && !bChoice && !bHiding && !bRiding;
 	ArmsShow = FMath::FInterpConstantTo(ArmsShow, bWant ? 1.0f : 0.0f, DeltaSeconds, 3.5f);
 	const bool bVis = ArmsShow > 0.01f;
 	if (Arms->IsVisible() != bVis) Arms->SetVisibility(bVis, true);
@@ -1490,7 +1498,8 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	// no repite frase enseguida (al cambiar de estado varias veces seguidas), salvo las que importan: el empujón,
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
-		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("perdido") || Key == TEXT("despierta");
+		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("perdido") || Key == TEXT("despierta")
+		|| Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -1523,6 +1532,9 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("tengo")) T = TEXT("Te tengo!");
 	else if (Key == TEXT("perdido")) T = TEXT("Lo he perdido.");
 	else if (Key == TEXT("yacasi")) T = TEXT("Ya casi esta.");
+	else if (Key == TEXT("papeles")) T = TEXT("Para ahi. Los papeles del porte.");
+	else if (Key == TEXT("pase")) T = TEXT("Todo en orden. Tira.");
+	else if (Key == TEXT("registro")) T = TEXT("Hay orden de mirar la carga. Abre atras.");
 	else T = Key;
 	T = Tx(FName(*(TEXT("voz_") + Key)), *T);
 	const FString Name = G->bTowerSentry ? Tx(TEXT("nombre_centinela"), TEXT("CENTINELA")) : G->GuardName.ToUpper();
@@ -2067,10 +2079,18 @@ void ATarsisDirector::TruckPlace()
 		TruckAudio->SetWorldLocation(L + FVector(120.0f, 0.0f, 130.0f));
 		TruckAudio->SetPitchMultiplier(0.82f + 0.45f * FMath::Clamp(TruckV / FMath::Max(1.0f, TruckSpeedOut), 0.0f, 1.0f));
 	}
+	RidePlace();
 }
 
 void ATarsisDirector::TruckReset(float Wait)
 {
+	// si ibas dentro, te deja donde esté (acabada la misión no: sigues en la caja hasta que cargues la partida)
+	if (bRiding && !bDone) LeaveTruck(true);
+	if (TruckInspector) TruckInspector->EndErrand();
+	TruckInspector = nullptr;
+	TruckCheck = 0;
+	TruckCheckT = 0.0f;
+	bTruckCalled = false;
 	TruckState = 0;
 	TruckT = Wait;
 	TruckX = TruckStart.X;
@@ -2160,13 +2180,8 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 	case 4:
 		TruckWaitT += DeltaSeconds;
 		StopX = TruckBarrierStopX;
-		// en el control miran los papeles unos segundos y levantan la barrera
-		if (TruckWaitT > 6.0f && BarrierTarget < 1.0f)
-		{
-			BarrierTarget = 1.0f;
-			PlaySfx(TEXT("barrera"), ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f));
-		}
-		if (TruckWaitT > 6.0f && BarrierT > 0.95f) { TruckState = 5; TruckWaitT = 0.0f; }
+		// en el control alguien viene a la cabina a mirar los papeles y levanta la barrera
+		TruckControlTick(DeltaSeconds);
 		break;
 	default:
 		Want = TruckX < ExitLoc.X + 300.0f ? TruckSpeed : TruckSpeedOut;
@@ -2222,9 +2237,21 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 		TruckState = 4;
 		TruckV = 0.0f;
 		TruckWaitT = 0.0f;
+		TruckCheck = 0;
+		TruckCheckT = 0.0f;
+		bTruckCalled = false;
+		TruckInspector = nullptr;
 	}
 	else if (TruckState == 5 && TruckX >= TruckEndX)
 	{
+		if (bRiding && bDone)
+		{
+			// final en la caja del camión: se queda al fondo del terraplén, con la base a lo lejos, hasta que cargues la partida
+			TruckX = TruckEndX;
+			TruckV = 0.0f;
+			TruckPlace();
+			return;
+		}
 		++TruckPasses;
 		TruckReset(TruckInterval);
 		return;
@@ -2234,7 +2261,7 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 	if (TruckSeenT > 0.0f && TruckHornT > 0.0f) TruckSeenT = 0.0f;
 	ACharacter* PC = Cast<ACharacter>(Player);
 	bool bSeen = false;
-	if (PC && !bDone && !bCine && !bCapturing && !bHiding && !PC->IsHidden() && TruckHornT <= 0.0f)
+	if (PC && !bDone && !bCine && !bCapturing && !bHiding && !bRiding && !PC->IsHidden() && TruckHornT <= 0.0f)
 	{
 		const FVector Eye = FVector(TruckX + 235.0f, TruckStart.Y, TruckStart.Z + 165.0f);
 		const FVector To = PC->GetActorLocation() - Eye;
@@ -2250,6 +2277,254 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 	}
 	TruckSeenT = bSeen ? TruckSeenT + DeltaSeconds : FMath::Max(0.0f, TruckSeenT - DeltaSeconds * 0.5f);
 	if (bSeen && TruckSeenT > 0.8f && !bBlockedByPlayer) TruckHorn(PC->GetActorLocation(), 0);
+}
+
+// ---------------------------------------------------------------- control de salida y viaje en la caja del camión (tanda 22)
+
+FString ATarsisDirector::TruckInspectorName() const
+{
+	return TruckInspector ? TruckInspector->GuardName : FString();
+}
+
+void ATarsisDirector::TruckControlTick(float DeltaSeconds)
+{
+	// En el control nadie abre desde lejos: el guardia de ronda más cercano va hasta la puerta del conductor (lado norte),
+	// mira los papeles y levanta la barrera. Con la base en guardia, además rodea el camión y mira la caja: si vas dentro,
+	// te saca. Si no hay nadie que pueda ir (dormido, lejos, ocupado), el conductor toca el claxon (y los que lo oyen se
+	// acercan) y, si ni así, se baja y levanta la barrera él.
+	TruckCheckT += DeltaSeconds;
+	const FVector Cab(TruckX + 62.0f, TruckStart.Y - 185.0f, TruckStart.Z);
+	const FVector CabFace(TruckX + 62.0f, TruckStart.Y, TruckStart.Z);
+	const FVector Tail(TruckX - 320.0f, TruckStart.Y - 140.0f, TruckStart.Z);
+	const FVector TailFace(TruckX - 150.0f, TruckStart.Y, TruckStart.Z);
+	auto Lift = [this]()
+	{
+		if (TruckInspector) TruckInspector->EndErrand();
+		TruckCheck = 5;
+		TruckCheckT = 0.0f;
+		if (BarrierTarget < 1.0f)
+		{
+			BarrierTarget = 1.0f;
+			PlaySfx(TEXT("barrera"), ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f));
+		}
+	};
+	ATarsisGuard* G = TruckInspector;
+	// el que venía ha dejado el recado (te ha visto, ha oído algo, lo han tumbado): se espera a otro
+	if (TruckCheck >= 1 && TruckCheck <= 4 && (!G || !G->IsOnErrand()))
+	{
+		TruckInspector = nullptr;
+		G = nullptr;
+		TruckCheck = 0;
+		TruckCheckT = 0.0f;
+	}
+	switch (TruckCheck)
+	{
+	case 0:
+	{
+		ATarsisGuard* Best = nullptr;
+		float BestD = 3000.0f;
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			if (It->bTowerSentry || It->bAlly || It->HoldT > 0.0f || It->IsStunned() || It->IsRepairing() || It->IsCheckingBody()) continue;
+			if (It->State != ETarsisGuardState::Patrol && It->State != ETarsisGuardState::Return) continue;
+			const float D = FVector::Dist2D(It->GetActorLocation(), Cab);
+			if (D < BestD) { BestD = D; Best = *It; }
+		}
+		if (Best && Best->Errand(Cab, CabFace, 45.0f))
+		{
+			TruckInspector = Best;
+			TruckCheck = 1;
+			TruckCheckT = 0.0f;
+			break;
+		}
+		if (TruckWaitT > TruckHornWait && !bTruckCalled && !bDone && !bCine)
+		{
+			bTruckCalled = true;
+			TruckHorn(Cab, 3);
+			Teach(TEXT("camion_nadie_abre"), TEXT("NADIE ABRE AL CAMION\nEn el control no hay quien mire los papeles. El conductor toca el claxon: los guardias de cerca vienen a ver."), {}, 4.5f);
+		}
+		if (TruckWaitT > TruckSelfWait) Lift();
+		break;
+	}
+	case 1:
+		if (G->AtErrand())
+		{
+			TruckCheck = 2;
+			TruckCheckT = 0.0f;
+			++TruckChecks;
+			GuardSay(G, TEXT("papeles"));
+		}
+		else if (TruckCheckT > 20.0f) Lift();   // no llega (algo le corta el paso): da paso desde donde está
+		break;
+	case 2:
+		if (TruckCheckT < TruckPapersTime) break;
+		if (BaseState() >= 1 && G->Errand(Tail, TailFace, 30.0f))
+		{
+			TruckCheck = 3;
+			TruckCheckT = 0.0f;
+			++TruckSearches;
+			GuardSay(G, TEXT("registro"));
+		}
+		else
+		{
+			GuardSay(G, TEXT("pase"));
+			Lift();
+		}
+		break;
+	case 3:
+		if (G->AtErrand()) { TruckCheck = 4; TruckCheckT = 0.0f; }
+		else if (TruckCheckT > 14.0f) Lift();
+		break;
+	case 4:
+		if (TruckCheckT < 1.3f) break;
+		if (bRiding && !bCapturing && !bDone)
+		{
+			BeginCapture(G);       // te baja de la caja (LeaveTruck) y la escena de siempre
+			bCaptureTruck = true;
+		}
+		else GuardSay(G, TEXT("nadie"));
+		Lift();
+		break;
+	default:
+		if (BarrierT > 0.95f)
+		{
+			if (bRiding && !bFile && !bCapturing)
+			{
+				// sin el expediente no te vas: te bajas antes de que arranque
+				LeaveTruck(true);
+				ShowMessage(Tx(TEXT("camion_sin_expediente"), TEXT("TE BAJAS DEL CAMION\nSin el expediente no puedes irte de Tarsis. El camion arranca: apartate de la luz del control.")), 5.0f);
+			}
+			TruckState = 5;
+			TruckWaitT = 0.0f;
+		}
+		break;
+	}
+}
+
+bool ATarsisDirector::CanBoardTruck() const
+{
+	if (!bTruck || bRiding || bHiding || bCapturing || bDone || bCine || bChoice || bKeypad || Dragged) return false;
+	if (TruckParts.Num() == 0 || TruckState < 3 || TruckState > 5) return false;
+	if (TruckState == 5 && !bFile) return false;        // sin el expediente no te vas
+	if (TruckV > TruckSpeed + 30.0f) return false;      // ya va lanzado
+	// la trasera, dentro de la base: pasado el portón de entrada y antes del punto de salida
+	const float TailX = TruckX - 200.0f;
+	if (TailX < EntryGateLoc.X + 60.0f || TailX > ExitLoc.X) return false;
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P) return false;
+	const FVector R = P->GetActorLocation() - FVector(TailX, TruckStart.Y, TruckStart.Z);
+	return R.X > -200.0f && R.X < 50.0f && FMath::Abs(R.Y) < 140.0f && R.Z > -50.0f && R.Z < 260.0f;
+}
+
+void ATarsisDirector::BoardTruck()
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!C || !PC || !CanBoardTruck()) return;
+	if (bBinoculars) ToggleBinoculars();
+	SprintOff();
+	bKeypad = false;
+	// ¿te han visto subir? Como en las taquillas: un guardia en alerta que te tiene a la vista o te acaba de perder
+	bRideSeen = false;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Alert && !It->bTowerSentry && It->UnseenT < 1.5f) bRideSeen = true;
+	}
+	bRiding = true;
+	++TruckRides;
+	if (C->bIsCrouched) C->UnCrouch();
+	C->SetActorEnableCollision(false);
+	C->GetCharacterMovement()->StopMovementImmediately();
+	C->GetCharacterMovement()->DisableMovement();
+	C->SetActorHiddenInGame(true);   // los guardias no ven a un actor oculto (ATarsisGuard::Visibility)
+	PC->SetControlRotation(FRotator(-4.0f, 180.0f, 0.0f));   // sentado al fondo, mirando por la trasera abierta
+	RidePlace();
+	PlaySfx(TEXT("camion_subir"), TruckLocation() + FVector(-190.0f, 0.0f, 120.0f), 0.8f);
+	if (bRideSeen) ShowMessage(Tx(TEXT("camion_caja_vista"), TEXT("TE HAN VISTO SUBIR\nEl que te persigue sabe donde estas: si llega a la trasera, te saca. E para bajar.")), 4.0f);
+	else if (!bFile) Teach(TEXT("ensena_camion_caja"), TEXT("EN LA CAJA DEL CAMION\nBajo la lona no te ven. En el control miran los papeles del conductor; con la base en guardia registran tambien la caja.\nSin el expediente no puedes irte: bajate (E) antes de que salga."), {}, 7.0f);
+	else Teach(TEXT("ensena_camion_salir"), TEXT("EN LA CAJA DEL CAMION\nCon el expediente, el camion te saca de la base. En el control miran los papeles del conductor; con la base en guardia registran tambien la caja."), {}, 7.0f);
+}
+
+void ATarsisDirector::RidePlace()
+{
+	if (!bRiding) return;
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!C) return;
+	// los ojos, a 82 cm del suelo de la caja (que queda a 113 cm del camino) y a 75 cm del portalón, en el eje del camión.
+	// Se coloca el actor de modo que su cámara caiga ahí, esté donde esté respecto a la cápsula
+	float CamUp = 64.0f;
+	if (const UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>()) CamUp = Cam->GetComponentLocation().Z - C->GetActorLocation().Z;
+	// el traqueteo: con el camión en marcha la vista tiembla un poco
+	const float K = FMath::Clamp(TruckV / FMath::Max(1.0f, TruckSpeed), 0.0f, 1.6f);
+	const float T = GetWorld()->GetTimeSeconds();
+	const FVector Shake(0.0f, FMath::Sin(T * 9.1f) * 0.5f * K, (FMath::Sin(T * 13.7f) * 0.9f + FMath::Sin(T * 23.3f) * 0.4f) * K);
+	const FVector Eye = FVector(TruckX - 125.0f, TruckStart.Y, TruckStart.Z + 113.0f + 82.0f) + Shake;
+	C->SetActorLocation(Eye - FVector(0.0f, 0.0f, CamUp), false, nullptr, ETeleportType::TeleportPhysics);
+}
+
+bool ATarsisDirector::LeaveTruck(bool bForced)
+{
+	if (!bRiding) return false;
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!C)
+	{
+		bRiding = false;
+		return false;
+	}
+	const float Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const float Rad = C->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	// al suelo, un paso por detrás del portalón
+	FVector Spot(TruckX - 295.0f, TruckStart.Y, TruckStart.Z);
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisBajar), false);
+	Q.AddIgnoredActor(C);
+	for (AActor* A : TruckParts) { if (A) Q.AddIgnoredActor(A); }
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Spot + FVector(0.0f, 0.0f, 150.0f), Spot - FVector(0.0f, 0.0f, 200.0f), ECC_Visibility, Q)) Spot.Z = Hit.ImpactPoint.Z;
+	Spot.Z += Half + 2.0f;
+	if (!bForced && GetWorld()->OverlapBlockingTestByChannel(Spot + FVector(0.0f, 0.0f, 6.0f), FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(Rad, Half), Q))
+	{
+		ShowMessage(Tx(TEXT("camion_no_bajar"), TEXT("NO PUEDES BAJAR AQUI\nHay algo justo detras del camion.")), 2.0f);
+		return false;
+	}
+	bRiding = false;
+	bRideSeen = false;
+	C->SetActorLocation(Spot, false, nullptr, ETeleportType::TeleportPhysics);
+	C->SetActorHiddenInGame(false);
+	C->SetActorEnableCollision(true);
+	C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	if (!bDone && !bCapturing)
+	{
+		PlaySfx(TEXT("camion_subir"), Spot, 0.7f);
+		// saltar en marcha hace ruido: los que estén a menos de 10 m se vuelven a mirar
+		if (TruckV > 120.0f)
+		{
+			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+			{
+				if (FVector::Dist(It->GetActorLocation(), Spot) < 1000.0f) It->HearNoise(Spot);
+			}
+		}
+	}
+	return true;
+}
+
+void ATarsisDirector::RideTick()
+{
+	if (!bRiding || !bRideSeen || bCapturing || bDone) return;
+	// te vieron subir: el que te persigue llega a la trasera y te saca de la caja
+	bool bAny = false;
+	const FVector Tail(TruckX - 230.0f, TruckStart.Y, TruckStart.Z);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State != ETarsisGuardState::Alert || It->bTowerSentry) continue;
+		bAny = true;
+		if (FVector::Dist2D(It->GetActorLocation(), Tail) < 260.0f)
+		{
+			BeginCapture(*It);
+			bCaptureTruck = true;
+			return;
+		}
+	}
+	if (!bAny) bRideSeen = false;   // ya no te persigue nadie
 }
 
 // ---------------------------------------------------------------- farol de la garita: se rompe de un disparo
@@ -2327,6 +2602,7 @@ bool ATarsisDirector::LoadCheckpoint()
 	UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::LoadGameFromSlot(TEXT("TarsisPartida"), 0));
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!S || !P) return false;
+	if (bRiding) LeaveTruck(true);
 	ExitHide();
 	StopDrag();
 	bKeypad = false;
@@ -2808,6 +3084,7 @@ void ATarsisDirector::BuildReport()
 	L.Add(TEXT("Base de Tarsis - Del capitan Alarcon al Mando de la Zona Sur"));
 	L.Add(TEXT(""));
 	L.Add(bMarsh ? TEXT("Anoche un intruso huyo por la marisma con el expediente LH-07. Se le perdio el rastro en los canales.")
+		: bLeftByTruck ? TEXT("Anoche un intruso salio de la base en la caja del camion de suministros, con el expediente LH-07. En el control miraron los papeles del conductor y nada mas.")
 		: TEXT("Anoche un intruso salio por el control de salida con el expediente LH-07. El de la garita no vio nada."));
 	if (Detections == 0) L.Add(TEXT("Nadie llego a verlo. Hay quien duda de que existiera."));
 	else L.Add(FString::Printf(TEXT("Fue visto %d %s, pero las descripciones no coinciden."), Detections, Detections == 1 ? TEXT("vez") : TEXT("veces")));
@@ -2832,6 +3109,7 @@ void ATarsisDirector::BuildReport()
 	if (bRamosAlly) Cons.Add(TEXT("Ramos te espera fuera"));
 	else if (bRamosDowned) Cons.Add(TEXT("Ramos desconfia de todos"));
 	if (bKey) Cons.Add(TEXT("cerradura nueva en la jefatura"));
+	if (bLeftByTruck) Cons.Add(TEXT("en el control registran todos los camiones"));
 	L.Add(Cons.Num() > 0 ? FString::Printf(TEXT("LA PROXIMA NOCHE: %s."), *FString::Join(Cons, TEXT(", "))) : FString(TEXT("LA PROXIMA NOCHE: todo sigue igual. Nadie sabe que estuviste.")));
 	L.Add(FString::Printf(TEXT("SIGILO: %d puntos - %s"), Score, *Rank));
 	L.Add(TEXT(""));
@@ -2840,6 +3118,7 @@ void ATarsisDirector::BuildReport()
 	UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::CreateSaveGameObject(UTarsisSave::StaticClass()));
 	if (!S) return;
 	S->bByMarsh = bMarsh;
+	S->bByTruck = bLeftByTruck;
 	S->Detections = Detections;
 	S->Takedowns = Takedowns;
 	S->Captures = Captures;
@@ -3040,12 +3319,14 @@ void ATarsisDirector::BeginCapture(ATarsisGuard* G)
 	bCaptureHit = false;
 	bCaptureDone = false;
 	bCaptureLocker = false;
+	bCaptureTruck = false;
 	Captor = G;
 	CaptureT = 0.0f;
 	StopDrag();
 	bKeypad = false;
 	if (bBinoculars) ToggleBinoculars();
 	ExitHide();   // de la taquilla te saca de un tirón: sales y lo tienes delante
+	if (bRiding) LeaveTruck(true);   // y de la caja del camión, lo mismo
 	if (ACharacter* C = Cast<ACharacter>(P)) C->GetCharacterMovement()->StopMovementImmediately();
 	if (PC)
 	{
@@ -3086,11 +3367,17 @@ void ATarsisDirector::CaptureTick(float DeltaSeconds)
 		bCaptureDone = true;
 		const FString Who = Captor ? Captor->GuardName.ToUpper() : FString();
 		const bool bLocker = bCaptureLocker;
+		const bool bFromTruck = bCaptureTruck;
 		bCaptureLocker = false;
+		bCaptureTruck = false;
 		if (P) Captured(P);   // en negro: al calabozo, al punto de control o a la entrada
 		if (bLocker)
 		{
 			ShowMessage(Tx(TEXT("taquilla_pillado"), TEXT("{0} TE VIO METERTE EN LA TAQUILLA\nLa abre de un tiron. {1}"), { Who, Message.Mid(Message.Find(TEXT("\n")) + 1) }), 6.0f);
+		}
+		else if (bFromTruck)
+		{
+			ShowMessage(Tx(TEXT("camion_pillado"), TEXT("{0} LEVANTA LA LONA\nTe saca de la caja del camion. {1}"), { Who, Message.Mid(Message.Find(TEXT("\n")) + 1) }), 6.0f);
 		}
 		if (PC)
 		{

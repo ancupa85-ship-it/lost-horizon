@@ -26,7 +26,10 @@
    "exit_barrier_length": 600.0,
    "truck_first_delay": 75.0,
    "truck_interval": 170.0,
-   "truck_speed": 400.0
+   "truck_speed": 400.0,
+   "truck_papers_time": 4.5,
+   "truck_horn_wait": 8.0,
+   "truck_self_wait": 30.0
   },
   "guardias": {
    "*": {
@@ -274,6 +277,19 @@
   "salida_sin_expediente": "NO PUEDES IRTE TODAVIA\nFalta el expediente de la jefatura.",
   "ensena_camion": "VIENE UN CAMION\nEntra por el porton del oeste y cruza la base por el camino. Sus faros alumbran lo que tiene delante; detras de el, todo queda a oscuras.",
   "camion_visto": "TE HA VISTO EL CAMION\nEstabas en la luz de sus faros. El conductor toca el claxon y los guardias de cerca vienen a mirar.",
-  "camion_paso": "ESTAS EN MEDIO DEL CAMINO\nEl camion frena y toca el claxon. Los guardias de cerca vienen a mirar."
+  "camion_paso": "ESTAS EN MEDIO DEL CAMINO\nEl camion frena y toca el claxon. Los guardias de cerca vienen a mirar.",
+  "p_camion_bajar": "E   BAJAR DEL CAMION",
+  "p_camion_subir": "E   SUBIR A LA CAJA DEL CAMION",
+  "final_salida_camion": "MISION CUMPLIDA\nSales de Tarsis bajo la lona del camion de suministros, con el expediente LH-07 en la chaqueta.",
+  "camion_nadie_abre": "NADIE ABRE AL CAMION\nEn el control no hay quien mire los papeles. El conductor toca el claxon: los guardias de cerca vienen a ver.",
+  "camion_sin_expediente": "TE BAJAS DEL CAMION\nSin el expediente no puedes irte de Tarsis. El camion arranca: apartate de la luz del control.",
+  "camion_caja_vista": "TE HAN VISTO SUBIR\nEl que te persigue sabe donde estas: si llega a la trasera, te saca. E para bajar.",
+  "ensena_camion_caja": "EN LA CAJA DEL CAMION\nBajo la lona no te ven. En el control miran los papeles del conductor; con la base en guardia registran tambien la caja.\nSin el expediente no puedes irte: bajate (E) antes de que salga.",
+  "ensena_camion_salir": "EN LA CAJA DEL CAMION\nCon el expediente, el camion te saca de la base. En el control miran los papeles del conductor; con la base en guardia registran tambien la caja.",
+  "camion_no_bajar": "NO PUEDES BAJAR AQUI\nHay algo justo detras del camion.",
+  "camion_pillado": "{0} LEVANTA LA LONA\nTe saca de la caja del camion. {1}",
+  "voz_papeles": "Para ahi. Los papeles del porte.",
+  "voz_pase": "Todo en orden. Tira.",
+  "voz_registro": "Hay orden de mirar la carga. Abre atras."
  }
 }

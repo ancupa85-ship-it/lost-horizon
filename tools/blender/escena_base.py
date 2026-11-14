@@ -172,6 +172,7 @@ def build_materials():
     MAT['foco'] = m_simple('foco', (1, 1, 1), 0.3, emit=(0.8, 0.9, 1.0), strength=400.0)
     MAT['marisma'] = m_simple('marisma', (0.008, 0.012, 0.012), 0.08, bumpk=0.15, scale=0.6)
     MAT['camino'] = m_hormigon('camino', (0.11, 0.11, 0.105), 0.6); MAT['tierra'] = m_simple('tierra', (0.05, 0.043, 0.034), 0.85, grime=0.6, bumpk=0.6, scale=5)
+    MAT['alquitran'] = m_simple('alquitran', (0.012, 0.012, 0.013), 0.32, bumpk=0.2, scale=30)   # juntas y grietas selladas del camino (tanda 22)
     # con texturas descargadas, las superficies grandes pasan a material escaneado
     if has_tex('asphalt_02'): MAT['suelo'] = m_tex('asfalto_mojado_tex', 'asphalt_02', 3.0, (0.3, 0.3, 0.32), 0.45, puddles=True, bumpk=0.8)
     if has_tex('concrete_wall_008'): MAT['muro'] = MAT['hormigon'] = m_tex('hormigon_tex', 'concrete_wall_008', 3.2, (0.5, 0.5, 0.5), 0.8, stains=0.8, plinth=0.6)
@@ -317,6 +318,62 @@ def baculo(xm, ym, largo, s=1):
     """Báculo con brazo hacia el sur (s = 1) o hacia el norte (s = -1): la luminaria queda sobre el camino."""
     box('hierro', (0.1, 0.1, 4.0), Mp(xm, ym, 2.0)); box('hierro', (0.07, largo + 0.2, 0.07), Mp(xm, ym + s * largo / 2, 3.96)); box('hormigon', (0.4, 0.4, 0.3), Mp(xm, ym, 0.15))
     box('oscuro', (0.3, 0.44, 0.1), Mp(xm, ym + s * largo, 3.88)); box('bombilla', (0.16, 0.26, 0.03), Mp(xm, ym + s * largo, 3.82))
+def cinta(mat, pts, anchos, z):
+    """Tira plana que sigue una línea quebrada (metros del plano), con un ancho por punto. Mira hacia arriba."""
+    bm = bm_of(mat); prev = None
+    for i, (px, py) in enumerate(pts):
+        a = pts[max(i - 1, 0)]; b = pts[min(i + 1, len(pts) - 1)]; dx, dy = b[0] - a[0], b[1] - a[1]; l = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / l * anchos[i] / 2, dx / l * anchos[i] / 2
+        cur = (bm.verts.new(Mp(px + nx, py + ny, z)), bm.verts.new(Mp(px - nx, py - ny, z)))
+        if prev:
+            f = bm.faces.new((prev[0], prev[1], cur[1], cur[0])); f.normal_update()
+            if f.normal.z < 0: f.normal_flip()
+        prev = cur
+def lengua(mat, cx, cy, rx, ry, z, rs, n=11, giro=0.0, ylim=None):
+    """Mancha plana de contorno irregular (un abanico): grava acumulada contra el bordillo o arrastrada por las ruedas.
+    ylim = (mínimo, máximo): el contorno no sale de esa franja (queda recto contra el bordillo)."""
+    lim = (lambda v: min(ylim[1], max(ylim[0], v))) if ylim else (lambda v: v)
+    bm = bm_of(mat); c = bm.verts.new(Mp(cx, lim(cy), z)); ring = []
+    for k in range(n):
+        a = 2 * math.pi * k / n; r = rs.uniform(0.6, 1.0); x, y = math.cos(a) * rx * r, math.sin(a) * ry * r
+        ring.append(bm.verts.new(Mp(cx + x * math.cos(giro) - y * math.sin(giro), lim(cy + x * math.sin(giro) + y * math.cos(giro)), z)))
+    for k in range(n):
+        f = bm.faces.new((c, ring[k], ring[(k + 1) % n])); f.normal_update()
+        if f.normal.z < 0: f.normal_flip()
+def desgaste_camino(X0, X1, ya, yb, CAUSE):
+    """Tanda 22: la losa del camino deja de ser una pieza lisa y recién puesta. Juntas de dilatación cada 6 m y la junta
+    del centro, grietas selladas con alquitrán, parches de asfalto y grava del anillo que se ha ido saliendo por los bordes.
+    Todo queda entre 2 y 5 mm por encima de la losa (z 0,04): no estorba al andar ni a la navegación."""
+    rs = random.Random(2222); zt = 0.04; yc = (ya + yb) / 2; an = yb - ya
+    xs = []; x = X0 - CAUSE + 3.0
+    while x < X1 + CAUSE - 2.0: xs.append(x); x += 6.0
+    for x in xs:
+        box('alquitran', (0.024 + rs.random() * 0.012, an - 0.04, 0.008), Mp(x + (rs.random() - 0.5) * 0.04, yc, zt))
+    for a, b in zip(xs, xs[1:]):       # la junta del centro, losa a losa: alguna falta y ninguna cae exactamente en línea
+        if rs.random() < 0.9: box('alquitran', (b - a - 0.03, 0.018 + rs.random() * 0.012, 0.008), Mp((a + b) / 2, yc + (rs.random() - 0.5) * 0.03, zt))
+    grietas = []
+    for k in range(16):                # grietas selladas: nacen en una junta o en el borde y vagan unos metros
+        x = rs.choice(xs) if k % 2 else rs.uniform(X0 - 14, X1 + 14); y = rs.uniform(ya + 0.3, yb - 0.3) if k % 2 else rs.choice((ya + 0.15, yb - 0.15))
+        ang = rs.uniform(-0.6, 0.6) + (0 if k % 2 else (math.pi / 2 if y < yc else -math.pi / 2)); n = rs.randint(7, 15); pts = []; anchos = []
+        for i in range(n):
+            pts.append((x, y)); anchos.append((0.02 + 0.03 * math.sin(math.pi * i / (n - 1))) * rs.uniform(0.7, 1.2))
+            ang += rs.uniform(-0.6, 0.6); st = rs.uniform(0.22, 0.5); x += math.cos(ang) * st; y = min(yb - 0.12, max(ya + 0.12, y + math.sin(ang) * st))
+        cinta('alquitran', pts, anchos, zt + 0.003); grietas.append([round(pts[0][0], 2), round(pts[0][1], 2), round(pts[-1][0], 2), round(pts[-1][1], 2)])
+    parches = [(14.0, 55.5, 2.6, 1.7, 0.04), (47.5, 58.5, 1.8, 1.4, -0.07), (71.0, 56.1, 3.2, 1.5, 0.02), (-9.5, 58.2, 2.0, 1.3, 0.05)]
+    for px, py, sx, sy, rz in parches:   # parches de asfalto con el canto sellado
+        Rz = -rz; c, s_ = math.cos(Rz), math.sin(Rz)
+        box('suelo', (sx, sy, 0.012), Mp(px, py, zt), rotz=Rz)
+        for ox, oy, bx, by in ((0, sy / 2, sx + 0.05, 0.05), (0, -sy / 2, sx + 0.05, 0.05), (sx / 2, 0, 0.05, sy + 0.05), (-sx / 2, 0, 0.05, sy + 0.05)):
+            box('alquitran', (bx, by, 0.016), Mp(px, py, zt) + Vector((ox * c - oy * s_, ox * s_ + oy * c, 0)), rotz=Rz)
+    # grava acumulada contra los bordillos (la misma textura del anillo, proyectada en el mundo)
+    for k in range(46):
+        lado = ya if k % 2 else yb; x = rs.uniform(X0 + 1.5, X1 - 1.5)
+        lengua('tierra', x, lado + rs.uniform(-0.1, 0.1), rs.uniform(0.7, 2.6), rs.uniform(0.2, 0.6), zt + 0.002 + rs.random() * 0.002, rs, giro=rs.uniform(-0.12, 0.12), ylim=(ya + 0.02, yb - 0.02))
+    for s, xg in ((1, X0 + 1.6), (-1, X1 - 1.6)):      # y lo que arrastran las ruedas al pasar por los portones
+        for k in range(5):
+            lengua('tierra', xg + s * rs.uniform(-0.6, 3.5), yc + rs.choice((-0.9, 0.9)) + rs.uniform(-0.35, 0.35), rs.uniform(0.5, 1.4), rs.uniform(0.12, 0.3), zt + 0.003, rs)
+    EXT_OUT['desgaste'] = {'juntas': [round(v, 2) for v in xs if X0 < v < X1], 'grietas': grietas, 'parches': [list(q) for q in parches]}
+
 def build_exterior():
     """Tanda 20 (Andres, 2026-11-14): el muro perimetral EXT casillas más afuera por los cuatro lados, un portón de entrada al oeste
     y otro de salida al este, y un camino que cruza la base de uno a otro por la franja sur. Dentro del muro antiguo no se mueve nada."""
@@ -331,6 +388,7 @@ def build_exterior():
             for q in (-5.6, 5.6): box('hormigon', (0.22, 0.22, 0.8), Mp((X0 - 3 - k * 6) if s < 0 else (X1 + 3 + k * 6), yc + q, 0.4))
     box('camino', (X1 - X0 + 2 * CAUSE, yb - ya, 0.24), Mp((X0 + X1) / 2, yc, -0.08))
     for q in (ya - 0.1, yb + 0.1): box('hormigon', (X1 - X0 + 2 * CAUSE, 0.24, 0.3), Mp((X0 + X1) / 2, q, -0.08))   # bordillo enrasado
+    desgaste_camino(X0, X1, ya, yb, CAUSE)
     # muro nuevo, con sus contrafuertes y la alambrada
     def tramo(x, y, size):
         p = wpos(x, y); box('muro', size, p + Vector((0, 0, HW / 2)))
@@ -583,14 +641,27 @@ def truck(pos, rotz):
     C('oscuro', 0.045, 1.5, (0.94, -0.06, 1.75), 'Z', 0.01, 12); C('metal', 0.07, 0.42, (0.94, -0.06, 1.35), 'Z', 0.02, 12)   # escape
     C('oliva', 0.21, 0.6, (-0.82, 0.3, 0.8), 'Y', 0.05, 20); C('metal', 0.04, 0.04, (-0.82, 0.3, 1.02), 'Z', 0.008, 10)        # depósito
     B('bajos', (0.36, 0.56, 0.34), (0.84, 0.3, 0.8), 0.025)
-    # caja y lona con arcos
-    B('bajos', (2.06, 1.98, 0.1), (0, 1.0, 1.06), 0.015); B('oliva', (2.06, 0.035, 0.42), (0, 1.975, 1.31), 0.008); B('oliva', (2.06, 0.035, 0.42), (0, 0.025, 1.31), 0.008)
+    # caja y lona con arcos. Desde la tanda 22 la caja es hueca (se viaja dentro): la lona es una cáscara con su cara de
+    # dentro, los arcos de tubo se ven por el interior, la trasera va abierta y la carga se apila contra el frontal
+    B('bajos', (2.06, 1.98, 0.1), (0, 1.0, 1.06), 0.015); B('madera', (1.96, 1.9, 0.025), (0, 1.0, 1.12), 0.004)
+    B('oliva', (2.06, 0.035, 0.42), (0, 1.975, 1.31), 0.008); B('oliva', (2.06, 0.035, 0.42), (0, 0.025, 1.31), 0.008)
     lona = [(-1.05, 1.5), (-1.05, 2.12), (-0.96, 2.32), (-0.72, 2.45), (-0.3, 2.5), (0.3, 2.5), (0.72, 2.45), (0.96, 2.32), (1.05, 2.12), (1.05, 1.5)]
-    Pr('lona', lona, 1.94, (0, 1.0, 0), 0.03, 'Y')
-    for yy in (0.06, 0.68, 1.32, 1.94): Pr('lona', [(x * 1.014, 1.5 + (z - 1.5) * 1.012) for x, z in lona], 0.05, (0, yy, 0), 0.012, 'Y')
-    B('oscuro', (1.7, 0.012, 0.9), (0, 1.975, 1.98), 0.004)                                 # trasera abierta en sombra
+    esc = lambda k: [(x * k, 1.5 + (z - 1.5) * k) for x, z in lona]
+    cascara = lambda k0, k1: esc(k0) + esc(k1)[::-1]            # perfil en arco, de k0 (fuera) a k1 (dentro)
+    Pr('lona', cascara(1.0, 0.976), 1.94, (0, 1.0, 0), 0.006, 'Y')
+    Pr('lona', esc(0.99), 0.04, (0, 0.05, 0), 0.008, 'Y')                                   # frontal cerrado, tras la cabina
+    for yy in (0.68, 1.32, 1.94): Pr('lona', cascara(1.014, 0.99), 0.05, (0, yy, 0), 0.008, 'Y')    # costuras por fuera
+    for yy in (0.36, 1.0, 1.64, 1.93): Pr('oliva', cascara(0.972, 0.948), 0.035, (0, yy, 0), 0.006, 'Y')   # arcos por dentro
     for s in (-1, 1): Pr('lona', [(-0.12, 1.5), (-0.12, 2.3), (0.12, 2.42), (0.12, 1.5)], 0.03, (s * 0.92, 1.985, 0), 0.008, 'Y')
     C('lona', 0.07, 1.8, (0, 1.99, 2.42), 'X', 0.02, 12)                                    # lona trasera enrollada
+    zc = 1.133                                                                              # tablas del suelo de la caja
+    for cx_, cy_, dz, sx_, sy_, sz_, rz_ in ((-0.52, 0.42, 0.0, 0.82, 0.6, 0.5, 0.03), (0.45, 0.36, 0.0, 0.7, 0.5, 0.44, -0.05), (-0.5, 0.4, 0.5, 0.66, 0.5, 0.38, -0.09)):
+        Rz = Matrix.Rotation(rz_, 4, 'Z'); c0 = V((cx_, cy_, zc + dz + sz_ / 2))
+        B('madera', (sx_, sy_, sz_), c0, 0.012, Rz)                                         # cajas de madera con flejes
+        for q in (-0.3, 0.3): B('oscuro', (0.03, sy_ + 0.012, sz_ + 0.012), c0 + Rz @ V((q * sx_, 0, 0)), 0.003, Rz)
+    C('oliva', 0.2, 0.62, (0.66, 0.78, zc + 0.31), 'Z', 0.03, 18); C('oscuro', 0.03, 0.02, (0.72, 0.74, zc + 0.625), 'Z', 0.004, 8)   # bidón
+    for sx_, sy_, sz_, rz_, k in ((-0.05, 0.86, 0.1, 0.25, 1.0), (0.12, 0.9, 0.27, -0.2, 0.92), (-0.62, 0.9, 0.1, 1.4, 0.9)):               # sacos
+        ell('lona', V((sx_, sy_, zc + sz_)), (0.33 * k, 0.21 * k, 0.11), M0, Matrix.Rotation(rz_, 4, 'Z'))
     if has_ph('metal_jerrycan_green'):
         for k in (0, 1): put('metal_jerrycan_green', M0 @ V((1.0 if not k else -1.0, -0.62 + 0.0, 0.745)), rotz + math.pi / 2)
 

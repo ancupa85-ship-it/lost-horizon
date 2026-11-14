@@ -33,6 +33,7 @@ public:
 
 	// ---- parte del día siguiente (hueco "TarsisParte"): lo que la misión 2 encuentra en la base
 	UPROPERTY() bool bByMarsh = false;
+	UPROPERTY() bool bByTruck = false;   // salió en la caja del camión de suministros (tanda 22)
 	UPROPERTY() int32 Detections = 0;
 	UPROPERTY() int32 Takedowns = 0;
 	UPROPERTY() bool bPowerCut = false;

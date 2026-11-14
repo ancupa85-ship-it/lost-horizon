@@ -335,6 +335,30 @@ void ATarsisGuard::Hold(float Seconds)
 	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
 }
 
+bool ATarsisGuard::Errand(const FVector& Where, const FVector& Face, float Seconds)
+{
+	if (bTowerSentry || bAlly || bRepairing || BodyTarget || HoldT > 0.0f || StunT > 0.0f) return false;
+	if (State != ETarsisGuardState::Patrol && State != ETarsisGuardState::Return) return false;
+	if (State != ETarsisGuardState::Patrol) SetState(ETarsisGuardState::Patrol);
+	bErrand = true;
+	bErrandThere = false;
+	ErrandLoc = Where;
+	ErrandFace = Face;
+	ErrandT = Seconds;
+	WaitT = 0.0f;
+	MoveDest = FVector(1e9f);   // que pida el camino nuevo
+	return true;
+}
+
+void ATarsisGuard::EndErrand()
+{
+	if (!bErrand) return;
+	bErrand = false;
+	bErrandThere = false;
+	MoveDest = FVector(1e9f);
+	if (State == ETarsisGuardState::Patrol) SetState(ETarsisGuardState::Return);   // al punto de ronda más cercano
+}
+
 void ATarsisGuard::HearNoise(const FVector& Where)
 {
 	if (bTowerSentry || bAlly || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
@@ -590,6 +614,7 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 	bRepairing = false;
 	if (NewState == ETarsisGuardState::Down && Flashlight) Flashlight->SetVisibility(false);
 	if (NewState != ETarsisGuardState::Suspicious) bInvestigate = false;
+	if (NewState != ETarsisGuardState::Patrol) { bErrand = false; bErrandThere = false; }   // un recado solo dura mientras nada le llame la atención
 	WaitT = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = (State == ETarsisGuardState::Alert) ? RunSpeed : WalkSpeed;
 	// arrancar y frenar poco a poco al andar (sin tirones); en alerta, reacción rápida
@@ -907,6 +932,23 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	{
 		if (Meter >= 1.0f) { SetState(ETarsisGuardState::Alert); break; }
 		if (Meter > 0.3f) { SetState(ETarsisGuardState::Suspicious); break; }
+		if (bErrand)
+		{
+			// recado del director: va al sitio, se queda mirando a donde le toca y, al acabar el tiempo, vuelve a la ronda
+			ErrandT -= DeltaSeconds;
+			if (ErrandT <= 0.0f) { EndErrand(); break; }
+			if (Near2D(ErrandLoc, 70.0f))
+			{
+				if (!bErrandThere)
+				{
+					bErrandThere = true;
+					if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+				}
+				FaceTowards(ErrandFace, DeltaSeconds);
+			}
+			else Walk(ErrandLoc, WalkSpeed);
+			break;
+		}
 		const FVector& P = PatrolPoints[PointIndex];
 		if (Near2D(P, 60.0f))
 		{

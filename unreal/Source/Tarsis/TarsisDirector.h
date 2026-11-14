@@ -179,8 +179,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void SetWeather(int32 NewWeather);
 
-	/** Base en guardia tras una alarma (segundos que quedan): la sospecha sube un 50 % más deprisa. */
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	/** Base en guardia tras una alarma (segundos que quedan): la sospecha sube un 50 % más deprisa, las rondas van a paso
+	 *  ligero y en el control registran la caja del camión. Editable para que las pruebas la pongan en guardia a mano. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
 	float TensionT = 0.0f;
 
 	/** Generador de la base (base.glb, «generador.001»). Con E se corta: se apagan farolas y focos hasta que alguien lo arregla. */
@@ -280,6 +281,58 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
 	FVector TruckLocation() const { return FVector(TruckX, TruckStart.Y, TruckStart.Z); }
+
+	/** Tanda 22: vas escondido en la caja del camión. Se sube por detrás con la E cuando está parado o cruza la base al
+	 *  paso; bajo la lona no te ven. En el control, un guardia va a la cabina a mirar los papeles; con la base en guardia
+	 *  registra también la caja. Con el expediente, el camión te saca de la base; sin él, te bajas antes de que salga. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	bool bRiding = false;
+
+	/** Veces que te has subido a la caja y registros de la caja que han hecho en el control. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckRides = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckSearches = 0;
+
+	/** Veces que un guardia ha llegado a la cabina a mirar los papeles. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckChecks = 0;
+
+	/** El control, con el camión parado: 0 esperan a que venga alguien, 1 un guardia va hacia la cabina, 2 mira los papeles,
+	 *  3 va a la trasera (base en guardia), 4 mira la caja, 5 barrera arriba. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckCheck = 0;
+
+	/** Segundos que mira los papeles en la cabina. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckPapersTime = 4.5f;
+
+	/** Si en el control no hay quien abra: a los TruckHornWait segundos el conductor toca el claxon y a los TruckSelfWait
+	 *  se baja y levanta la barrera él. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckHornWait = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckSelfWait = 30.0f;
+
+	/** Nombre del guardia que está con el camión en el control («» si ninguno). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
+	FString TruckInspectorName() const;
+
+	/** ¿Puedes subirte ahora a la caja? Subir y bajar (lo que hace la E). LeaveTruck devuelve si has bajado. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
+	bool CanBoardTruck() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Camion")
+	void BoardTruck();
+
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Camion")
+	bool LeaveTruck(bool bForced = false);
+
+	/** Saliste de la base en la caja del camión (sale en el final y en el parte). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	bool bLeftByTruck = false;
 
 	/** Punto de salida de la base (portón de salida): llegar con el expediente acaba la misión (final por la salida). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
@@ -882,6 +935,16 @@ private:
 	void TruckShow(bool bShow);
 	void TruckPlace();
 	void TruckHorn(const FVector& Where, int32 Why);
+	// control de salida y viaje en la caja (tanda 22)
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> TruckInspector;
+	float TruckCheckT = 0.0f;
+	bool bTruckCalled = false;
+	bool bRideSeen = false;
+	bool bCaptureTruck = false;
+	void TruckControlTick(float DeltaSeconds);
+	void RidePlace();
+	void RideTick();
 	UPROPERTY()
 	TObjectPtr<class ASpotLight> GateLamp;
 	bool bLampBroken = false;

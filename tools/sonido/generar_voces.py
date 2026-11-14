@@ -33,6 +33,10 @@ FRASES = {
     'tengo': ('¡Te tengo!', False),
     'perdido': ('Lo he perdido.', False),
     'yacasi': ('Ya casi está.', True),
+    # tanda 22: el control de salida con el camión parado (al final y sin radio: las voces de antes salen igual)
+    'papeles': ('Para ahí. Los papeles del porte.', False),
+    'pase': ('Todo en orden. Tira.', False),
+    'registro': ('Hay orden de mirar la carga. Abre atrás.', False),
 }
 # la central, por radio (voz_central_<clave>): el texto en pantalla lleva el nombre del guardia; la voz, no
 CENTRAL = ('-6%', '0.98')

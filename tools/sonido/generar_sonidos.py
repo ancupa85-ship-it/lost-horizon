@@ -389,6 +389,17 @@ def porton(sec=5.0):
     o = n - int(0.3 * SR); x[o:] += golpe(n - o, 95, 0.09, 1.6)   # tope
     return x
 
+def camion_subir():
+    # subirse a la caja del camión (o saltar de ella): la bota en el portalón de chapa, el roce de la lona y el peso en las tablas
+    n = int(0.95 * SR); t = np.arange(n) / SR
+    x = golpe(n, 210, 0.05, 0.7)
+    x += 0.25 * np.sin(2 * np.pi * 930 * t) * np.exp(-t / 0.09)
+    o = int(0.12 * SR); m = int(0.5 * SR)
+    x[o:o + m] += hp(lp(rng.normal(0, 1, m), 0.55), 0.9) * env(m, 0.06, 0.16) * 0.9
+    o = int(0.5 * SR); x[o:] += golpe(n - o, 95, 0.09, 1.0)
+    o = int(0.62 * SR); x[o:] += golpe(n - o, 130, 0.05, 0.45)
+    return x
+
 if __name__ == '__main__':
     for k in range(3):
         save('paso_grava_%d' % (k + 1), grava(k), 0.7)
@@ -420,3 +431,5 @@ if __name__ == '__main__':
     save('camion_motor', camion_motor(), 0.55)
     save('claxon', claxon(), 0.7)
     save('porton', porton(), 0.7)
+    # tanda 22: subirse a la caja del camión
+    save('camion_subir', camion_subir(), 0.6)

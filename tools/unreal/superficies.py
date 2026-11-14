@@ -17,7 +17,7 @@ SUPERFICIES = (
     ('Madera', ('madera', 'veta', 'wood')),
     ('Metal', ('hierro', 'metal', 'tejado', 'contenedor', 'oliva', 'chapa')),
     ('Hierba', ('hierba', 'cesped', 'marisma', 'grass')),
-    ('Cemento', ('suelo_int', 'hormigon', 'cemento', 'muro', 'pared', 'camino')),
+    ('Cemento', ('suelo_int', 'hormigon', 'cemento', 'muro', 'pared', 'camino', 'alquitran')),
     ('Grava', ('suelo', 'grava', 'tierra')),
 )
 # rozamiento: la chapa y el cemento pulido resbalan algo más que la grava o la hierba (no afecta al personaje)
