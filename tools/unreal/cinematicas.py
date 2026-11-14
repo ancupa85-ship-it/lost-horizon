@@ -121,11 +121,12 @@ secuencia('LS_Salida', 10, [
 ], focal=28.0, fundido=(6.0, 0.7))
 
 # ---- marisma (portillo en el muro sur, 310 7390): desde el agua, la cámara se aleja hacia el sur
-# (valores de partida; se ajustan en la fase B viendo el plano)
+# (a 10-16 m del muro y a 4 m de alto, el muro sur, sin luz, llenaba el plano de negro: se sube y se separa para
+# que entren la línea del muro, el cielo y las luces de dentro)
 portillo = unreal.Vector(310, 7390, 100)
-m0 = unreal.Vector(700, 8600, 400)
-m1 = unreal.Vector(800, 9200, 320)
-m2 = unreal.Vector(1500, 11900, 1100)
+m0 = unreal.Vector(1200, 9800, 900)
+m1 = unreal.Vector(1500, 10600, 800)
+m2 = unreal.Vector(2200, 13500, 1600)
 secuencia('LS_Marisma', 10, [
     (0.0, m0, mira(m0, portillo)),
     (4.0, m1, mira(m1, portillo)),

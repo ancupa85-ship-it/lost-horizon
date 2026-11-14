@@ -77,3 +77,20 @@ Qué se quitó:
 
 El barracón queda justo en el límite de 30 fps de media con el editor abierto; la VRAM, por debajo de 3,8 GB salvo
 algún pico de 3823 MB en la primera medida tras abrir el editor (texturas aún cargándose).
+
+## 0020: muro 20 m más afuera, portones y camino
+
+`tools/unreal/medir.py` con los dos sitios nuevos (portón de entrada desde dentro, -600 5850, y portón de salida, 7600
+5860), calidad Media, editor recién abierto, dos pasadas (medio / peor 1 %):
+
+| Sitio | Pasada 1 | Pasada 2 | VRAM (MB) |
+|---|---|---|---|
+| Entrada | 38,7 / 35,1 | 38,1 / 33,2 | 3821 / 3743 |
+| Patio central | 37,9 / 34,4 | 37,0 / 32,4 | 3821 / 3743 |
+| Barracón oeste | 33,3 / 29,3 | 31,7 / 28,5 | 3893 / 3743 |
+| Portón de entrada | 40,4 / 38,7 | 38,9 / 33,3 | 3890 / 3744 |
+| Portón de salida | 41,6 / 38,5 | 41,0 / 36,0 | 3889 / 3743 |
+
+El anillo nuevo no baja nada de 30 fps; los portones son lo más ligero (poca geometría a la vista). La VRAM (toda la
+tarjeta, con el editor abierto) pasa de 3,8 GB en la primera medida tras abrir el editor (3893 MB) y vuelve a 3,74 en la
+segunda: la grava nueva (gravel_floor_02 a 2K) suma; si hiciera falta, bajarla a 1K.

@@ -16,6 +16,9 @@ SITIOS = [
     ('entrada', V(500, 500, 120), V(3000, 2400, 150)),
     ('patio central', V(4300, 3500, 120), V(6600, 4100, 150)),
     ('barracon oeste', V(1900, 2350, 120), V(300, 2800, 120)),
+    # tanda 20: los portones del muro nuevo, con el camino y el anillo exterior a la vista
+    ('porton de entrada', V(-600, 5850, 120), V(-1900, 5700, 150)),
+    ('porton de salida', V(7600, 5860, 120), V(9100, 5700, 150)),
 ]
 ESPERA, MIDE = 2.0, 8.0
 M = {'estado': 'arrancando', 'res': [], 'h': None, 'gen': None, 'espera': 0.0, 'dts': None}

@@ -714,7 +714,9 @@ def prueba_reserva():
     on, off = luces()
     check('vuelve la luz a medias', 'A MEDIAS' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     check('la central: "entra la reserva"', 'central_reserva' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-4:])
-    check('los focos de las torres vuelven', 'foco_torreta_12' in on and 'foco_torreta_13' in on, on)
+    # por nombre de familia: el número depende del orden de las luces de base.json (la farola de la entrada, tanda 20, las corrió)
+    torres = [n for n in on + off if n.startswith('foco_torreta')]
+    check('los focos de las torres vuelven', len(torres) >= 2 and all(n in on for n in torres), on)
     # la mitad de las que estaban encendidas (sin las de las torres ni interior_0, que el barracón oeste tiene apagada)
     resto_on = [x for x in on if not x.startswith('foco_torreta') and x != 'interior_0']
     resto_off = [x for x in off if x != 'interior_0']
