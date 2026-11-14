@@ -354,6 +354,12 @@ if JEXT:   # báculo del portón de entrada (el farol de la salida lo crea el di
 for tw in TORRES:
     lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': tw['foco']['pos'], 'dir': tw['foco']['dir'],
                    'color': [0.8, 0.9, 1.0], 'power': 90000})
+if JEXT:   # tanda 21: farolas del camino y aplique del portillo. Al final de la lista: las luces de antes conservan su número
+    for q in JEXT.get('farolas', []):
+        lights.append(dict(f0, pos=[q[0], -q[1], q[2] + 0.2]))
+    if JEXT.get('portillo_luz'):
+        q = JEXT['portillo_luz']
+        lights.append({'kind': 'POINT', 'name': 'aplique', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.7, 0.4], 'power': 260})
 json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'marcas': MARCAS, 'torres': TORRES,
            **({'ext': JEXT} if JEXT else {}), 'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
           open(os.path.join(OUT, 'base.json'), 'w'), indent=1)

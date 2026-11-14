@@ -1,4 +1,4 @@
-"""Genera los sonidos de Tarsis (pasos en grava, cemento, metal, madera y hierba, piedra, dardo, puertas, teclado, objetos,\nreja, barrera, viento, lluvia, grillos, rumor lejano, radio, generador y las tres capas de música) como .wav en assets/unreal/sonidos.
+"""Genera los sonidos de Tarsis (pasos en grava, cemento, metal, madera y hierba, piedra, dardo, puertas, teclado, objetos,\nreja, barrera, viento, lluvia, grillos, rumor lejano, radio, generador, camión, claxon, portón y las tres capas de música) como .wav en assets/unreal/sonidos.
 
 Todo sintetizado con numpy (ruido filtrado y senos que decaen): sin bancos de sonidos ni licencias.
 Uso: python3 tools/sonido/generar_sonidos.py
@@ -354,6 +354,41 @@ def gotera(sec=9):
         pos += rng.uniform(0.6, 1.6)
     return bucle(x, 0.2)
 
+def camion_motor(sec=5):
+    # diésel de camión ligero: explosiones a 28 Hz con su traqueteo, zumbido grave con armónicos y ruido mecánico.
+    # En el juego se le sube o baja el tono con la velocidad (al ralentí en el portón, más agudo en marcha)
+    n = int((sec + 1) * SR); t = np.arange(n) / SR; f0 = 28.0
+    puls = np.maximum(0.0, np.sin(2 * np.pi * f0 * t)) ** 6
+    x = lp(puls * rng.normal(1.0, 0.25, n), 0.9) * 3.0 * (0.85 + 0.15 * np.sin(2 * np.pi * 3.0 * t))
+    x += 0.5 * np.sin(2 * np.pi * f0 * t) + 0.35 * np.sin(2 * np.pi * 2 * f0 * t + 0.7) + 0.2 * np.sin(2 * np.pi * 3 * f0 * t + 1.1)
+    x += lp(rng.normal(0, 1, n), 0.93) * 0.5 * (0.7 + 0.3 * puls)
+    x += hp(lp(rng.normal(0, 1, n), 0.5), 0.9) * 0.05
+    return bucle(x)
+
+def claxon():
+    # bocina de camión antiguo: dos notas a la vez (370 y 466 Hz), ricas en armónicos y algo nasales
+    n = int(0.85 * SR); t = np.arange(n) / SR; x = np.zeros(n)
+    for f, a in ((370.0, 1.0), (466.0, 0.8)):
+        for k in range(1, 9):
+            x += a * np.sin(2 * np.pi * f * k * t * (1 + 0.002 * np.sin(2 * np.pi * 6 * t))) / k ** 0.8
+    g = np.minimum(1.0, t / 0.03) * np.minimum(1.0, (0.85 - t) / 0.08)
+    return lp(x, 0.55) * g
+
+def porton(sec=5.0):
+    # portón corredero de hierro: ruedas sobre el carril (rumor grave con golpes en las juntas), chirrido y tope final
+    n = int(sec * SR); t = np.arange(n) / SR
+    x = lp(rng.normal(0, 1, n), 0.985) * 6.0 * (0.7 + 0.3 * np.sin(2 * np.pi * 2.2 * t))
+    f = 1900 + 500 * np.sin(2 * np.pi * 0.7 * t) + 200 * np.sin(2 * np.pi * 3.1 * t)
+    chirrido = np.sin(2 * np.pi * np.cumsum(f) / SR) * (np.sin(2 * np.pi * 0.45 * t + 1.0) > 0.55) * 0.12
+    x += lp(chirrido, 0.3)
+    for k in range(int(sec / 0.42)):                      # juntas del carril
+        o = int((0.2 + k * 0.42) * SR); m = min(n - o, int(0.12 * SR))
+        if m > 0: x[o:o + m] += golpe(m, 160, 0.03, 0.5)
+    g = np.minimum(1.0, t / 0.25) * np.minimum(1.0, (sec - t) / 0.15)
+    x *= g
+    o = n - int(0.3 * SR); x[o:] += golpe(n - o, 95, 0.09, 1.6)   # tope
+    return x
+
 if __name__ == '__main__':
     for k in range(3):
         save('paso_grava_%d' % (k + 1), grava(k), 0.7)
@@ -381,3 +416,7 @@ if __name__ == '__main__':
     save('fluorescente', fluorescente(), 0.35)
     save('radio_barracon', radio_barracon(), 0.55)
     save('gotera', gotera(), 0.6)
+    # tanda 21: el camión del camino y el portón de entrada
+    save('camion_motor', camion_motor(), 0.55)
+    save('claxon', claxon(), 0.7)
+    save('porton', porton(), 0.7)

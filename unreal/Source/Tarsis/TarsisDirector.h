@@ -204,6 +204,83 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
 	float ExitBarrierLength = 390.0f;
 
+	/** Camión de suministros (tanda 21): cada cierto tiempo entra por el portón del oeste (que se abre para él), cruza la
+	 *  base por el camino, para en el control hasta que sube la barrera y sale por el este. Sus piezas son los actores con
+	 *  la etiqueta «camion» y la hoja del portón, los de «hoja_entrada» (tools/unreal/montar_base.py). Sin ellos no hay camión. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	bool bTruck = true;
+
+	/** Segundos hasta el primer paso y entre el final de un paso y el siguiente. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckFirstDelay = 75.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckInterval = 170.0f;
+
+	/** Velocidad dentro de la base y por el terraplén de fuera (cm/s). Dentro va al paso de alguien que anda deprisa. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckSpeed = 400.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckSpeedOut = 900.0f;
+
+	/** Donde espera oculto (principio del terraplén del oeste); su Y es el eje del camino y su Z, la losa. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	FVector TruckStart = FVector(-13500.0f, 5700.0f, 4.0f);
+
+	/** X del centro del camión cuando para ante el portón de entrada, ante la barrera y donde desaparece. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckGateStopX = -2420.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckBarrierStopX = 8270.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckEndX = 20500.0f;
+
+	/** Portón de entrada: centro de la hoja cerrada y lo que se corre al abrirse. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	FVector EntryGateLoc = FVector(-1840.0f, 5700.0f, 130.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	FVector EntryGateSlide = FVector(0.0f, 640.0f, 0.0f);
+
+	/** Faros: lúmenes y si dan sombra (una sola luz con sombra; si pesa en la tarjeta, se quita aquí). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckLampLumens = 6000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	bool bTruckShadows = true;
+
+	/** Hasta dónde ve el conductor a quien esté de pie delante, dentro del haz de los faros (agachado, la mitad). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckSight = 2200.0f;
+
+	/** 0 espera fuera, 1 llega al portón, 2 parado mientras se abre, 3 cruza la base, 4 parado en el control, 5 sale. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckState = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckPasses = 0;
+
+	/** Veces que ha tocado el claxon (te ha visto en los faros o alguien le corta el paso). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckHorns = 0;
+
+	/** Hoja del portón de entrada (0 cerrada, 1 abierta) y barrera del control (0 bajada, 1 levantada). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	float EntryGateT = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	float BarrierT = 0.0f;
+
+	/** Para las pruebas y para probar a mano: el camión que espera fuera sale ya. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Camion")
+	void TruckSkipWait() { if (TruckState == 0) TruckT = 0.05f; }
+
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
+	FVector TruckLocation() const { return FVector(TruckX, TruckStart.Y, TruckStart.Z); }
+
 	/** Punto de salida de la base (portón de salida): llegar con el expediente acaba la misión (final por la salida). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
 	FVector ExitLoc = FVector(6900.0f, 5300.0f, 0.0f);
@@ -778,7 +855,33 @@ private:
 	TObjectPtr<class UStaticMeshComponent> BarrierArm;
 	UPROPERTY()
 	TObjectPtr<class UStaticMeshComponent> BarrierPost;
-	float BarrierT = 0.0f;
+	float BarrierTarget = 0.0f;
+	// camión de suministros y hoja del portón de entrada
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> TruckParts;
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> EntryLeaf;
+	UPROPERTY()
+	TObjectPtr<class ASpotLight> TruckLamp;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> TruckAudio;
+	UPROPERTY()
+	TObjectPtr<class USoundAttenuation> TruckAtten;
+	float TruckT = 0.0f;
+	float TruckX = 0.0f;
+	float TruckV = 0.0f;
+	float TruckWaitT = 0.0f;
+	float TruckSeenT = 0.0f;
+	float TruckBlockT = 0.0f;
+	float TruckHornT = 0.0f;
+	float EntryGateTarget = 0.0f;
+	bool bEntryGateShut = false;
+	void SetupTruck();
+	void TruckTick(float DeltaSeconds);
+	void TruckReset(float Wait);
+	void TruckShow(bool bShow);
+	void TruckPlace();
+	void TruckHorn(const FVector& Where, int32 Why);
 	UPROPERTY()
 	TObjectPtr<class ASpotLight> GateLamp;
 	bool bLampBroken = false;

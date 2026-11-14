@@ -95,6 +95,8 @@ def luces():
         c = a.get_component_by_class(unreal.LocalLightComponent)
         if not c:
             continue
+        if a.actor_has_tag('camion'):
+            continue   # los faros del camión (tanda 21): van y vienen con él y no dependen del generador
         n = a.get_actor_label()
         if n.startswith('SpotLight'):
             n = 'farol_garita'
@@ -103,6 +105,17 @@ def luces():
 
 def luz_en(punto):
     return unreal.TarsisGuard.light_at(mundo(), punto)
+
+def quietos(*nombres):
+    """Deja quietos y sin ver ni oír (Hold) a los guardias del anillo que se nombran: las pruebas que plantan al jugador
+    junto al control de salida o en el portillo se escribieron antes de que hubiera centinelas allí (tanda 21)."""
+    for n in nombres:
+        g = guardia(n)
+        if g:
+            g.hold(3600.0)
+
+def actores(tag, clase=None):
+    return [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), clase or unreal.StaticMeshActor) if a.actor_has_tag(tag)]
 
 def reparador_cercano():
     best = None
@@ -729,6 +742,7 @@ def prueba_reserva():
 
 def prueba_farol():
     d = director()
+    quietos('Sanz', 'Carmona')   # el centinela del control está a 4 m: esta prueba mide el farol, no su vista
     antes = luz_en(V(8620, 5600, 130))
     tp(8150, 5700, 0); yield 0.1
     mirar(FAROL); yield 0.2
@@ -773,6 +787,7 @@ def prueba_perimetro():
     """Tanda 20: muro 20 m más afuera, camino de portón a portón, portillo en el muro sur y la salida en el portón este."""
     d = director()
     w = mundo()
+    quietos('Lobato', 'Sanz', 'Carmona')
     def traza(a, b):
         h = unreal.SystemLibrary.line_trace_single(w, a, b, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [jugador()], unreal.DrawDebugTrace.NONE, True)
         return h.to_tuple()[4].x if h else None
@@ -787,6 +802,8 @@ def prueba_perimetro():
     # el tope invisible tras el portón de salida
     topes = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor) if a.actor_has_tag('Tope_Salida')]
     check('tope invisible fuera del portón de salida', len(topes) == 1 and topes[0].get_editor_property('hidden') and dist2d(topes[0].get_actor_location(), V(9280, 5700, 0)) < 50, len(topes))
+    topes = actores('Tope_Entrada')
+    check('y otro fuera del portón de entrada (se abre para el camión)', len(topes) == 1 and topes[0].get_editor_property('hidden') and dist2d(topes[0].get_actor_location(), V(-2010, 5700, 0)) < 50, len(topes))
     # el portillo avisa en su sitio nuevo (sin Ramos, cerrado)
     tp(PORTILLO.x, PORTILLO.y - 120, 90); yield 0.2
     check('el aviso del portillo sale en el muro sur', 'PORTILLO' in d.interact_prompt(), d.interact_prompt()[:30])
@@ -796,6 +813,127 @@ def prueba_perimetro():
     ps = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.PlayerStart)
     check('el jugador sigue empezando en (500, 500)', ps and dist2d(ps[0].get_actor_location(), V(500, 500, 0)) < 150, [ps[0].get_actor_location() if ps else None])
     aparte()
+
+
+def prueba_anillo():
+    """Tanda 21: el anillo deja de estar vacío y a oscuras: farolas en el camino, aplique en el portillo, la tela de las
+    vallas como malla de verdad y tres guardias (uno en cada garita y la ronda del sur)."""
+    d = director()
+    w = mundo()
+    aparte()
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    focos = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Light) if a.get_component_by_class(unreal.LocalLightComponent)]
+    def hay_luz(q):
+        return any(dist2d(a.get_actor_location(), V(q[0] * 100, q[1] * 100, 0)) < 150 and a.get_component_by_class(unreal.LocalLightComponent).is_visible() for a in focos)
+    check('tres farolas encendidas a lo largo del camino', len(ext['farolas']) == 3 and all(hay_luz(q) for q in ext['farolas']), [hay_luz(q) for q in ext['farolas']])
+    check('aplique encendido sobre el portillo', hay_luz(ext['portillo_luz']), ext['portillo_luz'])
+    # el camino bajo una farola está claro; el anillo, a media distancia entre el camino y el muro, sigue oscuro
+    f = ext['farolas'][1]
+    clara, oscura = luz_en(V(f[0] * 100, 5700, 100)), luz_en(V(f[0] * 100 + 1250, 6950, 100))
+    check('charco de luz en el camino y sombra entre farolas', clara > 0.5 and oscura < 0.3, '%.2f y %.2f' % (clara, oscura))
+    portillo = luz_en(V(PORTILLO.x, PORTILLO.y - 150, 100))
+    check('el portillo ya no está a oscuras (pero tampoco a plena luz)', 0.13 < portillo < 0.6, '%.2f' % portillo)
+    telas = set()
+    for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor):
+        c = a.get_component_by_class(unreal.StaticMeshComponent)
+        m = c.get_material(0) if c and c.get_num_materials() else None
+        if m and m.get_name().startswith('M_Tela'):
+            telas.add(m.get_name())
+    check('la tela de las vallas es la malla recortada', telas and all(n.startswith('M_TelaMalla_') for n in telas), sorted(telas))
+    # los tres guardias nuevos, en su sitio, fuera del camino y con su voz
+    sitios = {'Lobato': V(-1300, 5300, 0), 'Sanz': V(8500, 5300, 0), 'Carmona': V(-900, 6700, 0)}
+    gs = {n: guardia(n) for n in sitios}
+    check('Lobato, Sanz y Carmona están en el nivel', all(gs.values()), [n for n, g in gs.items() if not g])
+    if not all(gs.values()):
+        return
+    lejos = {n: int(dist2d(g.get_actor_location(), sitios[n])) for n, g in gs.items()}
+    check('cada uno empieza en su puesto', all(v < 400 for v in lejos.values()), lejos)
+    check('tienen cuerpo (no el cilindro)', all(g.get_editor_property('body_mesh') for g in gs.values()))
+    voces = ['voz_%s_%s' % (n.lower(), k) for n in gs for k in ('quien', 'alto', 'perdido')]
+    faltan = [v for v in voces if not unreal.EditorAssetLibrary.does_asset_exist('/Game/Tarsis/Sonidos/' + v)]
+    check('cada uno tiene su voz', not faltan, faltan)
+    c0 = gs['Carmona'].get_actor_location()
+    pisan = set()
+    t1 = time.time() + 14.0
+    while time.time() < t1:
+        for n, g in gs.items():
+            l = g.get_actor_location()
+            if abs(l.y - 5700) < 330 and -1800 < l.x < 9000:
+                pisan.add(n)
+        yield 0.5
+    check('la ronda del anillo anda', dist2d(gs['Carmona'].get_actor_location(), c0) > 300, int(dist2d(gs['Carmona'].get_actor_location(), c0)))
+    check('ninguno pisa el camino (por ahí pasa el camión)', not pisan, sorted(pisan))
+    check('nadie se ha mosqueado con el jugador aparcado', all(estado(g) == 'PATROL' for g in gs.values()), {n: estado(g) for n, g in gs.items()})
+
+
+def prueba_camion():
+    """Tanda 21: el camión de suministros entra por el portón oeste (la hoja se corre), cruza por el camino, para en el
+    control (la barrera sube) y sale por el este. Sus faros alumbran, el conductor ve y frena si te pones delante."""
+    d = director()
+    w = mundo()
+    piezas, hoja = actores('camion'), actores('hoja_entrada')
+    check('el camión y la hoja del portón están en el nivel', len(piezas) >= 5 and len(hoja) >= 1, '%d piezas, %d de la hoja' % (len(piezas), len(hoja)))
+    if not piezas or not hoja:
+        return
+    estado_c = lambda: director().get_editor_property('truck_state')
+    cx = lambda: director().truck_location().x
+    check('espera fuera, escondido', estado_c() == 0 and all(a.get_editor_property('hidden') for a in piezas), estado_c())
+    check('la hoja del portón de entrada, cerrada', d.get_editor_property('entry_gate_t') < 0.01 and abs(hoja[0].get_actor_location().y) < 5, hoja[0].get_actor_location().y)
+    # pasada corta: sale de más cerca y desaparece antes (lo de en medio es lo que se prueba)
+    d.set_editor_property('truck_start', V(-7000, 5700, 4))
+    d.set_editor_property('truck_end_x', 13000.0)
+    oscuro = luz_en(V(2300, 5700, 100))
+    aparte()
+    d.truck_skip_wait()
+    yield ('hasta', lambda: estado_c() == 1, 3.0)
+    faros = actores('camion', unreal.Light)
+    check('aparece con los faros encendidos', estado_c() == 1 and not any(a.get_editor_property('hidden') for a in piezas)
+          and len(faros) == 1 and faros[0].get_component_by_class(unreal.LocalLightComponent).is_visible(), '%s, %d faros' % (estado_c(), len(faros)))
+    yield ('hasta', lambda: 'CAMION' in str(director().get_editor_property('message')), 4.0)
+    check('se avisa la primera vez', 'VIENE UN CAMION' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
+    yield ('hasta', lambda: estado_c() == 2, 25.0)
+    check('para ante el portón cerrado', estado_c() == 2 and abs(cx() + 2420) < 40, '%s en x %d' % (estado_c(), cx()))
+    yield ('hasta', lambda: director().get_editor_property('entry_gate_t') > 0.98, 9.0)
+    check('la hoja se corre hacia el sur', abs(hoja[0].get_actor_location().y - 640) < 30, hoja[0].get_actor_location().y)
+    yield ('hasta', lambda: estado_c() == 3 and cx() > 1300, 25.0)
+    claro = luz_en(V(2300, 5700, 100))
+    check('los faros alumbran el camino por delante', claro > oscuro + 0.1, '%.2f -> %.2f' % (oscuro, claro))
+    check('y la hoja se cierra detrás', d.get_editor_property('entry_gate_t') < 0.9, d.get_editor_property('entry_gate_t'))
+    # de pie en el haz, a 15 m: el conductor te ve y toca el claxon; los guardias de cerca van a mirar
+    h0 = d.get_editor_property('truck_horns')
+    tp(cx() + 1700, 5700, 180)
+    yield ('hasta', lambda: director().get_editor_property('truck_horns') > h0, 4.0)
+    check('el conductor te ve en el haz y toca el claxon', d.get_editor_property('truck_horns') == h0 + 1 and 'CAMION' in str(d.get_editor_property('message')),
+          '%d, %s' % (d.get_editor_property('truck_horns'), str(d.get_editor_property('message'))[:24]))
+    yield 0.4
+    mosca = [g.get_actor_label()[8:] for g in guardias() if estado(g) in ('SUSPICIOUS', 'ALERT')]
+    check('los guardias de cerca van a mirar', len(mosca) >= 1, mosca)
+    # plantado delante: frena en seco y no te pasa por encima
+    tp(cx() + 420, 5700, 180); yield 1.2
+    x1 = cx(); yield 0.6
+    x2 = cx()
+    hueco = jugador().get_actor_location().x - x2
+    check('frena si te pones delante', abs(x2 - x1) < 3 and hueco > 200, 'se mueve %.1f cm, a %d cm de ti' % (x2 - x1, hueco))
+    aparte()
+    for g in guardias():   # que no se quede nadie en el camino mirando el ruido: el camión esperaría a que se aparte
+        if not g.get_editor_property('tower_sentry'):
+            g.hold(3600.0)
+            l = g.get_actor_location()
+            if abs(l.y - 5700) < 400:
+                g.set_actor_location(V(l.x, 6400, l.z), False, True)
+    yield 1.5
+    check('y sigue cuando te apartas', cx() > x2 + 50, '%d -> %d' % (x2, cx()))
+    yield ('hasta', lambda: estado_c() == 4, 40.0)
+    check('para en el control de salida', estado_c() == 4 and abs(cx() - 8270) < 40, '%s en x %d' % (estado_c(), cx()))
+    check('el portón de entrada ya está cerrado', d.get_editor_property('entry_gate_t') < 0.02 and abs(hoja[0].get_actor_location().y) < 5, d.get_editor_property('entry_gate_t'))
+    yield ('hasta', lambda: director().get_editor_property('barrier_t') > 0.95, 12.0)
+    check('le levantan la barrera', d.get_editor_property('barrier_t') > 0.95, d.get_editor_property('barrier_t'))
+    yield ('hasta', lambda: director().get_editor_property('truck_passes') >= 1, 30.0)
+    check('sale por el portón del este y desaparece', d.get_editor_property('truck_passes') == 1 and estado_c() == 0 and all(a.get_editor_property('hidden') for a in piezas),
+          '%d pasadas, estado %s' % (d.get_editor_property('truck_passes'), estado_c()))
+    yield ('hasta', lambda: director().get_editor_property('barrier_t') < 0.05, 6.0)
+    check('la barrera vuelve a bajar', d.get_editor_property('barrier_t') < 0.05, d.get_editor_property('barrier_t'))
+    check('la misión sigue (nadie te ha cogido ni has salido)', not d.get_editor_property('done') and not d.get_editor_property('capturing'))
 
 
 def capas_musica():
@@ -898,7 +1036,7 @@ def prueba_opciones():
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
-            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro]]
+            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro], [prueba_anillo, prueba_camion]]
 PRUEBAS = []
 
 
@@ -933,6 +1071,9 @@ def _limpieza(siguiente):
     # si la prueba anterior acabó con una captura, su escena (unos 2 s sin control y con la E ignorada) termina antes
     if d and d.get_editor_property('capturing'):
         yield ('hasta', lambda: not director().get_editor_property('capturing'), 5.0)
+    # el camión (tanda 21) solo en su prueba: en las demás cruzaría la base a mitad de una medida de luz o de una captura
+    if d:
+        d.set_editor_property('truck', siguiente is prueba_camion)
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 

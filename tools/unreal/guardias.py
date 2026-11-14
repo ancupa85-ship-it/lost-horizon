@@ -21,6 +21,15 @@ GUARDIAS = {
     # Con la misma espera en todos los puntos, ese ir y volver de pocos metros parecía un guardia en bucle.
     'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], [2.5, 1.0, 6.0, 1.0], 'vega'),   # portón
     'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], [3.0, 1.0, 6.0, 1.0], 'ramos'),   # barracón
+    # tanda 21: el perímetro deja de estar vacío. Casillas de fuera del plano (columnas negativas o filas de más de 27):
+    # el anillo entre el muro antiguo y el nuevo. Ninguno pisa el camino (filas 27-29): por ahí pasa el camión.
+    # Los de las garitas esperan junto a la puerta y cada poco dan unos pasos a lo largo del camino y vuelven: al llegar
+    # a cada punto se quedan mirando hacia donde iban (uno hacia el portón, el otro hacia dentro de la base).
+    'Lobato': ([[-7, 26], [-5, 26]], [14.0, 6.0], 'centinela'),   # garita del portón de entrada
+    'Sanz': ([[42, 26], [40, 26]], [16.0, 7.0], 'centinela'),     # control de salida: 16 s mirando al portón, 7 s hacia dentro
+    # la ronda del anillo sur: va y vuelve entre portón y portón, al borde de los charcos de luz de las farolas del camino,
+    # y pasa a unos 8 m del portillo de la marisma
+    'Carmona': ([[-5, 33], [40, 33], [40, 31], [-5, 31]], 4.0, 'centinela'),
 }
 
 def log(*a):

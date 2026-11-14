@@ -23,7 +23,10 @@
     0
    ],
    "exit_barrier_yaw": 90.0,
-   "exit_barrier_length": 600.0
+   "exit_barrier_length": 600.0,
+   "truck_first_delay": 75.0,
+   "truck_interval": 170.0,
+   "truck_speed": 400.0
   },
   "guardias": {
    "*": {
@@ -268,6 +271,9 @@
   "obj_mesa": "Registra la mesa de Alarcon en la jefatura",
   "obj_jefatura": "Abre la jefatura (se entra por el barracon oeste)",
   "obj_llave": "Consigue la llave de la jefatura: la lleva Ibarra (patio norte)",
-  "salida_sin_expediente": "NO PUEDES IRTE TODAVIA\nFalta el expediente de la jefatura."
+  "salida_sin_expediente": "NO PUEDES IRTE TODAVIA\nFalta el expediente de la jefatura.",
+  "ensena_camion": "VIENE UN CAMION\nEntra por el porton del oeste y cruza la base por el camino. Sus faros alumbran lo que tiene delante; detras de el, todo queda a oscuras.",
+  "camion_visto": "TE HA VISTO EL CAMION\nEstabas en la luz de sus faros. El conductor toca el claxon y los guardias de cerca vienen a mirar.",
+  "camion_paso": "ESTAS EN MEDIO DEL CAMINO\nEl camion frena y toca el claxon. Los guardias de cerca vienen a mirar."
  }
 }

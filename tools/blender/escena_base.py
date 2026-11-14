@@ -313,10 +313,10 @@ def garita(xc, yc, luz, puerta):
     box(v, (1.3, 0.05, 0.8), Mp(xc, yc + 1.205, 1.6)); box('oscuro', (1.45, 0.08, 0.07), Mp(xc, yc + 1.21, 2.04)); box('pared', (1.5, 0.16, 0.08), Mp(xc, yc + 1.22, 1.16))
     box(v, (0.05, 1.1, 0.8), Mp(xc - puerta * 1.205, yc, 1.6)); box('oscuro', (0.08, 1.25, 0.07), Mp(xc - puerta * 1.21, yc, 2.04))
     box('hierro', (0.06, 0.85, 2.0), Mp(xc + puerta * 1.2, yc - 0.4, 1.0)); box('oscuro', (0.1, 0.05, 0.2), Mp(xc + puerta * 1.23, yc - 0.08, 1.05))
-def baculo(xm, ym, largo):
-    """Báculo con brazo hacia el sur: la luminaria queda sobre el camino."""
-    box('hierro', (0.1, 0.1, 4.0), Mp(xm, ym, 2.0)); box('hierro', (0.07, largo + 0.2, 0.07), Mp(xm, ym + largo / 2, 3.96)); box('hormigon', (0.4, 0.4, 0.3), Mp(xm, ym, 0.15))
-    box('oscuro', (0.3, 0.44, 0.1), Mp(xm, ym + largo, 3.88)); box('bombilla', (0.16, 0.26, 0.03), Mp(xm, ym + largo, 3.82))
+def baculo(xm, ym, largo, s=1):
+    """Báculo con brazo hacia el sur (s = 1) o hacia el norte (s = -1): la luminaria queda sobre el camino."""
+    box('hierro', (0.1, 0.1, 4.0), Mp(xm, ym, 2.0)); box('hierro', (0.07, largo + 0.2, 0.07), Mp(xm, ym + s * largo / 2, 3.96)); box('hormigon', (0.4, 0.4, 0.3), Mp(xm, ym, 0.15))
+    box('oscuro', (0.3, 0.44, 0.1), Mp(xm, ym + s * largo, 3.88)); box('bombilla', (0.16, 0.26, 0.03), Mp(xm, ym + s * largo, 3.82))
 def build_exterior():
     """Tanda 20 (Andres, 2026-11-14): el muro perimetral EXT casillas más afuera por los cuatro lados, un portón de entrada al oeste
     y otro de salida al este, y un camino que cruza la base de uno a otro por la franja sur. Dentro del muro antiguo no se mueve nada."""
@@ -359,11 +359,13 @@ def build_exterior():
         xi = xx + s * 0.62
         box('hierro', (0.06, (yb - ya) * 2 + 1.6, 0.03), Mp(xi, yb + 0.5, 0.055))                              # carril
         box('hierro', (0.1, 0.1, 2.9), Mp(xi + s * 0.14, yb + 0.5, 1.45)); box('hierro', (0.36, 0.1, 0.08), Mp(xi + s * 0.02, yb + 0.5, 2.86))   # guía
-        if s > 0: porton(xi, ya - 0.3, yb + 0.3)
+        if s > 0:
+            # la hoja de la entrada va en su propia malla (hojaentrada_*): en Unreal se corre hacia el sur para el camión
+            guardado = dict(BM); BM.clear(); porton(xi, ya - 0.3, yb + 0.3); flush('hojaentrada'); BM.update(guardado)
         else: porton(xi, yb + 0.2, yb + 0.2 + (yb - ya) + 0.6)
         gx = xx + s * 3.2; garita(gx, ya - 2.4, s < 0, s); mx = gx + s * 1.2; baculo(mx, ya - 0.4, 2.8)
         box('hierro', (0.05, 0.05, 1.5), Mp(mx + s * 1.6, yb + 0.5, 0.75)); box('aviso', (0.03, 0.7, 0.45), Mp(mx + s * 1.6, yb + 0.5, 1.4))
-        EXT_OUT['entrada' if s > 0 else 'salida'] = {'pos': [xx, yc], 'ancho': yb - ya, 'garita': [gx, ya - 2.4], 'farol': [mx, ya + 2.4, 3.8], 'baculo': [mx, ya - 0.4], 'hoja': 'cerrada' if s > 0 else 'abierta',
+        EXT_OUT['entrada' if s > 0 else 'salida'] = {'pos': [xx, yc], 'ancho': yb - ya, 'garita': [gx, ya - 2.4], 'farol': [mx, ya + 2.4, 3.8], 'baculo': [mx, ya - 0.4], 'hoja': 'cerrada' if s > 0 else 'abierta', 'recorrido': (yb - ya) + 0.4,
                                                          'barrera': {'pos': [xx + s * 5.0, ya], 'giro': 90, 'largo': yb - ya}, 'meta': [xx + s * 0.5, yc]}
     # portillo de la marisma: puerta de chapa en el muro sur, lejos de los portones (la partida acaba al usarlo: no se abre de verdad)
     px = 3.1; yi = ys - T * 0.225
@@ -371,6 +373,13 @@ def build_exterior():
         box('hierro', (1.0, 0.1, 2.1), Mp(px, q, 1.05)); box('oscuro', (1.24, 0.14, 0.12), Mp(px, q, 2.16)); box('oscuro', (0.05, 0.05, 0.2), Mp(px + 0.38, q + k * 0.06, 1.05))
         for a in (-0.56, 0.56): box('oscuro', (0.12, 0.14, 2.1), Mp(px + a, q, 1.05))
     box('aviso', (0.3, 0.03, 0.2), Mp(px, yi - 0.1, 1.65))
+    # tanda 21: aplique sobre el portillo (antes era una mancha negra en el muro) y farolas a lo largo del camino, del lado
+    # del anillo y con el brazo hacia el norte. Van separadas: entre charco y charco de luz queda sombra para cruzar
+    box('oscuro', (0.24, 0.1, 0.14), Mp(px, yi - 0.09, 2.5)); box('bombilla', (0.14, 0.06, 0.08), Mp(px, yi - 0.16, 2.47))
+    EXT_OUT['portillo_luz'] = [px, round(yi - 0.3, 2), 2.4]
+    fx0, fx1 = EXT_OUT['entrada']['farol'][0], EXT_OUT['salida']['farol'][0]; NF = 3; EXT_OUT['farolas'] = []
+    for k in range(1, NF + 1):
+        fx = round(fx0 + (fx1 - fx0) * k / (NF + 1), 1); baculo(fx, yb + 0.5, 2.8, -1); EXT_OUT['farolas'].append([fx, round(yb + 0.5 - 2.8, 2), 3.8])
     for k in ('entrada', 'salida'): EXT_OUT[k] = json.loads(json.dumps(EXT_OUT[k]), parse_float=lambda v: round(float(v), 3))
     EXT_OUT.update({'casillas': EXT, 'x0': X0, 'x1': X1, 'y0': Y0, 'y1': Y1, 'camino': {'y': yc, 'ancho': yb - ya, 'x0': X0 - CAUSE, 'x1': X1 + CAUSE, 'alto': 0.04},
                     'portillo': [px, round(yi - 0.65, 2)], 'filas_porton': list(GR)})
@@ -893,6 +902,9 @@ def build_props():
     F('painted_wooden_bench', 30, 14, 0, 0.6); F('metal_tool_chest', 7, 8, 0, 0, 0.5); F('ammo_box', 29, 21, 0, 0, 0.8)
     furnish()
     flush('luces'); flush_smooth('camiones')
+    if EXT:   # tanda 21: el camión que cruza la base por el camino. En el origen y con el frente hacia +X: en Unreal se mueve el actor
+        truck(Vector((0, 0, 0)), math.pi / 2); flush_smooth('camionmovil')
+        EXT_OUT['camion'] = {'largo': 4.0, 'ancho': 2.1, 'alto': 2.5, 'faros': [[1.96, 0.72, 1.22], [1.96, -0.72, 1.22]]}
     people()
     # luces interiores del plano (despacho, archivo, calabozo...): se ven por las puertas y calientan las ventanas
     for m in re.finditer(r'\[([\d.]+),([\d.]+),0x([0-9a-f]{6}),([\d.]+)\]', re.search(r"ZONES\.base=.*?lights:\[(.*?)\]\],", src, re.S).group(1) + ']'):

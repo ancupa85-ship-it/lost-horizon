@@ -20,6 +20,8 @@ SITIOS = [
     ('porton de entrada', V(-600, 5850, 120), V(-1900, 5700, 150)),
     ('porton de salida', V(7600, 5860, 120), V(9100, 5700, 150)),
 ]
+# tanda 21: el camión entrando por el portón con los faros (una luz con sombra que se mueve) hacia la cámara
+CAMION = ('camino con el camion', V(1500, 6150, 120), V(-600, 5700, 120))
 ESPERA, MIDE = 2.0, 8.0
 M = {'estado': 'arrancando', 'res': [], 'h': None, 'gen': None, 'espera': 0.0, 'dts': None}
 builtins._tarsis_medida = M
@@ -52,12 +54,27 @@ def pasos():
     d = unreal.GameplayStatics.get_all_actors_of_class(w, cls)[0]
     if d.get_editor_property('cine'):
         d.interact()
+    try:
+        d.set_editor_property('truck', False)   # el camión, solo en su sitio de medida (el último)
+    except Exception:
+        pass
     unreal.SystemLibrary.execute_console_command(w, 'scalability 1')
     unreal.SystemLibrary.execute_console_command(w, 't.MaxFPS 0')
     unreal.SystemLibrary.execute_console_command(w, 'r.SetRes 1920x1080w')   # la ventana del PIE a 1080p
     yield 8.0   # calentamiento: sombreadores recién compilados y texturas que aún se cargan (el primer sitio salía 7 fps peor)
     gcls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
-    for nombre, pos, mira in SITIOS:
+    for nombre, pos, mira in SITIOS + [CAMION]:
+        if nombre == CAMION[0]:
+            try:
+                d.set_editor_property('truck', True)
+                d.set_editor_property('truck_start', V(-6000, 5700, 4))
+                d.truck_skip_wait()
+            except Exception:
+                continue   # módulo sin compilar con el camión
+            for _ in range(60):   # hasta que ha entrado por el portón (se mide mientras viene por el camino)
+                if d.get_editor_property('truck_state') >= 3:
+                    break
+                yield 0.5
         for g in unreal.GameplayStatics.get_all_actors_of_class(w, gcls):
             g.hold(60.0)
         p = unreal.GameplayStatics.get_player_pawn(w, 0)

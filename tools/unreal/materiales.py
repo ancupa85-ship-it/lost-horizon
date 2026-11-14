@@ -62,10 +62,22 @@ def lin(c):
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
 
 # ------------------------------------------------------------------ 1. texturas
+# lado máximo (píxeles) de las texturas que no lucen sus 2K: la grava del anillo se ve de noche y a ras de suelo, y con
+# 1K la tarjeta de 4 GB recupera unos 30 MB (tanda 21). El fichero descargado no cambia: lo reduce Unreal al cocinarla.
+LADO_MAX = {'gravel_floor_02': 1024}
+
+def limitar(tx, nombre):
+    lado = LADO_MAX.get(nombre)
+    if tx is not None and lado and tx.get_editor_property('max_texture_size') != lado:
+        tx.set_editor_property('max_texture_size', lado)
+        eal.save_loaded_asset(tx)
+        log('textura', tx.get_name(), 'limitada a', lado, 'px')
+    return tx
+
 def textura(nombre, tipo):
     ruta = '%s/T_%s_%s' % (DT, nombre, tipo)
     if eal.does_asset_exist(ruta):
-        return eal.load_asset(ruta)
+        return limitar(eal.load_asset(ruta), nombre)
     f = os.path.join(TEX, '%s_%s.jpg' % (nombre, tipo))
     if not os.path.exists(f):
         return None
@@ -88,7 +100,7 @@ def textura(nombre, tipo):
         tx.set_editor_property('compression_settings', unreal.TextureCompressionSettings.TC_MASKS)
         tx.set_editor_property('srgb', False)
     eal.save_loaded_asset(tx)
-    return tx
+    return limitar(tx, nombre)
 
 # ------------------------------------------------------------------ 2. material maestro
 # suciedad en el maestro (manchas de ruido y zócalo); False lo deja como antes (para medir lo que cuesta)

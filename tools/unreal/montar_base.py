@@ -8,7 +8,8 @@ Qué hace (se puede repetir: rehace el nivel cada vez):
 1. Importa base.glb en /Game/Tarsis/Base/v<huella> (mallas y materiales); al final borra las versiones anteriores.
 2. Crea el nivel /Game/Tarsis/Mapas/Tarsis y coloca todas las mallas en el origen (vienen con la posición aplicada).
    Las torres de vigilancia (torre1_*, torre2_*) van a la carpeta «Torres»; vallas y contenedores, a «Recintos»
-   (la tela de las vallas con un material translúcido, M_Tela).
+   (la tela de las vallas con un material recortado de malla metálica, M_TelaMalla).
+   El camión que circula (camionmovil_*) y la hoja del portón de entrada (hojaentrada_*) quedan móviles y con etiqueta.
 3. Deduce cómo quedaron los ejes con las marcas lh_marca_* y coloca con esa conversión las luces del visor,
    la luna, el cielo nocturno, la niebla y la salida de Cuttlas.
 4. Pone colisión «compleja como simple» para poder andar por todo, y guarda.
@@ -100,36 +101,131 @@ if eal.does_asset_exist(MAPA):   # se rehace por dentro: vaciar el nivel existen
 else:
     les.new_level(MAPA)
 
-def tela_mat(actor):
-    """La tela metálica se ve a través (en el visor es una textura con agujeros): material translúcido gris metálico."""
+def tela_translucida():
+    """Material de reserva (el de las primeras tandas): placa translúcida gris. Solo si falta la textura de la malla."""
     ruta = '/Game/Tarsis/Materiales/M_Tela'
     if eal.does_asset_exist(ruta):
-        m = eal.load_asset(ruta)
-    else:
-        mel = unreal.MaterialEditingLibrary
-        m = unreal.AssetToolsHelpers.get_asset_tools().create_asset('M_Tela', '/Game/Tarsis/Materiales',
-                                                                     unreal.Material, unreal.MaterialFactoryNew())
-        m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT)
-        m.set_editor_property('two_sided', True)
-        col = mel.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -300, 0)
-        col.set_editor_property('constant', unreal.LinearColor(0.38, 0.41, 0.41, 1))
-        mel.connect_material_property(col, '', unreal.MaterialProperty.MP_BASE_COLOR)
-        op = mel.create_material_expression(m, unreal.MaterialExpressionConstant, -300, 200)
-        op.set_editor_property('r', 0.35)
-        mel.connect_material_property(op, '', unreal.MaterialProperty.MP_OPACITY)
-        mel.recompile_material(m)
-        eal.save_loaded_asset(m)
+        return eal.load_asset(ruta)
+    mel = unreal.MaterialEditingLibrary
+    m = unreal.AssetToolsHelpers.get_asset_tools().create_asset('M_Tela', '/Game/Tarsis/Materiales',
+                                                                 unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property('two_sided', True)
+    col = mel.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -300, 0)
+    col.set_editor_property('constant', unreal.LinearColor(0.38, 0.41, 0.41, 1))
+    mel.connect_material_property(col, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    op = mel.create_material_expression(m, unreal.MaterialExpressionConstant, -300, 200)
+    op.set_editor_property('r', 0.35)
+    mel.connect_material_property(op, '', unreal.MaterialProperty.MP_OPACITY)
+    mel.recompile_material(m)
+    eal.save_loaded_asset(m)
+    return m
+
+TELA_PNG = os.path.join(ROOT, 'assets', 'unreal', 'texturas_propias', 'tela_metalica.png')
+TELA_CM = 32.0   # centímetros que cubre la textura (tools/texturas/tela_metalica.py)
+
+def tela_malla():
+    """Tanda 21: la tela metálica es una malla recortada (rombos de alambre con el hueco en el canal alfa), no una placa
+    translúcida que de noche parecía cristal. La textura se proyecta según la posición en el mundo (las placas de la valla
+    van a lo largo de X o de Y), así que no depende de las UV. Se rehace si cambia el PNG."""
+    mel = unreal.MaterialEditingLibrary
+    tools = unreal.AssetToolsHelpers.get_asset_tools()
+    dm = '/Game/Tarsis/Materiales'
+    huella = hashlib.md5(open(TELA_PNG, 'rb').read()).hexdigest()[:8]
+    ruta = '%s/M_TelaMalla_%s' % (dm, huella)
+    if eal.does_asset_exist(ruta):
+        return eal.load_asset(ruta)
+    t = unreal.AssetImportTask()
+    t.set_editor_property('filename', TELA_PNG)
+    t.set_editor_property('destination_path', dm)
+    t.set_editor_property('destination_name', 'T_TelaMetalica_' + huella)
+    t.set_editor_property('automated', True)
+    t.set_editor_property('replace_existing', True)
+    t.set_editor_property('save', False)
+    tools.import_asset_tasks([t])
+    tx = eal.load_asset('%s/T_TelaMetalica_%s' % (dm, huella))
+    if tx is None:
+        raise RuntimeError('no se importó ' + TELA_PNG)
+    # al reducirse con la distancia, el alambre (16 % de la superficie) desaparecería del recorte: se conserva su cobertura
+    for prop, val in (('do_scale_mips_for_alpha_coverage', True), ('alpha_coverage_thresholds', unreal.Vector4(0.0, 0.0, 0.0, 0.4))):
+        try:
+            tx.set_editor_property(prop, val)
+        except Exception as e:
+            log('AVISO: textura de la tela sin', prop, repr(e))
+    eal.save_loaded_asset(tx)
+    m = tools.create_asset('M_TelaMalla_' + huella, dm, unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MASKED)
+    m.set_editor_property('two_sided', True)
+    m.set_editor_property('opacity_mask_clip_value', 0.4)
+    E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
+    def uno(a, b):   # la entrada única se llama «Input» o «» según el nodo (como en materiales.py)
+        if not mel.connect_material_expressions(a, '', b, 'Input'):
+            mel.connect_material_expressions(a, '', b, '')
+    def canal(k, y):
+        c = E(unreal.MaterialExpressionComponentMask, -900, y)
+        for q in 'rgba':
+            c.set_editor_property(q, q == k)
+        uno(wp, c)
+        return c
+    wp = E(unreal.MaterialExpressionWorldPosition, -1150, 0)
+    cx, cy, cz = canal('r', -150), canal('g', 0), canal('b', 150)
+    u = E(unreal.MaterialExpressionAdd, -720, -80)      # a lo largo de la valla: X + Y (una de las dos no cambia en cada placa)
+    mel.connect_material_expressions(cx, '', u, 'A')
+    mel.connect_material_expressions(cy, '', u, 'B')
+    uv = E(unreal.MaterialExpressionAppendVector, -560, 0)
+    mel.connect_material_expressions(u, '', uv, 'A')
+    mel.connect_material_expressions(cz, '', uv, 'B')
+    esc = E(unreal.MaterialExpressionDivide, -400, 0)
+    esc.set_editor_property('const_b', TELA_CM)
+    mel.connect_material_expressions(uv, '', esc, 'A')
+    ts = E(unreal.MaterialExpressionTextureSample, -220, 0)
+    ts.set_editor_property('texture', tx)
+    if not mel.connect_material_expressions(esc, '', ts, 'UVs'):
+        mel.connect_material_expressions(esc, '', ts, 'Coordinates')
+    mel.connect_material_property(ts, 'RGB', unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(ts, 'A', unreal.MaterialProperty.MP_OPACITY_MASK)
+    for prop, val, y in ((unreal.MaterialProperty.MP_ROUGHNESS, 0.45, 250), (unreal.MaterialProperty.MP_METALLIC, 0.85, 350)):
+        c = E(unreal.MaterialExpressionConstant, -220, y)
+        c.set_editor_property('r', val)
+        mel.connect_material_property(c, '', prop)
+    mel.recompile_material(m)
+    eal.save_loaded_asset(m)
+    log('material de tela metálica recortada', ruta)
+    return m
+
+_TELA = []
+def tela_mat(actor):
+    if not _TELA:
+        try:
+            _TELA.append(tela_malla())
+        except Exception as e:
+            log('AVISO: tela metálica recortada no creada, se usa la translúcida:', repr(e))
+            _TELA.append(tela_translucida())
     c = actor.get_component_by_class(unreal.StaticMeshComponent)
     if c:
-        c.set_material(0, m)
+        c.set_material(0, _TELA[0])
+        c.set_editor_property('cast_shadow', False)   # miles de rombos dando sombra no compensan en una GTX 1050
 
 marks = {}
+# tanda 21: piezas que el director mueve en el juego (las busca por su etiqueta de actor, «tag»). Todas tienen el origen
+# en el origen del mundo: la hoja del portón de entrada se corre hacia el sur y el camión (modelado en el origen, con el
+# frente hacia +X) se lleva por el camino.
+MOVILES = {'camionmovil': ('camion', 'Camion'), 'hojaentrada': ('hoja_entrada', 'Perimetro')}
+moviles = {}
 for m in meshes:
     a = eas.spawn_actor_from_object(m, unreal.Vector(0, 0, 0))
     name = m.get_name()
     a.set_actor_label(name)
     a.set_folder_path('Torres' if name.startswith('torre') else
                       'Recintos' if name.startswith(('valla', 'contenedor')) else 'Base')
+    for clave, (tag, carpeta) in MOVILES.items():
+        if name.startswith(clave):
+            c = a.get_component_by_class(unreal.StaticMeshComponent)
+            c.set_mobility(unreal.ComponentMobility.MOVABLE)
+            c.set_editor_property('can_ever_affect_navigation', False)
+            a.tags = [unreal.Name(tag)]
+            a.set_folder_path(carpeta)
+            moviles.setdefault(clave, []).append(a)
     if name.startswith('valla_tela'):
         tela_mat(a)
     for k in ('lh_marca_o', 'lh_marca_x', 'lh_marca_y', 'lh_marca_z'):
@@ -153,6 +249,16 @@ def ue(p):
 
 def ue_dir(d):
     return ax[0] * d[0] + ax[1] * d[1] + ax[2] * d[2]
+
+# el camión espera fuera, al principio del terraplén del oeste (el director lo pone ahí al empezar; así tampoco estorba
+# en el editor ni en las capturas)
+ext = DATA.get('ext') or {}
+if moviles.get('camionmovil') and ext.get('camino'):
+    cam = ext['camino']
+    ini = ue([cam['x0'] + 5.0, -cam['y'], cam.get('alto', 0.04)])
+    for a in moviles['camionmovil']:
+        a.set_actor_location(ini, False, False)
+    log('camión en', ini, '-', len(moviles['camionmovil']), 'piezas; hoja de entrada:', len(moviles.get('hojaentrada', [])), 'piezas')
 
 # noche: exposición manual (EV) e intensidades de luna y luz ambiente, ajustadas con capturas en el patio
 EXPO = {'ev': 0.5, 'luna': 0.6, 'cielo': 2.5}
@@ -201,6 +307,9 @@ for i, l in enumerate(DATA['lights']):
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
         c.set_editor_property('intensity', min(l['power'] * 2.0, 4000.0))
         c.set_editor_property('attenuation_radius', 1800.0 if l['name'] == 'farola' else 900.0)
+        if l['name'] == 'aplique':   # bombilla de pared (portillo): alumbra la puerta y poco más, sin sombras
+            c.set_editor_property('attenuation_radius', 700.0)
+            c.set_editor_property('cast_shadows', False)
     c.set_light_color(col)
 
 # noche: cielo, luz ambiente tenue y niebla

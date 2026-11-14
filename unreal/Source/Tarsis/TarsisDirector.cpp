@@ -59,6 +59,7 @@ void ATarsisDirector::BeginPlay()
 	SetupMission();
 	SetupBarrier();
 	SetupSound();
+	SetupTruck();
 	SetupPlayer();
 	SetWeather(Weather);
 	SetupZones();
@@ -283,6 +284,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	RadioTick(DeltaSeconds);
 	PowerTick(DeltaSeconds);
 	BarrierTick(DeltaSeconds);
+	TruckTick(DeltaSeconds);
 	MusicTick(DeltaSeconds);
 	// el que fue a mirar el farol roto encuentra los cristales y avisa: la base se pone en guardia un rato
 	if (bLampBroken && !bLampReported && LampChecker && LampChecker->State != ETarsisGuardState::Down
@@ -826,8 +828,8 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	if (!bByMarsh)
 	{
 		// en el control, el de la garita levanta la barrera y mira hacia otro lado (sale en el plano de LS_Salida)
-		BarrierT = 0.001f;
-		PlaySfx(TEXT("barrera"), ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f));
+		if (BarrierTarget < 1.0f) PlaySfx(TEXT("barrera"), ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f));
+		BarrierTarget = 1.0f;
 		if (GateLamp && GateLamp->GetLightComponent())
 		{
 			// que el plano final se vea aunque cortaras la luz; si rompiste el farol, solo la bombilla de dentro de la garita
@@ -1720,6 +1722,7 @@ void ATarsisDirector::CutPower()
 	{
 		ULocalLightComponent* L = Cast<ULocalLightComponent>(It->GetLightComponent());
 		if (!L || !L->IsVisible()) continue;
+		if (It->ActorHasTag(FName(TEXT("camion")))) continue;   // los faros del camión van con su batería
 		PendingOff.Add(L);
 	}
 	const FVector G = GeneratorLoc;
@@ -1976,11 +1979,275 @@ void ATarsisDirector::SetupBarrier()
 void ATarsisDirector::BarrierTick(float DeltaSeconds)
 {
 	if (!BarrierArm) return;
-	if (BarrierT > 0.0f && BarrierT < 1.0f) BarrierT = FMath::Min(1.0f, BarrierT + DeltaSeconds / 2.5f);
+	// sube en el final por la salida y cuando pasa el camión; detrás del camión vuelve a bajar
+	BarrierT = FMath::FInterpConstantTo(BarrierT, BarrierTarget, DeltaSeconds, 1.0f / 2.5f);
 	const float Pitch = 80.0f * FMath::SmoothStep(0.0f, 1.0f, BarrierT);
 	const FRotator R(Pitch, ExitBarrierYaw, 0.0f);
 	const FVector Pivot = ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f);
 	BarrierArm->SetWorldLocationAndRotation(Pivot + R.RotateVector(FVector(ExitBarrierLength * 0.5f, 0.0f, 0.0f)), R);
+}
+
+// ---------------------------------------------------------------- camión de suministros y portón de entrada (tanda 21)
+// El camión es un decorado que se mueve (sin física): sus piezas se colocan cada fotograma a lo largo del eje del camino.
+// Lo que da al juego: sus faros alumbran lo que tiene delante (cuentan para LightAt como cualquier luz del nivel), su caja
+// tapa la vista de los guardias, el portón de entrada y la barrera se abren a su paso, y si el conductor te ve en el haz o
+// le cortas el paso toca el claxon y los guardias de cerca vienen a mirar.
+
+void ATarsisDirector::SetupTruck()
+{
+	TArray<AActor*> Found;
+	UGameplayStatics::GetAllActorsWithTag(this, FName(TEXT("hoja_entrada")), Found);
+	for (AActor* A : Found) { if (A) EntryLeaf.Add(A); }
+	Found.Reset();
+	UGameplayStatics::GetAllActorsWithTag(this, FName(TEXT("camion")), Found);
+	for (AActor* A : Found) { if (A && !A->IsA<ALight>()) TruckParts.Add(A); }
+	if (TruckParts.Num() == 0) return;
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	TruckLamp = GetWorld()->SpawnActor<ASpotLight>(TruckStart, FRotator(-5.0f, 0.0f, 0.0f), P);
+	if (TruckLamp)
+	{
+		TruckLamp->Tags.Add(FName(TEXT("camion")));
+		if (USceneComponent* Root = TruckLamp->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
+		if (USpotLightComponent* L = Cast<USpotLightComponent>(TruckLamp->GetLightComponent()))
+		{
+			L->SetIntensityUnits(ELightUnits::Lumens);
+			L->SetIntensity(TruckLampLumens);
+			L->SetAttenuationRadius(3800.0f);
+			L->SetOuterConeAngle(30.0f);
+			L->SetInnerConeAngle(14.0f);
+			L->SetLightColor(FLinearColor(1.0f, 0.88f, 0.66f));
+			L->SetCastShadows(bTruckShadows);
+			L->SetVolumetricScatteringIntensity(2.5f);
+		}
+	}
+	if (USoundBase* S = Sfx(TEXT("camion_motor")))
+	{
+		if (USoundWave* W = Cast<USoundWave>(S)) W->bLooping = true;
+		// se le oye venir desde lejos (unos 50 m), no como los pasos
+		TruckAtten = NewObject<USoundAttenuation>(this);
+		TruckAtten->Attenuation.bAttenuate = true;
+		TruckAtten->Attenuation.bSpatialize = true;
+		TruckAtten->Attenuation.AttenuationShape = EAttenuationShape::Sphere;
+		TruckAtten->Attenuation.AttenuationShapeExtents = FVector(350.0f, 0.0f, 0.0f);
+		TruckAtten->Attenuation.FalloffDistance = 5000.0f;
+		TruckAudio = UGameplayStatics::SpawnSoundAtLocation(this, S, TruckStart, FRotator::ZeroRotator, 0.9f, 1.0f, 0.0f, TruckAtten, nullptr, false);
+		if (TruckAudio) TruckAudio->Stop();
+	}
+	TruckReset(TruckFirstDelay);
+}
+
+void ATarsisDirector::TruckShow(bool bShow)
+{
+	for (AActor* A : TruckParts)
+	{
+		if (!A) continue;
+		A->SetActorHiddenInGame(!bShow);
+		A->SetActorEnableCollision(bShow);
+	}
+	if (TruckLamp && TruckLamp->GetLightComponent()) TruckLamp->GetLightComponent()->SetVisibility(bShow);
+	if (TruckAudio)
+	{
+		if (bShow && !TruckAudio->IsPlaying()) TruckAudio->Play();
+		else if (!bShow && TruckAudio->IsPlaying()) TruckAudio->Stop();
+	}
+}
+
+void ATarsisDirector::TruckPlace()
+{
+	const FVector L(TruckX, TruckStart.Y, TruckStart.Z);
+	for (AActor* A : TruckParts)
+	{
+		if (A) A->SetActorLocation(L, false, nullptr, ETeleportType::TeleportPhysics);
+	}
+	// los dos faros en una sola luz, delante de la calandra (la malla no le hace sombra) y algo hacia el suelo
+	if (TruckLamp) TruckLamp->SetActorLocationAndRotation(L + FVector(212.0f, 0.0f, 122.0f), FRotator(-5.0f, 0.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	if (TruckAudio)
+	{
+		TruckAudio->SetWorldLocation(L + FVector(120.0f, 0.0f, 130.0f));
+		TruckAudio->SetPitchMultiplier(0.82f + 0.45f * FMath::Clamp(TruckV / FMath::Max(1.0f, TruckSpeedOut), 0.0f, 1.0f));
+	}
+}
+
+void ATarsisDirector::TruckReset(float Wait)
+{
+	TruckState = 0;
+	TruckT = Wait;
+	TruckX = TruckStart.X;
+	TruckV = 0.0f;
+	TruckWaitT = TruckSeenT = TruckBlockT = 0.0f;
+	EntryGateTarget = 0.0f;
+	bEntryGateShut = false;
+	if (!bDone) BarrierTarget = 0.0f;
+	TruckShow(false);
+	TruckPlace();
+}
+
+void ATarsisDirector::TruckHorn(const FVector& Where, int32 Why)
+{
+	TruckHornT = 14.0f;
+	++TruckHorns;
+	const FVector L(TruckX, TruckStart.Y, TruckStart.Z + 150.0f);
+	if (USoundBase* S = Sfx(TEXT("claxon"))) UGameplayStatics::PlaySoundAtLocation(this, S, L, 1.0f, 1.0f, 0.0f, TruckAtten ? TruckAtten.Get() : Atten.Get());
+	// el claxon se oye en media base: los guardias de a pie que estén a menos de 45 m van a ver qué pasa
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->bTowerSentry || It->bAlly || It->State == ETarsisGuardState::Down) continue;
+		if (FVector::Dist2D(It->GetActorLocation(), L) < 4500.0f) It->HearNoise(Where);
+	}
+	if (Why == 0) ShowMessage(Tx(TEXT("camion_visto"), TEXT("TE HA VISTO EL CAMION\nEstabas en la luz de sus faros. El conductor toca el claxon y los guardias de cerca vienen a mirar.")), 4.0f);
+	else if (Why == 1) ShowMessage(Tx(TEXT("camion_paso"), TEXT("ESTAS EN MEDIO DEL CAMINO\nEl camion frena y toca el claxon. Los guardias de cerca vienen a mirar.")), 4.0f);
+}
+
+void ATarsisDirector::TruckTick(float DeltaSeconds)
+{
+	// hoja del portón de entrada: corre por su carril hacia el sur y vuelve
+	if (EntryLeaf.Num() > 0 && !FMath::IsNearlyEqual(EntryGateT, EntryGateTarget))
+	{
+		EntryGateT = FMath::FInterpConstantTo(EntryGateT, EntryGateTarget, DeltaSeconds, 1.0f / 5.0f);
+		const FVector Off = EntryGateSlide * FMath::SmoothStep(0.0f, 1.0f, EntryGateT);
+		for (AActor* A : EntryLeaf)
+		{
+			if (A) A->SetActorLocation(Off, false, nullptr, ETeleportType::TeleportPhysics);
+		}
+	}
+	if (TruckParts.Num() == 0) return;
+	if (!bTruck)
+	{
+		// apagado a media pasada (las pruebas y la medida): desaparece y vuelve a esperar fuera
+		if (TruckState != 0) TruckReset(TruckInterval);
+		return;
+	}
+	if (TruckHornT > 0.0f) TruckHornT -= DeltaSeconds;
+	if (TruckState == 0)
+	{
+		if (bCine || bDone) return;
+		TruckT -= DeltaSeconds;
+		if (TruckT > 0.0f) return;
+		TruckState = 1;
+		TruckX = TruckStart.X;
+		TruckV = TruckSpeedOut;
+		TruckShow(true);
+		Teach(TEXT("ensena_camion"), TEXT("VIENE UN CAMION\nEntra por el porton del oeste y cruza la base por el camino. Sus faros alumbran lo que tiene delante; detras de el, todo queda a oscuras."), {}, 5.0f);
+	}
+	const FVector Loc(TruckX, TruckStart.Y, TruckStart.Z);
+	float Want = 0.0f;
+	float StopX = TruckEndX;
+	switch (TruckState)
+	{
+	case 1:
+		Want = TruckSpeedOut;
+		StopX = TruckGateStopX;
+		break;
+	case 2:
+		TruckWaitT += DeltaSeconds;
+		StopX = TruckGateStopX;
+		if (EntryGateT > 0.98f && TruckWaitT > 1.5f) { TruckState = 3; TruckWaitT = 0.0f; }
+		break;
+	case 3:
+		Want = TruckSpeed;
+		StopX = TruckBarrierStopX;
+		// con la trasera ya dentro, la hoja se cierra detrás
+		if (!bEntryGateShut && TruckX > EntryGateLoc.X + 520.0f)
+		{
+			bEntryGateShut = true;
+			EntryGateTarget = 0.0f;
+			PlaySfx(TEXT("porton"), EntryGateLoc, 1.0f);
+		}
+		break;
+	case 4:
+		TruckWaitT += DeltaSeconds;
+		StopX = TruckBarrierStopX;
+		// en el control miran los papeles unos segundos y levantan la barrera
+		if (TruckWaitT > 6.0f && BarrierTarget < 1.0f)
+		{
+			BarrierTarget = 1.0f;
+			PlaySfx(TEXT("barrera"), ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f));
+		}
+		if (TruckWaitT > 6.0f && BarrierT > 0.95f) { TruckState = 5; TruckWaitT = 0.0f; }
+		break;
+	default:
+		Want = TruckX < ExitLoc.X + 300.0f ? TruckSpeed : TruckSpeedOut;
+		if (!bDone && BarrierTarget > 0.0f && TruckX > ExitBarrierLoc.X + 700.0f)
+		{
+			BarrierTarget = 0.0f;
+			PlaySfx(TEXT("barrera"), ExitBarrierLoc + FVector(0.0f, 0.0f, 100.0f));
+		}
+		break;
+	}
+	// alguien delante (tú, un guardia o un cuerpo en el suelo): frena en seco y, si no se aparta, claxon
+	bool bBlocked = false, bBlockedByPlayer = false;
+	FVector BlockLoc = Loc;
+	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (Want > 0.0f)
+	{
+		const float Ahead = 230.0f + 260.0f + TruckV * 0.7f;
+		for (TActorIterator<ACharacter> It(GetWorld()); It; ++It)
+		{
+			const FVector R = It->GetActorLocation() - Loc;
+			if (R.X > 150.0f && R.X < Ahead && FMath::Abs(R.Y) < 175.0f && FMath::Abs(R.Z) < 320.0f)
+			{
+				bBlocked = true;
+				BlockLoc = It->GetActorLocation();
+				if (*It == Player) bBlockedByPlayer = true;
+			}
+		}
+	}
+	if (bBlocked)
+	{
+		Want = 0.0f;
+		TruckBlockT += DeltaSeconds;
+		if (TruckBlockT > (bBlockedByPlayer ? 1.2f : 3.5f) && TruckHornT <= 0.0f && !bDone && !bCine) TruckHorn(BlockLoc, bBlockedByPlayer ? 1 : 2);
+	}
+	else TruckBlockT = 0.0f;
+	// frena a tiempo para parar justo en su sitio
+	const float Left = StopX - TruckX;
+	if (TruckState != 5 && Want > 0.0f) Want = FMath::Min(Want, FMath::Sqrt(2.0f * 240.0f * FMath::Max(0.0f, Left)) + 25.0f);
+	TruckV = FMath::FInterpConstantTo(TruckV, Want, DeltaSeconds, Want > TruckV ? 170.0f : (bBlocked ? 900.0f : 420.0f));
+	TruckX += TruckV * DeltaSeconds;
+	if (TruckState == 1 && Left < 10.0f)
+	{
+		// ante el portón: se para, la hoja empieza a correr
+		TruckState = 2;
+		TruckV = 0.0f;
+		TruckWaitT = 0.0f;
+		EntryGateTarget = 1.0f;
+		bEntryGateShut = false;
+		PlaySfx(TEXT("porton"), EntryGateLoc, 1.0f);
+	}
+	else if (TruckState == 3 && Left < 10.0f)
+	{
+		TruckState = 4;
+		TruckV = 0.0f;
+		TruckWaitT = 0.0f;
+	}
+	else if (TruckState == 5 && TruckX >= TruckEndX)
+	{
+		++TruckPasses;
+		TruckReset(TruckInterval);
+		return;
+	}
+	TruckPlace();
+	// el conductor: ve a quien esté de pie en el haz de los faros, sin nada por medio (agachado, solo a la mitad de distancia)
+	if (TruckSeenT > 0.0f && TruckHornT > 0.0f) TruckSeenT = 0.0f;
+	ACharacter* PC = Cast<ACharacter>(Player);
+	bool bSeen = false;
+	if (PC && !bDone && !bCine && !bCapturing && !bHiding && !PC->IsHidden() && TruckHornT <= 0.0f)
+	{
+		const FVector Eye = FVector(TruckX + 235.0f, TruckStart.Y, TruckStart.Z + 165.0f);
+		const FVector To = PC->GetActorLocation() - Eye;
+		const float Reach = PC->bIsCrouched ? TruckSight * 0.5f : TruckSight;
+		if (To.X > 120.0f && To.Size2D() < Reach && FMath::Abs(To.Y) < To.X * 0.34f)
+		{
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisCamion), true);
+			Q.AddIgnoredActor(PC);
+			for (AActor* A : TruckParts) { if (A) Q.AddIgnoredActor(A); }
+			FHitResult Hit;
+			bSeen = !GetWorld()->LineTraceSingleByChannel(Hit, Eye, PC->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f), ECC_Visibility, Q);
+		}
+	}
+	TruckSeenT = bSeen ? TruckSeenT + DeltaSeconds : FMath::Max(0.0f, TruckSeenT - DeltaSeconds * 0.5f);
+	if (bSeen && TruckSeenT > 0.8f && !bBlockedByPlayer) TruckHorn(PC->GetActorLocation(), 0);
 }
 
 // ---------------------------------------------------------------- farol de la garita: se rompe de un disparo
@@ -2117,6 +2384,7 @@ bool ATarsisDirector::LoadCheckpoint()
 		}
 	}
 	TensionT = 0.0f;
+	if (TruckParts.Num() > 0) TruckReset(FMath::Min(TruckInterval, 45.0f));   // el camión no se guarda: vuelve a esperar fuera
 	ShowMessage(Tx(TEXT("partida_cargada"), TEXT("PARTIDA CARGADA\nUltimo punto de control: {0}."), { CheckpointName }), 3.5f);
 	return true;
 }

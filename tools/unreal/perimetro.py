@@ -4,7 +4,9 @@ Se ejecuta en el editor con el nivel Tarsis abierto:  py tools/unreal/perimetro.
 - Tope_Salida: pared invisible fuera del portón de salida (1 x 8 x 4 m, centrada en 9280, 5700, 200) para que nadie
   se vaya andando por el terraplén sin acabar la misión. El punto de salida del director (ExitLoc 9050, 5700, radio
   420) queda antes del tope: con el expediente la misión acaba al llegar; sin él, sale el aviso y el tope para.
-Se puede ejecutar varias veces: borra lo que puso antes (etiqueta Tope_Salida) y lo vuelve a poner.
+- Tope_Entrada (tanda 21): lo mismo por fuera del portón de entrada (-2010, 5700, 200), que ahora se abre para el
+  camión. El camión los atraviesa (el director lo mueve sin barrido); el jugador y los guardias, no.
+Se puede ejecutar varias veces: borra lo que puso antes (por su etiqueta) y lo vuelve a poner.
 """
 import unreal
 
@@ -17,27 +19,38 @@ def log(*a):
     unreal.log('[Tarsis] ' + ' '.join(str(x) for x in a))
 
 
-def tope_salida():
+def tope(nombre, x):
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     for a in eas.get_all_level_actors():
-        if a.actor_has_tag('Tope_Salida'):
+        if a.actor_has_tag(nombre):
             eas.destroy_actor(a)
-    a = eas.spawn_actor_from_class(unreal.StaticMeshActor, V(9280, 5700, 200), unreal.Rotator(0, 0, 0))
-    a.set_actor_label('Tope_Salida')
+    a = eas.spawn_actor_from_class(unreal.StaticMeshActor, V(x, 5700, 200), unreal.Rotator(0, 0, 0))
+    a.set_actor_label(nombre)
     a.set_folder_path(CARPETA)
-    a.tags = [unreal.Name('Tope_Salida')]
+    a.tags = [unreal.Name(nombre)]
     c = a.static_mesh_component
     c.set_static_mesh(unreal.load_asset(CUBO))
     a.set_actor_scale3d(V(1.0, 8.0, 4.0))
     c.set_collision_profile_name('BlockAll')
     c.set_cast_shadow(False)
+    c.set_editor_property('can_ever_affect_navigation', False)
     a.set_actor_hidden_in_game(True)
-    log('tope de la salida en', a.get_actor_location())
+    log(nombre, 'en', a.get_actor_location())
     return a
+
+
+def tope_salida():
+    return tope('Tope_Salida', 9280)
+
+
+def tope_entrada():
+    # tanda 21: el portón de entrada se abre cuando llega el camión; el tope queda justo por fuera de los pilares
+    return tope('Tope_Entrada', -2010)
 
 
 def todo():
     tope_salida()
+    tope_entrada()
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
 
 

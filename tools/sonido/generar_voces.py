@@ -47,6 +47,8 @@ FRASES_CENTRAL = {
 GUARDIAS = {
     'ibarra': ('-12%', '0.92'), 'moya': ('-2%', '1.0'), 'peris': ('+8%', '1.06'),
     'vega': ('-6%', '0.97'), 'ramos': ('+15%', '1.1'), 'centinela': ('-16%', '0.95'),
+    # tanda 21: los de las garitas y la ronda del anillo (al final: las voces de antes salen igual)
+    'lobato': ('-9%', '0.9'), 'sanz': ('+4%', '1.03'), 'carmona': ('-3%', '0.94'),
 }
 
 PS = r'''
