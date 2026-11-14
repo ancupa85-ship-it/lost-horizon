@@ -21,23 +21,37 @@ eal = unreal.EditorAssetLibrary
 mel = unreal.MaterialEditingLibrary
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 
+
+def uno(a, b):
+    """Conecta a la única entrada de b (OneMinus, Saturate, Abs, ComponentMask): según el nodo se llama «Input» o «»."""
+    if not mel.connect_material_expressions(a, '', b, 'Input'):
+        mel.connect_material_expressions(a, '', b, '')
+
 def log(*a):
     unreal.log('[Tarsis] ' + ' '.join(str(x) for x in a))
 
 # clave del visor -> (textura de Poly Haven, metros que ocupa una repetición, como tex(name, rep) en visor.js)
 TEXTURAS = {
     'suelo': ('asphalt_02', 3.0), 'muro': ('concrete_wall_008', 3.2), 'hormigon': ('concrete_wall_008', 3.2),
+    # pared: en la tanda 18 se probó peeling_painted_wall; sale rojiza y cambia también las fachadas
     'pared': ('painted_plaster_wall', 2.6), 'madera': ('wood_planks_dirt', 1.6), 'hierro': ('rusty_metal_02', 1.4),
     'oliva': ('green_metal_rust', 2.2), 'tejado': ('corrugated_iron_02', 2.0), 'suelo_int': ('concrete_floor_worn_001', 2.0),
     # contenedores (exportar_base.py, lh_contenedor_N): chapa ondulada teñida con los cuatro colores del visor
     'contenedor_0': ('corrugated_iron_02', 1.2), 'contenedor_1': ('corrugated_iron_02', 1.2),
     'contenedor_2': ('corrugated_iron_02', 1.2), 'contenedor_3': ('corrugated_iron_02', 1.2),
+    # tanda 18: mantas de lana y colchones de tela basta (mallas de tools/unreal/ambiente.py)
+    'manta': ('poly_wool_herringbone', 0.6), 'colchon': ('rough_linen', 0.8),
+    # tanda 20: anillo exterior. El camino reutiliza el hormigón gastado de los interiores (no gasta memoria de vídeo);
+    # la tierra del anillo es grava suelta
+    'camino': ('concrete_floor_worn_001', 4.0), 'tierra': ('gravel_floor_02', 2.5),
 }
 # tinte, rugosidad y metal del visor (escenario/visor.js, tabla M; color en sRGB)
 VALORES = {
     'suelo': (0x777777, 0.75, 0.0), 'muro': (0x8a8a88, 0.82, 0.0), 'hormigon': (0x8a8a88, 0.82, 0.0),
     'pared': (0xa39c8e, 0.85, 0.0), 'madera': (0xb09a80, 0.75, 0.0), 'hierro': (0x999999, 0.6, 0.55),
     'oliva': (0x6f8a4c, 0.5, 0.1), 'tejado': (0x666668, 0.6, 0.4), 'suelo_int': (0x8c8c8c, 0.55, 0.0),
+    'manta': (0x6b6e58, 0.95, 0.0), 'colchon': (0xb8ab90, 0.9, 0.0),
+    'camino': (0x7d7c78, 0.7, 0.0), 'tierra': (0x6f675c, 0.9, 0.0),
     # colores de KC en visor.js, aclarados: la chapa gris ya oscurece al multiplicar
     'contenedor_0': (0xe0785c, 0.62, 0.15), 'contenedor_1': (0x78aed0, 0.62, 0.15),
     'contenedor_2': (0x94c48a, 0.62, 0.15), 'contenedor_3': (0xe8cf70, 0.62, 0.15),
@@ -48,10 +62,22 @@ def lin(c):
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
 
 # ------------------------------------------------------------------ 1. texturas
+# lado máximo (píxeles) de las texturas que no lucen sus 2K: la grava del anillo se ve de noche y a ras de suelo, y con
+# 1K la tarjeta de 4 GB recupera unos 30 MB (tanda 21). El fichero descargado no cambia: lo reduce Unreal al cocinarla.
+LADO_MAX = {'gravel_floor_02': 1024}
+
+def limitar(tx, nombre):
+    lado = LADO_MAX.get(nombre)
+    if tx is not None and lado and tx.get_editor_property('max_texture_size') != lado:
+        tx.set_editor_property('max_texture_size', lado)
+        eal.save_loaded_asset(tx)
+        log('textura', tx.get_name(), 'limitada a', lado, 'px')
+    return tx
+
 def textura(nombre, tipo):
     ruta = '%s/T_%s_%s' % (DT, nombre, tipo)
     if eal.does_asset_exist(ruta):
-        return eal.load_asset(ruta)
+        return limitar(eal.load_asset(ruta), nombre)
     f = os.path.join(TEX, '%s_%s.jpg' % (nombre, tipo))
     if not os.path.exists(f):
         return None
@@ -74,9 +100,11 @@ def textura(nombre, tipo):
         tx.set_editor_property('compression_settings', unreal.TextureCompressionSettings.TC_MASKS)
         tx.set_editor_property('srgb', False)
     eal.save_loaded_asset(tx)
-    return tx
+    return limitar(tx, nombre)
 
 # ------------------------------------------------------------------ 2. material maestro
+# suciedad en el maestro (manchas de ruido y zócalo); False lo deja como antes (para medir lo que cuesta)
+CON_SUCIEDAD = True
 WAT = '/Engine/Functions/Engine_MaterialFunctions01/Texturing/WorldAlignedTexture.WorldAlignedTexture'
 WAN = '/Engine/Functions/Engine_MaterialFunctions01/Texturing/WorldAlignedNormal.WorldAlignedNormal'
 
@@ -118,7 +146,82 @@ def maestro(defecto):
     mul = E(unreal.MaterialExpressionMultiply, -400, -350)
     mel.connect_material_expressions(col, 'XYZ Texture', mul, 'A')
     mel.connect_material_expressions(tint, '', mul, 'B')
-    mel.connect_material_property(mul, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    # suciedad (tanda 18): nada de superficies uniformes. Manchas grandes de ruido en el espacio del mundo (oscurecen
+    # el color y cambian la rugosidad) y un zócalo sucio en las paredes (solo en superficies verticales, hasta ~45 cm)
+    suc = E(unreal.MaterialExpressionScalarParameter, -1200, -800)
+    suc.set_editor_property('parameter_name', 'Suciedad'); suc.set_editor_property('default_value', 0.6)
+    ruido = E(unreal.MaterialExpressionNoise, -1000, -800)
+    ruido.set_editor_property('scale', 0.004); ruido.set_editor_property('levels', 2)
+    # ruido de textura (barato): el de cálculo en cada píxel de toda la base costaba ~8 fps en una GTX 1050 Ti
+    ruido.set_editor_property('noise_function', unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX)
+    ruido.set_editor_property('quality', 1)
+    ruido.set_editor_property('output_min', 0.0); ruido.set_editor_property('output_max', 1.0)
+    wp = E(unreal.MaterialExpressionWorldPosition, -1200, -1000)
+    zm = E(unreal.MaterialExpressionComponentMask, -1000, -1000)
+    for k, v in (('r', False), ('g', False), ('b', True), ('a', False)):
+        zm.set_editor_property(k, v)
+    uno(wp, zm)
+    zdiv = E(unreal.MaterialExpressionDivide, -850, -1000)
+    zdiv.set_editor_property('const_b', 45.0)
+    mel.connect_material_expressions(zm, '', zdiv, 'A')
+    zsat = E(unreal.MaterialExpressionSaturate, -720, -1000)
+    uno(zdiv, zsat)
+    zinv = E(unreal.MaterialExpressionOneMinus, -600, -1000)
+    uno(zsat, zinv)
+    vn = E(unreal.MaterialExpressionVertexNormalWS, -1000, -1150)
+    nz = E(unreal.MaterialExpressionComponentMask, -850, -1150)
+    for k, v in (('r', False), ('g', False), ('b', True), ('a', False)):
+        nz.set_editor_property(k, v)
+    uno(vn, nz)
+    nza = E(unreal.MaterialExpressionAbs, -720, -1150)
+    uno(nz, nza)
+    pared = E(unreal.MaterialExpressionOneMinus, -600, -1150)
+    uno(nza, pared)
+    zocalo = E(unreal.MaterialExpressionMultiply, -480, -1080)
+    mel.connect_material_expressions(zinv, '', zocalo, 'A')
+    mel.connect_material_expressions(pared, '', zocalo, 'B')
+    # oscurecer = 1 - Suciedad * (0,35 x ruido + 0,45 x zócalo)
+    rk = E(unreal.MaterialExpressionMultiply, -800, -800)
+    rk.set_editor_property('const_b', 0.35)
+    mel.connect_material_expressions(ruido, '', rk, 'A')
+    zk = E(unreal.MaterialExpressionMultiply, -360, -1080)
+    zk.set_editor_property('const_b', 0.45)
+    mel.connect_material_expressions(zocalo, '', zk, 'A')
+    sm_ = E(unreal.MaterialExpressionAdd, -250, -950)
+    mel.connect_material_expressions(rk, '', sm_, 'A')
+    mel.connect_material_expressions(zk, '', sm_, 'B')
+    sk = E(unreal.MaterialExpressionMultiply, -150, -900)
+    mel.connect_material_expressions(sm_, '', sk, 'A')
+    mel.connect_material_expressions(suc, '', sk, 'B')
+    osc = E(unreal.MaterialExpressionOneMinus, -50, -900)
+    uno(sk, osc)
+    sucio0 = E(unreal.MaterialExpressionMultiply, -250, -350)
+    mel.connect_material_expressions(mul, '', sucio0, 'A')
+    mel.connect_material_expressions(osc, '', sucio0, 'B')
+    # zócalo pintado (paredes de dentro): hasta ZocaloAltura cm el color se tiñe con ZocaloTinte; 0 = sin zócalo
+    zalt = E(unreal.MaterialExpressionScalarParameter, -1200, -1300)
+    zalt.set_editor_property('parameter_name', 'ZocaloAltura'); zalt.set_editor_property('default_value', 0.0)
+    ztin = E(unreal.MaterialExpressionVectorParameter, -1200, -1450)
+    ztin.set_editor_property('parameter_name', 'ZocaloTinte'); ztin.set_editor_property('default_value', unreal.LinearColor(1, 1, 1, 1))
+    zres = E(unreal.MaterialExpressionSubtract, -1000, -1300)
+    mel.connect_material_expressions(zalt, '', zres, 'A')
+    mel.connect_material_expressions(zm, '', zres, 'B')
+    zesc = E(unreal.MaterialExpressionMultiply, -880, -1300)
+    zesc.set_editor_property('const_b', 0.5)   # transición de 2 cm
+    mel.connect_material_expressions(zres, '', zesc, 'A')
+    zmsk = E(unreal.MaterialExpressionSaturate, -760, -1300)
+    uno(zesc, zmsk)
+    zpar = E(unreal.MaterialExpressionMultiply, -640, -1300)
+    mel.connect_material_expressions(zmsk, '', zpar, 'A')
+    mel.connect_material_expressions(pared, '', zpar, 'B')
+    ztc = E(unreal.MaterialExpressionMultiply, -500, -1450)
+    mel.connect_material_expressions(sucio0, '', ztc, 'A')
+    mel.connect_material_expressions(ztin, '', ztc, 'B')
+    sucio = E(unreal.MaterialExpressionLinearInterpolate, -150, -350)
+    mel.connect_material_expressions(sucio0, '', sucio, 'A')
+    mel.connect_material_expressions(ztc, '', sucio, 'B')
+    mel.connect_material_expressions(zpar, '', sucio, 'Alpha')
+    mel.connect_material_property(sucio if CON_SUCIEDAD else mul, '', unreal.MaterialProperty.MP_BASE_COLOR)
     # relieve: si una instancia no tiene normal, se queda con la normal plana por defecto del parámetro
     nor = wat(tex_obj('Normal', -1000, 0, 'nor'), -700, 0, WAN)
     mel.connect_material_property(nor, 'XYZ Texture', unreal.MaterialProperty.MP_NORMAL)
@@ -132,9 +235,23 @@ def maestro(defecto):
     mask = E(unreal.MaterialExpressionComponentMask, -250, 350)
     mask.set_editor_property('r', True); mask.set_editor_property('g', False)
     mask.set_editor_property('b', False); mask.set_editor_property('a', False)
-    if not mel.connect_material_expressions(rm, '', mask, 'Input'):   # con '' no conecta («Missing ComponentMask input»)
-        mel.connect_material_expressions(rm, '', mask, '')
-    mel.connect_material_property(mask, '', unreal.MaterialProperty.MP_ROUGHNESS)
+    uno(rm, mask)   # con '' a secas no conecta («Missing ComponentMask input»): uno() prueba «Input» primero
+    # la rugosidad varía con las mismas manchas: donde hay mugre, más mate; donde no, algo más brillante (humedad)
+    rvar = E(unreal.MaterialExpressionSubtract, -400, 700)
+    rvar.set_editor_property('const_b', 0.5)
+    mel.connect_material_expressions(ruido, '', rvar, 'A')
+    rv2 = E(unreal.MaterialExpressionMultiply, -280, 700)
+    mel.connect_material_expressions(rvar, '', rv2, 'A')
+    mel.connect_material_expressions(suc, '', rv2, 'B')
+    rv3 = E(unreal.MaterialExpressionMultiply, -160, 700)
+    rv3.set_editor_property('const_b', 0.4)
+    mel.connect_material_expressions(rv2, '', rv3, 'A')
+    radd = E(unreal.MaterialExpressionAdd, -120, 400)
+    mel.connect_material_expressions(mask, '', radd, 'A')
+    mel.connect_material_expressions(rv3, '', radd, 'B')
+    rsat = E(unreal.MaterialExpressionSaturate, 0, 400)
+    uno(radd, rsat)
+    mel.connect_material_property(rsat if CON_SUCIEDAD else mask, '', unreal.MaterialProperty.MP_ROUGHNESS)
     met = E(unreal.MaterialExpressionScalarParameter, -400, 600)
     met.set_editor_property('parameter_name', 'Metal'); met.set_editor_property('default_value', 0.0)
     mel.connect_material_property(met, '', unreal.MaterialProperty.MP_METALLIC)
@@ -180,6 +297,11 @@ def instancias():
         mel.set_material_instance_scalar_parameter_value(mi, 'Metal', metal)
         mel.set_material_instance_scalar_parameter_value(mi, 'Tamano', rep * 100.0)
         mel.set_material_instance_vector_parameter_value(mi, 'Tinte', tinte)
+        if clave == 'pared':   # zócalo pintado de cuartel: verde grisáceo hasta 1,15 m
+            mel.set_material_instance_scalar_parameter_value(mi, 'ZocaloAltura', 115.0)
+            mel.set_material_instance_vector_parameter_value(mi, 'ZocaloTinte', unreal.LinearColor(0.42, 0.55, 0.47, 1))
+        if clave == 'suelo_int':   # hormigón mate: el brillo uniforme del fluorescente en el suelo parecía plástico
+            mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', 1.6)
         eal.save_loaded_asset(mi)
         out[clave] = mi
     return out

@@ -27,6 +27,8 @@ UCLASS()
 class ATarsisGuard : public ACharacter
 {
 	GENERATED_BODY()
+	// el director pone a los guardias en su ronda al cargar un punto de control (SetState es privado)
+	friend class ATarsisDirector;
 
 public:
 	ATarsisGuard();
@@ -43,8 +45,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
 	TArray<float> PatrolWaits;
 
+	/** Paso de ronda (cm/s). 175 con las animaciones del maniquí (andar a ~280): zancada natural sin parecer cámara lenta. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
-	float WalkSpeed = 140.0f;
+	float WalkSpeed = 175.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ronda")
 	float RunSpeed = 430.0f;
@@ -173,6 +176,47 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	float WalkAnimSpeed = 150.0f;
 
+	/** Reconstruye los datos de ejecución (segmentos) de una mezcla creada por script. Solo en el editor: Python puede
+	 *  rellenar SampleData, pero el motor solo llama a ResampleData desde el editor de mezclas; sin eso la mezcla no
+	 *  avanza en el juego y el guardia se desliza con una pose fija. Lo usa tools/unreal/animaciones.py. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Editor")
+	static bool RebuildBlendSpace(class UBlendSpace* BlendSpace);
+
+	/** Velocidad (cm/s) de la muestra de trotar en MoveBlend (tools/unreal/animaciones.py); 0 = la mezcla solo llega a andar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float RunAnimSpeed = 0.0f;
+
+	/** Giro actual de cabeza y cuello respecto al cuerpo (grados, + a la derecha): mira hacia un ruido, barre al buscar. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	float LookYaw = 0.0f;
+
+	/** Pasos que ha dado (pie que apoya, según la animación): para las pruebas y el sonido de sus pasos. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 StepsTaken = 0;
+
+	/** Gira en el sitio dando pasos (la animación de andar despacio mientras rota). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	bool bTurnStepping = false;
+
+	/** Empujón de frente (E, si aún no está en alerta): aturdido Seconds segundos, sin ver; se le puede derribar por
+	 *  cualquier lado. Si nadie lo derriba, al rehacerse va a por ti (alerta hacia donde estabas). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Stun(float Seconds);
+
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	bool IsStunned() const { return StunT > 0.0f; }
+
+	/** Ha visto un cuerpo y va a mirarlo antes de dar la alarma (se agacha 2 s sobre él y avisa por radio). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	bool IsCheckingBody() const { return BodyTarget != nullptr; }
+
+	/** Segundos que lleva agachado sobre el cuerpo (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
+	float BodyCheckT = 0.0f;
+
+	/** Tiene cuerpo con esqueleto y sus pasos salen de la animación (si no, el director los cuenta por distancia). */
+	bool HasFootSync() const { return Pose != nullptr; }
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
 	ETarsisGuardState State = ETarsisGuardState::Patrol;
 
@@ -193,6 +237,17 @@ public:
 	bool HasFlashlightOn() const;
 	void SetFlashlightShadows(bool bOn);
 
+	/** Arreglando el generador: se queda junto a él barriendo la zona con la linterna (si te ve, deja de arreglar). */
+	void StartRepair(const FVector& Center);
+	void StopRepair();
+	bool IsRepairing() const { return bRepairing; }
+
+	/** Dormido con un dardo: se le puede quitar (E) y vuelve a la pistola. */
+	bool bDarted = false;
+
+	/** En alerta porque se lo han mandado por radio (no te ha visto): no abandona por UnseenT antes de llegar. */
+	bool bRadioCall = false;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -209,7 +264,29 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class USpotLightComponent> Flashlight;
 
+	/** Cuerpo que se ve en el juego: copia la pose de la malla animada (oculta) y le añade el giro de cabeza y cuello y
+	 *  la inclinación al buscar. Con SingleNode no hay grafo de animación donde meter un LookAt. */
+	UPROPERTY()
+	TObjectPtr<class UPoseableMeshComponent> Pose;
+
 private:
+	float StunT = 0.0f;
+	UPROPERTY()
+	TObjectPtr<ATarsisGuard> BodyTarget;
+	void BodyTick(float DeltaSeconds, APawn* Player, float V);
+	void SetupPose();
+	void LookTick(float DeltaSeconds);
+	void FootTick(float DeltaSeconds);
+	float LookTarget = 0.0f;
+	float Lean = 0.0f;
+	float PrevYaw = 0.0f;
+	float YawRate = 0.0f;
+	float FootMin[2] = { 0.0f, 0.0f };
+	bool bFootUp[2] = { true, true };
+	bool bFootInit = false;
+	/** Fue a mirar un ruido (para la frase al volver: «habrá sido el viento»). */
+	bool bNoiseSearch = false;
+	FName HeadBone, NeckBone, SpineBone;
 	int32 PointIndex = 0;
 	float WaitT = 0.0f;
 	float StateT = 0.0f;
@@ -221,6 +298,12 @@ private:
 	float DownT = 0.0f;
 	bool bInvestigate = false;
 	float BlendPos = 0.0f;
+	bool bRepairing = false;
+	FVector RepairCenter = FVector::ZeroVector;
+	float SweepT = 0.0f;
+	float RepairLookT = 0.0f;
+	float LastRepairNoise = -100.0f;
+	FVector RepairLook = FVector::ZeroVector;
 	float HoldT = 0.0f;
 	void WakeUp();
 	void LookForBodies();

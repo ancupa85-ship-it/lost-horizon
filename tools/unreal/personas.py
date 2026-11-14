@@ -114,6 +114,9 @@ def mezcla(ruta, malla, idle, walk, andar=150.0):
         m.set_editor_property('sample_value', unreal.Vector(v, 0.0, 0.0))
         muestras.append(m)
     bs.set_editor_property('sample_data', muestras)
+    # sin esto la mezcla no avanza en el juego (ver animaciones.reconstruir)
+    if hasattr(unreal, 'TarsisGuard') and hasattr(unreal.TarsisGuard, 'rebuild_blend_space'):
+        unreal.TarsisGuard.rebuild_blend_space(bs)
     eal.save_loaded_asset(bs)
     log('mezcla creada', nombre)
     return bs

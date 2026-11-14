@@ -12,6 +12,50 @@
 #include "InputCoreTypes.h"
 #include "TarsisDirector.generated.h"
 
+/** Punto de interacción sencillo de la misión (assets/unreal/mision1.json, tools/unreal/mision.py): con la E, si tienes la
+ *  bandera Need, pone Sets, suena Sound, sale el texto Text, quita el bloque RemoveBlock y guarda un punto de control. */
+USTRUCT(BlueprintType)
+struct FTarsisPoint
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Id;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FVector Pos = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") float Radius = 170.0f;
+	/** Clave del aviso de la E; PromptLocked, si falta la bandera Need (vacío: no hay aviso). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Prompt;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName PromptLocked;
+	/** Bandera que exige; si falta: texto NeedText, sonido NeedSound y bandera NeedSets (p. ej. «ya sabes de Ramos»). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Need;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName NeedText;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName NeedSound;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName NeedSets;
+	/** Banderas que pone al usarlo; con Sets ya puesta el punto desaparece (salvo bRepeat, p. ej. releer una nota). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Sets;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName AlsoSets;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") bool bRepeat = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Sound;
+	/** Clave del texto que sale y segundos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Text;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") float TextSeconds = 5.0f;
+	/** Clave del nombre del punto de control que guarda (vacío: no guarda). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Checkpoint;
+	/** Lo notan los guardias si lo ven cambiado (puerta que estaba cerrada). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") bool bChange = false;
+	/** Bloque de la misión que quita (puerta_jefatura, puerta_botiquin, carta, expediente...). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName RemoveBlock;
+	/** Dardos que te da (pistola del botiquín). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") int32 Darts = 0;
+};
+
+/** Objetivo del HUD: el primero de la lista cuya bandera If esté puesta (If vacía: siempre). */
+USTRUCT(BlueprintType)
+struct FTarsisObjective
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName If;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Text;
+};
+
 UCLASS()
 class ATarsisDirector : public AActor
 {
@@ -31,6 +75,12 @@ public:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	float MessageT = 0.0f;
+	/** Mensajes de radio (los que empiezan por "RADIO"): van aparte, abajo a la izquierda, sin tapar el mensaje principal. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	FString Radio;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	float RadioT = 0.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void ShowMessage(const FString& Text, float Seconds = 4.0f);
@@ -144,6 +194,104 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Luz")
 	bool bPowerOff = false;
 
+	/** Barrera del control de salida (pie del poste), su orientación y largo: se levanta en el final por la salida. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
+	FVector ExitBarrierLoc = FVector(6780.0f, 5060.0f, 0.0f);   // atraviesa el pasillo que lleva a G
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
+	float ExitBarrierYaw = 90.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
+	float ExitBarrierLength = 390.0f;
+
+	/** Camión de suministros (tanda 21): cada cierto tiempo entra por el portón del oeste (que se abre para él), cruza la
+	 *  base por el camino, para en el control hasta que sube la barrera y sale por el este. Sus piezas son los actores con
+	 *  la etiqueta «camion» y la hoja del portón, los de «hoja_entrada» (tools/unreal/montar_base.py). Sin ellos no hay camión. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	bool bTruck = true;
+
+	/** Segundos hasta el primer paso y entre el final de un paso y el siguiente. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckFirstDelay = 75.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckInterval = 170.0f;
+
+	/** Velocidad dentro de la base y por el terraplén de fuera (cm/s). Dentro va al paso de alguien que anda deprisa. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckSpeed = 400.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckSpeedOut = 900.0f;
+
+	/** Donde espera oculto (principio del terraplén del oeste); su Y es el eje del camino y su Z, la losa. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	FVector TruckStart = FVector(-13500.0f, 5700.0f, 4.0f);
+
+	/** X del centro del camión cuando para ante el portón de entrada, ante la barrera y donde desaparece. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckGateStopX = -2420.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckBarrierStopX = 8270.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckEndX = 20500.0f;
+
+	/** Portón de entrada: centro de la hoja cerrada y lo que se corre al abrirse. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	FVector EntryGateLoc = FVector(-1840.0f, 5700.0f, 130.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	FVector EntryGateSlide = FVector(0.0f, 640.0f, 0.0f);
+
+	/** Faros: lúmenes y si dan sombra (una sola luz con sombra; si pesa en la tarjeta, se quita aquí). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckLampLumens = 6000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	bool bTruckShadows = true;
+
+	/** Hasta dónde ve el conductor a quien esté de pie delante, dentro del haz de los faros (agachado, la mitad). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckSight = 2200.0f;
+
+	/** 0 espera fuera, 1 llega al portón, 2 parado mientras se abre, 3 cruza la base, 4 parado en el control, 5 sale. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckState = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckPasses = 0;
+
+	/** Veces que ha tocado el claxon (te ha visto en los faros o alguien le corta el paso). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckHorns = 0;
+
+	/** Hoja del portón de entrada (0 cerrada, 1 abierta) y barrera del control (0 bajada, 1 levantada). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	float EntryGateT = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	float BarrierT = 0.0f;
+
+	/** Para las pruebas y para probar a mano: el camión que espera fuera sale ya. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Camion")
+	void TruckSkipWait() { if (TruckState == 0) TruckT = 0.05f; }
+
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
+	FVector TruckLocation() const { return FVector(TruckX, TruckStart.Y, TruckStart.Z); }
+
+	/** Punto de salida de la base (portón de salida): llegar con el expediente acaba la misión (final por la salida). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	FVector ExitLoc = FVector(6900.0f, 5300.0f, 0.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	float ExitRadius = 260.0f;
+
+	/** Portillo de la marisma (final con Ramos). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	FVector WicketLoc = FVector(310.0f, 4900.0f, 0.0f);
+
 	/** Cinemáticas de Sequencer (tools/unreal/cinematicas.py las crea en /Game/Tarsis/Cine). Sin ellas, el juego va igual. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cine")
 	bool bPlayIntro = true;
@@ -232,9 +380,264 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ramos")
 	bool bMarsh = false;
 
+	// ---- menú de pausa (P o Esc; en el editor Esc para el PIE, así que P) y puntos de control
+
+	/** Menú de pausa abierto (el juego está en pausa). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	bool bMenu = false;
+
+	/** Opción marcada del menú. */
+	int32 MenuSel = 0;
+
+	/** Líneas del menú tal como se ven (con el valor de cada opción). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Menu")
+	TArray<FString> MenuLines() const;
+
+	/** Pruebas automáticas: pulsa una tecla del menú por su nombre («P», «Down», «Right», «Enter»...) sin teclado real. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void PressKey(FName Key) { const FKey K(Key); MenuKey(K); AnyKey(K); }   // en el mismo orden que BindAll: menú y luego AnyKey
+
+	/** Opciones: sensibilidad del ratón (0,2-3), invertir Y, volumen (0-1), calidad (0 baja - 3 épica) y contador de fps. */
+	float OptSensitivity = 1.0f;
+	bool bOptInvertY = false;
+	float OptVolume = 1.0f;
+	int32 OptQuality = 1;
+	bool bShowFps = false;
+	float OptMusic = 0.7f;
+	bool bShowHelp = true;
+	/** Accesibilidad: tamaño del texto del HUD (0,8-1,4), colores para daltonismo y subtítulos de sonidos. */
+	float OptTextScale = 1.0f;
+	bool bColorblind = false;
+	bool bSubtitles = false;
+	/** Dificultad: 0 fácil, 1 normal, 2 difícil (vista y oído de los guardias; en difícil no hay puntos de control). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	int32 Difficulty = 1;
+
+	/** Subtítulo de sonido ahora mismo («[PASOS - MOYA, DETRAS A LA IZQUIERDA, 8 m]») y segundos que le quedan. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	FString Subtitle;
+	float SubtitleT = 0.0f;
+
+	/** Veces que un guardia te ha visto (pasa a alerta por verte, no por la radio). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 Detections = 0;
+
+	/** Puntuación de sigilo al acabar (0-1000) y su rango («FANTASMA»...). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 Score = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	FString Rank;
+
+	/** Parte del día siguiente: sale tras el mensaje final y resume lo que dejaste en la base (lo leerá la misión 2). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bReport = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	TArray<FString> ReportLines;
+
+	/** Fotogramas en que el HUD ha dibujado el parte (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 ReportFrames = 0;
+
+	/** Estado que pasa a la misión 2. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bPowerCutOnce = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bReserveHalf = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	bool bRamosDowned = false;
+
+	/** Página del menú: 0 la principal, 1 los controles. Esperando tecla para la acción ActionSel (o -1). */
+	int32 MenuPage = 0;
+	int32 WaitKeyFor = -1;
+
+	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
+	static constexpr int32 NumActions = 6;
+	FKey ActionKeys[NumActions];
+	static const TCHAR* ActionName(int32 I);
+
+	/** Tira de ayuda de abajo a la derecha: teclas de lo que puedes hacer ahora. */
+	FString HelpLine() const;
+
+	/** Capas de música (0-1 cada una), para el HUD de pruebas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Musica")
+	float MusicTension = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Musica")
+	float MusicAlert = 0.0f;
+
+	/** Último punto de control («la llave de Ibarra»...) y segundos que queda el aviso en pantalla. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	FString CheckpointName;
+	float CheckT = 0.0f;
+
+	/** Hay partida guardada en disco (para «Continuar desde el último punto»). */
+	bool bHasSave = false;
+
+	/** Guarda un punto de control: dónde estás ahora y cómo va la misión (también en disco). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Checkpoint(const FString& Name);
+
+	/** Guardado en disco: vuelve al último punto de control con la misión como estaba. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	bool LoadCheckpoint();
+
 	/** Guardia caído que vas arrastrando (o nullptr). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	TObjectPtr<class ATarsisGuard> Dragged;
+
+	// ---- sonido del mundo: superficies, pasos de los guardias y voces
+
+	/** Lo que hay bajo ese punto: "grava", "cemento", "metal", "madera" o "hierba" (material físico PM_*, o el nombre de
+	 *  la malla o del material). De ello salen el sonido de los pasos y lo lejos que se oyen los tuyos. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sonido")
+	FString SurfaceAt(FVector Where) const;
+
+	/** Superficie de tu último paso y pasos dados (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	FString LastStepSurface;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	int32 PlayerSteps = 0;
+
+	/** Pasos de guardias que han sonado (cerca de ti). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	int32 GuardStepsPlayed = 0;
+
+	/** Un guardia apoya un pie (lo llama ATarsisGuard a compás de su animación): suena en 3D según el suelo. */
+	void GuardStep(class ATarsisGuard* G, bool bRun);
+
+	/** Un guardia dice una frase (voz_<guardia>_<clave>, tools/sonido/generar_voces.py): en 3D sobre él, con subtítulo
+	 *  si están activados. Claves: quien, ruido, viento, alto, nadie, suelo (por radio). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sonido")
+	void GuardSay(class ATarsisGuard* G, const FString& Key, bool bRadio = false);
+
+	/** Última frase dicha («moya_ruido») y cuántas van (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	FString LastVoice;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	int32 VoicesPlayed = 0;
+
+	/** Últimas 30 frases dichas («moya_ruido»...), para las pruebas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	TArray<FString> VoiceLog;
+
+	/** Subtítulos de sonido (opción del menú); para las pruebas. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sonido")
+	void SetSubtitles(bool bOn) { bSubtitles = bOn; }
+
+	// ---- tus brazos en primera persona (maniquí de la plantilla) con la pistola de dardos
+
+	/** Se ven los brazos con la pistola (cuando tienes dardos y nada te ocupa las manos). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
+	bool bArmsVisible = false;
+
+	/** Animación de los brazos sosteniendo la pistola y momento en que se congela (-1 = en bucle). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FString ArmsAnimPath = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS.MF_Pistol_Idle_ADS");
+
+	/** Dónde quedan los brazos respecto a la cámara (cm: delante, derecha, arriba), con la cabeza del maniquí en la cámara. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FVector ArmsOffset = FVector(16.0f, 5.0f, -8.0f);
+
+	/** Malla de la pistola de dardos (la pistola de la plantilla) y su colocación en la mano (socket HandGrip_R). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FString PistolMeshPath = TEXT("/Game/Weapons/Pistol/Meshes/SM_Pistol.SM_Pistol");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
+	FTransform PistolGrip;
+
+	/** Componentes de los brazos y la pistola (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
+	TObjectPtr<class USkeletalMeshComponent> Arms;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
+	TObjectPtr<class UStaticMeshComponent> Pistol;
+
+	// ---- empezar sin armas: consejos, empujón de frente y escondites
+
+	/** Consejo de la esquina («CONSEJO: ...»): agacharse, la piedra y la E por la espalda, hasta que los usas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ayuda")
+	FString Hint;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ayuda")
+	int32 HintStep = 0;
+
+	/** Guardia al que puedes empujar ahora con la E (de frente, cerca, sin estar en alerta) o nullptr. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	class ATarsisGuard* ShoveTarget() const;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	int32 Shoves = 0;
+
+	/** Metido en una taquilla: no te ven, oyes amortiguado y la vista va por las rendijas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Escondites")
+	bool bHiding = false;
+
+	/** Taquillas (punto del suelo y hacia dónde abren): barracón oeste y sala de guardia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	TArray<FVector> HideSpots = { FVector(1500.0f, 2965.0f, 0.0f), FVector(1700.0f, 2965.0f, 0.0f), FVector(5330.0f, 1235.0f, 0.0f) };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	TArray<float> HideYaws = { -90.0f, -90.0f, 90.0f };
+
+	/** Taquilla a mano (índice) o -1. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Escondites")
+	int32 HideSpotNear() const;
+
+	/** Cambios que han notado los guardias (puertas que estaban cerradas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	int32 ChangesNoticed = 0;
+
+	/** Pruebas: una tecla de verdad por PlayerController::InputKey (pasa por toda la pila de entrada, no como PressKey). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void SimulateKey(FName Key, bool bPress = true, bool bRelease = true);
+
+	// ---- misión en datos (assets/unreal/mision1.json, tools/unreal/mision.py la vuelca aquí y se guarda con el nivel)
+
+	/** Textos de la misión: clave -> texto ({0}, {1}... para los datos). Todo lo que sale en pantalla pasa por Tx. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	TMap<FName, FString> Texts;
+
+	/** Claves pedidas que no están en Texts (se usa el texto por defecto del C++): una prueba exige que esté vacía. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	TArray<FString> MissingTexts;
+
+	/** Objetivos del HUD, en orden: sale el primero cuya bandera esté puesta. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	TArray<FTarsisObjective> Objectives;
+
+	/** Puntos de interacción sencillos (puertas, notas, objetos). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	TArray<FTarsisPoint> Points;
+
+	/** Banderas de la misión (llave, jefatura, nota, archivo, expediente, carta, llave_botiquin, botiquin...). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Mision")
+	bool HasFlag(FName Flag) const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Mision")
+	void SetFlag(FName Flag);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Mision")
+	TArray<FName> FlagList() const;
+
+	/** Texto de la misión por clave; Default si no está (y la clave se apunta en MissingTexts). */
+	FString Tx(FName Key, const TCHAR* Default, const FStringFormatOrderedArguments& Args = FStringFormatOrderedArguments()) const;
+
+	/** Explicaciones que solo salen la primera vez por partida (derribar, arrastrar, la pistola, la taquilla...). */
+	void Teach(FName Key, const TCHAR* Default, const FStringFormatOrderedArguments& Args, float Seconds);
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ayuda")
+	TArray<FName> Taught;
+
+	/** Estado de la base para el HUD: 0 tranquila, 1 en guardia, 2 alerta. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	int32 BaseState() const;
+
+	/** Te han cogido: escena (frase del guardia, la cámara gira hacia él, golpe y fundido a negro) y luego Captured. */
+	void BeginCapture(class ATarsisGuard* G);
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	bool bCapturing = false;
+
+	/** La central habla por radio: voz voz_central_<Key> y subtítulo (siempre, como las voces de los guardias). */
+	void CentralSay(const FString& Key, const FString& Text, float Delay = 0.0f);
+
+	/** Pruebas: los subtítulos de voz que han salido (los últimos 30). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Pruebas")
+	TArray<FString> SubtitleLog;
+
+	/** Hay una voz con subtítulo en pantalla (se ve aunque la opción de subtítulos esté apagada). */
+	bool VoiceSubtitleOn() const { return VoiceSubT > 0.0f; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -296,10 +699,6 @@ private:
 
 	// sonido (tools/unreal/sonidos.py los importa en /Game/Tarsis/Sonidos)
 	UPROPERTY()
-	TArray<TObjectPtr<class USoundBase>> StepGravel;
-	UPROPERTY()
-	TArray<TObjectPtr<class USoundBase>> StepConcrete;
-	UPROPERTY()
 	TObjectPtr<class USoundBase> StoneSnd;
 	UPROPERTY()
 	TObjectPtr<class USoundBase> DartSnd;
@@ -327,10 +726,100 @@ private:
 	float BaseFog = -1.0f;
 	float PlayerStride = 0.0f;
 	void SetupSound();
-	void StepSound(const FVector& Where, bool bIndoorStep, float Volume, bool b3D);
+	/** Surface: 0 grava, 1 cemento, 2 metal, 3 madera, 4 hierba. */
+	void StepSound(const FVector& Where, int32 Surface, float Volume, bool b3D);
+	int32 SurfaceIndex(const FVector& P, const AActor* Ignore) const;
+	/** Pasos por superficie: 5 superficies x 3 variantes (paso_<superficie>_N). */
+	UPROPERTY()
+	TArray<TObjectPtr<class USoundBase>> StepSnds;
+	/** Efectos sueltos cargados la primera vez que suenan (puertas, teclado, objetos, voces...). */
+	UPROPERTY()
+	TMap<FName, TObjectPtr<class USoundBase>> SfxCache;
+	class USoundBase* Sfx(const FString& Name);
+	void PlaySfx(const FString& Name, const FVector& Where, float Volume = 1.0f, bool b3D = true);
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> CricketComp;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> RumbleComp;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, float> VoiceNext;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, FString> VoicePrev;
+	float VoiceSubT = 0.0f;
+	int32 PlayerSurface = 0;
+	// brazos
+	void SetupArms(class ACharacter* C);
+	void ArmsTick(class ACharacter* C, float DeltaSeconds);
+	float ArmsShow = 0.0f;
+	float RecoilT = 0.0f;
+	FRotator LastViewRot = FRotator::ZeroRotator;
+	FVector Sway = FVector::ZeroVector;
+	// empezar: consejos, empujón, escondites y cambios que notan los guardias
+	void HintTick();
+	void Shove(class ATarsisGuard* G);
+	class ATarsisGuard* FacingAlertGuard() const;
+	float FrontMsgT = 0.0f;
+	/** Enfriamiento del aviso «no puedes irte todavía» en la salida. */
+	float ExitMsgT = 0.0f;
+	void SetupHiding();
+	void EnterHide(int32 Index);
+	void ExitHide();
+	void HideTick();
+	int32 HideIdx = -1;
+	bool bHideSeen = false;
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> Lockers;
+public:
+	/** Malla de la taquilla (chapa biselada con rendijas de verdad, tools/unreal/ambiente.py); sin ella, cubos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	TSoftObjectPtr<class UStaticMesh> LockerMesh = TSoftObjectPtr<class UStaticMesh>(FSoftObjectPath(TEXT("/Game/Tarsis/Atrezo/Taquilla/SM_Taquilla.SM_Taquilla")));
+	/** Pruebas: componentes que parpadean, que callan sin luz y que suenan con lluvia. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	FIntVector ZoneCounts() const { return FIntVector(FlickerLights.Num(), PowerSounds.Num(), RainSounds.Num()); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	int32 RainDecalCount() const { return RainDecals.Num(); }
+private:
+	void AddChange(const FVector& Where, const TCHAR* Key);
+	void ChangesTick(float DeltaSeconds);
+	TArray<FVector> ChangeLocs;
+	TArray<FString> ChangeKeys;
+	TArray<bool> ChangeSeen;
+	float ChangeT = 0.0f;
+	// misión en datos
+	TSet<FName> Flags;
+	bool* FlagBool(FName Flag);
+	const FTarsisPoint* PointNear() const;
+	void UsePoint(const FTarsisPoint& Pt);
+	UPROPERTY()
+	TMap<FName, TObjectPtr<class UStaticMeshComponent>> Blocks;
+	void RemoveBlockNamed(FName Name);
+	// captura como escena
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> Captor;
+	float CaptureT = 0.0f;
+	bool bCaptureLocker = false;
+	bool bCaptureHit = false;
+	bool bCaptureDone = false;
+	void DefaultMission();
+	FRotator CaptureFrom = FRotator::ZeroRotator;
+	void CaptureTick(float DeltaSeconds);
+	/** Frase de un guardia sin sonido (para las que aún no tienen voz): solo subtítulo. */
+	void SaySubtitle(const FString& Who, const FString& Text, float Seconds = 3.0f);
+	void ShowSubtitleLine(const FString& Line, float Seconds = 3.0f);
+	TArray<FString> PendingSubs;
 	bool IndoorAt(const FVector& P, const AActor* Ignore) const;
 	void SoundTick(class ACharacter* C, float DeltaSeconds);
 	void RainTick(float DeltaSeconds);
+	// ---- ambiente de las zonas (tanda 18): luces con la etiqueta «parpadeo» (fluorescente viejo), sonidos con
+	// «electrico» (callan sin luz) y con «lluvia» (gotera: solo si llueve). Los coloca tools/unreal/ambiente.py
+	void SetupZones();
+	void ZonesTick(float DeltaSeconds);
+	UPROPERTY() TArray<TObjectPtr<class ULightComponent>> FlickerLights;
+	TArray<float> FlickerBase;
+	TArray<float> FlickerT;
+	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> PowerSounds;
+	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> RainSounds;
+	UPROPERTY() TArray<TObjectPtr<class UDecalComponent>> RainDecals;   // charco y pisadas mojadas: solo con lluvia
 	void RadioTick(float DeltaSeconds);
 	UPROPERTY()
 	TSet<TObjectPtr<class ATarsisGuard>> Called;
@@ -344,7 +833,8 @@ private:
 	TObjectPtr<class UAudioComponent> HumComp;
 	UPROPERTY()
 	TArray<TObjectPtr<class ULightComponent>> OffLights;
-	UPROPERTY()
+	/** El que han mandado a arreglar el generador (visible para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, Category = "Tarsis|Luz")
 	TObjectPtr<class ATarsisGuard> Repairer;
 	float RepairT = 0.0f;
 	UPROPERTY()
@@ -358,6 +848,90 @@ private:
 	void RestorePower(bool bByGuard);
 	void PowerTick(float DeltaSeconds);
 	void WindowsDark(bool bDark);
+	UPROPERTY()
+	TArray<TObjectPtr<class ULightComponent>> PendingOff;
+	float OffClock = 0.0f;
+	UPROPERTY()
+	TObjectPtr<class UStaticMeshComponent> BarrierArm;
+	UPROPERTY()
+	TObjectPtr<class UStaticMeshComponent> BarrierPost;
+	float BarrierTarget = 0.0f;
+	// camión de suministros y hoja del portón de entrada
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> TruckParts;
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> EntryLeaf;
+	UPROPERTY()
+	TObjectPtr<class ASpotLight> TruckLamp;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> TruckAudio;
+	UPROPERTY()
+	TObjectPtr<class USoundAttenuation> TruckAtten;
+	float TruckT = 0.0f;
+	float TruckX = 0.0f;
+	float TruckV = 0.0f;
+	float TruckWaitT = 0.0f;
+	float TruckSeenT = 0.0f;
+	float TruckBlockT = 0.0f;
+	float TruckHornT = 0.0f;
+	float EntryGateTarget = 0.0f;
+	bool bEntryGateShut = false;
+	void SetupTruck();
+	void TruckTick(float DeltaSeconds);
+	void TruckReset(float Wait);
+	void TruckShow(bool bShow);
+	void TruckPlace();
+	void TruckHorn(const FVector& Where, int32 Why);
+	UPROPERTY()
+	TObjectPtr<class ASpotLight> GateLamp;
+	bool bLampBroken = false;
+	bool bLampReported = false;
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> LampChecker;
+	float RepairCallT = 0.0f;
+	bool bRepairerSilent = false;
+	bool ShootLamp(const FVector& From, const FVector& Fwd, float MaxT);
+	/** Dónde se pone el reparador: al sur del generador, despejado (encima de la malla el camino sale parcial). */
+	FVector RepairSpot() const { return GeneratorLoc + FVector(0.0f, 280.0f, 0.0f); }
+	void SetupBarrier();
+	void BarrierTick(float DeltaSeconds);
+
+	// menú y guardado
+	bool bHasCheck = false;
+	FVector CheckLoc = FVector::ZeroVector;
+	FRotator CheckRot = FRotator::ZeroRotator;
+	int32 CheckDarts = 0;
+	float BaseYawScale = 1.0f;
+	float BasePitchScale = 1.0f;
+	bool bScalesRead = false;
+	void TogglePause();
+	void MenuKey(FKey Key);
+	void MenuActivate(int32 Dir);
+	void ApplyOptions();
+	void SaveOptions() const;
+	void LoadOptions();
+	void BindMenuKeys();
+	void BindAll();
+	void AnyKey(FKey Key);
+	uint64 KeyFrame = 0;
+	void DefaultKeys();
+
+	// música por capas (tools/sonido/generar_sonidos.py): ambiente siempre, tensión con la sospecha, alerta con la alarma
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> MusicBase;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> MusicTen;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> MusicAlr;
+	void SetupMusic();
+	void MusicTick(float DeltaSeconds);
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, uint8> PrevState;
+	void DetectTick();
+	void BuildReport();
+	float ReportWait = -1.0f;
+	FString Direction(const FVector& Where) const;
+	float SubtitleDist = 0.0f;
 
 	// cinemáticas
 	UPROPERTY()

@@ -1,0 +1,279 @@
+{
+ "_leeme": "Mision 1 de Tarsis en datos. tools/unreal/mision.py lo vuelca en el director del nivel (y guardias.py al colocarlo). Textos en ASCII: la fuente del HUD no lleva tildes. {0}, {1}... son los datos que pone el juego (nombres, teclas, cifras).",
+ "ajustes": {
+  "director": {
+   "vault_code": "0129",
+   "cell_time": 25.0,
+   "repair_seconds": 12.0,
+   "noise_radius": 900.0,
+   "exit_loc": [
+    9050,
+    5700,
+    0
+   ],
+   "exit_radius": 420.0,
+   "wicket_loc": [
+    310,
+    7390,
+    0
+   ],
+   "exit_barrier_loc": [
+    8600,
+    5400,
+    0
+   ],
+   "exit_barrier_yaw": 90.0,
+   "exit_barrier_length": 600.0,
+   "truck_first_delay": 75.0,
+   "truck_interval": 170.0,
+   "truck_speed": 400.0
+  },
+  "guardias": {
+   "*": {
+    "knock_out_time": 100.0
+   }
+  }
+ },
+ "objetivos": [
+  {
+   "si": "expediente",
+   "texto": "obj_salir"
+  },
+  {
+   "si": "archivo_abierto",
+   "texto": "obj_expediente"
+  },
+  {
+   "si": "nota_leida",
+   "texto": "obj_archivo"
+  },
+  {
+   "si": "jefatura_abierta",
+   "texto": "obj_mesa"
+  },
+  {
+   "si": "llave_jefatura",
+   "texto": "obj_jefatura"
+  },
+  {
+   "si": "",
+   "texto": "obj_llave"
+  }
+ ],
+ "puntos": [
+  {
+   "id": "jefatura",
+   "nota": "puerta de la jefatura, en el muro de la fila 15",
+   "celda": [
+    4,
+    15
+   ],
+   "radio": 190,
+   "aviso": "p_jefatura_abrir",
+   "aviso_cerrado": "p_jefatura_cerrada",
+   "necesita": "llave_jefatura",
+   "si_falta_texto": "jefatura_cerrada",
+   "si_falta_sonido": "candado",
+   "pone": "jefatura_abierta",
+   "sonido": "puerta_madera",
+   "texto": "jefatura_abierta",
+   "segundos": 4.0,
+   "punto_de_control": "cp_jefatura",
+   "lo_notan": true,
+   "quita": "puerta_jefatura"
+  },
+  {
+   "id": "mesa_alarcon",
+   "nota": "la nota con la clave; se puede releer",
+   "celda": [
+    3,
+    17
+   ],
+   "radio": 150,
+   "aviso": "p_nota",
+   "necesita": "jefatura_abierta",
+   "pone": "nota_leida",
+   "repetible": true,
+   "sonido": "recoger",
+   "texto": "mesa_alarcon",
+   "segundos": 12.0
+  },
+  {
+   "id": "litera_ramos",
+   "nota": "carta sin terminar en la litera de Ramos (barracon oeste)",
+   "pos": [
+    1130,
+    2850,
+    0
+   ],
+   "radio": 150,
+   "aviso": "p_carta",
+   "pone": "carta_leida",
+   "pone_tambien": "sabe_de_ramos",
+   "sonido": "recoger",
+   "texto": "carta_ramos",
+   "segundos": 12.0,
+   "quita": "carta"
+  },
+  {
+   "id": "botiquin",
+   "nota": "botiquin del veterinario, muro norte del patio este",
+   "pos": [
+    4660,
+    300,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_botiquin_abrir",
+   "aviso_cerrado": "p_botiquin_cerrado",
+   "necesita": "llave_botiquin",
+   "si_falta_texto": "botiquin_cerrado",
+   "si_falta_sonido": "candado",
+   "si_falta_pone": "sabe_de_ramos",
+   "pone": "botiquin_abierto",
+   "sonido": "candado",
+   "texto": "pistola_dardos",
+   "segundos": 5.0,
+   "punto_de_control": "cp_botiquin",
+   "lo_notan": true,
+   "quita": "puerta_botiquin",
+   "dardos": 5
+  },
+  {
+   "id": "expediente",
+   "nota": "en la mesa del archivo",
+   "celda": [
+    9,
+    17
+   ],
+   "radio": 160,
+   "aviso": "p_expediente",
+   "necesita": "archivo_abierto",
+   "pone": "expediente",
+   "sonido": "recoger",
+   "texto": "expediente_cogido",
+   "segundos": 5.0,
+   "punto_de_control": "cp_expediente",
+   "quita": "expediente"
+  }
+ ],
+ "textos": {
+  "intro": "TARSIS, DE NOCHE\nBusca la sombra. Agachado ({0}) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n{1} lanza una piedra para distraer. {2} prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo ({3}) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control.",
+  "calabozo": "CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas.",
+  "cogido_punto": "TE HAN COGIDO\nVuelves al ultimo punto de control: {0}.",
+  "cogido_entrada": "TE HAN COGIDO\nVuelves a la entrada de la base.",
+  "celda_abierta": "CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia.",
+  "ensena_derribo": "{0} DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma.",
+  "ramos_radio": "RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, en el muro sur, junto al agua.\"",
+  "p_taquilla_salir": "E   SALIR DE LA TAQUILLA",
+  "p_soltar": "E   SOLTAR EL CUERPO",
+  "p_ramos_eleccion": "1   VENTE CONMIGO        2   DERRIBARLO",
+  "p_ramos_agarrar": "E   AGARRAR A RAMOS",
+  "p_derribar": "E   DERRIBAR",
+  "p_empujar": "E   EMPUJAR (queda aturdido 2 s; hace ruido)",
+  "p_te_ve": "TE VE: huye, rodealo o distraelo ({0})",
+  "p_llave_ibarra": "E   QUITARLE LA LLAVE",
+  "p_llave_ramos": "E   QUITARLE LA LLAVE DEL BOTIQUIN",
+  "p_dardo": "E   RECUPERAR EL DARDO",
+  "p_arrastrar": "E   ARRASTRAR (escondelo en la sombra)",
+  "p_teclado": "E   TECLADO DEL ARCHIVO",
+  "p_portillo": "E   PORTILLO DE LA MARISMA",
+  "p_generador_parado": "GENERADOR: PARADO",
+  "p_generador": "E   CORTAR EL GENERADOR (apaga las luces)",
+  "p_taquilla": "E   ESCONDERTE EN LA TAQUILLA",
+  "obj_fin": "MISION CUMPLIDA",
+  "ensena_cuerpo": "CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca.",
+  "ramos_dialogo": "RAMOS, EL CUARTELERO\n\"No me haga nada. El jueves bajo con los partes y no pienso volver.\"\n\"Llevo la llave del botiquin del veterinario: dentro hay una pistola de dardos. Si me saca de aqui, es suya.\"\n1   \"Vente conmigo\"          2   Derribarlo",
+  "ensena_de_frente": "DE FRENTE TE VE\n{0} esta en alerta: no se deja. Huye, rodealo o distraelo con una piedra ({1}).",
+  "llave_ramos": "LLAVE DE RAMOS\n\"Botiquin - veterinario\". Esta en el muro norte del patio este.",
+  "llave_ibarra": "LLAVE DE LA JEFATURA\nSe la quitas a Ibarra del cinturon. Ahora puedes arrastrarlo a la sombra (E).",
+  "cp_llave": "LA LLAVE DE IBARRA",
+  "ensena_dardo_recuperado": "DARDO RECUPERADO\nSe lo sacas del cuello a {0}. Los que llevas, abajo a la derecha.",
+  "portillo_cerrado": "PORTILLO DE LA MARISMA\nCerrado. La llave la guarda el cuartelero del barracon oeste.",
+  "portillo_sin_expediente": "PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente.",
+  "portillo_espera": "ESPERA A RAMOS\nEl trae la llave del portillo.",
+  "archivo_abierto": "ARCHIVO ABIERTO\nLa puerta blindada se abre con un chasquido.",
+  "ensena_arrastrar": "ARRASTRAS A {0}\nLlevalo a la sombra y sueltalo con E. Si un guardia te ve con el, dara la alarma.",
+  "ensena_piedra": "CLAC\nNadie lo ha oido: la piedra solo atrae a los que estan cerca.",
+  "ensena_marcado": "{0} MARCADO\nLo veras aunque haya paredes por medio.",
+  "ramos_contigo": "RAMOS ESTA CONTIGO\nTe da la llave del botiquin del veterinario (muro norte del patio este).\nSigue su ronda para que no le echen en falta, y ya no te delatara.",
+  "ramos_derribado": "RAMOS DERRIBADO\nLleva encima la llave del botiquin.",
+  "sec_portillo": "Otra salida: Ramos te espera en el portillo de la marisma (muro sur)",
+  "sec_ramos_contigo": "Ramos esta contigo: con el expediente, saldra por la marisma",
+  "sec_botiquin": "Abre el botiquin del veterinario: muro norte del patio este",
+  "sec_ramos": "Ramos, el cuartelero del barracon oeste, lleva la llave del botiquin: agarralo por la espalda",
+  "ensena_dormido": "{0} DORMIDO\nEl dardo se recupera: acercate al cuerpo y pulsa E.",
+  "final_garita": "En la garita, {0} levanta la barrera y mira hacia la marisma.",
+  "final_datos": "Tiempo {0}:{1}   Te vieron {2}   Capturas {3}   Derribos {4}\nSIGILO: {5} puntos - {6} ({7})",
+  "final_marisma": "EL QUE NO ENTREGO\nRamos abre el portillo y rema sin encender la linterna. El expediente sigue en tu chaqueta.\nControl pierde tu rastro en la marisma.",
+  "final_salida": "MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.",
+  "final_ramos": "Ramos sale solo por la marisma y os espera en el camino de Trebujena.",
+  "ensena_empujon": "EMPUJAS A {0}\nAturdido 2 s: rodealo y derribalo (E) o vete. El golpe se oye: los que esten cerca vienen.",
+  "ensena_taquilla": "EN LA TAQUILLA\nNo te ven ni te oyen, salvo que te hayan visto meterte. E para salir.",
+  "nombre_centinela": "CENTINELA",
+  "radio_responde": "{0}, responde. {0}?",
+  "radio_luz": "Se ha ido la luz en toda la base! {0}, mira el generador.",
+  "ensena_generador": "GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.",
+  "ensena_luz_vuelve": "VUELVE LA LUZ\n{0} ha arrancado el generador.",
+  "ensena_reserva": "VUELVE LA LUZ (A MEDIAS)\nEl generador de reserva no da para todo: la mitad de las farolas se quedan apagadas.",
+  "radio_comova": "{0}, como va eso?",
+  "radio_reserva": "{0}, como va eso? ... {0}? Entra la reserva. Todos al generador, ya!",
+  "titulo": "LOST HORIZON: DE PROFUNDIS\nMision 1 - Tarsis\nUna base en la marisma. Esta noche, el expediente LH-07 sale de ahi contigo.\n\n(E o Espacio para saltar)",
+  "farol_roto": "FAROL ROTO\nEl control queda a oscuras.{0}",
+  "farol_viene": "{0} ha oido los cristales y viene a mirar.",
+  "partida_cargada": "PARTIDA CARGADA\nUltimo punto de control: {0}.",
+  "calidad": "CALIDAD GRAFICA\nElegida segun tu PC: {0}. Se cambia en Pausa (P).",
+  "nombre_central": "CENTRAL (RADIO)",
+  "taquilla_pillado": "{0} TE VIO METERTE EN LA TAQUILLA\nLa abre de un tiron. {1}",
+  "radio_todos": "A todas las unidades: {0} esta en el suelo. Hay alguien dentro. Buscadlo.",
+  "hud_base_alerta": "BASE: ALERTA",
+  "hud_base_guardia": "BASE: EN GUARDIA  {0} s",
+  "hud_base_tranquila": "BASE: TRANQUILA",
+  "voz_quien": "Quien anda ahi?",
+  "voz_ruido": "Que ha sido eso?",
+  "voz_viento": "Bah. Habra sido el viento.",
+  "voz_alto": "Alto! Quieto ahi!",
+  "voz_nadie": "Aqui no hay nadie.",
+  "voz_suelo": "Central, aqui patio. He encontrado a uno en el suelo.",
+  "voz_puerta": "Esta puerta estaba cerrada.",
+  "voz_luz": "Y la luz?",
+  "voz_donde": "Donde se ha metido? No contesta.",
+  "voz_eh": "Eh! Pero que...?",
+  "voz_farol": "Central, el farol del control esta roto. Cristales por el suelo... esto no es el viento.",
+  "voz_cuerpo": "Eh... ese de ahi esta en el suelo?",
+  "voz_despierta": "Ay, mi cabeza... Quien ha sido?",
+  "voz_tengo": "Te tengo!",
+  "voz_perdido": "Lo he perdido.",
+  "voz_yacasi": "Ya casi esta.",
+  "clima_despejado": "DESPEJADO\nLa vista y el oido de los guardias, normales.",
+  "clima_lluvia": "LLUVIA\nLos guardias ven menos de lejos y el agua tapa tus pasos fuera.",
+  "clima_niebla": "NIEBLA\nLos guardias ven mucho menos de lejos; tus pasos se oyen igual.",
+  "p_jefatura_abrir": "E   ABRIR LA JEFATURA",
+  "p_jefatura_cerrada": "JEFATURA: CERRADA CON LLAVE",
+  "jefatura_cerrada": "JEFATURA CERRADA\nHace falta la llave. La lleva el sargento Ibarra.",
+  "jefatura_abierta": "JEFATURA ABIERTA\nEl despacho de Alarcon. Al fondo, la puerta blindada del archivo.",
+  "cp_jefatura": "LA JEFATURA",
+  "p_nota": "E   LEER LA NOTA",
+  "mesa_alarcon": "MESA DE ALARCON\nUna Vulgata abierta por el salmo CXXIX: \"De profundis clamavi ad te, Domine\".\nEn el margen, a lapiz: \"Ella tambien clama. Nadie la oye. - A.\"\nUna nota: \"Clave: la de siempre. No apuntar.\"",
+  "p_carta": "E   LEER LA CARTA",
+  "carta_ramos": "LITERA DE RAMOS - CARTA SIN TERMINAR\n\"Padre: el jueves me toca bajar con los partes. No se lo diga a madre.\"\n\"El veterinario se dejo la pistola de dardos en el botiquin y la llave la llevo encima.\"\n\"A veces pienso en dormirlos a todos y salir andando por la marisma.\"\nEn el sobre: Julian Ramos, Trebujena.",
+  "p_botiquin_abrir": "E   ABRIR EL BOTIQUIN",
+  "p_botiquin_cerrado": "E   BOTIQUIN DEL VETERINARIO",
+  "botiquin_cerrado": "BOTIQUIN DEL VETERINARIO\nCandado. La llave la lleva Ramos, el cuartelero del barracon oeste.",
+  "pistola_dardos": "PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres.",
+  "cp_botiquin": "EL BOTIQUIN",
+  "p_expediente": "E   COGER EL EXPEDIENTE LH-07",
+  "expediente_cogido": "EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base por el porton de salida, al este.",
+  "cp_expediente": "EL EXPEDIENTE",
+  "obj_salir": "Sal por el porton de salida (muro este, por el camino)",
+  "obj_expediente": "Coge el expediente LH-07 del archivo",
+  "obj_archivo": "Abre el archivo con la clave de la nota",
+  "obj_mesa": "Registra la mesa de Alarcon en la jefatura",
+  "obj_jefatura": "Abre la jefatura (se entra por el barracon oeste)",
+  "obj_llave": "Consigue la llave de la jefatura: la lleva Ibarra (patio norte)",
+  "salida_sin_expediente": "NO PUEDES IRTE TODAVIA\nFalta el expediente de la jefatura.",
+  "ensena_camion": "VIENE UN CAMION\nEntra por el porton del oeste y cruza la base por el camino. Sus faros alumbran lo que tiene delante; detras de el, todo queda a oscuras.",
+  "camion_visto": "TE HA VISTO EL CAMION\nEstabas en la luz de sus faros. El conductor toca el claxon y los guardias de cerca vienen a mirar.",
+  "camion_paso": "ESTAS EN MEDIO DEL CAMINO\nEl camion frena y toca el claxon. Los guardias de cerca vienen a mirar."
+ }
+}

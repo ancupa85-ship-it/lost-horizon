@@ -17,8 +17,19 @@ GUARDIAS = {
     'Ibarra': ([[13, 4], [13, 9], [9, 9], [9, 4]], 2.5, 'ibarra'),   # patio norte, con la llave de la jefatura
     'Moya': ([[20, 19], [33, 19], [33, 20], [20, 20]], 3.0, 'moya'),   # patio central
     'Peris': ([[28, 7], [28, 8], [23, 8], [28, 8]], [9.0, 0.5, 16.0, 0.5], 'peris'),   # cuartelero: sale a fumar a la puerta y vuelve a la mesa
-    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], 2.5, 'moya'),   # portón
-    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], 2.5, 'peris'),   # barracón
+    # Vega y Ramos se asoman a un rincón y vuelven: allí se paran a mirar (6 s); en la esquina de paso, apenas.
+    # Con la misma espera en todos los puntos, ese ir y volver de pocos metros parecía un guardia en bucle.
+    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], [2.5, 1.0, 6.0, 1.0], 'vega'),   # portón
+    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], [3.0, 1.0, 6.0, 1.0], 'ramos'),   # barracón
+    # tanda 21: el perímetro deja de estar vacío. Casillas de fuera del plano (columnas negativas o filas de más de 27):
+    # el anillo entre el muro antiguo y el nuevo. Ninguno pisa el camino (filas 27-29): por ahí pasa el camión.
+    # Los de las garitas esperan junto a la puerta y cada poco dan unos pasos a lo largo del camino y vuelven: al llegar
+    # a cada punto se quedan mirando hacia donde iban (uno hacia el portón, el otro hacia dentro de la base).
+    'Lobato': ([[-7, 26], [-5, 26]], [14.0, 6.0], 'centinela'),   # garita del portón de entrada
+    'Sanz': ([[42, 26], [40, 26]], [16.0, 7.0], 'centinela'),     # control de salida: 16 s mirando al portón, 7 s hacia dentro
+    # la ronda del anillo sur: va y vuelve entre portón y portón, al borde de los charcos de luz de las farolas del camino,
+    # y pasa a unos 8 m del portillo de la marisma
+    'Carmona': ([[-5, 33], [40, 33], [40, 31], [-5, 31]], 4.0, 'centinela'),
 }
 
 def log(*a):
@@ -42,6 +53,19 @@ def cuerpo(g, nombre):
     if not p:
         return
     g.set_editor_property('body_mesh', p['malla'])
+    # idle, andar y trotar del maniquí de la plantilla retargeteados a su esqueleto (tools/unreal/animaciones.py);
+    # si no se puede, se quedan las del .glb. Apuntar y caer siguen siendo las del .glb.
+    try:
+        import animaciones
+        importlib.reload(animaciones)
+        a = animaciones.preparar(nombre, p)
+    except Exception as e:
+        log('AVISO: sin animaciones retargeteadas para', nombre, repr(e))
+        a = None
+    if a:
+        p = dict(p, idle=a['idle'], walk=a['walk'], blend=a['blend'])
+        g.set_editor_property('walk_anim_speed', a['walk_speed'])
+        g.set_editor_property('run_anim_speed', a['run_speed'])
     for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim'), ('down_anim', 'down'), ('move_blend', 'blend')):
         if p.get(k):
             g.set_editor_property(prop, p[k])
@@ -60,7 +84,12 @@ def navegacion():
     filas = len(DATA['map'])
     cols = max(len(f) for f in DATA['map'])
     ancho, largo = cols * T * 100.0, filas * T * 100.0
-    v = eas.spawn_actor_from_class(unreal.NavMeshBoundsVolume, unreal.Vector(ancho / 2, largo / 2, 300.0), unreal.Rotator(0, 0, 0))
+    cx, cy = ancho / 2, largo / 2
+    ext = DATA.get('ext')   # tanda 20: el muro perimetral está más afuera que el plano; el mapa de navegación llega hasta él
+    if ext:
+        ancho, largo = (ext['x1'] - ext['x0']) * 100.0, (ext['y1'] - ext['y0']) * 100.0
+        cx, cy = (ext['x0'] + ext['x1']) * 50.0, (ext['y0'] + ext['y1']) * 50.0
+    v = eas.spawn_actor_from_class(unreal.NavMeshBoundsVolume, unreal.Vector(cx, cy, 300.0), unreal.Rotator(0, 0, 0))
     v.set_actor_label('MapaNavegacion')
     v.set_folder_path('Guardias')
     # la caja por defecto mide 200 cm de lado
@@ -98,7 +127,7 @@ def centinelas(eas, cls):
                 g.set_editor_property('tower_light', f)
             else:
                 log('AVISO: no encuentro el foco de', t['name'])
-        cuerpo(g, 'moya')
+        cuerpo(g, 'centinela')
         n += 1
     return n
 
@@ -140,6 +169,12 @@ def colocar():
         d.set_editor_property('cell_spot', unreal.Vector(31 * T * 100 + T * 50, 12 * T * 100 + T * 50 + 340.0, 110.0))
         d.set_editor_property('cell_yaw', -90.0)
         d.set_editor_property('cell_door', unreal.Vector(31 * T * 100 + T * 50, 13 * T * 100, 0.0))
+        # textos, objetivos, puntos de interacción y ajustes de la misión 1 (assets/unreal/mision1.json)
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        import mision
+        importlib.reload(mision)
+        mision.aplicar(d)
     log('guardias colocados', n, '- director', 'sí' if dcls else 'no compilado')
     return n
 
