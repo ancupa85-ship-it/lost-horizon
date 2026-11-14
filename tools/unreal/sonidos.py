@@ -10,7 +10,10 @@ import unreal
 HERE = os.path.dirname(os.path.abspath(__file__))
 CARPETA = os.path.join(os.path.dirname(os.path.dirname(HERE)), 'assets', 'unreal', 'sonidos')
 DEST = '/Game/Tarsis/Sonidos'
-BUCLES = ('viento', 'lluvia', 'generador', 'musica_base', 'musica_tension', 'musica_alerta', 'grillos', 'rumor')
+# Los tres últimos son los que ambiente.py coloca en el nivel: si al reimportar perdieran el bucle, la gotera, la radio
+# y el fluorescente sonarían una vez y callarían hasta volver a ejecutar ambiente.py.
+BUCLES = ('viento', 'lluvia', 'generador', 'musica_base', 'musica_tension', 'musica_alerta', 'grillos', 'rumor',
+          'fluorescente', 'radio_barracon', 'gotera')
 
 def importar():
     tareas = []
