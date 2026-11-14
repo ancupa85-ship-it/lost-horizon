@@ -421,7 +421,7 @@ void ATarsisGuard::WakeUp()
 	SetState(ETarsisGuardState::Search);   // se levanta buscando a quien le ha tumbado
 	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It)
 	{
-		It->ShowMessage(FString::Printf(TEXT("%s SE HA DESPERTADO\nBusca a quien le ha tumbado."), *GuardName.ToUpper()), 4.0f);
+		It->GuardSay(this, TEXT("despierta"));   // voz y subtítulo; el «?» encima dice que busca
 		break;
 	}
 }
@@ -453,7 +453,7 @@ void ATarsisGuard::LookForBodies()
 			for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
 			{
 				Dt->GuardSay(this, TEXT("suelo"), true);
-				Dt->ShowMessage(FString::Printf(TEXT("%s HA ENCONTRADO A %s EN EL SUELO\nToda la base te busca."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 5.0f);
+				Dt->CentralSay(TEXT("todos"), Dt->Tx(TEXT("radio_todos"), TEXT("A todas las unidades: {0} esta en el suelo. Hay alguien dentro. Buscadlo."), { O->GuardName }), 3.2f);
 				break;
 			}
 			break;
@@ -468,7 +468,7 @@ void ATarsisGuard::LookForBodies()
 		Mark->SetTextRenderColor(FColor(255, 210, 58));
 		for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
 		{
-			Dt->ShowMessage(FString::Printf(TEXT("%s HA VISTO A %s EN EL SUELO\nVa a mirarlo. Mientras se agacha sobre el, aun puedes irte."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 4.0f);
+			Dt->GuardSay(this, TEXT("cuerpo"));   // «¿ese de ahí está en el suelo?»: va a mirarlo; mientras se agacha, aún puedes irte
 			break;
 		}
 		break;
@@ -514,7 +514,7 @@ void ATarsisGuard::BodyTick(float DeltaSeconds, APawn* Player, float V)
 	for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
 	{
 		Dt->GuardSay(this, TEXT("suelo"), true);
-		Dt->ShowMessage(FString::Printf(TEXT("%s HA ENCONTRADO A %s EN EL SUELO\nAvisa por radio: toda la base te busca."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 5.0f);
+		Dt->CentralSay(TEXT("todos"), Dt->Tx(TEXT("radio_todos"), TEXT("A todas las unidades: {0} esta en el suelo. Hay alguien dentro. Buscadlo."), { O->GuardName }), 3.2f);
 		break;
 	}
 	Alarm(P);
@@ -800,7 +800,9 @@ void ATarsisGuard::Caught(APawn* Player)
 	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { D = *It; break; }
 	if (D)
 	{
-		D->Captured(Player);
+		// escena: «¡te tengo!», la cámara se vuelve hacia él, golpe y fundido a negro; luego Captured
+		if (D->bCapturing) return;
+		D->BeginCapture(this);
 	}
 	else if (AActor* Start = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
 	{
@@ -813,6 +815,7 @@ void ATarsisGuard::Caught(APawn* Player)
 		It->Meter = 0.0f;
 		It->SetState(ETarsisGuardState::Return);
 	}
+	if (D) Hold(1.5f);   // se queda delante mientras la cámara se vuelve hacia él
 }
 
 void ATarsisGuard::Tick(float DeltaSeconds)

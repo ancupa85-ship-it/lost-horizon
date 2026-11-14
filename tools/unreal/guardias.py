@@ -155,6 +155,12 @@ def colocar():
         d.set_editor_property('cell_spot', unreal.Vector(31 * T * 100 + T * 50, 12 * T * 100 + T * 50 + 340.0, 110.0))
         d.set_editor_property('cell_yaw', -90.0)
         d.set_editor_property('cell_door', unreal.Vector(31 * T * 100 + T * 50, 13 * T * 100, 0.0))
+        # textos, objetivos, puntos de interacción y ajustes de la misión 1 (assets/unreal/mision1.json)
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        import mision
+        importlib.reload(mision)
+        mision.aplicar(d)
     log('guardias colocados', n, '- director', 'sí' if dcls else 'no compilado')
     return n
 

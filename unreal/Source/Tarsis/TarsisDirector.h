@@ -12,6 +12,50 @@
 #include "InputCoreTypes.h"
 #include "TarsisDirector.generated.h"
 
+/** Punto de interacción sencillo de la misión (assets/unreal/mision1.json, tools/unreal/mision.py): con la E, si tienes la
+ *  bandera Need, pone Sets, suena Sound, sale el texto Text, quita el bloque RemoveBlock y guarda un punto de control. */
+USTRUCT(BlueprintType)
+struct FTarsisPoint
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Id;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FVector Pos = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") float Radius = 170.0f;
+	/** Clave del aviso de la E; PromptLocked, si falta la bandera Need (vacío: no hay aviso). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Prompt;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName PromptLocked;
+	/** Bandera que exige; si falta: texto NeedText, sonido NeedSound y bandera NeedSets (p. ej. «ya sabes de Ramos»). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Need;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName NeedText;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName NeedSound;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName NeedSets;
+	/** Banderas que pone al usarlo; con Sets ya puesta el punto desaparece (salvo bRepeat, p. ej. releer una nota). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Sets;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName AlsoSets;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") bool bRepeat = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Sound;
+	/** Clave del texto que sale y segundos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Text;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") float TextSeconds = 5.0f;
+	/** Clave del nombre del punto de control que guarda (vacío: no guarda). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Checkpoint;
+	/** Lo notan los guardias si lo ven cambiado (puerta que estaba cerrada). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") bool bChange = false;
+	/** Bloque de la misión que quita (puerta_jefatura, puerta_botiquin, carta, expediente...). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName RemoveBlock;
+	/** Dardos que te da (pistola del botiquín). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") int32 Darts = 0;
+};
+
+/** Objetivo del HUD: el primero de la lista cuya bandera If esté puesta (If vacía: siempre). */
+USTRUCT(BlueprintType)
+struct FTarsisObjective
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName If;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Text;
+};
+
 UCLASS()
 class ATarsisDirector : public AActor
 {
@@ -454,6 +498,59 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
 	void SimulateKey(FName Key, bool bPress = true, bool bRelease = true);
 
+	// ---- misión en datos (assets/unreal/mision1.json, tools/unreal/mision.py la vuelca aquí y se guarda con el nivel)
+
+	/** Textos de la misión: clave -> texto ({0}, {1}... para los datos). Todo lo que sale en pantalla pasa por Tx. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	TMap<FName, FString> Texts;
+
+	/** Claves pedidas que no están en Texts (se usa el texto por defecto del C++): una prueba exige que esté vacía. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	TArray<FString> MissingTexts;
+
+	/** Objetivos del HUD, en orden: sale el primero cuya bandera esté puesta. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	TArray<FTarsisObjective> Objectives;
+
+	/** Puntos de interacción sencillos (puertas, notas, objetos). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	TArray<FTarsisPoint> Points;
+
+	/** Banderas de la misión (llave, jefatura, nota, archivo, expediente, carta, llave_botiquin, botiquin...). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Mision")
+	bool HasFlag(FName Flag) const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Mision")
+	void SetFlag(FName Flag);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Mision")
+	TArray<FName> FlagList() const;
+
+	/** Texto de la misión por clave; Default si no está (y la clave se apunta en MissingTexts). */
+	FString Tx(FName Key, const TCHAR* Default, const FStringFormatOrderedArguments& Args = FStringFormatOrderedArguments()) const;
+
+	/** Explicaciones que solo salen la primera vez por partida (derribar, arrastrar, la pistola, la taquilla...). */
+	void Teach(FName Key, const TCHAR* Default, const FStringFormatOrderedArguments& Args, float Seconds);
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ayuda")
+	TArray<FName> Taught;
+
+	/** Estado de la base para el HUD: 0 tranquila, 1 en guardia, 2 alerta. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	int32 BaseState() const;
+
+	/** Te han cogido: escena (frase del guardia, la cámara gira hacia él, golpe y fundido a negro) y luego Captured. */
+	void BeginCapture(class ATarsisGuard* G);
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	bool bCapturing = false;
+
+	/** La central habla por radio: voz voz_central_<Key> y subtítulo (siempre, como las voces de los guardias). */
+	void CentralSay(const FString& Key, const FString& Text, float Delay = 0.0f);
+
+	/** Pruebas: los subtítulos de voz que han salido (los últimos 30). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Pruebas")
+	TArray<FString> SubtitleLog;
+
+	/** Hay una voz con subtítulo en pantalla (se ve aunque la opción de subtítulos esté apagada). */
+	bool VoiceSubtitleOn() const { return VoiceSubT > 0.0f; }
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -588,6 +685,28 @@ private:
 	TArray<FString> ChangeKeys;
 	TArray<bool> ChangeSeen;
 	float ChangeT = 0.0f;
+	// misión en datos
+	TSet<FName> Flags;
+	bool* FlagBool(FName Flag);
+	const FTarsisPoint* PointNear() const;
+	void UsePoint(const FTarsisPoint& Pt);
+	UPROPERTY()
+	TMap<FName, TObjectPtr<class UStaticMeshComponent>> Blocks;
+	void RemoveBlockNamed(FName Name);
+	// captura como escena
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> Captor;
+	float CaptureT = 0.0f;
+	bool bCaptureLocker = false;
+	bool bCaptureHit = false;
+	bool bCaptureDone = false;
+	void DefaultMission();
+	FRotator CaptureFrom = FRotator::ZeroRotator;
+	void CaptureTick(float DeltaSeconds);
+	/** Frase de un guardia sin sonido (para las que aún no tienen voz): solo subtítulo. */
+	void SaySubtitle(const FString& Who, const FString& Text, float Seconds = 3.0f);
+	void ShowSubtitleLine(const FString& Line, float Seconds = 3.0f);
+	TArray<FString> PendingSubs;
 	bool IndoorAt(const FVector& P, const AActor* Ignore) const;
 	void SoundTick(class ACharacter* C, float DeltaSeconds);
 	void RainTick(float DeltaSeconds);

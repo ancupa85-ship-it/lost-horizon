@@ -44,6 +44,8 @@
 #include "Animation/AnimationAsset.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "InputKeyEventArgs.h"
+#include "TimerManager.h"
+#include "Camera/PlayerCameraManager.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -84,8 +86,8 @@ void ATarsisDirector::SetupPlayer()
 void ATarsisDirector::IntroText()
 {
 	auto K = [this](int32 I) { return ActionKeys[I].GetDisplayName().ToString(); };
-	ShowMessage(FString::Printf(TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado (%s) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n%s lanza una piedra para distraer. %s prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo (%s) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control."),
-		*K(0), *K(2), *K(3), *K(4)), 11.0f);
+	ShowMessage(Tx(TEXT("intro"), TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado ({0}) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n{1} lanza una piedra para distraer. {2} prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo ({3}) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control."),
+		{ K(0), K(2), K(3), K(4) }), 11.0f);
 }
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
@@ -120,7 +122,7 @@ void ATarsisDirector::Captured(APawn* Player)
 		CloseCell();
 		PlaySfx(TEXT("reja"), CellDoor + FVector(0.0f, 0.0f, 100.0f));
 		CellT = CellTime;
-		ShowMessage(TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas."), 8.0f);
+		ShowMessage(Tx(TEXT("calabozo"), TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas.")), 8.0f);
 		return;
 	}
 	if (bHasCheck && Difficulty < 2)
@@ -129,7 +131,7 @@ void ATarsisDirector::Captured(APawn* Player)
 		Player->TeleportTo(CheckLoc, CheckRot);
 		if (Ctl) Ctl->SetControlRotation(CheckRot);
 		Darts = FMath::Max(Darts, CheckDarts);
-		ShowMessage(FString::Printf(TEXT("TE HAN COGIDO\nVuelves al ultimo punto de control: %s."), *CheckpointName), 4.0f);
+		ShowMessage(Tx(TEXT("cogido_punto"), TEXT("TE HAN COGIDO\nVuelves al ultimo punto de control: {0}."), { CheckpointName }), 4.0f);
 		return;
 	}
 	if (AActor* Start = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
@@ -137,7 +139,7 @@ void ATarsisDirector::Captured(APawn* Player)
 		Player->TeleportTo(Start->GetActorLocation(), Start->GetActorRotation());
 		if (Ctl) Ctl->SetControlRotation(Start->GetActorRotation());
 	}
-	ShowMessage(TEXT("TE HAN COGIDO\nVuelves a la entrada de la base."), 4.0f);
+	ShowMessage(Tx(TEXT("cogido_entrada"), TEXT("TE HAN COGIDO\nVuelves a la entrada de la base.")), 4.0f);
 }
 
 void ATarsisDirector::CloseCell()
@@ -176,7 +178,7 @@ void ATarsisDirector::OpenCell()
 	}
 	Bars.Empty();
 	PlaySfx(TEXT("reja"), CellDoor + FVector(0.0f, 0.0f, 100.0f));
-	ShowMessage(TEXT("CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia."), 8.0f);
+	ShowMessage(Tx(TEXT("celda_abierta"), TEXT("CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia.")), 8.0f);
 }
 
 ATarsisGuard* ATarsisDirector::TakedownTarget() const
@@ -201,7 +203,7 @@ void ATarsisDirector::Takedown()
 	G->KnockOut();
 	++Takedowns;
 	HintStep = 3;
-	ShowMessage(FString::Printf(TEXT("%s DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma."), *G->GuardName.ToUpper()), 4.0f);
+	Teach(TEXT("ensena_derribo"), TEXT("{0} DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma."), { G->GuardName.ToUpper() }, 4.0f);
 }
 
 void ATarsisDirector::ToggleCrouch()
@@ -249,6 +251,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	DetectTick();
 	HintTick();
 	HideTick();
+	CaptureTick(DeltaSeconds);
 	ChangesTick(DeltaSeconds);
 	if (FrontMsgT > 0.0f) FrontMsgT -= DeltaSeconds;
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
@@ -274,10 +277,9 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		&& GateLamp && FVector::Dist2D(LampChecker->GetActorLocation(), GateLamp->GetActorLocation()) < 350.0f)
 	{
 		bLampReported = true;
-		GuardSay(LampChecker, TEXT("luz"));
+		// lo dice por radio (voz y subtítulo); que la base se pone en guardia lo dice el indicador del HUD
+		GuardSay(LampChecker, TEXT("farol"), true);
 		TensionT = FMath::Max(TensionT, 60.0f);
-		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, LampChecker->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
-		ShowMessage(FString::Printf(TEXT("RADIO, %s: \"Farol roto en el control. Cristales por el suelo... esto no es el viento.\"\nLA BASE SE PONE EN GUARDIA."), *LampChecker->GuardName.ToUpper()), 4.5f);
 	}
 	// el camino hasta la garita es largo (rodea): a los 25 s de investigar lo deja a medio camino y vuelve a su ronda.
 	// Si no ha llegado a verlo, se le vuelve a mandar (sale ya más cerca)
@@ -296,7 +298,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		{
 			bRamosSent = true;
 			R->GoTo(FVector(310.0f, 4900.0f, R->GetActorLocation().Z));
-			ShowMessage(TEXT("RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, muro oeste del patio suroeste.\""), 6.0f);
+			ShowMessage(Tx(TEXT("ramos_radio"), TEXT("RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, muro oeste del patio suroeste.\"")), 6.0f);
 		}
 	}
 	if (CellT > 0.0f)
@@ -364,7 +366,15 @@ void ATarsisDirector::SetupMission()
 	const FVector Floor = Rest(Cell(9, 17));
 	AddBlock(Floor + FVector(0.0f, 0.0f, 37.5f), FVector(1.2f, 0.6f, 0.75f), FLinearColor(0.16f, 0.11f, 0.07f), true);
 	FileProp = AddBlock(Floor + FVector(0.0f, 0.0f, 77.0f), FVector(0.24f, 0.32f, 0.04f), FLinearColor(0.55f, 0.42f, 0.2f), false);
+	// los puntos de la misión (mision1.json) los quitan por su nombre
+	Blocks.Add(TEXT("puerta_jefatura"), DoorL);
+	Blocks.Add(TEXT("puerta_archivo"), DoorV);
+	Blocks.Add(TEXT("puerta_botiquin"), VetDoor);
+	Blocks.Add(TEXT("nota"), NoteProp);
+	Blocks.Add(TEXT("carta"), LetterProp);
+	Blocks.Add(TEXT("expediente"), FileProp);
 	SetupHiding();
+	DefaultMission();
 }
 
 ATarsisGuard* ATarsisDirector::DownedNear(float Radius) const
@@ -389,51 +399,53 @@ static bool IsIbarra(const ATarsisGuard* G)
 
 FString ATarsisDirector::InteractPrompt() const
 {
-	if (bHiding) return TEXT("E   SALIR DE LA TAQUILLA");
-	if (Dragged) return TEXT("E   SOLTAR EL CUERPO");
-	if (bChoice) return TEXT("1   VENTE CONMIGO        2   DERRIBARLO");
+	if (bCapturing) return FString();
+	if (bHiding) return Tx(TEXT("p_taquilla_salir"), TEXT("E   SALIR DE LA TAQUILLA"));
+	if (Dragged) return Tx(TEXT("p_soltar"), TEXT("E   SOLTAR EL CUERPO"));
+	if (bChoice) return Tx(TEXT("p_ramos_eleccion"), TEXT("1   VENTE CONMIGO        2   DERRIBARLO"));
 	if (ATarsisGuard* T = TakedownTarget())
 	{
-		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? TEXT("E   AGARRAR A RAMOS") : TEXT("E   DERRIBAR");
+		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? Tx(TEXT("p_ramos_agarrar"), TEXT("E   AGARRAR A RAMOS")) : Tx(TEXT("p_derribar"), TEXT("E   DERRIBAR"));
 	}
-	if (ShoveTarget()) return TEXT("E   EMPUJAR (queda aturdido 2 s; hace ruido)");
-	if (FacingAlertGuard()) return TEXT("TE VE: huye, rodealo o distraelo (Q)");
+	if (ShoveTarget()) return Tx(TEXT("p_empujar"), TEXT("E   EMPUJAR (queda aturdido 2 s; hace ruido)"));
+	if (FacingAlertGuard()) return Tx(TEXT("p_te_ve"), TEXT("TE VE: huye, rodealo o distraelo ({0})"), { ActionKeys[2].GetDisplayName().ToString().ToUpper() });
 	if (ATarsisGuard* G = DownedNear(170.0f))
 	{
-		if (IsIbarra(G) && !bKey) return TEXT("E   QUITARLE LA LLAVE");
-		if (G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bVetKey && !bVetOpen) return TEXT("E   QUITARLE LA LLAVE DEL BOTIQUIN");
-		if (G->bDarted) return TEXT("E   RECUPERAR EL DARDO");
-		return TEXT("E   ARRASTRAR (escondelo en la sombra)");
+		if (IsIbarra(G) && !bKey) return Tx(TEXT("p_llave_ibarra"), TEXT("E   QUITARLE LA LLAVE"));
+		if (G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bVetKey && !bVetOpen) return Tx(TEXT("p_llave_ramos"), TEXT("E   QUITARLE LA LLAVE DEL BOTIQUIN"));
+		if (G->bDarted) return Tx(TEXT("p_dardo"), TEXT("E   RECUPERAR EL DARDO"));
+		return Tx(TEXT("p_arrastrar"), TEXT("E   ARRASTRAR (escondelo en la sombra)"));
 	}
-	if (!bJefOpen && NearPlayer(Cell(4, 15), 190.0f)) return bKey ? TEXT("E   ABRIR LA JEFATURA") : TEXT("JEFATURA: CERRADA CON LLAVE");
-	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f)) return bKeypad ? TEXT("") : TEXT("E   TECLADO DEL ARCHIVO");
-	if (bJefOpen && NearPlayer(Cell(3, 17), 150.0f)) return TEXT("E   LEER LA NOTA");
-	if (bVaultOpen && !bFile && NearPlayer(Cell(9, 17), 160.0f)) return TEXT("E   COGER EL EXPEDIENTE LH-07");
-	if (!bLetter && NearPlayer(FVector(1130.0f, 2850.0f, 0.0f), 150.0f)) return TEXT("E   LEER LA CARTA");
-	if (!bVetOpen && NearPlayer(FVector(4660.0f, 300.0f, 0.0f), 170.0f)) return bVetKey ? TEXT("E   ABRIR EL BOTIQUIN") : TEXT("E   BOTIQUIN DEL VETERINARIO");
-	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f)) return TEXT("E   PORTILLO DE LA MARISMA");
-	if (NearPlayer(GeneratorLoc, 230.0f)) return bPowerOff ? TEXT("GENERADOR: PARADO") : TEXT("E   CORTAR EL GENERADOR (apaga las luces)");
-	if (HideSpotNear() >= 0) return TEXT("E   ESCONDERTE EN LA TAQUILLA");
+	// puertas, notas y objetos de la misión (mision1.json)
+	if (const FTarsisPoint* Pt = PointNear())
+	{
+		const FName K = (Pt->Need.IsNone() || HasFlag(Pt->Need)) ? Pt->Prompt : Pt->PromptLocked;
+		return K.IsNone() ? FString() : Tx(K, *K.ToString());
+	}
+	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f)) return bKeypad ? FString() : Tx(TEXT("p_teclado"), TEXT("E   TECLADO DEL ARCHIVO"));
+	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f)) return Tx(TEXT("p_portillo"), TEXT("E   PORTILLO DE LA MARISMA"));
+	if (NearPlayer(GeneratorLoc, 230.0f)) return bPowerOff ? Tx(TEXT("p_generador_parado"), TEXT("GENERADOR: PARADO")) : Tx(TEXT("p_generador"), TEXT("E   CORTAR EL GENERADOR (apaga las luces)"));
+	if (HideSpotNear() >= 0) return Tx(TEXT("p_taquilla"), TEXT("E   ESCONDERTE EN LA TAQUILLA"));
 	return FString();
 }
 
 FString ATarsisDirector::Objective() const
 {
-	if (bDone) return TEXT("MISION CUMPLIDA");
-	if (bFile) return TEXT("Sal por el control de salida (esquina sureste)");
-	if (bVaultOpen) return TEXT("Coge el expediente LH-07 del archivo");
-	if (bNoteRead) return TEXT("Abre el archivo con la clave de la nota");
-	if (bJefOpen) return TEXT("Registra la mesa de Alarcon en la jefatura");
-	if (bKey) return TEXT("Abre la jefatura (se entra por el barracon oeste)");
-	return TEXT("Consigue la llave de la jefatura: la lleva Ibarra (patio norte)");
+	if (bDone) return Tx(TEXT("obj_fin"), TEXT("MISION CUMPLIDA"));
+	// el primero de la lista (mision1.json, «objetivos») cuya bandera esté puesta
+	for (const FTarsisObjective& O : Objectives)
+	{
+		if (O.If.IsNone() || HasFlag(O.If)) return Tx(O.Text, *O.Text.ToString());
+	}
+	return FString();
 }
 
 void ATarsisDirector::Interact()
 {
 	if (bCine) { SkipCine(); return; }
-	if (bDone) return;
+	if (bDone || bCapturing) return;
 	if (bHiding) { ExitHide(); return; }
-	if (Dragged) { StopDrag(); ShowMessage(TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), 3.0f); return; }
+	if (Dragged) { StopDrag(); Teach(TEXT("ensena_cuerpo"), TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), {}, 3.0f); return; }
 	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
 	if (ATarsisGuard* T = TakedownTarget())
 	{
@@ -443,7 +455,7 @@ void ATarsisDirector::Interact()
 			bRamosKnown = true;
 			bChoice = true;
 			T->Hold(25.0f);
-			ShowMessage(TEXT("RAMOS, EL CUARTELERO\n\"No me haga nada. El jueves bajo con los partes y no pienso volver.\"\n\"Llevo la llave del botiquin del veterinario: dentro hay una pistola de dardos. Si me saca de aqui, es suya.\"\n1   \"Vente conmigo\"          2   Derribarlo"), 25.0f);
+			ShowMessage(Tx(TEXT("ramos_dialogo"), TEXT("RAMOS, EL CUARTELERO\n\"No me haga nada. El jueves bajo con los partes y no pienso volver.\"\n\"Llevo la llave del botiquin del veterinario: dentro hay una pistola de dardos. Si me saca de aqui, es suya.\"\n1   \"Vente conmigo\"          2   Derribarlo")), 25.0f);
 			return;
 		}
 		Takedown();
@@ -457,7 +469,7 @@ void ATarsisDirector::Interact()
 		{
 			FrontMsgT = 2.0f;
 			PlaySfx(TEXT("empujon"), A->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 0.4f);
-			ShowMessage(FString::Printf(TEXT("DE FRENTE TE VE\n%s esta en alerta: no se deja. Huye, rodealo o distraelo con una piedra (%s)."), *A->GuardName.ToUpper(), *ActionKeys[2].GetDisplayName().ToString().ToUpper()), 2.5f);
+			Teach(TEXT("ensena_de_frente"), TEXT("DE FRENTE TE VE\n{0} esta en alerta: no se deja. Huye, rodealo o distraelo con una piedra ({1})."), { A->GuardName.ToUpper(), ActionKeys[2].GetDisplayName().ToString().ToUpper() }, 2.5f);
 		}
 		return;
 	}
@@ -468,15 +480,15 @@ void ATarsisDirector::Interact()
 			bVetKey = true;
 			bRamosKnown = true;
 			PlaySfx(TEXT("llaves"), G->GetActorLocation(), 0.8f);
-			ShowMessage(TEXT("LLAVE DE RAMOS\n\"Botiquin - veterinario\". Esta en el muro norte del patio este."), 4.0f);
+			ShowMessage(Tx(TEXT("llave_ramos"), TEXT("LLAVE DE RAMOS\n\"Botiquin - veterinario\". Esta en el muro norte del patio este.")), 4.0f);
 			return;
 		}
 		if (IsIbarra(G) && !bKey)
 		{
 			bKey = true;
 			PlaySfx(TEXT("llaves"), G->GetActorLocation(), 0.8f);
-			ShowMessage(TEXT("LLAVE DE LA JEFATURA\nSe la quitas a Ibarra del cinturon. Ahora puedes arrastrarlo a la sombra (E)."), 5.0f);
-			Checkpoint(TEXT("LA LLAVE DE IBARRA"));
+			ShowMessage(Tx(TEXT("llave_ibarra"), TEXT("LLAVE DE LA JEFATURA\nSe la quitas a Ibarra del cinturon. Ahora puedes arrastrarlo a la sombra (E).")), 5.0f);
+			Checkpoint(Tx(TEXT("cp_llave"), TEXT("LA LLAVE DE IBARRA")));
 			return;
 		}
 		if (G->bDarted)
@@ -484,23 +496,14 @@ void ATarsisDirector::Interact()
 			G->bDarted = false;
 			++Darts;
 			PlaySfx(TEXT("recoger"), G->GetActorLocation(), 0.6f);
-			ShowMessage(FString::Printf(TEXT("DARDO RECUPERADO\nSe lo sacas del cuello a %s. Tienes %d."), *G->GuardName, Darts), 3.0f);
+			Teach(TEXT("ensena_dardo_recuperado"), TEXT("DARDO RECUPERADO\nSe lo sacas del cuello a {0}. Los que llevas, abajo a la derecha."), { G->GuardName }, 3.0f);
 			return;
 		}
 		StartDrag(G);
 		return;
 	}
-	if (!bJefOpen && NearPlayer(Cell(4, 15), 190.0f))
-	{
-		if (!bKey) { PlaySfx(TEXT("candado"), Cell(4, 15, 100.0f), 0.5f); ShowMessage(TEXT("JEFATURA CERRADA\nHace falta la llave. La lleva el sargento Ibarra."), 3.5f); return; }
-		bJefOpen = true;
-		if (DoorL) { DoorL->DestroyComponent(); DoorL = nullptr; }
-		AddChange(Cell(4, 15, 110.0f), TEXT("puerta"));
-		PlaySfx(TEXT("puerta_madera"), Cell(4, 15, 100.0f));
-		ShowMessage(TEXT("JEFATURA ABIERTA\nEl despacho de Alarcon. Al fondo, la puerta blindada del archivo."), 4.0f);
-		Checkpoint(TEXT("LA JEFATURA"));
-		return;
-	}
+	// puertas, notas y objetos de la misión (mision1.json)
+	if (const FTarsisPoint* Pt = PointNear()) { UsePoint(*Pt); return; }
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))
 	{
 		bKeypad = !bKeypad;
@@ -508,41 +511,12 @@ void ATarsisDirector::Interact()
 		PlaySfx(TEXT("tecla"), Cell(6, 17, 120.0f), 0.6f);
 		return;
 	}
-	if (bJefOpen && NearPlayer(Cell(3, 17), 150.0f))
-	{
-		bNoteRead = true;
-		PlaySfx(TEXT("recoger"), Cell(3, 17, 80.0f), 0.7f);
-		ShowMessage(TEXT("MESA DE ALARCON\nUna Vulgata abierta por el salmo CXXIX: \"De profundis clamavi ad te, Domine\".\nEn el margen, a lapiz: \"Ella tambien clama. Nadie la oye. - A.\"\nUna nota: \"Clave: la de siempre. No apuntar.\""), 12.0f);
-		return;
-	}
-	if (!bLetter && NearPlayer(FVector(1130.0f, 2850.0f, 0.0f), 150.0f))
-	{
-		bLetter = true;
-		bRamosKnown = true;
-		PlaySfx(TEXT("recoger"), FVector(1130.0f, 2850.0f, 60.0f), 0.7f);
-		if (LetterProp) { LetterProp->DestroyComponent(); LetterProp = nullptr; }
-		ShowMessage(TEXT("LITERA DE RAMOS - CARTA SIN TERMINAR\n\"Padre: el jueves me toca bajar con los partes. No se lo diga a madre.\"\n\"El veterinario se dejo la pistola de dardos en el botiquin y la llave la llevo encima.\"\n\"A veces pienso en dormirlos a todos y salir andando por la marisma.\"\nEn el sobre: Julian Ramos, Trebujena."), 12.0f);
-		return;
-	}
-	if (!bVetOpen && NearPlayer(FVector(4660.0f, 300.0f, 0.0f), 170.0f))
-	{
-		if (!bVetKey) { bRamosKnown = true; PlaySfx(TEXT("candado"), FVector(4660.0f, 160.0f, 145.0f), 0.5f); ShowMessage(TEXT("BOTIQUIN DEL VETERINARIO\nCandado. La llave la lleva Ramos, el cuartelero del barracon oeste."), 3.5f); return; }
-		bVetOpen = true;
-		Darts = 5;
-		if (VetDoor) { VetDoor->DestroyComponent(); VetDoor = nullptr; }
-		AddChange(FVector(4660.0f, 160.0f, 145.0f), TEXT("puerta"));
-		PlaySfx(TEXT("candado"), FVector(4660.0f, 160.0f, 145.0f));
-		PlaySfx(TEXT("recoger"), FVector(4660.0f, 160.0f, 145.0f), 0.7f);
-		ShowMessage(TEXT("PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres."), 5.0f);
-		Checkpoint(TEXT("EL BOTIQUIN"));
-		return;
-	}
 	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f))
 	{
 		ATarsisGuard* R = FindGuard(TEXT("Ramos"));
-		if (!bRamosAlly) { ShowMessage(TEXT("PORTILLO DE LA MARISMA\nCerrado. La llave la guarda el cuartelero del barracon oeste."), 3.5f); return; }
-		if (!bFile) { ShowMessage(TEXT("PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente."), 3.0f); return; }
-		if (!R || R->State == ETarsisGuardState::Down || FVector::Dist2D(R->GetActorLocation(), FVector(310.0f, 4900.0f, 0.0f)) > 700.0f) { ShowMessage(TEXT("ESPERA A RAMOS\nEl trae la llave del portillo."), 2.5f); return; }
+		if (!bRamosAlly) { ShowMessage(Tx(TEXT("portillo_cerrado"), TEXT("PORTILLO DE LA MARISMA\nCerrado. La llave la guarda el cuartelero del barracon oeste.")), 3.5f); return; }
+		if (!bFile) { ShowMessage(Tx(TEXT("portillo_sin_expediente"), TEXT("PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente.")), 3.0f); return; }
+		if (!R || R->State == ETarsisGuardState::Down || FVector::Dist2D(R->GetActorLocation(), FVector(310.0f, 4900.0f, 0.0f)) > 700.0f) { ShowMessage(Tx(TEXT("portillo_espera"), TEXT("ESPERA A RAMOS\nEl trae la llave del portillo.")), 2.5f); return; }
 		PlaySfx(TEXT("reja"), FVector(310.0f, 4900.0f, 100.0f), 0.8f);
 		Finish(true);
 		return;
@@ -556,14 +530,6 @@ void ATarsisDirector::Interact()
 	{
 		EnterHide(H);
 		return;
-	}
-	if (bVaultOpen && !bFile && NearPlayer(Cell(9, 17), 160.0f))
-	{
-		bFile = true;
-		if (FileProp) { FileProp->DestroyComponent(); FileProp = nullptr; }
-		PlaySfx(TEXT("recoger"), Cell(9, 17, 80.0f), 0.8f);
-		ShowMessage(TEXT("EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base por el control de salida, al sureste."), 5.0f);
-		Checkpoint(TEXT("EL EXPEDIENTE"));
 	}
 }
 
@@ -601,14 +567,13 @@ void ATarsisDirector::KeypadDigit(int32 Digit)
 		AddChange(Cell(6, 17, 110.0f), TEXT("puerta"));
 		PlaySfx(TEXT("clave_ok"), Cell(6, 17, 120.0f), 0.8f);
 		PlaySfx(TEXT("puerta_blindada"), Cell(6, 17, 110.0f));
-		ShowMessage(TEXT("ARCHIVO ABIERTO\nLa puerta blindada se abre con un chasquido."), 4.0f);
+		ShowMessage(Tx(TEXT("archivo_abierto"), TEXT("ARCHIVO ABIERTO\nLa puerta blindada se abre con un chasquido.")), 4.0f);
 	}
 	else
 	{
 		KeypadErrT = 1.2f;
 		PlaySfx(TEXT("clave_mal"), Cell(6, 17, 120.0f), 0.8f);
-		KeypadInput.Reset();
-		ShowMessage(TEXT("CLAVE INCORRECTA"), 1.5f);
+		KeypadInput.Reset();   // el teclado se pone en rojo (KeypadErrT): no hace falta cartel
 	}
 }
 
@@ -623,7 +588,7 @@ void ATarsisDirector::StartDrag(ATarsisGuard* G)
 	bSprint = false;
 	M->MaxWalkSpeed = 180.0f;
 	M->MaxWalkSpeedCrouched = 140.0f;
-	ShowMessage(FString::Printf(TEXT("ARRASTRAS A %s\nLlevalo a la sombra y sueltalo con E. Si un guardia te ve con el, dara la alarma."), *G->GuardName.ToUpper()), 4.0f);
+	Teach(TEXT("ensena_arrastrar"), TEXT("ARRASTRAS A {0}\nLlevalo a la sombra y sueltalo con E. Si un guardia te ve con el, dara la alarma."), { G->GuardName.ToUpper() }, 4.0f);
 }
 
 void ATarsisDirector::StopDrag()
@@ -707,7 +672,7 @@ void ATarsisDirector::ThrowStone()
 			++Heard;
 		}
 	}
-	if (Heard == 0) ShowMessage(TEXT("CLAC\nNadie lo ha oido."), 1.5f);
+	if (Heard == 0) Teach(TEXT("ensena_piedra"), TEXT("CLAC\nNadie lo ha oido: la piedra solo atrae a los que estan cerca."), {}, 2.5f);
 }
 
 void ATarsisDirector::ToggleBinoculars()
@@ -742,7 +707,7 @@ void ATarsisDirector::BinocularTick()
 		FHitResult Hit;
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Loc, Head, ECC_Visibility, Q2)) continue;
 		It->bMarked = true;
-		ShowMessage(FString::Printf(TEXT("%s MARCADO\nLo veras aunque haya paredes por medio."), *It->GuardName.ToUpper()), 2.5f);
+		Teach(TEXT("ensena_marcado"), TEXT("{0} MARCADO\nLo veras aunque haya paredes por medio."), { It->GuardName.ToUpper() }, 2.5f);
 	}
 }
 
@@ -769,7 +734,7 @@ void ATarsisDirector::Choose(int32 Option)
 		bVetKey = true;
 		R->bAlly = true;
 		R->Hold(1.5f);
-		ShowMessage(TEXT("RAMOS ESTA CONTIGO\nTe da la llave del botiquin del veterinario (muro norte del patio este).\nSigue su ronda para que no le echen en falta, y ya no te delatara."), 7.0f);
+		ShowMessage(Tx(TEXT("ramos_contigo"), TEXT("RAMOS ESTA CONTIGO\nTe da la llave del botiquin del veterinario (muro norte del patio este).\nSigue su ronda para que no le echen en falta, y ya no te delatara.")), 7.0f);
 	}
 	else
 	{
@@ -777,17 +742,17 @@ void ATarsisDirector::Choose(int32 Option)
 		R->KnockOut();
 		++Takedowns;
 		bRamosDowned = true;
-		ShowMessage(TEXT("RAMOS DERRIBADO\nLleva encima la llave del botiquin."), 3.5f);
+		ShowMessage(Tx(TEXT("ramos_derribado"), TEXT("RAMOS DERRIBADO\nLleva encima la llave del botiquin.")), 3.5f);
 	}
 }
 
 FString ATarsisDirector::SideObjective() const
 {
 	if (bDone || !bRamosKnown) return FString();
-	if (bRamosAlly && bFile) return TEXT("Otra salida: Ramos te espera en el portillo de la marisma (muro oeste, patio suroeste)");
-	if (bVetOpen) return bRamosAlly ? TEXT("Ramos esta contigo: con el expediente, saldra por la marisma") : FString();
-	if (bVetKey) return TEXT("Abre el botiquin del veterinario: muro norte del patio este");
-	return TEXT("Ramos, el cuartelero del barracon oeste, lleva la llave del botiquin: agarralo por la espalda");
+	if (bRamosAlly && bFile) return Tx(TEXT("sec_portillo"), TEXT("Otra salida: Ramos te espera en el portillo de la marisma (muro oeste, patio suroeste)"));
+	if (bVetOpen) return bRamosAlly ? Tx(TEXT("sec_ramos_contigo"), TEXT("Ramos esta contigo: con el expediente, saldra por la marisma")) : FString();
+	if (bVetKey) return Tx(TEXT("sec_botiquin"), TEXT("Abre el botiquin del veterinario: muro norte del patio este"));
+	return Tx(TEXT("sec_ramos"), TEXT("Ramos, el cuartelero del barracon oeste, lleva la llave del botiquin: agarralo por la espalda"));
 }
 
 void ATarsisDirector::ShootDart()
@@ -831,15 +796,11 @@ void ATarsisDirector::ShootDart()
 		}
 	}
 	if (ShootLamp(Loc, Fwd, Best ? BestT : 3500.0f)) return;
-	if (!Best)
-	{
-		ShowMessage(FString::Printf(TEXT("FALLASTE\nTe quedan %d dardos."), Darts), 1.8f);
-		return;
-	}
+	if (!Best) return;   // fallado: el contador de dardos del HUD ya lo dice
 	Best->KnockOut();
 	Best->bDarted = true;
 	++Takedowns;
-	ShowMessage(FString::Printf(TEXT("%s DORMIDO\nTe quedan %d dardos."), *Best->GuardName.ToUpper(), Darts), 2.5f);
+	Teach(TEXT("ensena_dormido"), TEXT("{0} DORMIDO\nEl dardo se recupera: acercate al cuerpo y pulsa E."), { Best->GuardName.ToUpper() }, 3.0f);
 }
 
 void ATarsisDirector::Finish(bool bByMarsh)
@@ -876,7 +837,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 			Best->SetActorLocationAndRotation(FVector(Spot.X, Spot.Y, Best->GetActorLocation().Z), FRotator(0.0f, ExitBarrierYaw + 150.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
 			Best->SetFlashlight(false);
 			Best->Hold(3600.0f);
-			GateLine = FString::Printf(TEXT("\nEn la garita, %s levanta la barrera y mira hacia la marisma."), *Best->GuardName);
+			GateLine = TEXT("\n") + Tx(TEXT("final_garita"), TEXT("En la garita, {0} levanta la barrera y mira hacia la marisma."), { Best->GuardName });
 		}
 	}
 	PlayCine(bByMarsh ? TEXT("LS_Marisma") : TEXT("LS_Salida"), false);
@@ -889,16 +850,16 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	Rank = (Detections == 0 && Captures == 0 && Takedowns == 0) ? TEXT("FANTASMA")
 		: (Detections == 0 && Captures == 0) ? TEXT("SOMBRA")
 		: Score >= 600 ? TEXT("INFILTRADO") : TEXT("RUIDOSO");
-	const FString Stats = FString::Printf(TEXT("Tiempo %d:%02d   Te vieron %d   Capturas %d   Derribos %d\nSIGILO: %d puntos - %s (%s)"),
-		Secs / 60, Secs % 60, Detections, Captures, Takedowns, Score, *Rank, Df[FMath::Clamp(Difficulty, 0, 2)]);
+	const FString Stats = Tx(TEXT("final_datos"), TEXT("Tiempo {0}:{1}   Te vieron {2}   Capturas {3}   Derribos {4}\nSIGILO: {5} puntos - {6} ({7})"),
+		{ Secs / 60, FString::Printf(TEXT("%02d"), Secs % 60), Detections, Captures, Takedowns, Score, Rank, FString(Df[FMath::Clamp(Difficulty, 0, 2)]) });
 	if (bByMarsh)
 	{
-		ShowMessage(FString(TEXT("EL QUE NO ENTREGO\nRamos abre el portillo y rema sin encender la linterna. El expediente sigue en tu chaqueta.\nControl pierde tu rastro en la marisma.\n")) + Stats, 20.0f);
+		ShowMessage(Tx(TEXT("final_marisma"), TEXT("EL QUE NO ENTREGO\nRamos abre el portillo y rema sin encender la linterna. El expediente sigue en tu chaqueta.\nControl pierde tu rastro en la marisma.")) + TEXT("\n") + Stats, 20.0f);
 	}
 	else
 	{
-		FString T = FString(TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.")) + GateLine + TEXT("\n") + Stats;
-		if (bRamosAlly) T += TEXT("\nRamos sale solo por la marisma y os espera en el camino de Trebujena.");
+		FString T = Tx(TEXT("final_salida"), TEXT("MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.")) + GateLine + TEXT("\n") + Stats;
+		if (bRamosAlly) T += TEXT("\n") + Tx(TEXT("final_ramos"), TEXT("Ramos sale solo por la marisma y os espera en el camino de Trebujena."));
 		ShowMessage(T, 15.0f);
 	}
 	BuildReport();
@@ -1021,8 +982,7 @@ void ATarsisDirector::Shove(ATarsisGuard* G)
 		It->HearNoise(G->GetActorLocation());
 		++Heard;
 	}
-	ShowMessage(FString::Printf(TEXT("EMPUJAS A %s\nAturdido 2 s: rodealo y derribalo (E) o vete. %s"), *G->GuardName.ToUpper(),
-		Heard > 0 ? TEXT("El golpe se ha oido.") : TEXT("Nadie mas lo ha oido.")), 3.0f);
+	Teach(TEXT("ensena_empujon"), TEXT("EMPUJAS A {0}\nAturdido 2 s: rodealo y derribalo (E) o vete. El golpe se oye: los que esten cerca vienen."), { G->GuardName.ToUpper() }, 3.5f);
 }
 
 // ---------------------------------------------------------------- escondites: taquillas del barracón y de la sala de guardia
@@ -1102,7 +1062,7 @@ void ATarsisDirector::EnterHide(int32 Index)
 	PC->SetControlRotation(FRotator(0.0f, Yaw, 0.0f));
 	if (FAudioDeviceHandle Dev = GEngine->GetMainAudioDevice()) Dev->SetTransientPrimaryVolume(OptVolume * 0.45f);   // se oye amortiguado
 	PlaySfx(TEXT("taquilla"), HideSpots[Index] + FVector(0.0f, 0.0f, 100.0f), 0.8f);
-	ShowMessage(TEXT("EN LA TAQUILLA\nNo te ven ni te oyen, salvo que te hayan visto meterte. E para salir."), 3.5f);
+	Teach(TEXT("ensena_taquilla"), TEXT("EN LA TAQUILLA\nNo te ven ni te oyen, salvo que te hayan visto meterte. E para salir."), {}, 3.5f);
 }
 
 void ATarsisDirector::ExitHide()
@@ -1131,13 +1091,9 @@ void ATarsisDirector::HideTick()
 		bAny = true;
 		if (FVector::Dist2D(It->GetActorLocation(), HideSpots[HideIdx]) < 190.0f)
 		{
-			ATarsisGuard* G = *It;
-			ExitHide();
-			if (APawn* P = UGameplayStatics::GetPlayerPawn(this, 0))
-			{
-				Captured(P);
-				ShowMessage(FString::Printf(TEXT("%s TE VIO METERTE EN LA TAQUILLA\nLa abre de un tiron. %s"), *G->GuardName.ToUpper(), *Message.Mid(Message.Find(TEXT("\n")) + 1)), 6.0f);
-			}
+			// la abre de un tirón: la misma escena que cualquier captura (BeginCapture), con su aviso al final
+			BeginCapture(*It);
+			bCaptureLocker = true;
 			return;
 		}
 	}
@@ -1180,8 +1136,7 @@ void ATarsisDirector::ChangesTick(float DeltaSeconds)
 			ChangeSeen[i] = true;
 			++ChangesNoticed;
 			GuardSay(G, ChangeKeys[i]);   // antes que HearNoise: así no dice además «¿qué ha sido eso?»
-			G->HearNoise(P);
-			ShowMessage(FString::Printf(TEXT("%s HA VISTO UNA PUERTA ABIERTA\nEstaba cerrada. Va a mirar."), *G->GuardName.ToUpper()), 3.5f);
+			G->HearNoise(P);   // lo dice él («esta puerta estaba cerrada»), con subtítulo
 			break;
 		}
 	}
@@ -1507,7 +1462,8 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	float& Next = VoiceNext.FindOrAdd(K, 0.0f);
 	// no repite frase enseguida (al cambiar de estado varias veces seguidas), salvo las que importan: el empujón,
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
-	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde");
+	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
+		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("perdido") || Key == TEXT("despierta");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -1522,8 +1478,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	++VoicesPlayed;
 	VoiceLog.Add(LastVoice);
 	if (VoiceLog.Num() > 30) VoiceLog.RemoveAt(0);
-	if (!bSubtitles) return;
-	// texto en ASCII (la fuente del HUD no lleva tildes)
+	// las voces llevan siempre subtítulo (los de pasos y ruidos, solo con la opción). Texto en ASCII (la fuente del HUD no lleva tildes)
 	FString T;
 	if (Key == TEXT("quien")) T = TEXT("Quien anda ahi?");
 	else if (Key == TEXT("ruido")) T = TEXT("Que ha sido eso?");
@@ -1535,18 +1490,28 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("luz")) T = TEXT("Y la luz?");
 	else if (Key == TEXT("donde")) T = TEXT("Donde se ha metido? No contesta.");
 	else if (Key == TEXT("eh")) T = TEXT("Eh! Pero que...?");
+	else if (Key == TEXT("farol")) T = TEXT("Central, el farol del control esta roto. Cristales por el suelo... esto no es el viento.");
+	else if (Key == TEXT("cuerpo")) T = TEXT("Eh... ese de ahi esta en el suelo?");
+	else if (Key == TEXT("despierta")) T = TEXT("Ay, mi cabeza... Quien ha sido?");
+	else if (Key == TEXT("tengo")) T = TEXT("Te tengo!");
+	else if (Key == TEXT("perdido")) T = TEXT("Lo he perdido.");
+	else if (Key == TEXT("yacasi")) T = TEXT("Ya casi esta.");
 	else T = Key;
-	const FString Name = G->bTowerSentry ? FString(TEXT("CENTINELA")) : G->GuardName.ToUpper();
-	Subtitle = bRadio ? FString::Printf(TEXT("%s (RADIO): \"%s\""), *Name, *T)
-		: FString::Printf(TEXT("%s (%s): \"%s\""), *Name, *Direction(G->GetActorLocation()), *T);
-	SubtitleT = 3.0f;
-	VoiceSubT = 3.0f;
-	SubtitleDist = 0.0f;
+	T = Tx(FName(*(TEXT("voz_") + Key)), *T);
+	const FString Name = G->bTowerSentry ? Tx(TEXT("nombre_centinela"), TEXT("CENTINELA")) : G->GuardName.ToUpper();
+	SaySubtitle(bRadio ? FString::Printf(TEXT("%s (RADIO)"), *Name) : FString::Printf(TEXT("%s (%s)"), *Name, *Direction(G->GetActorLocation())), T);
 }
 
 void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
 {
 	if (VoiceSubT > 0.0f) VoiceSubT -= DeltaSeconds;
+	// subtítulos en cola: si hablan dos seguidos, el segundo sale al acabar el primero
+	if (VoiceSubT <= 0.0f && PendingSubs.Num() > 0)
+	{
+		const FString Next = PendingSubs[0];
+		PendingSubs.RemoveAt(0);
+		ShowSubtitleLine(Next);
+	}
 	// tus pasos: uno cada ~1,4 m (agachado, flojito; corriendo, fuerte), con el sonido de lo que pisas
 	const float Speed = C->GetCharacterMovement()->IsFalling() ? 0.0f : C->GetVelocity().Size2D();
 	if (Speed > 40.0f)
@@ -1608,11 +1573,12 @@ void ATarsisDirector::RainTick(float DeltaSeconds)
 void ATarsisDirector::CycleWeather()
 {
 	SetWeather((Weather + 1) % 3);
-	static const TCHAR* Texts[] = {
+	static const TCHAR* Def[] = {
 		TEXT("DESPEJADO\nLa vista y el oido de los guardias, normales."),
 		TEXT("LLUVIA\nLos guardias ven menos de lejos y el agua tapa tus pasos fuera."),
 		TEXT("NIEBLA\nLos guardias ven mucho menos de lejos; tus pasos se oyen igual.") };
-	ShowMessage(Texts[Weather], 3.5f);
+	static const TCHAR* Keys[] = { TEXT("clima_despejado"), TEXT("clima_lluvia"), TEXT("clima_niebla") };
+	ShowMessage(Tx(Keys[Weather], Def[Weather]), 3.5f);
 }
 
 void ATarsisDirector::SetWeather(int32 NewWeather)
@@ -1690,10 +1656,12 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 		}
 		if (!Best) continue;
 		Best->HearNoise(G->KnockLoc);
-		GuardSay(Best, TEXT("donde"));
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Best->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
-		ShowMessage(FString::Printf(TEXT("RADIO: \"%s, responde.\" ... Nada.\n%s va a ver que pasa donde le toca la ronda."),
-			*G->GuardName, *Best->GuardName), 4.5f);
+		// la central llama al caído; nada. Al rato, el que va a mirar: «¿dónde se ha metido?»
+		CentralSay(TEXT("responde"), Tx(TEXT("radio_responde"), TEXT("{0}, responde. {0}?"), { G->GuardName }));
+		TWeakObjectPtr<ATarsisGuard> W(Best);
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, W]() { if (W.IsValid()) GuardSay(W.Get(), TEXT("donde")); }), 2.2f, false);
 	}
 }
 
@@ -1754,14 +1722,14 @@ void ATarsisDirector::CutPower()
 		Repairer->SetFlashlightShadows(true);   // su cono recorta cajas y muros: te puedes esconder detrás
 		Repairer->HearNoise(RepairSpot());
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
-		// el aviso va aparte, a la caja de radio (ShowMessage lo manda allí si empieza por RADIO)
-		ShowMessage(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia."), 5.0f);
-		ShowMessage(FString::Printf(TEXT("RADIO: \"Se ha ido la luz en toda la base! %s, mira el generador.\""), *Repairer->GuardName), 5.0f);
+		const FString RName = Repairer->GuardName;
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, RName]()
+		{
+			CentralSay(TEXT("luz"), Tx(TEXT("radio_luz"), TEXT("Se ha ido la luz en toda la base! {0}, mira el generador."), { RName }));
+		}), 1.6f, false);
 	}
-	else
-	{
-		ShowMessage(TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia."), 4.5f);
-	}
+	Teach(TEXT("ensena_generador"), TEXT("GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia."), {}, 4.5f);
 }
 
 void ATarsisDirector::RestorePower(bool bByGuard)
@@ -1790,9 +1758,8 @@ void ATarsisDirector::RestorePower(bool bByGuard)
 	if (Repairer) Repairer->StopRepair();
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) { It->SetFlashlightShadows(false); It->SetFlashlight(false); }
 	if (HumComp) HumComp->Play();
-	ShowMessage(bByGuard && Repairer
-		? FString::Printf(TEXT("VUELVE LA LUZ\n%s ha arrancado el generador."), *Repairer->GuardName)
-		: FString(TEXT("VUELVE LA LUZ (A MEDIAS)\nEl generador de reserva no da para todo: la mitad de las farolas se quedan apagadas.")), 4.0f);
+	if (bByGuard && Repairer) Teach(TEXT("ensena_luz_vuelve"), TEXT("VUELVE LA LUZ\n{0} ha arrancado el generador."), { Repairer->GuardName }, 3.5f);
+	else Teach(TEXT("ensena_reserva"), TEXT("VUELVE LA LUZ (A MEDIAS)\nEl generador de reserva no da para todo: la mitad de las farolas se quedan apagadas."), {}, 4.0f);
 	Repairer = nullptr;
 }
 
@@ -1826,7 +1793,10 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Repairer->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		if (Repairer->State != ETarsisGuardState::Down)
 		{
-			ShowMessage(FString::Printf(TEXT("RADIO: \"%s, como va eso?\" - \"Ya casi.\""), *Repairer->GuardName), 2.5f);
+			CentralSay(TEXT("comova"), Tx(TEXT("radio_comova"), TEXT("{0}, como va eso?"), { Repairer->GuardName }));
+			TWeakObjectPtr<ATarsisGuard> W(Repairer.Get());
+			FTimerHandle H;
+			GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, W]() { if (W.IsValid() && W->State != ETarsisGuardState::Down) GuardSay(W.Get(), TEXT("yacasi"), true); }), 2.0f, false);
 		}
 		else
 		{
@@ -1843,7 +1813,7 @@ void ATarsisDirector::PowerTick(float DeltaSeconds)
 			const FVector G = GeneratorLoc;
 			Near.Sort([G](const ATarsisGuard& A, const ATarsisGuard& B) { return FVector::DistSquared(A.GetActorLocation(), G) < FVector::DistSquared(B.GetActorLocation(), G); });
 			for (int32 i = 0; i < Near.Num() && i < 2; ++i) { Near[i]->Alarm(GeneratorLoc); Near[i]->bRadioCall = true; }
-			ShowMessage(FString::Printf(TEXT("RADIO: \"%s, como va eso?\" ... Nada.\nEntra el generador de reserva (solo la mitad de las luces) y mandan gente corriendo al generador. LA BASE ESTA EN ALERTA."), *Name), 5.0f);
+			CentralSay(TEXT("reserva"), Tx(TEXT("radio_reserva"), TEXT("{0}, como va eso? ... {0}? Entra la reserva. Todos al generador, ya!"), { Name }));
 			return;
 		}
 	}
@@ -1923,7 +1893,7 @@ bool ATarsisDirector::PlayCine(const TCHAR* Name, bool bIntro)
 	CinePlayer->Play();
 	if (bIntro)
 	{
-		ShowMessage(TEXT("LOST HORIZON: DE PROFUNDIS\nMision 1 - Tarsis\nUna base en la marisma. Esta noche, el expediente LH-07 sale de ahi contigo.\n\n(E o Espacio para saltar)"), 30.0f);
+		ShowMessage(Tx(TEXT("titulo"), TEXT("LOST HORIZON: DE PROFUNDIS\nMision 1 - Tarsis\nUna base en la marisma. Esta noche, el expediente LH-07 sale de ahi contigo.\n\n(E o Espacio para saltar)")), 30.0f);
 	}
 	return true;
 }
@@ -2018,8 +1988,8 @@ bool ATarsisDirector::ShootLamp(const FVector& From, const FVector& Fwd, float M
 	}
 	if (Best) Best->HearNoise(FVector(P.X, P.Y, ExitBarrierLoc.Z));
 	LampChecker = Best;
-	ShowMessage(FString::Printf(TEXT("FAROL ROTO\nEl control queda a oscuras.%s Te quedan %d dardos."),
-		Best ? *FString::Printf(TEXT(" %s ha oido los cristales y viene a mirar."), *Best->GuardName) : TEXT(""), Darts), 4.0f);
+	ShowMessage(Tx(TEXT("farol_roto"), TEXT("FAROL ROTO\nEl control queda a oscuras.{0}"),
+		{ Best ? TEXT(" ") + Tx(TEXT("farol_viene"), TEXT("{0} ha oido los cristales y viene a mirar."), { Best->GuardName }) : FString() }), 4.0f);
 	return true;
 }
 
@@ -2054,6 +2024,7 @@ void ATarsisDirector::Checkpoint(const FString& Name)
 	S->bRamosKnown = bRamosKnown;
 	S->bLampBroken = bLampBroken;
 	S->Weather = Weather;
+	S->Flags = FlagList();
 	bHasSave = UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisPartida"), 0) || bHasSave;
 }
 
@@ -2067,23 +2038,35 @@ bool ATarsisDirector::LoadCheckpoint()
 	bKeypad = false;
 	if (bBinoculars) ToggleBinoculars();
 	// la misión como estaba: puertas abiertas, objetos cogidos
-	bKey = S->bKey;
-	bJefOpen = S->bJefOpen;
-	bNoteRead = S->bNoteRead;
-	bVaultOpen = S->bVaultOpen;
-	bFile = S->bFile;
-	bLetter = S->bLetter;
-	bVetKey = S->bVetKey;
-	bVetOpen = S->bVetOpen;
-	bRamosKnown = S->bRamosKnown || bLetter || bVetKey;
+	if (S->Flags.Num() > 0)
+	{
+		// banderas (desde la tanda 17): se quitan todas y se ponen las guardadas
+		for (const FName& F : FlagList()) { if (bool* B = FlagBool(F)) *B = false; }
+		Flags.Reset();
+		for (const FName& F : S->Flags) SetFlag(F);
+	}
+	else
+	{
+		// partida guardada antes de las banderas
+		bKey = S->bKey;
+		bJefOpen = S->bJefOpen;
+		bNoteRead = S->bNoteRead;
+		bVaultOpen = S->bVaultOpen;
+		bFile = S->bFile;
+		bLetter = S->bLetter;
+		bVetKey = S->bVetKey;
+		bVetOpen = S->bVetOpen;
+	}
+	bRamosKnown = bRamosKnown || bLetter || bVetKey;
 	Darts = S->Darts;
 	MissionTime = S->MissionTime;
 	Captures = FMath::Max(Captures, S->Captures);
-	if (bJefOpen && DoorL) { DoorL->DestroyComponent(); DoorL = nullptr; }
-	if (bVaultOpen && DoorV) { DoorV->DestroyComponent(); DoorV = nullptr; }
-	if (bFile && FileProp) { FileProp->DestroyComponent(); FileProp = nullptr; }
-	if (bLetter && LetterProp) { LetterProp->DestroyComponent(); LetterProp = nullptr; }
-	if (bVetOpen && VetDoor) { VetDoor->DestroyComponent(); VetDoor = nullptr; }
+	// lo que quitaron los puntos ya usados (puertas abiertas, carta y expediente cogidos) y la puerta del archivo
+	for (const FTarsisPoint& Pt : Points)
+	{
+		if (!Pt.RemoveBlock.IsNone() && !Pt.Sets.IsNone() && HasFlag(Pt.Sets)) RemoveBlockNamed(Pt.RemoveBlock);
+	}
+	if (bVaultOpen) RemoveBlockNamed(TEXT("puerta_archivo"));
 	if (S->bLampBroken && GateLamp && GateLamp->GetLightComponent() && !bLampBroken)
 	{
 		bLampBroken = true;
@@ -2109,7 +2092,7 @@ bool ATarsisDirector::LoadCheckpoint()
 		}
 	}
 	TensionT = 0.0f;
-	ShowMessage(FString::Printf(TEXT("PARTIDA CARGADA\nUltimo punto de control: %s."), *CheckpointName), 3.5f);
+	ShowMessage(Tx(TEXT("partida_cargada"), TEXT("PARTIDA CARGADA\nUltimo punto de control: {0}."), { CheckpointName }), 3.5f);
 	return true;
 }
 
@@ -2319,8 +2302,8 @@ void ATarsisDirector::LoadOptions()
 			const int32 Cur = G->GetOverallScalabilityLevel();
 			OptQuality = Cur >= 0 ? FMath::Clamp(Cur, 0, 3) : 1;
 			SaveOptions();
-			ShowMessage(FString::Printf(TEXT("CALIDAD GRAFICA\nElegida segun tu PC: %s. Se cambia en Pausa (P)."),
-				OptQuality == 0 ? TEXT("BAJA") : OptQuality == 1 ? TEXT("MEDIA") : OptQuality == 2 ? TEXT("ALTA") : TEXT("EPICA")), 5.0f);
+			ShowMessage(Tx(TEXT("calidad"), TEXT("CALIDAD GRAFICA\nElegida segun tu PC: {0}. Se cambia en Pausa (P)."),
+				{ FString(OptQuality == 0 ? TEXT("BAJA") : OptQuality == 1 ? TEXT("MEDIA") : OptQuality == 2 ? TEXT("ALTA") : TEXT("EPICA")) }), 5.0f);
 		}
 	}
 	if (UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::LoadGameFromSlot(TEXT("TarsisOpciones"), 0)))
@@ -2492,6 +2475,7 @@ void ATarsisDirector::DetectTick()
 			if (It->State == ETarsisGuardState::Alert && !It->bRadioCall) GuardSay(*It, TEXT("alto"));
 			else if (It->State == ETarsisGuardState::Suspicious && Before != ETarsisGuardState::Alert) GuardSay(*It, It->bInvestigate ? TEXT("ruido") : TEXT("quien"));
 			else if (It->State == ETarsisGuardState::Return && Before == ETarsisGuardState::Search) GuardSay(*It, It->bNoiseSearch ? TEXT("viento") : TEXT("nadie"));
+			else if (It->State == ETarsisGuardState::Search && Before == ETarsisGuardState::Alert && !It->bRadioCall) GuardSay(*It, TEXT("perdido"));
 		}
 		Prev = Now;
 	}
@@ -2578,4 +2562,248 @@ void ATarsisDirector::BuildReport()
 	S->Report = L;
 	S->Difficulty = Difficulty;
 	UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisParte"), 0);
+}
+
+// ---------------------------------------------------------------- misión en datos: textos, banderas, puntos y objetivos
+// assets/unreal/mision1.json lo vuelca tools/unreal/mision.py en este actor y se guarda con el nivel (vale empaquetado).
+
+FString ATarsisDirector::Tx(FName Key, const TCHAR* Default, const FStringFormatOrderedArguments& Args) const
+{
+	const FString* Found = Texts.Find(Key);
+	if (!Found) const_cast<ATarsisDirector*>(this)->MissingTexts.AddUnique(Key.ToString());
+	const FString Raw = Found ? *Found : FString(Default);
+	return Args.Num() > 0 ? FString::Format(*Raw, Args) : Raw;
+}
+
+void ATarsisDirector::Teach(FName Key, const TCHAR* Default, const FStringFormatOrderedArguments& Args, float Seconds)
+{
+	const FString T = Tx(Key, Default, Args);
+	if (Taught.Contains(Key)) return;   // ya lo sabes: la segunda vez no sale
+	Taught.Add(Key);
+	ShowMessage(T, Seconds);
+}
+
+// las banderas de siempre siguen siendo booleanos del C++ (los usa media clase); el resto, en el conjunto Flags
+static const TCHAR* const MappedFlags[] = {
+	TEXT("llave_jefatura"), TEXT("jefatura_abierta"), TEXT("nota_leida"), TEXT("archivo_abierto"), TEXT("expediente"),
+	TEXT("carta_leida"), TEXT("llave_botiquin"), TEXT("botiquin_abierto"), TEXT("sabe_de_ramos") };
+
+bool* ATarsisDirector::FlagBool(FName F)
+{
+	bool* const Ptrs[] = { &bKey, &bJefOpen, &bNoteRead, &bVaultOpen, &bFile, &bLetter, &bVetKey, &bVetOpen, &bRamosKnown };
+	static_assert(UE_ARRAY_COUNT(MappedFlags) == 9, "una bandera por booleano");
+	for (int32 i = 0; i < UE_ARRAY_COUNT(MappedFlags); ++i)
+	{
+		if (F == FName(MappedFlags[i])) return Ptrs[i];
+	}
+	return nullptr;
+}
+
+bool ATarsisDirector::HasFlag(FName F) const
+{
+	if (F.IsNone()) return true;
+	if (const bool* B = const_cast<ATarsisDirector*>(this)->FlagBool(F)) return *B;
+	return Flags.Contains(F);
+}
+
+void ATarsisDirector::SetFlag(FName F)
+{
+	if (F.IsNone()) return;
+	if (bool* B = FlagBool(F)) *B = true;
+	Flags.Add(F);
+}
+
+TArray<FName> ATarsisDirector::FlagList() const
+{
+	TArray<FName> L;
+	for (const TCHAR* N : MappedFlags) { if (HasFlag(FName(N))) L.Add(FName(N)); }
+	for (const FName& F : Flags) L.AddUnique(F);
+	return L;
+}
+
+int32 ATarsisDirector::BaseState() const
+{
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Alert && !It->bAlly) return 2;
+	}
+	return TensionT > 0.0f ? 1 : 0;
+}
+
+void ATarsisDirector::DefaultMission()
+{
+	// sin datos (no se ha pasado tools/unreal/mision.py por el nivel) no hay puertas, notas ni objetivos: se avisa
+	if (Points.Num() == 0 || Objectives.Num() == 0)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Tarsis: el director no tiene los datos de la mision; ejecuta tools/unreal/mision.py en el editor"));
+		ShowMessage(TEXT("FALTAN LOS DATOS DE LA MISION\nEn el editor: tools/unreal/mision.py (assets/unreal/mision1.json)."), 30.0f);
+	}
+}
+
+const FTarsisPoint* ATarsisDirector::PointNear() const
+{
+	for (const FTarsisPoint& Pt : Points)
+	{
+		if (!Pt.bRepeat && !Pt.Sets.IsNone() && HasFlag(Pt.Sets)) continue;   // ya usado
+		const bool bHave = HasFlag(Pt.Need);
+		if (!bHave && Pt.PromptLocked.IsNone() && Pt.NeedText.IsNone()) continue;   // aún no existe para ti (la nota, con la jefatura cerrada)
+		if (NearPlayer(Pt.Pos, Pt.Radius)) return &Pt;
+	}
+	return nullptr;
+}
+
+void ATarsisDirector::RemoveBlockNamed(FName Name)
+{
+	TObjectPtr<UStaticMeshComponent>* Found = Blocks.Find(Name);
+	if (!Found) return;
+	UStaticMeshComponent* B = *Found;
+	Blocks.Remove(Name);
+	if (!B) return;
+	if (B == DoorL) DoorL = nullptr;
+	if (B == DoorV) DoorV = nullptr;
+	if (B == VetDoor) VetDoor = nullptr;
+	if (B == NoteProp) NoteProp = nullptr;
+	if (B == LetterProp) LetterProp = nullptr;
+	if (B == FileProp) FileProp = nullptr;
+	B->DestroyComponent();
+}
+
+void ATarsisDirector::UsePoint(const FTarsisPoint& PtRef)
+{
+	const FTarsisPoint Pt = PtRef;   // copia: lo que sigue no debe depender de la lista
+	// dónde suena y dónde lo notan los guardias: en el bloque que quita (la puerta), o en el punto
+	FVector Where = Pt.Pos + FVector(0.0f, 0.0f, 100.0f);
+	if (const TObjectPtr<UStaticMeshComponent>* B = Blocks.Find(Pt.RemoveBlock)) { if (*B) Where = (*B)->GetComponentLocation(); }
+	if (!HasFlag(Pt.Need))
+	{
+		SetFlag(Pt.NeedSets);
+		if (!Pt.NeedSound.IsNone()) PlaySfx(Pt.NeedSound.ToString(), Where, 0.5f);
+		if (!Pt.NeedText.IsNone()) ShowMessage(Tx(Pt.NeedText, *Pt.NeedText.ToString()), 3.5f);
+		return;
+	}
+	SetFlag(Pt.Sets);
+	SetFlag(Pt.AlsoSets);
+	if (Pt.Darts > 0) Darts = FMath::Max(Darts, Pt.Darts);
+	if (!Pt.RemoveBlock.IsNone()) RemoveBlockNamed(Pt.RemoveBlock);
+	if (Pt.bChange) AddChange(Where, TEXT("puerta"));
+	if (!Pt.Sound.IsNone()) PlaySfx(Pt.Sound.ToString(), Where, 0.8f);
+	if (!Pt.Text.IsNone()) ShowMessage(Tx(Pt.Text, *Pt.Text.ToString()), Pt.TextSeconds);
+	if (!Pt.Checkpoint.IsNone()) Checkpoint(Tx(Pt.Checkpoint, *Pt.Checkpoint.ToString()));
+}
+
+// ---------------------------------------------------------------- subtítulos de voz y la central por radio
+
+void ATarsisDirector::ShowSubtitleLine(const FString& Line, float Seconds)
+{
+	Subtitle = Line;
+	SubtitleT = Seconds;
+	VoiceSubT = Seconds;
+	SubtitleDist = 0.0f;
+	SubtitleLog.Add(Line);
+	if (SubtitleLog.Num() > 30) SubtitleLog.RemoveAt(0);
+}
+
+void ATarsisDirector::SaySubtitle(const FString& Who, const FString& Text, float Seconds)
+{
+	const FString Line = FString::Printf(TEXT("%s: \"%s\""), *Who, *Text);
+	// si aún se lee el anterior, este espera su turno (como mucho tres en cola; si hay más, el más viejo sobra)
+	if (VoiceSubT > 0.8f)
+	{
+		PendingSubs.Add(Line);
+		if (PendingSubs.Num() > 3) PendingSubs.RemoveAt(0);
+		return;
+	}
+	ShowSubtitleLine(Line, Seconds);
+}
+
+void ATarsisDirector::CentralSay(const FString& Key, const FString& Text, float Delay)
+{
+	if (Delay > 0.0f)
+	{
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, Key, Text]() { CentralSay(Key, Text, 0.0f); }), Delay, false);
+		return;
+	}
+	if (bCine || bDone) return;
+	if (USoundBase* S = Sfx(TEXT("voz_central_") + Key)) UGameplayStatics::PlaySound2D(this, S, 0.8f);
+	else if (RadioSnd) UGameplayStatics::PlaySound2D(this, RadioSnd, 0.35f);
+	LastVoice = TEXT("central_") + Key;
+	++VoicesPlayed;
+	VoiceLog.Add(LastVoice);
+	if (VoiceLog.Num() > 30) VoiceLog.RemoveAt(0);
+	SaySubtitle(Tx(TEXT("nombre_central"), TEXT("CENTRAL (RADIO)")), Text);
+}
+
+// ---------------------------------------------------------------- te cogen: escena en vez de teletransporte en seco
+
+void ATarsisDirector::BeginCapture(ATarsisGuard* G)
+{
+	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P || bCapturing || bDone) return;
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	bCapturing = true;
+	bCaptureHit = false;
+	bCaptureDone = false;
+	bCaptureLocker = false;
+	Captor = G;
+	CaptureT = 0.0f;
+	StopDrag();
+	bKeypad = false;
+	if (bBinoculars) ToggleBinoculars();
+	ExitHide();   // de la taquilla te saca de un tirón: sales y lo tienes delante
+	if (ACharacter* C = Cast<ACharacter>(P)) C->GetCharacterMovement()->StopMovementImmediately();
+	if (PC)
+	{
+		PC->SetIgnoreMoveInput(true);
+		PC->SetIgnoreLookInput(true);
+		CaptureFrom = PC->GetControlRotation();
+	}
+	if (G) GuardSay(G, TEXT("tengo"));
+}
+
+void ATarsisDirector::CaptureTick(float DeltaSeconds)
+{
+	if (!bCapturing) return;
+	CaptureT += DeltaSeconds;
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!bCaptureHit)
+	{
+		// la cámara se vuelve hacia él (0,75 s); luego el golpe y negro
+		if (PC && P && Captor)
+		{
+			FVector Eye; FRotator R;
+			PC->GetPlayerViewPoint(Eye, R);
+			const FRotator Want = (Captor->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f) - Eye).Rotation();
+			PC->SetControlRotation(FMath::RInterpTo(PC->GetControlRotation(), Want, DeltaSeconds, 7.0f));
+		}
+		if (CaptureT >= 0.75f)
+		{
+			bCaptureHit = true;
+			PlaySfx(TEXT("empujon"), FVector::ZeroVector, 1.0f, false);
+			if (PC && PC->PlayerCameraManager) PC->PlayerCameraManager->StartCameraFade(0.0f, 1.0f, 0.15f, FLinearColor::Black, false, true);
+		}
+		return;
+	}
+	if (!bCaptureDone)
+	{
+		if (CaptureT < 1.15f) return;
+		bCaptureDone = true;
+		const FString Who = Captor ? Captor->GuardName.ToUpper() : FString();
+		const bool bLocker = bCaptureLocker;
+		bCaptureLocker = false;
+		if (P) Captured(P);   // en negro: al calabozo, al punto de control o a la entrada
+		if (bLocker)
+		{
+			ShowMessage(Tx(TEXT("taquilla_pillado"), TEXT("{0} TE VIO METERTE EN LA TAQUILLA\nLa abre de un tiron. {1}"), { Who, Message.Mid(Message.Find(TEXT("\n")) + 1) }), 6.0f);
+		}
+		if (PC)
+		{
+			PC->SetIgnoreMoveInput(false);
+			PC->SetIgnoreLookInput(false);
+			if (PC->PlayerCameraManager) PC->PlayerCameraManager->StartCameraFade(1.0f, 0.0f, 0.9f, FLinearColor::Black, false, false);
+		}
+		return;
+	}
+	if (CaptureT >= 2.1f) { bCapturing = false; Captor = nullptr; }
 }

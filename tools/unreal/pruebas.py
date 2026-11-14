@@ -2,16 +2,26 @@
 
 Uso (en el editor, con el nivel Tarsis abierto; por ejecución remota de Python o desde la consola):
     py tools/unreal/pruebas.py
-Arranca el PIE si no está en marcha, ejecuta las pruebas una tras otra con un ejecutor por ticks (cada prueba es un
-generador que cede segundos de juego o una condición de espera) y deja el informe en
+Arranca el PIE, ejecuta las pruebas con un ejecutor por ticks (cada prueba es un generador que cede segundos de juego o una
+condición de espera) y deja el informe en
     Saved/Pruebas/informe_<fecha>.txt
 El progreso queda en builtins._tarsis_pruebas (estado, prueba actual y resultados) para consultarlo desde fuera.
+
+Las pruebas van por familias (FAMILIAS): cada familia en un PIE limpio, para que lo que deja una (guardias en alerta,
+capturas, puertas abiertas) no tuerza las demás. Las que dependen unas de otras (la llave, la jefatura, el farol y el
+final) van en la misma familia. Al acabar cada familia se comprueba que no se ha pedido ningún texto que falte en
+assets/unreal/mision1.json.
 
 Las pruebas usan solo funciones y propiedades expuestas del Director y de los guardias (Interact, KeypadDigit, ShootDart,
 PressKey, MenuLines, KnockOut...). No necesitan el teclado ni que la ventana tenga el foco.
 """
-import builtins, math, os, time
+import builtins, json, math, os, re, time
 import unreal
+
+try:
+    ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+except NameError:   # ejecutado sin archivo (pegado en la consola)
+    ROOT = os.path.join(os.path.dirname(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir())), '..', '..', 'LostHorizon', 'lost-horizon')
 
 V = unreal.Vector
 GEN = V(4300, 1700, 0)          # GeneratorLoc
@@ -121,6 +131,30 @@ def prueba_intro():
     yield 0.5
     check('E salta la cinemática', not d.get_editor_property('cine'))
     check('salen las instrucciones', 'TARSIS' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
+    check('el objetivo sale de mision1.json', d.objective() == MISION['textos']['obj_llave'], d.objective())
+    check('base tranquila al empezar (indicador del HUD)', d.base_state() == 0, d.base_state())
+
+MISION = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'mision1.json'), encoding='utf-8'))
+
+def prueba_datos():
+    """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
+    d = director()
+    src = ''
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp'):
+        src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
+    claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
+    claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
+    t = MISION['textos']
+    check('todas las claves del C++ tienen texto en mision1.json', claves and not (claves - set(t)), sorted(claves - set(t)))
+    usadas = {x for pt in MISION['puntos'] for k, x in pt.items() if k in ('aviso', 'aviso_cerrado', 'si_falta_texto', 'texto', 'punto_de_control')}
+    usadas |= {o['texto'] for o in MISION['objetivos']}
+    check('los puntos y objetivos solo usan claves que existen', not (usadas - set(t)), sorted(usadas - set(t)))
+    check('textos en ASCII (la fuente del HUD no lleva tildes)', all(ord(c) < 128 for v in t.values() for c in v),
+          [k for k, v in t.items() if any(ord(c) > 127 for c in v)][:5])
+    check('el director tiene los textos del .json', len(d.get_editor_property('texts')) == len(t), '%d de %d' % (len(d.get_editor_property('texts')), len(t)))
+    check('y los %d puntos y %d objetivos' % (len(MISION['puntos']), len(MISION['objetivos'])),
+          len(d.get_editor_property('points')) == len(MISION['puntos']) and len(d.get_editor_property('objectives')) == len(MISION['objetivos']))
+    yield 0.1
 
 def aparte():
     """Aparca al jugador lejos de todas las rondas (en la marisma, al oeste): entre pruebas, que nadie le vea ni le coja."""
@@ -234,7 +268,9 @@ def prueba_frente():
     msg = str(d.get_editor_property('message'))
     aparte()
     check('en alerta: aviso "TE VE"', 'TE VE' in aviso, aviso)
-    check('y la E explica por qué no', 'DE FRENTE TE VE' in msg, msg[:40])
+    check('y la E explica por qué no (la primera vez)', 'DE FRENTE TE VE' in msg, msg[:40])
+    taught = [str(x) for x in d.get_editor_property('taught')]
+    check('lo enseñado se apunta una sola vez', taught.count('ensena_empujon') == 1 and taught.count('ensena_de_frente') == 1, taught)
     check('sin capturas en esta prueba', d.get_editor_property('captures') == c0, d.get_editor_property('captures'))
     yield ('hasta', lambda: estado(m) != 'DOWN', 8.0)
 
@@ -274,7 +310,9 @@ def prueba_escondites():
     v.alarm(frente)
     d.interact()
     check('te ha visto meterte', d.get_editor_property('hiding'))
-    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 15.0)
+    yield ('hasta', lambda: director().get_editor_property('capturing'), 15.0)
+    check('al abrirla, la escena de captura', d.get_editor_property('capturing') and not d.get_editor_property('hiding'), d.get_editor_property('capturing'))
+    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 5.0)
     check('te saca de la taquilla', d.get_editor_property('captures') > c0 and 'TAQUILLA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:45])
     check('ya fuera de la taquilla', not d.get_editor_property('hiding') and not jugador().get_editor_property('hidden'))
     aparte()
@@ -324,6 +362,8 @@ def prueba_cuerpo():
     obs.set_actor_rotation(unreal.Rotator(0, 0, 180), True)
     yield ('hasta', lambda: obs.is_checking_body(), 5.0)
     check('ve el cuerpo y va a mirarlo (sin alarma todavía)', obs.is_checking_body() and estado(obs) != 'ALERT', '%s %s' % (obs.get_actor_label()[8:], estado(obs)))
+    check('lo dice él: "¿ese de ahí está en el suelo?"', obs.get_actor_label()[8:].lower() + '_cuerpo' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-4:])
+    check('sin cartel "HA VISTO A..."', 'EN EL SUELO' not in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
     agach = 0.0
     t0 = time.time()
     while time.time() - t0 < 8.0 and estado(obs) != 'ALERT':
@@ -333,6 +373,10 @@ def prueba_cuerpo():
     quien = obs.get_actor_label()[8:].lower()
     check('avisa por radio: "suelo"', quien + '_suelo' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-4:])
     check('y da la alarma', estado(obs) == 'ALERT', estado(obs))
+    check('base en alerta (indicador del HUD)', d.base_state() == 2, d.base_state())
+    yield ('hasta', lambda: 'central_todos' in list(director().get_editor_property('voice_log')), 6.0)
+    check('la central por radio: "a todas las unidades"', 'central_todos' in list(d.get_editor_property('voice_log'))
+          and any('A todas las unidades' in str(x) for x in d.get_editor_property('subtitle_log')), list(d.get_editor_property('subtitle_log'))[-3:])
     for x in torres:
         x.hold(0.0)
     yield ('hasta', lambda: estado(caido) != 'DOWN', 20.0)   # encontrado, se levanta pronto
@@ -396,29 +440,37 @@ def prueba_guardias():
     l = m.get_actor_location(); r = m.get_actor_right_vector()
     ruido = V(l.x + r.x * 700, l.y + r.y * 700, l.z)
     m.hear_noise(ruido)
-    cabeza, pasos_giro, vmin = 0.0, False, 1e9
+    # el giro se mide mientras se vuelve en el sitio: luego va hacia allí por el camino de la navegación, que rodea
+    # muros y cajas, y su rumbo ya no apunta al ruido
+    def error_giro():
+        l = m.get_actor_location()
+        quiere = math.degrees(math.atan2(ruido.y - l.y, ruido.x - l.x))
+        return abs((quiere - m.get_actor_rotation().yaw + 540) % 360 - 180)
+    cabeza, pasos_giro, vmin, error = 0.0, False, 1e9, 180.0
     for _ in range(12):
         yield 0.1
+        error = min(error, error_giro())
         cabeza = max(cabeza, abs(m.get_editor_property('look_yaw')))
         pasos_giro = pasos_giro or m.get_editor_property('turn_stepping')
         if estado(m) == 'SUSPICIOUS': vmin = min(vmin, m.get_velocity().length())
-    l = m.get_actor_location()
-    quiere = math.degrees(math.atan2(ruido.y - l.y, ruido.x - l.x))
-    error = abs((quiere - m.get_actor_rotation().yaw + 540) % 360 - 180)
     check('se para al oír el ruido', vmin < 40, round(vmin))
     check('se gira hacia el ruido', error < 30, '%.0f grados de error' % error)
     check('la cabeza se adelanta al cuerpo', cabeza > 6, '%.0f grados' % cabeza)
     check('gira en el sitio dando pasos', pasos_giro)
     check('dice "¿qué ha sido eso?"', d.get_editor_property('last_voice') == 'moya_ruido', d.get_editor_property('last_voice'))
-    check('con subtítulo', 'Que ha sido eso' in str(d.get_editor_property('subtitle')), d.get_editor_property('subtitle'))
+    check('con subtítulo', any('Que ha sido eso' in str(x) for x in d.get_editor_property('subtitle_log')), list(d.get_editor_property('subtitle_log'))[-3:])
     v = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and x != m][0]
     lv = v.get_actor_location()
     v.alarm(V(lv.x + 300, lv.y, lv.z)); yield 0.3   # a su lado, lejos de ti: que no te capture (la 1.ª captura es al calabozo)
-    check('al dar la alarma: "¡alto!"', d.get_editor_property('last_voice').endswith('_alto') and 'Alto' in str(d.get_editor_property('subtitle')), '%s | %s' % (d.get_editor_property('last_voice'), d.get_editor_property('subtitle')))
+    check('al dar la alarma: "¡alto!"', d.get_editor_property('last_voice').endswith('_alto') and any('Alto' in str(x) for x in d.get_editor_property('subtitle_log')),
+          '%s | %s' % (d.get_editor_property('last_voice'), list(d.get_editor_property('subtitle_log'))[-2:]))
+    check('base en alerta (indicador del HUD)', d.base_state() == 2, d.base_state())
     faltan = ['%s_%s' % (g, k) for g in ('ibarra', 'moya', 'peris', 'vega', 'ramos', 'centinela')
-              for k in ('quien', 'ruido', 'viento', 'alto', 'nadie', 'suelo', 'puerta', 'luz', 'donde', 'eh')
-              if not unreal.load_object(None, '/Game/Tarsis/Sonidos/voz_%s_%s.voz_%s_%s' % (g, k, g, k))]
-    check('voces de los seis guardias importadas', not faltan, faltan)
+              for k in ('quien', 'ruido', 'viento', 'alto', 'nadie', 'suelo', 'puerta', 'luz', 'donde', 'eh',
+                        'farol', 'cuerpo', 'despierta', 'tengo', 'perdido', 'yacasi')]
+    faltan += ['central_' + k for k in ('todos', 'responde', 'luz', 'comova', 'reserva')]
+    faltan = [x for x in faltan if not unreal.load_object(None, '/Game/Tarsis/Sonidos/voz_%s.voz_%s' % (x, x))]
+    check('voces de los seis guardias y de la central importadas', not faltan, faltan)
     d.set_subtitles(False)
     # superficies: lo que pisas decide el sonido y lo lejos que se oyen tus pasos
     t1 = guardia('torre1').get_actor_location()
@@ -496,6 +548,7 @@ def prueba_dardos():
     mirar(V(l.x, l.y, l.z + 20)); yield 0.2
     d.shoot_dart(); yield 0.3
     check('el dardo duerme a Vega', estado(v) == 'DOWN' and d.get_editor_property('darts') == 4, '%s, %d dardos' % (estado(v), d.get_editor_property('darts')))
+    check('la primera vez se explica', 'DORMIDO' in str(d.get_editor_property('message')) and 'ensena_dormido' in [str(x) for x in d.get_editor_property('taught')], str(d.get_editor_property('message'))[:30])
     junto_a(v); yield 0.3
     check('aviso de recuperar el dardo', 'RECUPERAR EL DARDO' in d.interact_prompt(), d.interact_prompt())
     d.interact(); yield 0.3
@@ -516,7 +569,7 @@ def prueba_punto_control():
     for n in (1, 2):
         a_la_vista_de(pe, 150)   # en su mesa mira a la pared: «delante» podía quedar tras ella
         pe.alarm(jugador().get_actor_location())
-        yield ('hasta', lambda: director().get_editor_property('captures') >= c0 + n, 20.0)
+        yield ('hasta', lambda: director().get_editor_property('captures') >= c0 + n, 25.0)
         msg = str(d.get_editor_property('message'))   # en el momento: otro aviso podría taparlo después
         yield 0.3
         pos = jugador().get_actor_location()
@@ -524,6 +577,48 @@ def prueba_punto_control():
             check('1.ª captura: al calabozo', 'CALABOZO' in msg or c0 > 0, '%s (capturas antes: %d; Peris %s, ve %.2f, a %d cm, jugador oculto %s, colisión %s)' % (msg[:30], c0, estado(pe), pe.visibility(jugador()), dist2d(pe.get_actor_location(), jugador().get_actor_location()), jugador().get_editor_property('hidden'), jugador().get_actor_enable_collision()))
         else:
             check('2.ª captura: vuelve junto a Ibarra', dist2d(pos, sitio) < 150, 'a %d cm del punto' % dist2d(pos, sitio))
+
+def prueba_captura():
+    d = director()
+    pc = unreal.GameplayStatics.get_player_controller(mundo(), 0)
+    c0 = d.get_editor_property('captures')
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.get_actor_label().endswith('Ramos')]
+    yield ('hasta', lambda: len(ronda()) > 0, 30.0)
+    g = ronda()[0]
+    a_la_vista_de(g, 150)
+    g.alarm(jugador().get_actor_location())
+    yield ('hasta', lambda: director().get_editor_property('capturing'), 10.0)
+    check('te coge: empieza la escena', d.get_editor_property('capturing'), estado(g))
+    check('dice "¡te tengo!"', g.get_actor_label()[8:].lower() + '_tengo' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-3:])
+    check('sin control durante la escena', pc.is_move_input_ignored() and pc.is_look_input_ignored())
+    check('aún no te ha llevado (primero la escena)', d.get_editor_property('captures') == c0)
+    yield 0.6
+    cam = jugador().get_component_by_class(unreal.CameraComponent).get_world_location()
+    gl = g.get_actor_location()
+    quiere = math.degrees(math.atan2(gl.y - cam.y, gl.x - cam.x))
+    err = abs((quiere - pc.get_control_rotation().yaw + 540) % 360 - 180)
+    check('la cámara se vuelve hacia él', err < 30, '%.0f grados' % err)
+    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 4.0)
+    check('golpe, negro y al calabozo', d.get_editor_property('captures') == c0 + 1 and 'CALABOZO' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
+    yield ('hasta', lambda: not director().get_editor_property('capturing'), 4.0)
+    check('vuelves a tener el control', not pc.is_move_input_ignored() and not pc.is_look_input_ignored())
+
+def prueba_perdido():
+    d = director()
+    aparte()
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) in ('PATROL', 'RETURN') and not x.get_actor_label().endswith('Ramos')]
+    yield ('hasta', lambda: len(ronda()) > 0, 30.0)
+    g = ronda()[0]
+    l = g.get_actor_location()
+    g.alarm(V(l.x + 250, l.y, l.z))
+    yield ('hasta', lambda: estado(g) == 'SEARCH', 20.0)
+    yield 0.3
+    quien = g.get_actor_label()[8:].lower()
+    check('al perderte: "lo he perdido"', quien + '_perdido' in list(d.get_editor_property('voice_log')), '%s %s' % (estado(g), list(d.get_editor_property('voice_log'))[-3:]))
+    # el subtítulo puede esperar en cola a que acabe el anterior
+    yield ('hasta', lambda: any('Lo he perdido' in str(x) for x in director().get_editor_property('subtitle_log')), 8.0)
+    check('con subtítulo aunque la opción esté apagada', 'SUBTITULOS DE SONIDOS   < NO' in ' '.join(d.menu_lines()) and any('Lo he perdido' in str(x) for x in d.get_editor_property('subtitle_log')),
+          list(d.get_editor_property('subtitle_log'))[-2:])
 
 def prueba_generador():
     d = director()
@@ -535,7 +630,11 @@ def prueba_generador():
     yield 3.0
     on, off = luces()
     check('apagón en cadena: todas las luces fuera', len(on) == 0, 'encendidas %s' % on)
-    check('aviso por radio en su caja', 'Se ha ido la luz' in str(d.get_editor_property('radio')), str(d.get_editor_property('radio'))[:50])
+    # la central habla 1,6 s después del corte; su subtítulo espera en cola a que acaben los de los guardias
+    yield ('hasta', lambda: any('Se ha ido la luz' in str(x) for x in director().get_editor_property('subtitle_log')), 10.0)
+    check('la central por radio (voz y subtítulo)', 'central_luz' in list(d.get_editor_property('voice_log'))
+          and any('Se ha ido la luz' in str(x) for x in d.get_editor_property('subtitle_log')), list(d.get_editor_property('subtitle_log'))[-3:])
+    check('base en guardia (indicador del HUD)', d.base_state() >= 1, d.base_state())
     despiertos = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) != 'DOWN']
     linternas = [g.get_actor_label()[8:] for g in despiertos if any(c.is_visible() for c in g.get_components_by_class(unreal.SpotLightComponent))]
     check('los guardias de suelo despiertos sacan linterna', len(linternas) == len(despiertos), '%s de %s' % (linternas, [g.get_actor_label()[8:] for g in despiertos]))
@@ -568,6 +667,7 @@ def prueba_reserva():
     yield 0.5
     on, off = luces()
     check('vuelve la luz a medias', 'A MEDIAS' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
+    check('la central: "entra la reserva"', 'central_reserva' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-4:])
     check('los focos de las torres vuelven', 'foco_torreta_12' in on and 'foco_torreta_13' in on, on)
     check('queda apagada la mitad del resto', 4 <= len(off) <= 7, 'apagadas %s' % off)
     check('el reparador sigue en el suelo', estado(rep) == 'DOWN', estado(rep))
@@ -711,9 +811,11 @@ def prueba_opciones():
     check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < 100 %' in ' '.join(lineas(d)))
 
 
-PRUEBAS = [prueba_intro, prueba_empezar, prueba_guardias, prueba_menu, prueba_musica, prueba_controles, prueba_opciones, prueba_frente,
-           prueba_dardos, prueba_punto_control, prueba_escondites, prueba_cambios, prueba_cuerpo, prueba_generador, prueba_reserva,
-           prueba_farol, prueba_final]
+# cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
+FAMILIAS = [[prueba_intro, prueba_datos, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
+            [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
+            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva]]
+PRUEBAS = []
 
 
 # ---------------------------------------------------------------- ejecutor por ticks
@@ -747,13 +849,37 @@ def _limpieza(siguiente):
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 
+def _arranque():
+    # PIE nuevo (salvo la primera familia, que prueba la intro): se salta la cinemática de entrada
+    d = director()
+    if d and d.get_editor_property('cine'):
+        d.interact()
+    yield 0.5
+
+def _textos():
+    d = director()
+    falta = list(d.get_editor_property('missing_texts')) if d else []
+    check('textos: nada se ha pedido que no esté en mision1.json', not falta, falta)
+    yield 0.1
+
 def _siguiente():
-    while PRUEBAS:
+    if PRUEBAS:
         fn = PRUEBAS.pop(0)
         R['prueba'] = fn.__name__.replace('prueba_', '')
-        R['gen'] = _limpieza(fn)
+        R['gen'] = fn() if fn in (_arranque, _textos) else _limpieza(fn)
         R['espera'] = None
         return True
+    if FAMILIAS:
+        # familia nueva: se cierra el PIE y se abre otro limpio
+        PRUEBAS.extend(FAMILIAS.pop(0) + [_textos])
+        if R.get('familia', 0) > 0:
+            PRUEBAS.insert(0, _arranque)
+        R['familia'] = R.get('familia', 0) + 1
+        if mundo():
+            unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()
+            R['estado'] = 'reiniciando'
+            return True
+        return _siguiente()
     return False
 
 def _tick(dt):
@@ -767,7 +893,10 @@ def _tick(dt):
         if R['estado'] == 'preparando':
             if w and director() and jugador():
                 R['estado'] = 'corriendo'
-                _siguiente()
+                if not _siguiente():
+                    R['estado'] = 'terminado'
+                    unreal.unregister_slate_post_tick_callback(R['h'])
+                    _informe()
             return
         if R['estado'] != 'corriendo':
             return
@@ -783,7 +912,7 @@ def _tick(dt):
             y = next(R['gen'])
             R['espera'] = ('t', t + y) if not isinstance(y, tuple) else ('c', y[1], t + y[2])
         except StopIteration:
-            if not _siguiente():
+            if not _siguiente() and R['estado'] == 'corriendo':
                 R['estado'] = 'terminado'
                 unreal.unregister_slate_post_tick_callback(R['h'])
                 _informe()
@@ -794,10 +923,19 @@ def _tick(dt):
             unreal.unregister_slate_post_tick_callback(R['h'])
             _informe()
 
+# solo algunas familias: builtins._tarsis_solo = ['captura', 'cuerpo'] (nombre de una prueba de la familia)
+_solo = getattr(builtins, '_tarsis_solo', None)
+if _solo:
+    FAMILIAS[:] = [f for f in FAMILIAS if any(fn.__name__.replace('prueba_', '') in _solo for fn in f)]
+_n = sum(len(f) for f in FAMILIAS)
+PRUEBAS.extend(FAMILIAS.pop(0) + [_textos])
+R['familia'] = 1
+if PRUEBAS[0] is not prueba_intro:
+    PRUEBAS.insert(0, _arranque)
 if mundo():
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()
     R['estado'] = 'reiniciando'
 else:
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_begin_play()
 R['h'] = unreal.register_slate_post_tick_callback(_tick)
-unreal.log('[Pruebas] en marcha: %d pruebas' % len(PRUEBAS))
+unreal.log('[Pruebas] en marcha: %d pruebas en %d familias' % (_n, len(FAMILIAS) + 1))

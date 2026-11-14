@@ -56,5 +56,6 @@ public:
 	UPROPERTY() bool bColorblind = false;
 	UPROPERTY() bool bSubtitles = false;
 	UPROPERTY() int32 Difficulty = 1;
-	UPROPERTY() TArray<FName> Keys;   // teclas de las acciones, en el orden de ATarsisDirector::ActionName
+	UPROPERTY() TArray<FName> Keys;    // teclas de las acciones, en el orden de ATarsisDirector::ActionName
+	UPROPERTY() TArray<FName> Flags;   // banderas de la misión (ATarsisDirector::SetFlag)
 };

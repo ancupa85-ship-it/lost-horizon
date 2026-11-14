@@ -26,6 +26,22 @@ FRASES = {
     'luz': ('¿Y la luz?', False),
     'donde': ('¿Dónde se ha metido? No contesta.', False),
     'eh': ('¡Eh! ¿Pero qué...?', False),
+    # tanda 17: lo que antes eran carteles («HA VISTO A... EN EL SUELO», «SE HA DESPERTADO»...) y la captura
+    'farol': ('Central, el farol del control está roto. Cristales por el suelo... esto no es el viento.', True),
+    'cuerpo': ('Eh... ¿ese de ahí está en el suelo?', False),
+    'despierta': ('Ay, mi cabeza... ¿Quién ha sido?', False),
+    'tengo': ('¡Te tengo!', False),
+    'perdido': ('Lo he perdido.', False),
+    'yacasi': ('Ya casi está.', True),
+}
+# la central, por radio (voz_central_<clave>): el texto en pantalla lleva el nombre del guardia; la voz, no
+CENTRAL = ('-6%', '0.98')
+FRASES_CENTRAL = {
+    'todos': 'A todas las unidades: hay alguien dentro de la base. Buscadlo.',
+    'responde': 'Central a patrulla. Responda. ¿Me oye?',
+    'luz': 'Se ha ido la luz en toda la base. Que alguien mire el generador.',
+    'comova': 'Central. ¿Cómo va ese generador?',
+    'reserva': 'No contesta. Entra la reserva. Todos al generador, ya.',
 }
 # guardia -> (tono, velocidad): un sargento grave y lento, un cuartelero joven y deprisa...
 GUARDIAS = {
@@ -103,6 +119,8 @@ if __name__ == '__main__':
     for g, (tono, vel) in GUARDIAS.items():
         for k, (texto, _) in FRASES.items():
             lista.append({'ruta': os.path.join(tmp, '%s_%s.wav' % (g, k)), 'texto': texto, 'tono': tono, 'vel': vel})
+    for k, texto in FRASES_CENTRAL.items():
+        lista.append({'ruta': os.path.join(tmp, 'central_%s.wav' % k), 'texto': texto, 'tono': CENTRAL[0], 'vel': CENTRAL[1]})
     with open(os.path.join(tmp, 'lista.json'), 'w', encoding='utf-8') as f:
         json.dump(lista, f, ensure_ascii=False)
     with open(os.path.join(tmp, 'voces.ps1'), 'w', encoding='utf-8-sig') as f:
@@ -119,3 +137,6 @@ if __name__ == '__main__':
             if por_radio:
                 x = radio(x, sr)
             guardar('voz_%s_%s' % (g, k), x, sr, 0.75 if por_radio else 0.85)
+    for k in FRASES_CENTRAL:
+        x, sr = leer(os.path.join(tmp, 'central_%s.wav' % k))
+        guardar('voz_central_%s' % k, radio(recortar(x, sr), sr), sr, 0.75)

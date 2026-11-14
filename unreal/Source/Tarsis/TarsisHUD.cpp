@@ -139,7 +139,8 @@ void ATarsisHUD::DrawExtras(ATarsisDirector* D)
 		Text(D->HelpLine(), Canvas->ClipX / 2.0f, Canvas->ClipY - 26.0f * S, FLinearColor(0.85f, 0.85f, 0.85f, 0.6f), 0.7f * S, true);
 	}
 	// subtítulos de sonidos (opción del menú), encima del panel de mensajes
-	if (D->bSubtitles && D->SubtitleT > 0.0f && !D->Subtitle.IsEmpty() && !D->bMenu)
+	// las voces (guardias y central) llevan siempre subtítulo; los de pasos y ruidos, solo con la opción
+	if ((D->bSubtitles || D->VoiceSubtitleOn()) && D->SubtitleT > 0.0f && !D->Subtitle.IsEmpty() && !D->bMenu)
 	{
 		const float A = FMath::Clamp(D->SubtitleT * 2.0f, 0.0f, 1.0f);
 		// a 0,75 del alto: entre la caja de radio (que al 140 % baja hasta ~0,67) y los paneles de abajo
@@ -333,10 +334,14 @@ void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 	{
 		static const TCHAR* Wx[] = { TEXT("DESPEJADO"), TEXT("LLUVIA"), TEXT("NIEBLA") };
 		Text(FString::Printf(TEXT("%s (Y)"), Wx[FMath::Clamp(D->Weather, 0, 2)]), X + W - 120.0f * S, Y + 10.0f * S, FLinearColor(0.6f, 0.7f, 0.8f), 0.7f * S);
-		if (D->TensionT > 0.0f)
+		// estado de la base, siempre a la vista (en vez de carteles): tranquila, en guardia (con los segundos) o en alerta
 		{
-			Panel(X, Y - 36.0f * S, 240.0f * S, 30.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
-			Text(FString::Printf(TEXT("BASE EN GUARDIA  %d s"), FMath::CeilToInt(D->TensionT)), X + 14.0f * S, Y - 32.0f * S, FLinearColor(1.0f, 0.45f, 0.3f), 0.85f * S);
+			const int32 B = D->BaseState();
+			const FString BT = B == 2 ? D->Tx(TEXT("hud_base_alerta"), TEXT("BASE: ALERTA"))
+				: (B == 1 ? D->Tx(TEXT("hud_base_guardia"), TEXT("BASE: EN GUARDIA  {0} s"), { FMath::CeilToInt(D->TensionT) }) : D->Tx(TEXT("hud_base_tranquila"), TEXT("BASE: TRANQUILA")));
+			const FLinearColor BC = B == 2 ? FLinearColor(1.0f, 0.25f, 0.2f) : (B == 1 ? FLinearColor(1.0f, 0.6f, 0.3f) : FLinearColor(0.6f, 0.75f, 0.65f));
+			Panel(X, Y - 36.0f * S, 240.0f * S, 30.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, B > 0 ? 0.55f : 0.35f));
+			Text(BT, X + 14.0f * S, Y - 32.0f * S, BC, 0.85f * S);
 		}
 		if (D->bPowerOff)
 		{
