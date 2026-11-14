@@ -75,7 +75,12 @@ def navegacion():
     filas = len(DATA['map'])
     cols = max(len(f) for f in DATA['map'])
     ancho, largo = cols * T * 100.0, filas * T * 100.0
-    v = eas.spawn_actor_from_class(unreal.NavMeshBoundsVolume, unreal.Vector(ancho / 2, largo / 2, 300.0), unreal.Rotator(0, 0, 0))
+    cx, cy = ancho / 2, largo / 2
+    ext = DATA.get('ext')   # tanda 20: el muro perimetral está más afuera que el plano; el mapa de navegación llega hasta él
+    if ext:
+        ancho, largo = (ext['x1'] - ext['x0']) * 100.0, (ext['y1'] - ext['y0']) * 100.0
+        cx, cy = (ext['x0'] + ext['x1']) * 50.0, (ext['y0'] + ext['y1']) * 50.0
+    v = eas.spawn_actor_from_class(unreal.NavMeshBoundsVolume, unreal.Vector(cx, cy, 300.0), unreal.Rotator(0, 0, 0))
     v.set_actor_label('MapaNavegacion')
     v.set_folder_path('Guardias')
     # la caja por defecto mide 200 cm de lado

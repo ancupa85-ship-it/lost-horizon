@@ -41,6 +41,9 @@ TEXTURAS = {
     'contenedor_2': ('corrugated_iron_02', 1.2), 'contenedor_3': ('corrugated_iron_02', 1.2),
     # tanda 18: mantas de lana y colchones de tela basta (mallas de tools/unreal/ambiente.py)
     'manta': ('poly_wool_herringbone', 0.6), 'colchon': ('rough_linen', 0.8),
+    # tanda 20: anillo exterior. El camino reutiliza el hormigón gastado de los interiores (no gasta memoria de vídeo);
+    # la tierra del anillo es grava suelta
+    'camino': ('concrete_floor_worn_001', 4.0), 'tierra': ('gravel_floor_02', 2.5),
 }
 # tinte, rugosidad y metal del visor (escenario/visor.js, tabla M; color en sRGB)
 VALORES = {
@@ -48,6 +51,7 @@ VALORES = {
     'pared': (0xa39c8e, 0.85, 0.0), 'madera': (0xb09a80, 0.75, 0.0), 'hierro': (0x999999, 0.6, 0.55),
     'oliva': (0x6f8a4c, 0.5, 0.1), 'tejado': (0x666668, 0.6, 0.4), 'suelo_int': (0x8c8c8c, 0.55, 0.0),
     'manta': (0x6b6e58, 0.95, 0.0), 'colchon': (0xb8ab90, 0.9, 0.0),
+    'camino': (0x7d7c78, 0.7, 0.0), 'tierra': (0x6f675c, 0.9, 0.0),
     # colores de KC en visor.js, aclarados: la chapa gris ya oscurece al multiplicar
     'contenedor_0': (0xe0785c, 0.62, 0.15), 'contenedor_1': (0x78aed0, 0.62, 0.15),
     'contenedor_2': (0x94c48a, 0.62, 0.15), 'contenedor_3': (0xe8cf70, 0.62, 0.15),

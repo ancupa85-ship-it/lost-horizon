@@ -27,6 +27,12 @@ Seis siluetas: Ibarra (capote y capucha), Moya (casco y correaje), Peris (gorra)
 
 Ojo: el esqueleto es el mismo en los tres cuerpos y no coincide con las mallas (codos y hombros hasta unos 8 cm fuera en Ibarra y Moya). Las medidas de las prendas se toman de la malla, no de los huesos.
 
+### Perímetro, portones y camino (tanda 20)
+
+`tools/unreal/exportar_base.py` exporta la base con el muro perimetral 10 casillas (20 m) más afuera que el plano del juego (`LH_EXT`, por defecto 10; con `LH_EXT=0` sale la base original, idéntica). Lo levanta `build_exterior()` en `tools/blender/escena_base.py`: muro nuevo de 112 × 96 m, portón de entrada al oeste (hoja corredera cerrada) y de salida al este (hoja corrida), cada uno con su garita y su báculo; un camino de 6 m que cruza de portón a portón por la franja sur y sigue fuera por un terraplén sobre la marisma, y el portillo de la marisma en el muro sur. El tabique entre el patio norte y la zona este llega hasta el muro nuevo y tres vallas con paso agachado cruzan el anillo, para que no sirva de atajo entre zonas.
+
+Dentro del muro antiguo no se mueve nada: el plano (`map`) y sus coordenadas son los mismos. Donde un edificio se apoyaba en el muro (barracón y jefatura del oeste) queda su pared trasera, con la cara interior donde estaba. Todo lo nuevo está descrito en `base.json` → `ext`, en metros del plano (x al este, y al sur; en Unreal, × 100): límites `x0 x1 y0 y1`, `entrada` y `salida` (`pos`, `garita`, `farol`, `barrera`, `meta`), `camino`, `portillo`, `vallas` y `tabiques`. Materiales nuevos: `lh_camino` (losa de hormigón) y `lh_tierra` (grava del anillo).
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

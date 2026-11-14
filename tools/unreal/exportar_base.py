@@ -18,7 +18,10 @@ os.makedirs(OUT, exist_ok=True)
 # 1) la escena del visor, sin modelos de Poly Haven ni texturas (el aspecto final se hará con materiales de Unreal)
 tmp = tempfile.mkdtemp()
 glb0 = os.path.join(tmp, 'base.glb')
-env = dict(os.environ, LH_GLB=glb0, LH_NOPH='1', LH_NOTEX='1')
+# LH_EXT: casillas que se aleja el muro perimetral respecto al plano del juego (tanda 20: 10 casillas = 20 m, con portones,
+# camino y portillo; ver build_exterior en escena_base.py). El plano y todo lo de dentro quedan en las mismas coordenadas.
+EXT = int(os.environ.get('LH_EXT', '10'))
+env = dict(os.environ, LH_GLB=glb0, LH_NOPH='1', LH_NOTEX='1', LH_EXT=str(EXT))
 subprocess.run([sys.executable, os.path.join(R, 'tools', 'blender', 'escena_base.py')], env=env, check=True,
                stdout=subprocess.DEVNULL)
 
@@ -68,6 +71,9 @@ for key, args in re.findall(r'(?:^|[\s,{.])([a-z_]+)\s*[:=]\s*std\(\{(.*?)\}\)',
             d[k] = float(m.group(1))
     PAL[key] = d
 PAL.setdefault('hormigon', PAL.get('muro', {}))
+# materiales del anillo exterior, que el visor no tiene: losa de hormigón del camino y tierra con grava
+PAL.setdefault('camino', {'color': [lin(c) for c in (0x6e, 0x6d, 0x69)], 'roughness': 0.7})
+PAL.setdefault('tierra', {'color': [lin(c) for c in (0x5a, 0x52, 0x46)], 'roughness': 0.9})
 
 for mat in bpy.data.materials:
     key = mat.name.split('.')[0][3:] if mat.name.startswith('lh_') else None
@@ -241,13 +247,41 @@ def mat_rgb(nombre, rgb, rough, metal):
     return m
 
 ROWS, COLS = len(MAP), max(len(r) for r in MAP)
-ch = lambda x, y: (MAP[y] if 0 <= y < ROWS else '')[x] if 0 <= y < ROWS and 0 <= x < len(MAP[y]) else '#'
+JEXT = json.load(open(os.path.splitext(glb0)[0] + '.json')).get('ext')
+ANILLO = {}   # casillas de fuera del plano: vallas del anillo y muro nuevo
+if JEXT:
+    E = JEXT['casillas']; conserva = {tuple(c) for c in JEXT['conserva']}
+    for x in range(-E, COLS + E):
+        for y in range(-E, ROWS + E):
+            if x in (-E, COLS + E - 1) or y in (-E, ROWS + E - 1):
+                ANILLO[(x, y)] = '.' if (y in JEXT['filas_porton'] and x in (-E, COLS + E - 1)) else '#'
+    for x0, y0, x1, y1 in JEXT.get('tabiques', []):
+        for y in range(y0, y1 + 1):
+            ANILLO[(x0, y)] = '#'
+    # vallas que antes morían en el muro y ahora cruzan el anillo hasta el muro nuevo, cada una con su hueco para pasar agachado:
+    # así el anillo no sirve de atajo entre zonas. [fila, primera columna, última columna, columna del hueco]
+    VALLAS_ANILLO = [(10, -E + 1, -1, -5), (12, COLS - 1, COLS + E - 2, COLS + 4), (23, COLS - 1, COLS + E - 2, COLS + 3)]
+    for fila, c0, c1, hueco in VALLAS_ANILLO:
+        for x in range(c0, c1 + 1):
+            ANILLO[(x, fila)] = 'h' if x == hueco else 'f'
+    JEXT['vallas'] = [list(v) for v in VALLAS_ANILLO]
+def ch(x, y):
+    if (x, y) in ANILLO:
+        return ANILLO[(x, y)]
+    if 0 <= y < ROWS and 0 <= x < len(MAP[y]):
+        if JEXT and (x in (0, COLS - 1) or y in (0, ROWS - 1)) and MAP[y][x] == '#':
+            return '#' if (x, y) in conserva else '.'   # el muro antiguo ya no está, salvo donde hace de pared de un edificio
+        return MAP[y][x]
+    return '.' if JEXT and -JEXT['casillas'] < x < COLS + JEXT['casillas'] - 1 and -JEXT['casillas'] < y < ROWS + JEXT['casillas'] - 1 else '#'
+EX = JEXT['casillas'] if JEXT else 0
 isF = lambda x, y: ch(x, y) in 'fh'
-con = lambda x, y: ch(x, y) in 'fh#W'
+solido = lambda x, y: ch(x, y) in 'fh#W'
+# para decidir hacia dónde corre cada valla cuenta también el muro antiguo: las de dentro quedan como estaban
+con = lambda x, y: solido(x, y) or (0 <= y < ROWS and 0 <= x < len(MAP[y]) and MAP[y][x] == '#')
 H, HH, PI = 2.3, 0.85, math.pi
 arms, holes, posts = [], [], []
-for y in range(ROWS):
-    for x in range(len(MAP[y])):
+for y in range(-EX, ROWS + EX):
+    for x in range(-EX, COLS + EX):
         if not isF(x, y):
             continue
         cx, cz = x * TT + TT / 2, y * TT + TT / 2
@@ -257,7 +291,7 @@ for y in range(ROWS):
         posts.append((cx, cz, 0))
         for d in ds:
             (holes if ch(x, y) == 'h' else arms).append((cx + d[0] * 0.5, cz + d[1] * 0.5, 0 if d[0] else PI / 2))
-            if not con(x + d[0], y + d[1]):
+            if not solido(x + d[0], y + d[1]):
                 posts.append((cx + d[0], cz + d[1], 0.5))
 tela, hierro = [], []
 for q in arms:   # la tela: placa fina (en Unreal se le pondrá un material de malla con transparencia)
@@ -314,11 +348,14 @@ lights = [l for l in j['lights'] if l.get('name') not in ('foco_torreta', 'farol
 f0 = next(l for l in j['lights'] if l.get('name') == 'farola')
 for w in FAROLA_POS:
     lights.append(dict(f0, pos=[w[0], w[1], f0['pos'][2]]))
+if JEXT:   # báculo del portón de entrada (el farol de la salida lo crea el director junto a la barrera)
+    q = JEXT['entrada']['farol']
+    lights.append(dict(f0, pos=[q[0], -q[1], q[2] + 0.2]))
 for tw in TORRES:
     lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': tw['foco']['pos'], 'dir': tw['foco']['dir'],
                    'color': [0.8, 0.9, 1.0], 'power': 90000})
 json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'marcas': MARCAS, 'torres': TORRES,
-           'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
+           **({'ext': JEXT} if JEXT else {}), 'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
           open(os.path.join(OUT, 'base.json'), 'w'), indent=1)
 shutil.rmtree(tmp, ignore_errors=True)
 n = len([o for o in bpy.data.objects if o.type == 'MESH'])

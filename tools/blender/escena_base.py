@@ -14,6 +14,8 @@ os.makedirs(OUT, exist_ok=True)
 random.seed(1983)
 GLB = os.environ.get('LH_GLB')   # si se da una ruta, en vez de renderizar se exporta la escena para el visor en tiempo real
 LIGHTS = []
+EXT = int(os.environ.get('LH_EXT', '0'))   # casillas que se aleja el muro perimetral (exportación a Unreal, tanda 20); con 0 la base queda como siempre
+EXT_OUT = {'conserva': []}
 
 src = open(os.path.join(R, 'src', '10-zones.js'), encoding='utf-8').read()
 MAP = re.findall(r'"([^"]+)"', re.search(r'const MAPSRC_BASE=\[(.*?)\];', src, re.S).group(1))
@@ -169,6 +171,7 @@ def build_materials():
     MAT['baliza'] = m_simple('baliza', (1, 0.05, 0.02), 0.3, emit=(1.0, 0.04, 0.02), strength=60.0)
     MAT['foco'] = m_simple('foco', (1, 1, 1), 0.3, emit=(0.8, 0.9, 1.0), strength=400.0)
     MAT['marisma'] = m_simple('marisma', (0.008, 0.012, 0.012), 0.08, bumpk=0.15, scale=0.6)
+    MAT['camino'] = m_hormigon('camino', (0.11, 0.11, 0.105), 0.6); MAT['tierra'] = m_simple('tierra', (0.05, 0.043, 0.034), 0.85, grime=0.6, bumpk=0.6, scale=5)
     # con texturas descargadas, las superficies grandes pasan a material escaneado
     if has_tex('asphalt_02'): MAT['suelo'] = m_tex('asfalto_mojado_tex', 'asphalt_02', 3.0, (0.3, 0.3, 0.32), 0.45, puddles=True, bumpk=0.8)
     if has_tex('concrete_wall_008'): MAT['muro'] = MAT['hormigon'] = m_tex('hormigon_tex', 'concrete_wall_008', 3.2, (0.5, 0.5, 0.5), 0.8, stains=0.8, plinth=0.6)
@@ -276,6 +279,102 @@ def furnish():
     F('worn_metal_rack', 33, 11, 0.45, 0, math.pi / 2); F('old_military_crate', 26, 11, 0.55, -0.1, 0.4); F('wooden_crate_02', 33, 10, 0.3, 0.2, 0.2); table(P_(28, 11, 0.4, 0.2), 0, 2)
     bunk(P_(32, 13, 0.52, -0.9), math.pi / 2, top=False); cyl('metal', 0.14, 0.28, P_(30, 13, -0.6, 0.55, 0.14), seg=12); box('techo_int', (0.5, 0.008, 0.36), P_(30, 14, -0.98, 0.2, 1.5), rotz=math.pi / 2)
 
+def Mp(xm, ym, z=0.0): return Vector((xm, -ym, z))   # metros del plano (x al este, y al sur) → Blender
+def ext_borde(x, y, p):
+    """Con el muro perimetral alejado (LH_EXT), la casilla de borde queda libre salvo donde un edificio se apoyaba en el muro:
+    ahí se levanta la pared trasera del edificio, con la cara de dentro donde estaba (y del mismo hormigón), y se cierra el tejado."""
+    if (x in (0, COLS - 1)) and (y in (0, ROWS - 1)): return
+    dx, dy = (1 if x == 0 else -1 if x == COLS - 1 else 0), (1 if y == 0 else -1 if y == ROWS - 1 else 0)
+    back = lambda xx, yy: roomy(xx + dx, yy + dy) or cell(xx + dx, yy + dy) in 'bB'
+    n = cell(x + dx, y + dy); d = Vector((dx, -dy, 0)); S = lambda a, b, h: (a, b, h) if dx else (b, a, h)   # a: grosor hacia dentro; b: largo del muro
+    if n == '#':     # tabique interior que llegaba hasta el muro: sigue hasta el muro nuevo (build_exterior)
+        box('muro', S(T, T * 0.5, HW), p + Vector((0, 0, HW / 2))); EXT_OUT['conserva'].append([x, y]); return
+    if back(x, y):
+        box('muro', S(0.2, T, HB), p + d * 0.35 + Vector((0, 0, HB / 2))); box('pared', S(1.25, T, HB), p - d * 0.375 + Vector((0, 0, HB / 2)))
+        box('techo_int', S(0.55, T, 0.04), p + d * 0.725 + Vector((0, 0, HB - 0.02))); box('pared', S(1.59, T + 0.14, 0.3), p - d * 0.345 + Vector((0, 0, HB + 0.33)))
+    elif n == 'W' and any(back(x + abs(dy) * s, y + abs(dx) * s) for s in (-1, 1)):   # esquina del edificio: bloque entero, para que la fachada trasera quede a paño
+        box('pared', (T, T, HB), p + Vector((0, 0, HB / 2))); box('pared', (T + 0.14, T + 0.14, 0.3), p + Vector((0, 0, HB + 0.33)))
+    else: return
+    box('tejado', (T + 0.02, T + 0.02, 0.22), p + Vector((0, 0, HB + 0.11))); EXT_OUT['conserva'].append([x, y])
+
+def porton(xc, ya, yb):
+    """Hoja corredera de un portón, en el plano x = xc y de ya a yb (metros del plano): chapa abajo y barrotes arriba."""
+    L_ = yb - ya; ym = (ya + yb) / 2
+    for z in (0.16, 1.3, 2.6): box('hierro', (0.08, L_, 0.08), Mp(xc, ym, z))
+    for yy in (ya + 0.04, ym, yb - 0.04): box('hierro', (0.08, 0.08, 2.5), Mp(xc, yy, 1.38))
+    box('oliva', (0.03, L_ - 0.1, 1.1), Mp(xc, ym, 0.73)); k = ya + 0.2
+    while k < yb - 0.12:
+        box('oscuro', (0.03, 0.03, 1.3), Mp(xc, k, 1.95)); box('oscuro', (0.02, 0.02, 0.22), Mp(xc, k, 2.72)); k += 0.16
+    for yy in (ya + 0.5, yb - 0.5): cyl('oscuro', 0.09, 0.07, Mp(xc, yy, 0.1), rot=Matrix.Rotation(math.pi / 2, 4, 'Y'), seg=10)   # ruedas
+def garita(xc, yc, luz, puerta):
+    """Garita de 2,4 m con ventana al camino (sur) y al portón; la puerta, del lado de la base (puerta = +1 al este, -1 al oeste)."""
+    box('pared', (2.4, 2.4, 2.5), Mp(xc, yc, 1.25)); box('tejado', (3.0, 3.0, 0.12), Mp(xc, yc, 2.56)); box('hormigon', (2.7, 2.7, 0.12), Mp(xc, yc, 0.06))
+    v = 'ventana_on' if luz else 'ventana_off'
+    box(v, (1.3, 0.05, 0.8), Mp(xc, yc + 1.205, 1.6)); box('oscuro', (1.45, 0.08, 0.07), Mp(xc, yc + 1.21, 2.04)); box('pared', (1.5, 0.16, 0.08), Mp(xc, yc + 1.22, 1.16))
+    box(v, (0.05, 1.1, 0.8), Mp(xc - puerta * 1.205, yc, 1.6)); box('oscuro', (0.08, 1.25, 0.07), Mp(xc - puerta * 1.21, yc, 2.04))
+    box('hierro', (0.06, 0.85, 2.0), Mp(xc + puerta * 1.2, yc - 0.4, 1.0)); box('oscuro', (0.1, 0.05, 0.2), Mp(xc + puerta * 1.23, yc - 0.08, 1.05))
+def baculo(xm, ym, largo):
+    """Báculo con brazo hacia el sur: la luminaria queda sobre el camino."""
+    box('hierro', (0.1, 0.1, 4.0), Mp(xm, ym, 2.0)); box('hierro', (0.07, largo + 0.2, 0.07), Mp(xm, ym + largo / 2, 3.96)); box('hormigon', (0.4, 0.4, 0.3), Mp(xm, ym, 0.15))
+    box('oscuro', (0.3, 0.44, 0.1), Mp(xm, ym + largo, 3.88)); box('bombilla', (0.16, 0.26, 0.03), Mp(xm, ym + largo, 3.82))
+def build_exterior():
+    """Tanda 20 (Andres, 2026-11-14): el muro perimetral EXT casillas más afuera por los cuatro lados, un portón de entrada al oeste
+    y otro de salida al este, y un camino que cruza la base de uno a otro por la franja sur. Dentro del muro antiguo no se mueve nada."""
+    X0, X1, Y0, Y1 = -EXT * T, (COLS + EXT) * T, -EXT * T, (ROWS + EXT) * T
+    GR = (ROWS - 1, ROWS, ROWS + 1); ya, yb = GR[0] * T, (GR[-1] + 1) * T; yc = (ya + yb) / 2; CAUSE = 120.0   # filas del portón, ancho del camino y largo del terraplén de fuera
+    # suelo del anillo (el asfalto de la base se queda como estaba) y terraplén del camino sobre la marisma
+    for sx, sy, cx, cy in ((X1 - X0, -Y0, (X0 + X1) / 2, Y0 / 2), (X1 - X0, Y1 - ROWS * T, (X0 + X1) / 2, (ROWS * T + Y1) / 2), (-X0, ROWS * T, X0 / 2, ROWS * T / 2), (X1 - COLS * T, ROWS * T, (COLS * T + X1) / 2, ROWS * T / 2)):
+        box('tierra', (sx, sy, 0.4), Mp(cx, cy, -0.2))
+    for s in (-1, 1):
+        box('tierra', (CAUSE, 13.0, 0.7), Mp((X0 - CAUSE / 2) if s < 0 else (X1 + CAUSE / 2), yc, -0.37))
+        for k in range(int(CAUSE / 6)):      # hitos del terraplén
+            for q in (-5.6, 5.6): box('hormigon', (0.22, 0.22, 0.8), Mp((X0 - 3 - k * 6) if s < 0 else (X1 + 3 + k * 6), yc + q, 0.4))
+    box('camino', (X1 - X0 + 2 * CAUSE, yb - ya, 0.24), Mp((X0 + X1) / 2, yc, -0.08))
+    for q in (ya - 0.1, yb + 0.1): box('hormigon', (X1 - X0 + 2 * CAUSE, 0.24, 0.3), Mp((X0 + X1) / 2, q, -0.08))   # bordillo enrasado
+    # muro nuevo, con sus contrafuertes y la alambrada
+    def tramo(x, y, size):
+        p = wpos(x, y); box('muro', size, p + Vector((0, 0, HW / 2)))
+        if (x + y) % 3 == 0 and y not in (GR[0] - 1, GR[-1] + 1):
+            box('muro', (0.6, 0.6, HW + 0.1), p + Vector((0, 0, HW / 2))); box('oscuro', (0.06, 0.06, 1.0), p + Vector((0, 0, HW + 0.5)))
+    for x in range(-EXT, COLS + EXT):
+        for y in (-EXT, ROWS + EXT - 1): tramo(x, y, (T, T * 0.45, HW))
+    for y in range(-EXT + 1, ROWS + EXT - 1):
+        if y in GR: continue
+        for x in (-EXT, COLS + EXT - 1): tramo(x, y, (T * 0.45, T, HW))
+    xw, xe, yn, ys = X0 + T / 2, X1 - T / 2, Y0 + T / 2, Y1 - T / 2
+    for k in range(3):
+        z = HW + 0.35 + k * 0.28
+        for yy in (yn, ys): box('oscuro', (X1 - X0 - 2, 0.02, 0.02), Mp((X0 + X1) / 2, yy, z))
+        for xx in (xw, xe):
+            box('oscuro', (0.02, ya - 0.7 - yn, 0.02), Mp(xx, (yn + ya - 0.7) / 2, z)); box('oscuro', (0.02, ys - yb - 0.7, 0.02), Mp(xx, (yb + 0.7 + ys) / 2, z))
+    # el tabique que separa el patio norte de la zona este sigue hasta el muro nuevo
+    for x, y in EXT_OUT['conserva']:
+        if y == 0 and cell(x, 1) == '#':
+            for k in range(1, EXT): box('muro', (T * 0.5, T, HW), wpos(x, -k, HW / 2))
+            EXT_OUT.setdefault('tabiques', []).append([x, -EXT + 1, x, -1])
+    # portones: pilares, hoja corredera con su carril, garita, báculo y cartel. Entrada (oeste) cerrada; salida (este) con la hoja corrida
+    for xx, s in ((xw, 1), (xe, -1)):     # s: hacia dentro de la base
+        for yy in (ya - 0.3, yb + 0.3):       # los pilares asoman 5 cm al hueco: el paso libre queda en 5,9 m
+            box('muro', (1.1, 0.7, HW + 0.5), Mp(xx, yy, (HW + 0.5) / 2)); box('hormigon', (1.3, 0.9, 0.14), Mp(xx, yy, HW + 0.57)); box('oscuro', (0.06, 0.06, 1.0), Mp(xx, yy, HW + 1.1))
+        xi = xx + s * 0.62
+        box('hierro', (0.06, (yb - ya) * 2 + 1.6, 0.03), Mp(xi, yb + 0.5, 0.055))                              # carril
+        box('hierro', (0.1, 0.1, 2.9), Mp(xi + s * 0.14, yb + 0.5, 1.45)); box('hierro', (0.36, 0.1, 0.08), Mp(xi + s * 0.02, yb + 0.5, 2.86))   # guía
+        if s > 0: porton(xi, ya - 0.3, yb + 0.3)
+        else: porton(xi, yb + 0.2, yb + 0.2 + (yb - ya) + 0.6)
+        gx = xx + s * 3.2; garita(gx, ya - 2.4, s < 0, s); mx = gx + s * 1.2; baculo(mx, ya - 0.4, 2.8)
+        box('hierro', (0.05, 0.05, 1.5), Mp(mx + s * 1.6, yb + 0.5, 0.75)); box('aviso', (0.03, 0.7, 0.45), Mp(mx + s * 1.6, yb + 0.5, 1.4))
+        EXT_OUT['entrada' if s > 0 else 'salida'] = {'pos': [xx, yc], 'ancho': yb - ya, 'garita': [gx, ya - 2.4], 'farol': [mx, ya + 2.4, 3.8], 'baculo': [mx, ya - 0.4], 'hoja': 'cerrada' if s > 0 else 'abierta',
+                                                         'barrera': {'pos': [xx + s * 5.0, ya], 'giro': 90, 'largo': yb - ya}, 'meta': [xx + s * 0.5, yc]}
+    # portillo de la marisma: puerta de chapa en el muro sur, lejos de los portones (la partida acaba al usarlo: no se abre de verdad)
+    px = 3.1; yi = ys - T * 0.225
+    for q, k in ((yi - 0.04, -1), (ys + T * 0.225 + 0.04, 1)):
+        box('hierro', (1.0, 0.1, 2.1), Mp(px, q, 1.05)); box('oscuro', (1.24, 0.14, 0.12), Mp(px, q, 2.16)); box('oscuro', (0.05, 0.05, 0.2), Mp(px + 0.38, q + k * 0.06, 1.05))
+        for a in (-0.56, 0.56): box('oscuro', (0.12, 0.14, 2.1), Mp(px + a, q, 1.05))
+    box('aviso', (0.3, 0.03, 0.2), Mp(px, yi - 0.1, 1.65))
+    for k in ('entrada', 'salida'): EXT_OUT[k] = json.loads(json.dumps(EXT_OUT[k]), parse_float=lambda v: round(float(v), 3))
+    EXT_OUT.update({'casillas': EXT, 'x0': X0, 'x1': X1, 'y0': Y0, 'y1': Y1, 'camino': {'y': yc, 'ancho': yb - ya, 'x0': X0 - CAUSE, 'x1': X1 + CAUSE, 'alto': 0.04},
+                    'portillo': [px, round(yi - 0.65, 2)], 'filas_porton': list(GR)})
+
 def build_world():
     # suelo de la base y marisma alrededor
     box('suelo', (COLS * T, ROWS * T, 0.4), (COLS * T / 2, -ROWS * T / 2, -0.2))
@@ -283,7 +382,8 @@ def build_world():
     for y in range(ROWS):
         for x in range(COLS):
             c = cell(x, y); p = wpos(x, y)
-            if c == '#':
+            if c == '#' and EXT and (x in (0, COLS - 1) or y in (0, ROWS - 1)): ext_borde(x, y, p)
+            elif c == '#':
                 box('muro', (T, T * 0.45, HW) if (y in (0, ROWS - 1)) else (T * 0.45, T, HW) if x in (0, COLS - 1) else (T * 0.5, T, HW), p + Vector((0, 0, HW / 2)))
                 if (x + y) % 3 == 0 and (x in (0, COLS - 1) or y in (0, ROWS - 1)):   # contrafuerte y poste de alambrada
                     box('muro', (0.6, 0.6, HW + 0.1), p + Vector((0, 0, HW / 2)))
@@ -324,7 +424,8 @@ def build_world():
                 elif rnd(x, y, 7) < 0.04: cyl('metal', 0.18, 1.1, p + Vector((0, 0, HB + 0.75)))
     # alambrada sobre el muro: tres hilos por lado
     Wm, Hm = COLS * T, ROWS * T
-    for k in range(3):
+    if EXT: build_exterior()
+    for k in range(0 if EXT else 3):
         z = HW + 0.35 + k * 0.28
         for yy in (-1.0, -(Hm - 1.0)): box('oscuro', (Wm - 2, 0.02, 0.02), (Wm / 2, yy, z))
         for xx in (1.0, Wm - 1.0): box('oscuro', (0.02, Hm - 2, 0.02), (xx, -Hm / 2, z))
@@ -843,7 +944,7 @@ if GLB:
     L_ = []
     for o in LIGHTS:
         d = o.rotation_euler.to_quaternion() @ Vector((0, 0, -1)); L_.append({'kind': o.data.type, 'name': o.name.split('.')[0], 'pos': [round(v, 3) for v in o.location], 'color': [round(v, 3) for v in o.data.color], 'power': o.data.energy, 'dir': [round(v, 3) for v in d]})
-    json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD), 'people': PEOPLE_OUT, 'obst': OBST}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
+    json.dump({'map': MAP, 'T': T, 'HB': HB, 'HW': HW, 'lights': L_, 'lampHead': list(LAMP_HEAD), 'people': PEOPLE_OUT, 'obst': OBST, **({'ext': EXT_OUT} if EXT else {})}, open(os.path.splitext(GLB)[0] + '.json', 'w'))
     for o in bpy.data.objects: o.select_set(o.type == 'MESH' and o.name in col.objects)
     kw = dict(filepath=GLB, export_format='GLB', use_selection=True, export_yup=True, export_cameras=False, export_lights=False, export_animations=False, export_image_format='JPEG')
     try: bpy.ops.export_scene.gltf(**kw, export_image_quality=72)
