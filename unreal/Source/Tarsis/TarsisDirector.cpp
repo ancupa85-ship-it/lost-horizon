@@ -43,6 +43,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Animation/AnimationAsset.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "InputKeyEventArgs.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -102,6 +103,7 @@ void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
 void ATarsisDirector::Captured(APawn* Player)
 {
 	if (!Player) return;
+	ExitHide();
 	StopDrag();
 	bKeypad = false;
 	if (bBinoculars) ToggleBinoculars();
@@ -198,6 +200,7 @@ void ATarsisDirector::Takedown()
 	if (!G) return;
 	G->KnockOut();
 	++Takedowns;
+	HintStep = 3;
 	ShowMessage(FString::Printf(TEXT("%s DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma."), *G->GuardName.ToUpper()), 4.0f);
 }
 
@@ -244,6 +247,10 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (SubtitleT > 0.0f) SubtitleT -= DeltaSeconds;
 	if (ReportWait > 0.0f) { ReportWait -= DeltaSeconds; if (ReportWait <= 0.0f) { bReport = true; MessageT = 0.0f; } }
 	DetectTick();
+	HintTick();
+	HideTick();
+	ChangesTick(DeltaSeconds);
+	if (FrontMsgT > 0.0f) FrontMsgT -= DeltaSeconds;
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
 	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
 	BinocularTick();
@@ -267,6 +274,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		&& GateLamp && FVector::Dist2D(LampChecker->GetActorLocation(), GateLamp->GetActorLocation()) < 350.0f)
 	{
 		bLampReported = true;
+		GuardSay(LampChecker, TEXT("luz"));
 		TensionT = FMath::Max(TensionT, 60.0f);
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, LampChecker->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		ShowMessage(FString::Printf(TEXT("RADIO, %s: \"Farol roto en el control. Cristales por el suelo... esto no es el viento.\"\nLA BASE SE PONE EN GUARDIA."), *LampChecker->GuardName.ToUpper()), 4.5f);
@@ -356,6 +364,7 @@ void ATarsisDirector::SetupMission()
 	const FVector Floor = Rest(Cell(9, 17));
 	AddBlock(Floor + FVector(0.0f, 0.0f, 37.5f), FVector(1.2f, 0.6f, 0.75f), FLinearColor(0.16f, 0.11f, 0.07f), true);
 	FileProp = AddBlock(Floor + FVector(0.0f, 0.0f, 77.0f), FVector(0.24f, 0.32f, 0.04f), FLinearColor(0.55f, 0.42f, 0.2f), false);
+	SetupHiding();
 }
 
 ATarsisGuard* ATarsisDirector::DownedNear(float Radius) const
@@ -380,12 +389,15 @@ static bool IsIbarra(const ATarsisGuard* G)
 
 FString ATarsisDirector::InteractPrompt() const
 {
+	if (bHiding) return TEXT("E   SALIR DE LA TAQUILLA");
 	if (Dragged) return TEXT("E   SOLTAR EL CUERPO");
 	if (bChoice) return TEXT("1   VENTE CONMIGO        2   DERRIBARLO");
 	if (ATarsisGuard* T = TakedownTarget())
 	{
 		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? TEXT("E   AGARRAR A RAMOS") : TEXT("E   DERRIBAR");
 	}
+	if (ShoveTarget()) return TEXT("E   EMPUJAR (queda aturdido 2 s; hace ruido)");
+	if (FacingAlertGuard()) return TEXT("TE VE: huye, rodealo o distraelo (Q)");
 	if (ATarsisGuard* G = DownedNear(170.0f))
 	{
 		if (IsIbarra(G) && !bKey) return TEXT("E   QUITARLE LA LLAVE");
@@ -401,6 +413,7 @@ FString ATarsisDirector::InteractPrompt() const
 	if (!bVetOpen && NearPlayer(FVector(4660.0f, 300.0f, 0.0f), 170.0f)) return bVetKey ? TEXT("E   ABRIR EL BOTIQUIN") : TEXT("E   BOTIQUIN DEL VETERINARIO");
 	if (NearPlayer(FVector(310.0f, 4900.0f, 0.0f), 220.0f)) return TEXT("E   PORTILLO DE LA MARISMA");
 	if (NearPlayer(GeneratorLoc, 230.0f)) return bPowerOff ? TEXT("GENERADOR: PARADO") : TEXT("E   CORTAR EL GENERADOR (apaga las luces)");
+	if (HideSpotNear() >= 0) return TEXT("E   ESCONDERTE EN LA TAQUILLA");
 	return FString();
 }
 
@@ -419,6 +432,7 @@ void ATarsisDirector::Interact()
 {
 	if (bCine) { SkipCine(); return; }
 	if (bDone) return;
+	if (bHiding) { ExitHide(); return; }
 	if (Dragged) { StopDrag(); ShowMessage(TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), 3.0f); return; }
 	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
 	if (ATarsisGuard* T = TakedownTarget())
@@ -433,6 +447,18 @@ void ATarsisDirector::Interact()
 			return;
 		}
 		Takedown();
+		return;
+	}
+	// de frente: si aún no te ha visto en alerta, lo empujas; si ya está en alerta, la E no sirve y se dice por qué
+	if (ATarsisGuard* S = ShoveTarget()) { Shove(S); return; }
+	if (ATarsisGuard* A = FacingAlertGuard())
+	{
+		if (FrontMsgT <= 0.0f)
+		{
+			FrontMsgT = 2.0f;
+			PlaySfx(TEXT("empujon"), A->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 0.4f);
+			ShowMessage(FString::Printf(TEXT("DE FRENTE TE VE\n%s esta en alerta: no se deja. Huye, rodealo o distraelo con una piedra (%s)."), *A->GuardName.ToUpper(), *ActionKeys[2].GetDisplayName().ToString().ToUpper()), 2.5f);
+		}
 		return;
 	}
 	if (ATarsisGuard* G = DownedNear(170.0f))
@@ -469,6 +495,7 @@ void ATarsisDirector::Interact()
 		if (!bKey) { PlaySfx(TEXT("candado"), Cell(4, 15, 100.0f), 0.5f); ShowMessage(TEXT("JEFATURA CERRADA\nHace falta la llave. La lleva el sargento Ibarra."), 3.5f); return; }
 		bJefOpen = true;
 		if (DoorL) { DoorL->DestroyComponent(); DoorL = nullptr; }
+		AddChange(Cell(4, 15, 110.0f), TEXT("puerta"));
 		PlaySfx(TEXT("puerta_madera"), Cell(4, 15, 100.0f));
 		ShowMessage(TEXT("JEFATURA ABIERTA\nEl despacho de Alarcon. Al fondo, la puerta blindada del archivo."), 4.0f);
 		Checkpoint(TEXT("LA JEFATURA"));
@@ -503,6 +530,7 @@ void ATarsisDirector::Interact()
 		bVetOpen = true;
 		Darts = 5;
 		if (VetDoor) { VetDoor->DestroyComponent(); VetDoor = nullptr; }
+		AddChange(FVector(4660.0f, 160.0f, 145.0f), TEXT("puerta"));
 		PlaySfx(TEXT("candado"), FVector(4660.0f, 160.0f, 145.0f));
 		PlaySfx(TEXT("recoger"), FVector(4660.0f, 160.0f, 145.0f), 0.7f);
 		ShowMessage(TEXT("PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres."), 5.0f);
@@ -522,6 +550,11 @@ void ATarsisDirector::Interact()
 	if (!bPowerOff && NearPlayer(GeneratorLoc, 230.0f))
 	{
 		CutPower();
+		return;
+	}
+	if (const int32 H = HideSpotNear(); H >= 0)
+	{
+		EnterHide(H);
 		return;
 	}
 	if (bVaultOpen && !bFile && NearPlayer(Cell(9, 17), 160.0f))
@@ -565,6 +598,7 @@ void ATarsisDirector::KeypadDigit(int32 Digit)
 		bVaultOpen = true;
 		bKeypad = false;
 		if (DoorV) { DoorV->DestroyComponent(); DoorV = nullptr; }
+		AddChange(Cell(6, 17, 110.0f), TEXT("puerta"));
 		PlaySfx(TEXT("clave_ok"), Cell(6, 17, 120.0f), 0.8f);
 		PlaySfx(TEXT("puerta_blindada"), Cell(6, 17, 110.0f));
 		ShowMessage(TEXT("ARCHIVO ABIERTO\nLa puerta blindada se abre con un chasquido."), 4.0f);
@@ -657,6 +691,7 @@ void ATarsisDirector::ThrowStone()
 	}
 	StoneT = 1.2f;
 	LastStone = P;
+	if (HintStep < 2) HintStep = 2;
 	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, P, 1.0f, FMath::FRandRange(0.9f, 1.1f), 0.0f, Atten);
 	if (UStaticMeshComponent* S = AddBlock(P + FVector(0.0f, 0.0f, 3.0f), FVector(0.06f, 0.05f, 0.05f), FLinearColor(0.3f, 0.29f, 0.27f), false))
 	{
@@ -924,6 +959,243 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 	if (C->bIsCrouched || Speed < 60.0f) PlayerNoise = 0.0f;   // al pararte o agacharte, el HUD lo ve enseguida
 }
 
+// ---------------------------------------------------------------- empezar sin armas: consejos y empujón de frente
+
+void ATarsisDirector::HintTick()
+{
+	// consejos del principio, uno tras otro hasta que los usas (o pasados 3 min): agacharse, la piedra y la E
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (HintStep == 0 && C && C->bIsCrouched) HintStep = 1;
+	if (HintStep >= 3 || MissionTime > 180.0f || bDone) { Hint.Reset(); return; }
+	auto K = [this](int32 I) { return ActionKeys[I].GetDisplayName().ToString().ToUpper(); };
+	if (HintStep == 0) Hint = FString::Printf(TEXT("CONSEJO: agachate (%s) y busca la sombra: asi te ven mucho menos."), *K(0));
+	else if (HintStep == 1) Hint = FString::Printf(TEXT("CONSEJO: %s lanza una piedra: el guardia se para, se gira y va a mirar. Pasa por detras."), *K(2));
+	else Hint = FString::Printf(TEXT("CONSEJO: por la espalda, %s derriba. De frente, si aun no te ha visto, %s le empuja y queda aturdido 2 s."), *K(1), *K(1));
+}
+
+ATarsisGuard* ATarsisDirector::ShoveTarget() const
+{
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P || bHiding) return nullptr;
+	ATarsisGuard* Best = nullptr;
+	float BestD = 170.0f;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		ATarsisGuard* G = *It;
+		if (G->bTowerSentry || G->bAlly || G->State == ETarsisGuardState::Down || G->State == ETarsisGuardState::Alert || G->IsStunned()) continue;
+		if (G->CanBeTakenDown(P)) continue;   // por la espalda: eso es derribar
+		const FVector D = G->GetActorLocation() - P->GetActorLocation();
+		if (FMath::Abs(D.Z) > 120.0f) continue;
+		if (D.Size2D() < BestD) { BestD = D.Size2D(); Best = G; }
+	}
+	return Best;
+}
+
+ATarsisGuard* ATarsisDirector::FacingAlertGuard() const
+{
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P) return nullptr;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State != ETarsisGuardState::Alert || It->bTowerSentry || It->bAlly) continue;
+		if (FVector::Dist2D(It->GetActorLocation(), P->GetActorLocation()) < 260.0f) return *It;
+	}
+	return nullptr;
+}
+
+void ATarsisDirector::Shove(ATarsisGuard* G)
+{
+	if (!G) return;
+	// de frente y sin que esté en alerta: lo empujas y queda aturdido 2,5 s (no ve). Da tiempo a rodearlo y derribarlo
+	// o a irte, pero hace ruido: los que estén cerca vienen a mirar. Si no lo derribas, al rehacerse va a por ti
+	G->Stun(2.5f);
+	++Shoves;
+	HintStep = 3;
+	PlaySfx(TEXT("empujon"), G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f));
+	GuardSay(G, TEXT("eh"));
+	int32 Heard = 0;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (*It == G || It->bTowerSentry || It->State == ETarsisGuardState::Down || It->State == ETarsisGuardState::Alert) continue;
+		if (FVector::Dist(It->GetActorLocation(), G->GetActorLocation()) > NoiseRadius) continue;
+		It->HearNoise(G->GetActorLocation());
+		++Heard;
+	}
+	ShowMessage(FString::Printf(TEXT("EMPUJAS A %s\nAturdido 2 s: rodealo y derribalo (E) o vete. %s"), *G->GuardName.ToUpper(),
+		Heard > 0 ? TEXT("El golpe se ha oido.") : TEXT("Nadie mas lo ha oido.")), 3.0f);
+}
+
+// ---------------------------------------------------------------- escondites: taquillas del barracón y de la sala de guardia
+
+void ATarsisDirector::SetupHiding()
+{
+	for (int32 i = 0; i < HideSpots.Num(); ++i)
+	{
+		FVector P = HideSpots[i];
+		const float Yaw = HideYaws.IsValidIndex(i) ? HideYaws[i] : 0.0f;
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisTaquilla), true, this);
+		if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
+		if (GetWorld()->LineTraceSingleByChannel(Hit, P + FVector(0.0f, 0.0f, 250.0f), P - FVector(0.0f, 0.0f, 100.0f), ECC_Visibility, Q)) P.Z = Hit.ImpactPoint.Z;
+		HideSpots[i] = P;
+		// taquilla metálica de 60 x 50 x 190 cm con la puerta (más clara) hacia donde abre
+		const FRotator R(0.0f, Yaw - 90.0f, 0.0f);
+		const FVector Dir = FRotator(0.0f, Yaw, 0.0f).Vector();
+		if (UStaticMeshComponent* L = AddBlock(P + FVector(0.0f, 0.0f, 95.0f), FVector(0.6f, 0.5f, 1.9f), FLinearColor(0.09f, 0.11f, 0.08f), true))
+		{
+			L->SetWorldRotation(R);
+			Lockers.Add(L);
+		}
+		if (UStaticMeshComponent* Door = AddBlock(P + Dir * 26.0f + FVector(0.0f, 0.0f, 95.0f), FVector(0.56f, 0.02f, 1.84f), FLinearColor(0.14f, 0.16f, 0.12f), false))
+		{
+			Door->SetWorldRotation(R);
+			Lockers.Add(Door);
+		}
+		// rendijas de ventilación en la puerta, a la altura de los ojos
+		for (int32 s = 0; s < 4; ++s)
+		{
+			if (UStaticMeshComponent* Slit = AddBlock(P + Dir * 27.5f + FVector(0.0f, 0.0f, 150.0f + s * 6.0f), FVector(0.36f, 0.01f, 0.015f), FLinearColor(0.01f, 0.01f, 0.01f), false))
+			{
+				Slit->SetWorldRotation(R);
+				Lockers.Add(Slit);
+			}
+		}
+	}
+}
+
+int32 ATarsisDirector::HideSpotNear() const
+{
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P || bHiding) return -1;
+	for (int32 i = 0; i < HideSpots.Num(); ++i)
+	{
+		const FVector Front = HideSpots[i] + FRotator(0.0f, HideYaws.IsValidIndex(i) ? HideYaws[i] : 0.0f, 0.0f).Vector() * 75.0f;
+		if (FVector::Dist2D(P->GetActorLocation(), Front) < 120.0f && FMath::Abs(P->GetActorLocation().Z - HideSpots[i].Z) < 200.0f) return i;
+	}
+	return -1;
+}
+
+void ATarsisDirector::EnterHide(int32 Index)
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!C || !PC || !HideSpots.IsValidIndex(Index)) return;
+	StopDrag();
+	if (bBinoculars) ToggleBinoculars();
+	bKeypad = false;
+	// ¿te ha visto meterte? Un guardia en alerta que te tiene a la vista o te acaba de perder te saca de un tirón
+	bHideSeen = false;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Alert && !It->bTowerSentry && It->UnseenT < 1.5f) bHideSeen = true;
+	}
+	HideIdx = Index;
+	bHiding = true;
+	const float Yaw = HideYaws.IsValidIndex(Index) ? HideYaws[Index] : 0.0f;
+	const FVector Dir = FRotator(0.0f, Yaw, 0.0f).Vector();
+	if (C->bIsCrouched) C->UnCrouch();
+	C->SetActorEnableCollision(false);
+	C->GetCharacterMovement()->StopMovementImmediately();
+	C->GetCharacterMovement()->DisableMovement();
+	C->SetActorLocation(HideSpots[Index] - Dir * 5.0f + FVector(0.0f, 0.0f, C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), false, nullptr, ETeleportType::TeleportPhysics);
+	C->SetActorHiddenInGame(true);   // los guardias no ven a un actor oculto (ATarsisGuard::Visibility)
+	PC->SetControlRotation(FRotator(0.0f, Yaw, 0.0f));
+	if (FAudioDeviceHandle Dev = GEngine->GetMainAudioDevice()) Dev->SetTransientPrimaryVolume(OptVolume * 0.45f);   // se oye amortiguado
+	PlaySfx(TEXT("taquilla"), HideSpots[Index] + FVector(0.0f, 0.0f, 100.0f), 0.8f);
+	ShowMessage(TEXT("EN LA TAQUILLA\nNo te ven ni te oyen, salvo que te hayan visto meterte. E para salir."), 3.5f);
+}
+
+void ATarsisDirector::ExitHide()
+{
+	if (!bHiding) return;
+	bHiding = false;
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (FAudioDeviceHandle Dev = GEngine->GetMainAudioDevice()) Dev->SetTransientPrimaryVolume(OptVolume);
+	if (!C || !HideSpots.IsValidIndex(HideIdx)) return;
+	const FVector Dir = FRotator(0.0f, HideYaws.IsValidIndex(HideIdx) ? HideYaws[HideIdx] : 0.0f, 0.0f).Vector();
+	C->SetActorLocation(HideSpots[HideIdx] + Dir * 85.0f + FVector(0.0f, 0.0f, C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 2.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	C->SetActorHiddenInGame(false);
+	C->SetActorEnableCollision(true);
+	C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	PlaySfx(TEXT("taquilla"), HideSpots[HideIdx] + FVector(0.0f, 0.0f, 100.0f), 0.8f);
+}
+
+void ATarsisDirector::HideTick()
+{
+	if (!bHiding || !bHideSeen) return;
+	// te vio meterte: el que te persigue abre la taquilla al llegar
+	bool bAny = false;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State != ETarsisGuardState::Alert || It->bTowerSentry) continue;
+		bAny = true;
+		if (FVector::Dist2D(It->GetActorLocation(), HideSpots[HideIdx]) < 190.0f)
+		{
+			ATarsisGuard* G = *It;
+			ExitHide();
+			if (APawn* P = UGameplayStatics::GetPlayerPawn(this, 0))
+			{
+				Captured(P);
+				ShowMessage(FString::Printf(TEXT("%s TE VIO METERTE EN LA TAQUILLA\nLa abre de un tiron. %s"), *G->GuardName.ToUpper(), *Message.Mid(Message.Find(TEXT("\n")) + 1)), 6.0f);
+			}
+			return;
+		}
+	}
+	if (!bAny) bHideSeen = false;   // ya no te persigue nadie: estás a salvo ahí dentro
+}
+
+// ---------------------------------------------------------------- los guardias notan cambios (puertas que estaban cerradas)
+
+void ATarsisDirector::AddChange(const FVector& Where, const TCHAR* Key)
+{
+	ChangeLocs.Add(Where);
+	ChangeKeys.Add(Key);
+	ChangeSeen.Add(false);
+}
+
+void ATarsisDirector::ChangesTick(float DeltaSeconds)
+{
+	ChangeT -= DeltaSeconds;
+	if (ChangeT > 0.0f || ChangeLocs.Num() == 0) return;
+	ChangeT = 0.25f;
+	for (int32 i = 0; i < ChangeLocs.Num(); ++i)
+	{
+		if (ChangeSeen[i]) continue;
+		const FVector P = ChangeLocs[i];
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			ATarsisGuard* G = *It;
+			if (G->State == ETarsisGuardState::Down || G->State == ETarsisGuardState::Alert || G->bAlly || G->bTowerSentry
+				|| G->IsInvestigating() || G->IsCheckingBody() || G->IsStunned()) continue;
+			const FVector Eye = G->GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
+			const float D = FVector::Dist(Eye, P);
+			if (D > 1200.0f) continue;
+			if (FVector::DotProduct(G->GetActorForwardVector(), (P - Eye).GetSafeNormal2D()) < 0.5f) continue;   // ±60 grados
+			if (D > 600.0f && ATarsisGuard::LightAt(this, P) < 0.2f) continue;   // a oscuras solo lo nota de cerca
+			FHitResult Hit;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisCambio), true, this);
+			Q.AddIgnoredActor(G);
+			if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, P, ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, P) > 60.0f) continue;
+			ChangeSeen[i] = true;
+			++ChangesNoticed;
+			GuardSay(G, ChangeKeys[i]);   // antes que HearNoise: así no dice además «¿qué ha sido eso?»
+			G->HearNoise(P);
+			ShowMessage(FString::Printf(TEXT("%s HA VISTO UNA PUERTA ABIERTA\nEstaba cerrada. Va a mirar."), *G->GuardName.ToUpper()), 3.5f);
+			break;
+		}
+	}
+}
+
+void ATarsisDirector::SimulateKey(FName Key, bool bPress, bool bRelease)
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC) return;
+	const FKey K(Key);
+	if (bPress) PC->InputKey(FInputKeyEventArgs::CreateSimulated(K, IE_Pressed, 1.0f));
+	if (bRelease) PC->InputKey(FInputKeyEventArgs::CreateSimulated(K, IE_Released, 0.0f));
+}
+
 // ---------------------------------------------------------------- tus brazos con la pistola de dardos
 
 void ATarsisDirector::SetupArms(ACharacter* C)
@@ -971,7 +1243,7 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 {
 	if (!Arms) return;
 	// con dardos y las manos libres, la pistola sube a la vista; si no, baja y se oculta
-	const bool bWant = Darts > 0 && !bCine && !bDone && !bBinoculars && !bKeypad && !Dragged && !bMenu && !bReport && !bChoice;
+	const bool bWant = Darts > 0 && !bCine && !bDone && !bBinoculars && !bKeypad && !Dragged && !bMenu && !bReport && !bChoice && !bHiding;
 	ArmsShow = FMath::FInterpConstantTo(ArmsShow, bWant ? 1.0f : 0.0f, DeltaSeconds, 3.5f);
 	const bool bVis = ArmsShow > 0.01f;
 	if (Arms->IsVisible() != bVis) Arms->SetVisibility(bVis, true);
@@ -1233,7 +1505,13 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	const float Now = GetWorld()->GetTimeSeconds();
 	const TObjectPtr<ATarsisGuard> K(G);
 	float& Next = VoiceNext.FindOrAdd(K, 0.0f);
-	if (Now < Next) return;   // no repite frase enseguida (al cambiar de estado varias veces seguidas)
+	// no repite frase enseguida (al cambiar de estado varias veces seguidas), salvo las que importan: el empujón,
+	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
+	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde");
+	FString& Prev = VoicePrev.FindOrAdd(K);
+	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
+	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
+	Prev = Key;
 	Next = Now + 3.5f;
 	FString Who = G->bTowerSentry ? TEXT("centinela") : G->GuardName.ToLower();
 	USoundBase* S = Sfx(FString::Printf(TEXT("voz_%s_%s"), *Who, *Key));
@@ -1242,6 +1520,8 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	if (bRadio && RadioSnd) UGameplayStatics::PlaySound2D(this, RadioSnd, 0.35f);   // la radio la oyes tú también, lejos o no
 	LastVoice = Who + TEXT("_") + Key;
 	++VoicesPlayed;
+	VoiceLog.Add(LastVoice);
+	if (VoiceLog.Num() > 30) VoiceLog.RemoveAt(0);
 	if (!bSubtitles) return;
 	// texto en ASCII (la fuente del HUD no lleva tildes)
 	FString T;
@@ -1251,6 +1531,10 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("alto")) T = TEXT("Alto! Quieto ahi!");
 	else if (Key == TEXT("nadie")) T = TEXT("Aqui no hay nadie.");
 	else if (Key == TEXT("suelo")) T = TEXT("Central, aqui patio. He encontrado a uno en el suelo.");
+	else if (Key == TEXT("puerta")) T = TEXT("Esta puerta estaba cerrada.");
+	else if (Key == TEXT("luz")) T = TEXT("Y la luz?");
+	else if (Key == TEXT("donde")) T = TEXT("Donde se ha metido? No contesta.");
+	else if (Key == TEXT("eh")) T = TEXT("Eh! Pero que...?");
 	else T = Key;
 	const FString Name = G->bTowerSentry ? FString(TEXT("CENTINELA")) : G->GuardName.ToUpper();
 	Subtitle = bRadio ? FString::Printf(TEXT("%s (RADIO): \"%s\""), *Name, *T)
@@ -1406,6 +1690,7 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 		}
 		if (!Best) continue;
 		Best->HearNoise(G->KnockLoc);
+		GuardSay(Best, TEXT("donde"));
 		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Best->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 		ShowMessage(FString::Printf(TEXT("RADIO: \"%s, responde.\" ... Nada.\n%s va a ver que pasa donde le toca la ronda."),
 			*G->GuardName, *Best->GuardName), 4.5f);
@@ -1418,6 +1703,18 @@ void ATarsisDirector::CutPower()
 {
 	bPowerOff = true;
 	bPowerCutOnce = true;
+	// el guardia de suelo más cercano se queja: «¿y la luz?»
+	{
+		ATarsisGuard* Near = nullptr;
+		float ND = TNumericLimits<float>::Max();
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			if (It->bTowerSentry || It->bAlly || It->State == ETarsisGuardState::Down) continue;
+			const float Dd = FVector::Dist(It->GetActorLocation(), GeneratorLoc);
+			if (Dd < ND) { ND = Dd; Near = *It; }
+		}
+		if (Near) GuardSay(Near, TEXT("luz"));
+	}
 	PowerT = 60.0f;
 	RepairT = 0.0f;
 	OffLights.Reset();
@@ -1765,6 +2062,7 @@ bool ATarsisDirector::LoadCheckpoint()
 	UTarsisSave* S = Cast<UTarsisSave>(UGameplayStatics::LoadGameFromSlot(TEXT("TarsisPartida"), 0));
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!S || !P) return false;
+	ExitHide();
 	StopDrag();
 	bKeypad = false;
 	if (bBinoculars) ToggleBinoculars();

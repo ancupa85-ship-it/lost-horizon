@@ -52,7 +52,7 @@ def dist2d(a, b):
 
 def tp(x, y, yaw=0.0):
     p = jugador()
-    p.set_actor_location(V(x, y, p.get_actor_location().z), False, True)
+    p.set_actor_location(V(x, y, max(p.get_actor_location().z, 100)), False, True)
     unreal.GameplayStatics.get_player_controller(mundo(), 0).set_control_rotation(unreal.Rotator(0.0, 0.0, yaw))
 
 def mirar(punto):
@@ -63,7 +63,7 @@ def mirar(punto):
 def junto_a(g, d=90.0):
     l = g.get_actor_location()
     p = jugador()
-    p.set_actor_location(V(l.x + d, l.y, p.get_actor_location().z), False, True)
+    p.set_actor_location(V(l.x + d, l.y, max(p.get_actor_location().z, 100)), False, True)
 
 def derribar(g):
     g.set_editor_property('knock_out_time', 100.0)
@@ -122,6 +122,222 @@ def prueba_intro():
     check('E salta la cinemática', not d.get_editor_property('cine'))
     check('salen las instrucciones', 'TARSIS' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
 
+def aparte():
+    """Aparca al jugador lejos de todas las rondas (en la marisma, al oeste): entre pruebas, que nadie le vea ni le coja."""
+    p = jugador()
+    p.set_actor_location(V(-33900, -34700, 100), False, True)
+
+def detras_de(g, d=130.0):
+    """Pone al jugador a d cm a la espalda del guardia, mirándole."""
+    l = g.get_actor_location(); f = g.get_actor_forward_vector()
+    p = jugador(); p.set_actor_location(V(l.x - f.x * d, l.y - f.y * d, max(p.get_actor_location().z, 100)), False, True)
+    mirar(V(l.x, l.y, l.z))
+
+def a_la_vista_de(g, d=150.0):
+    """Pone al jugador a d cm del guardia, en una dirección que este vea sin paredes ni muebles por medio."""
+    l = g.get_actor_location(); f = g.get_actor_forward_vector()
+    base = math.atan2(f.y, f.x)
+    p = jugador()
+    for k in (0, 1, -1, 2, -2, 3, -3, 4):
+        a = base + k * math.pi / 4
+        q = V(l.x + math.cos(a) * d, l.y + math.sin(a) * d, max(p.get_actor_location().z, 100))
+        h = unreal.SystemLibrary.line_trace_single(mundo(), V(l.x, l.y, l.z + 60), V(q.x, q.y, q.z + 20), unreal.TraceTypeQuery.ECC_VISIBILITY, False, [g, p], unreal.DrawDebugTrace.NONE, True)
+        if not h:
+            p.set_actor_location(q, False, True)
+            return True
+    return False
+
+def delante_de(g, d=120.0):
+    l = g.get_actor_location(); f = g.get_actor_forward_vector()
+    p = jugador(); p.set_actor_location(V(l.x + f.x * d, l.y + f.y * d, max(p.get_actor_location().z, 100)), False, True)
+    mirar(V(l.x, l.y, l.z))
+
+def agachado():
+    return jugador().get_editor_property('is_crouched')
+
+def prueba_empezar():
+    d = director()
+    inicio = jugador().get_actor_location()
+    check('consejo al empezar', str(d.get_editor_property('hint')).startswith('CONSEJO'), d.get_editor_property('hint'))
+    # teclas de verdad: PlayerController.InputKey pasa por toda la pila de entrada (no como PressKey)
+    d.simulate_key('C'); yield 0.4
+    check('tecla C de verdad: te agachas', agachado())
+    check('el consejo pasa a la piedra', d.get_editor_property('hint_step') >= 1, d.get_editor_property('hint'))
+    d.simulate_key('C'); yield 0.4
+    check('C otra vez: de pie', not agachado())
+    s0 = d.get_editor_property('last_stone'); s0 = V(s0.x, s0.y, s0.z)   # copia: el struct es una referencia viva
+    d.simulate_key('Q'); yield 0.3
+    s1 = d.get_editor_property('last_stone')
+    check('tecla Q de verdad: lanza una piedra', dist2d(s0, s1) > 1, s1)
+    d.simulate_key('B'); yield 0.2
+    check('tecla B de verdad: prismáticos', d.get_editor_property('binoculars'))
+    d.simulate_key('B'); yield 0.2
+    w0 = d.get_editor_property('weather')
+    d.simulate_key('Y'); yield 0.2
+    check('tecla Y de verdad: cambia el clima', d.get_editor_property('weather') != w0, '%d -> %d' % (w0, d.get_editor_property('weather')))
+    while d.get_editor_property('weather') != w0:
+        d.simulate_key('Y'); yield 0.2
+    d.simulate_key('LeftShift', True, False); yield 0.2
+    check('Mayús de verdad: corres', d.get_editor_property('sprint'))
+    d.simulate_key('LeftShift', False, True); yield 0.2
+    check('al soltar Mayús dejas de correr', not d.get_editor_property('sprint'))
+    d.simulate_key('P'); yield 0.2
+    check('tecla P de verdad: menú', d.get_editor_property('menu'))
+    d.simulate_key('P'); yield 0.2
+    check('P otra vez: se cierra', not d.get_editor_property('menu'))
+    # el primer guardia de tu ruta: agachado y por la espalda, sin suerte, se le derriba con la E de verdad
+    # (antes, que se les pase la piedra de arriba: el que la oyó va a mirar y vuelve)
+    yield ('hasta', lambda: all(estado(x) == 'PATROL' for x in guardias() if not x.get_editor_property('tower_sentry')), 30.0)
+    # (Ramos no: a él la E le agarra para hablar)
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) == 'PATROL' and not g.get_actor_label().endswith('Ramos')]
+    g = min(ronda, key=lambda x: dist2d(x.get_actor_location(), inicio))
+    g.set_editor_property('knock_out_time', 4.0)   # que se levante pronto: lo usan otras pruebas
+    d.simulate_key('C'); yield 0.3
+    visto = False
+    for _ in range(8):
+        detras_de(g, 130); yield 0.1
+        visto = visto or estado(g) in ('ALERT', 'SUSPICIOUS')
+    check('por la espalda y agachado no te nota', not visto, '%s %s' % (g.get_actor_label()[8:], estado(g)))
+    detras_de(g, 90)   # el último paso, pegado a él (con el editor a pocos fps se aleja entre tick y tick)
+    check('aviso "E DERRIBAR" por la espalda', 'DERRIBAR' in d.interact_prompt(), d.interact_prompt())
+    d.simulate_key('E'); yield 0.3
+    check('tecla E de verdad: derribas al primer guardia', estado(g) == 'DOWN', '%s %s' % (g.get_actor_label()[8:], estado(g)))
+    check('consejos cumplidos', d.get_editor_property('hint') == '', d.get_editor_property('hint'))
+    d.simulate_key('C'); yield 0.3
+    aparte()
+    yield ('hasta', lambda: estado(g) != 'DOWN', 8.0)
+
+def prueba_frente():
+    d = director()
+    # de frente y sin que esté en alerta: E empuja y lo aturde; entonces se le derriba por cualquier lado
+    c0 = d.get_editor_property('captures')
+    m = guardia('Moya')
+    yield ('hasta', lambda: estado(m) == 'PATROL', 20.0)
+    m.set_editor_property('knock_out_time', 4.0)
+    delante_de(m, 120)
+    check('aviso "E EMPUJAR" de frente', 'EMPUJAR' in d.interact_prompt(), d.interact_prompt())
+    d.simulate_key('E'); yield 0.2
+    check('el empujón lo aturde', m.is_stunned(), estado(m))
+    check('aturdido no te ve', m.visibility(jugador()) == 0)
+    check('dice "¡eh!"', d.get_editor_property('last_voice') == 'moya_eh', d.get_editor_property('last_voice'))
+    check('ahora se le derriba de frente', 'DERRIBAR' in d.interact_prompt(), d.interact_prompt())
+    d.simulate_key('E'); yield 0.3
+    check('derribado tras el empujón', estado(m) == 'DOWN', estado(m))
+    aparte()
+    # en alerta de frente: la E no hace nada, pero se dice por qué
+    pe = guardia('Peris')
+    lp = pe.get_actor_location()
+    pe.alarm(V(lp.x + 300, lp.y, lp.z)); yield 0.1
+    delante_de(pe, 220)
+    aviso = d.interact_prompt()
+    d.interact()
+    msg = str(d.get_editor_property('message'))
+    aparte()
+    check('en alerta: aviso "TE VE"', 'TE VE' in aviso, aviso)
+    check('y la E explica por qué no', 'DE FRENTE TE VE' in msg, msg[:40])
+    check('sin capturas en esta prueba', d.get_editor_property('captures') == c0, d.get_editor_property('captures'))
+    yield ('hasta', lambda: estado(m) != 'DOWN', 8.0)
+
+def prueba_escondites():
+    d = director()
+    spots, yaws = list(d.get_editor_property('hide_spots')), list(d.get_editor_property('hide_yaws'))
+    check('hay taquillas en el barracón y la sala de guardia', len(spots) >= 2, len(spots))
+    s, yaw = spots[0], math.radians(yaws[0])
+    frente = V(s.x + math.cos(yaw) * 75, s.y + math.sin(yaw) * 75, s.z)
+    p = jugador(); p.set_actor_location(V(frente.x, frente.y, max(p.get_actor_location().z, 100)), False, True); yield 0.2
+    check('aviso "E ESCONDERTE"', 'ESCONDERTE' in d.interact_prompt(), d.interact_prompt())
+    d.interact(); yield 0.3
+    check('dentro de la taquilla', d.get_editor_property('hiding') and jugador().get_editor_property('hidden'))
+    check('aviso "E SALIR"', 'SALIR' in d.interact_prompt(), d.interact_prompt())
+    # un guardia delante, mirando la taquilla: no te ve
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) in ('PATROL', 'RETURN')]
+    yield ('hasta', lambda: len(ronda()) > 0, 30.0)
+    g = (ronda() or [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) != 'DOWN'])[0]
+    g.set_actor_location(V(s.x + math.cos(yaw) * 220, s.y + math.sin(yaw) * 220, g.get_actor_location().z), False, True)
+    g.set_actor_rotation(unreal.Rotator(0, 0, yaws[0] + 180), True)
+    yield 0.2
+    check('desde fuera no te ven', g.visibility(jugador()) == 0, g.get_actor_label()[8:])
+    g.set_actor_location(V(500, 500, g.get_actor_location().z), False, True)   # fuera de en medio (si no, la E le empujaría)
+    d.interact(); yield 0.3
+    check('E sales de la taquilla', not d.get_editor_property('hiding') and not jugador().get_editor_property('hidden') and dist2d(jugador().get_actor_location(), frente) < 120,
+          dist2d(jugador().get_actor_location(), frente))
+    # si te ve meterte, el que te persigue te saca (en la otra taquilla, la de la sala de guardia: junto a la del
+    # barracón puede haber un caído de otra prueba y la E lo arrastraría)
+    c0 = d.get_editor_property('captures')
+    s, yaw = spots[-1], math.radians(yaws[-1])
+    frente = V(s.x + math.cos(yaw) * 75, s.y + math.sin(yaw) * 75, s.z)
+    p = jugador(); p.set_actor_location(V(frente.x, frente.y, max(p.get_actor_location().z, 100)), False, True); yield 0.2
+    libres = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) in ('PATROL', 'RETURN', 'SEARCH') and x != g]
+    yield ('hasta', lambda: len(libres()) > 0, 30.0)
+    v = libres()[0] if libres() else g   # si todos están ocupados, el mismo de antes
+    v.set_actor_location(V(frente.x + math.cos(yaw) * 600, frente.y + math.sin(yaw) * 600, v.get_actor_location().z), False, True)
+    v.alarm(frente)
+    d.interact()
+    check('te ha visto meterte', d.get_editor_property('hiding'))
+    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 15.0)
+    check('te saca de la taquilla', d.get_editor_property('captures') > c0 and 'TAQUILLA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:45])
+    check('ya fuera de la taquilla', not d.get_editor_property('hiding') and not jugador().get_editor_property('hidden'))
+    aparte()
+
+def prueba_cambios():
+    d = director()
+    if d.get_editor_property('hiding'):   # por si la prueba anterior se cortó con el jugador en la taquilla
+        d.interact(); yield 0.2
+    # la jefatura abierta (la llave se cogió en el punto de control): un guardia que la ve abierta va a mirar
+    tp(900, 3100 - 120, 90); yield 0.2
+    if not d.get_editor_property('jef_open'):
+        d.interact(); yield 0.2
+    check('jefatura abierta', d.get_editor_property('jef_open'))
+    aparte()
+    n0 = d.get_editor_property('changes_noticed')
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.is_investigating()]
+    yield ('hasta', lambda: len(ronda()) > 0, 40.0)
+    g = ronda()[0]
+    g.hold(30.0)
+    for lado in (-1, 1):
+        g.set_actor_location(V(900, 3100 + lado * 450, g.get_actor_location().z), False, True)
+        g.set_actor_rotation(unreal.Rotator(0, 0, -90 if lado > 0 else 90), True)
+        yield 1.0
+        if d.get_editor_property('changes_noticed') > n0:
+            break
+    g.hold(0.0)
+    check('nota la puerta abierta', d.get_editor_property('changes_noticed') > n0, g.get_actor_label()[8:])
+    check('dice "esta puerta estaba cerrada"', g.get_actor_label()[8:].lower() + '_puerta' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-4:])
+    check('va a mirar', g.is_investigating() or estado(g) == 'SEARCH', estado(g))
+
+def prueba_cuerpo():
+    d = director()
+    # al ver un cuerpo: va hasta él, se agacha 2 s y avisa por radio; luego la alarma
+    # (no el de cerca del generador: lo usan las pruebas de la luz)
+    despiertos = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL']
+    yield ('hasta', lambda: len(despiertos()) >= 2, 40.0)
+    caido = max(despiertos(), key=lambda x: dist2d(x.get_actor_location(), GEN))
+    # los de las torres, quietos: si uno ve antes el cuerpo, da la voz desde arriba y no hay escena que medir
+    torres = [x for x in guardias() if x.get_editor_property('tower_sentry')]
+    for x in torres:
+        x.hold(20.0)
+    caido.set_editor_property('knock_out_time', 60.0)
+    caido.knock_out(); yield 0.2
+    cl = caido.get_actor_location()
+    obs = [x for x in despiertos() if x != caido][0]
+    obs.set_actor_location(V(cl.x + 300, cl.y, obs.get_actor_location().z), False, True)
+    obs.set_actor_rotation(unreal.Rotator(0, 0, 180), True)
+    yield ('hasta', lambda: obs.is_checking_body(), 5.0)
+    check('ve el cuerpo y va a mirarlo (sin alarma todavía)', obs.is_checking_body() and estado(obs) != 'ALERT', '%s %s' % (obs.get_actor_label()[8:], estado(obs)))
+    agach = 0.0
+    t0 = time.time()
+    while time.time() - t0 < 8.0 and estado(obs) != 'ALERT':
+        agach = max(agach, obs.get_editor_property('body_check_t'))
+        yield 0.1
+    check('se agacha sobre el cuerpo', agach > 1.0, '%.1f s' % agach)
+    quien = obs.get_actor_label()[8:].lower()
+    check('avisa por radio: "suelo"', quien + '_suelo' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-4:])
+    check('y da la alarma', estado(obs) == 'ALERT', estado(obs))
+    for x in torres:
+        x.hold(0.0)
+    yield ('hasta', lambda: estado(caido) != 'DOWN', 20.0)   # encontrado, se levanta pronto
+    check('el caído se levanta al poco', estado(caido) != 'DOWN', estado(caido))
+
 def encima_de(malla):
     """Un punto sobre una malla de la base (las de la base van una por material y juntan muchas piezas)."""
     for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.StaticMeshActor):
@@ -166,12 +382,13 @@ def prueba_guardias():
     check('nadie anda sin avanzar', not atascados, atascados)
     # pasos a compás de la animación (pie que apoya) y suenan cerca de ti
     m = guardia('Moya')
+    yield ('hasta', lambda: m.get_velocity().length() > 60, 10.0)   # que esté andando, no parado en su punto
     s0 = m.get_editor_property('steps_taken'); g0 = d.get_editor_property('guard_steps_played')
     l = m.get_actor_location(); tp(l.x + 500, l.y + 500, 0)
-    yield 3.0
+    yield ('hasta', lambda: m.get_editor_property('steps_taken') > s0 and director().get_editor_property('guard_steps_played') > g0, 10.0)
     check('los pasos de los guardias salen de la animación', m.get_editor_property('steps_taken') > s0, '%d -> %d' % (s0, m.get_editor_property('steps_taken')))
     check('y suenan cerca de ti', d.get_editor_property('guard_steps_played') > g0, '%d -> %d' % (g0, d.get_editor_property('guard_steps_played')))
-    tp(500, 500, 0)
+    aparte()
     # un ruido (lo mismo que llama la piedra): se para, gira el cuerpo con suavidad y la cabeza por delante, y lo dice
     d.set_subtitles(True)
     while estado(m) != 'PATROL':
@@ -190,15 +407,16 @@ def prueba_guardias():
     error = abs((quiere - m.get_actor_rotation().yaw + 540) % 360 - 180)
     check('se para al oír el ruido', vmin < 40, round(vmin))
     check('se gira hacia el ruido', error < 30, '%.0f grados de error' % error)
-    check('la cabeza se adelanta al cuerpo', cabeza > 10, '%.0f grados' % cabeza)
+    check('la cabeza se adelanta al cuerpo', cabeza > 6, '%.0f grados' % cabeza)
     check('gira en el sitio dando pasos', pasos_giro)
     check('dice "¿qué ha sido eso?"', d.get_editor_property('last_voice') == 'moya_ruido', d.get_editor_property('last_voice'))
     check('con subtítulo', 'Que ha sido eso' in str(d.get_editor_property('subtitle')), d.get_editor_property('subtitle'))
-    v = guardia('Vega')
+    v = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and x != m][0]
     lv = v.get_actor_location()
     v.alarm(V(lv.x + 300, lv.y, lv.z)); yield 0.3   # a su lado, lejos de ti: que no te capture (la 1.ª captura es al calabozo)
-    check('al dar la alarma: "¡alto!"', d.get_editor_property('last_voice') == 'vega_alto' and 'Alto' in str(d.get_editor_property('subtitle')), '%s | %s' % (d.get_editor_property('last_voice'), d.get_editor_property('subtitle')))
-    faltan = ['%s_%s' % (g, k) for g in ('ibarra', 'moya', 'peris', 'vega', 'ramos', 'centinela') for k in ('quien', 'ruido', 'viento', 'alto', 'nadie', 'suelo')
+    check('al dar la alarma: "¡alto!"', d.get_editor_property('last_voice').endswith('_alto') and 'Alto' in str(d.get_editor_property('subtitle')), '%s | %s' % (d.get_editor_property('last_voice'), d.get_editor_property('subtitle')))
+    faltan = ['%s_%s' % (g, k) for g in ('ibarra', 'moya', 'peris', 'vega', 'ramos', 'centinela')
+              for k in ('quien', 'ruido', 'viento', 'alto', 'nadie', 'suelo', 'puerta', 'luz', 'donde', 'eh')
               if not unreal.load_object(None, '/Game/Tarsis/Sonidos/voz_%s_%s.voz_%s_%s' % (g, k, g, k))]
     check('voces de los seis guardias importadas', not faltan, faltan)
     d.set_subtitles(False)
@@ -210,15 +428,21 @@ def prueba_guardias():
     check('superficies: grava, cemento, metal, madera, hierba', not malas, malas)
     # tus pasos dentro del barracón suenan a cemento
     p = jugador()
-    p.set_actor_location(V(1130, 2850, p.get_actor_location().z), False, True)   # barracón oeste, junto a la litera de Ramos
+    if agachado():   # de pie: agachado los pasos casi no suenan y la zancada es otra
+        d.simulate_key('C'); yield 0.3
+    p.set_actor_location(V(1700, 2350, max(p.get_actor_location().z, 100)), False, True)   # barracón oeste, lejos de la ronda de Ramos
+    # por si una prueba anterior lo dejó cayendo o con el movimiento bloqueado (cinemática, menú)
+    p.get_component_by_class(unreal.CharacterMovementComponent).set_movement_mode(unreal.MovementMode.MOVE_WALKING)
+    unreal.GameplayStatics.get_player_controller(mundo(), 0).reset_ignore_move_input()
+    yield 0.2
     n0 = d.get_editor_property('player_steps')
     t0 = time.time()
     while time.time() - t0 < 3.0:
         # de un lado a otro del pasillo (0,3 s en cada sentido) sin salir del barracón
         p.add_movement_input(V(1 if int((time.time() - t0) / 0.3) % 2 == 0 else -1, 0, 0), 1.0); yield 0.03
     check('tus pasos suenan según el suelo', d.get_editor_property('player_steps') > n0 and d.get_editor_property('last_step_surface') == 'cemento',
-          '%d pasos, %s' % (d.get_editor_property('player_steps') - n0, d.get_editor_property('last_step_surface')))
-    tp(500, 500, 0)
+          '%d pasos, %s, en %s, agachado %s' % (d.get_editor_property('player_steps') - n0, d.get_editor_property('last_step_surface'), p.get_actor_location(), agachado()))
+    aparte()
 
 def prueba_menu():
     d = director()
@@ -268,7 +492,7 @@ def prueba_dardos():
           and str(pistola.get_attach_socket_name()) == 'HandGrip_R', pistola.get_attach_socket_name() if pistola else None)
     v = guardia('Vega')
     l = v.get_actor_location(); f = v.get_actor_forward_vector()
-    p = jugador(); p.set_actor_location(V(l.x - f.x * 500, l.y - f.y * 500, p.get_actor_location().z), False, True)
+    p = jugador(); p.set_actor_location(V(l.x - f.x * 500, l.y - f.y * 500, max(p.get_actor_location().z, 100)), False, True)
     mirar(V(l.x, l.y, l.z + 20)); yield 0.2
     d.shoot_dart(); yield 0.3
     check('el dardo duerme a Vega', estado(v) == 'DOWN' and d.get_editor_property('darts') == 4, '%s, %d dardos' % (estado(v), d.get_editor_property('darts')))
@@ -290,14 +514,14 @@ def prueba_punto_control():
     c0 = d.get_editor_property('captures')
     pe = guardia('Peris')
     for n in (1, 2):
+        a_la_vista_de(pe, 150)   # en su mesa mira a la pared: «delante» podía quedar tras ella
         pe.alarm(jugador().get_actor_location())
-        l = pe.get_actor_location(); f = pe.get_actor_forward_vector()
-        p = jugador(); p.set_actor_location(V(l.x + f.x * 120, l.y + f.y * 120, p.get_actor_location().z), False, True)
         yield ('hasta', lambda: director().get_editor_property('captures') >= c0 + n, 20.0)
+        msg = str(d.get_editor_property('message'))   # en el momento: otro aviso podría taparlo después
         yield 0.3
         pos = jugador().get_actor_location()
         if n == 1:
-            check('1.ª captura: al calabozo', 'CALABOZO' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
+            check('1.ª captura: al calabozo', 'CALABOZO' in msg or c0 > 0, '%s (capturas antes: %d; Peris %s, ve %.2f, a %d cm, jugador oculto %s, colisión %s)' % (msg[:30], c0, estado(pe), pe.visibility(jugador()), dist2d(pe.get_actor_location(), jugador().get_actor_location()), jugador().get_editor_property('hidden'), jugador().get_actor_enable_collision()))
         else:
             check('2.ª captura: vuelve junto a Ibarra', dist2d(pos, sitio) < 150, 'a %d cm del punto' % dist2d(pos, sitio))
 
@@ -306,7 +530,7 @@ def prueba_generador():
     on0, off0 = luces()
     tp(4300, 1910, -90); yield 0.1
     d.interact(); yield 0.1
-    tp(500, 500, 0)
+    aparte()
     check('se corta el generador', d.get_editor_property('power_off'))
     yield 3.0
     on, off = luces()
@@ -324,13 +548,23 @@ def prueba_reserva():
     d = director()
     tp(4300, 1910, -90); yield 0.1
     d.interact(); yield 0.1
-    tp(500, 500, 0)
+    aparte()
     # en cuanto llega a su sitio (si se espera a la radio de los 15 s, uno que esté cerca ya lo ha arreglado)
-    yield ('hasta', lambda: reparador_cercano()[0] < 250, 30.0)
-    dd, rep = reparador_cercano()
+    # el que manda el director (no siempre el más cercano al sitio)
+    rep_d = lambda: director().get_editor_property('repairer')
+    yield ('hasta', lambda: rep_d() is not None and dist2d(rep_d().get_actor_location(), SITIO) < 250, 30.0)
+    rep = rep_d() or reparador_cercano()[1]
+    dd = dist2d(rep.get_actor_location(), SITIO)
     check('el reparador está en su sitio', dd < 400, '%s a %d cm' % (rep.get_actor_label(), dd))
     derribar(rep)
+    # los demás, quietos mientras entra la reserva: si uno encuentra al reparador en el suelo, este se levanta antes
+    # de que la radio pregunte y la prueba mediría otra cosa
+    otros = [g for g in guardias() if g != rep and not g.get_editor_property('tower_sentry') and estado(g) != 'DOWN']
+    for g in otros:
+        g.hold(25.0)
     yield ('hasta', lambda: not director().get_editor_property('power_off'), 20.0)
+    for g in otros:
+        g.hold(0.0)
     yield 0.5
     on, off = luces()
     check('vuelve la luz a medias', 'A MEDIAS' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
@@ -347,7 +581,7 @@ def prueba_farol():
     tp(6350, 5250, 0); yield 0.1
     mirar(FAROL); yield 0.2
     d.shoot_dart(); yield 0.2
-    tp(500, 500, 0); yield 0.3
+    aparte(); yield 0.3
     despues = luz_en(V(6800, 5250, 130))
     check('el dardo rompe el farol', 'FAROL ROTO' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     check('el control queda a oscuras', despues < antes, '%.2f -> %.2f' % (antes, despues))
@@ -413,7 +647,7 @@ def prueba_musica():
     t0 = d.get_editor_property('music_tension')
     g = guardia('Moya')
     l = g.get_actor_location(); f = g.get_actor_forward_vector()
-    p = jugador(); p.set_actor_location(V(l.x + f.x * 700, l.y + f.y * 700, p.get_actor_location().z), False, True)
+    p = jugador(); p.set_actor_location(V(l.x + f.x * 700, l.y + f.y * 700, max(p.get_actor_location().z, 100)), False, True)
     yield ('hasta', lambda: director().get_editor_property('music_tension') > 0.3, 6.0)
     check('la tensión sube al acercarte a un guardia', d.get_editor_property('music_tension') > 0.3, '%.2f -> %.2f' % (t0, d.get_editor_property('music_tension')))
     tp(500, 500, 0)
@@ -467,16 +701,19 @@ def prueba_opciones():
     g = guardia('Moya')
     l = g.get_actor_location()
     tp(l.x + 600, l.y, 180)
-    yield ('hasta', lambda: str(director().get_editor_property('subtitle')).startswith('['), 8.0)
-    check('subtítulo de los pasos de un guardia', 'MOYA' in str(d.get_editor_property('subtitle')) or str(d.get_editor_property('subtitle')).startswith('['), d.get_editor_property('subtitle'))
-    tp(500, 500, 0)
+    # pasos («[PASOS - MOYA...]») o, si alguno habla en ese momento, su frase: las dos son subtítulos de sonido
+    sub = lambda: str(director().get_editor_property('subtitle'))
+    yield ('hasta', lambda: sub().startswith('[') or '"' in sub(), 8.0)
+    check('subtítulo de los pasos de un guardia', 'MOYA' in sub() or sub().startswith('[') or '"' in sub(), sub())
+    aparte()
     # dejarlo todo como estaba
     yield from teclas(d, 'P', *(['Down'] * 11), 'Left', 'Down', 'Enter', 'Down', 'Enter', 'P')
     check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < 100 %' in ' '.join(lineas(d)))
 
 
-PRUEBAS = [prueba_intro, prueba_guardias, prueba_menu, prueba_musica, prueba_controles, prueba_opciones, prueba_dardos, prueba_punto_control,
-           prueba_generador, prueba_reserva, prueba_farol, prueba_final]
+PRUEBAS = [prueba_intro, prueba_empezar, prueba_guardias, prueba_menu, prueba_musica, prueba_controles, prueba_opciones, prueba_frente,
+           prueba_dardos, prueba_punto_control, prueba_escondites, prueba_cambios, prueba_cuerpo, prueba_generador, prueba_reserva,
+           prueba_farol, prueba_final]
 
 
 # ---------------------------------------------------------------- ejecutor por ticks

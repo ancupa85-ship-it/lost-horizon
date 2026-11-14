@@ -21,6 +21,11 @@ FRASES = {
     'alto': ('¡Alto! ¡Quieto ahí!', False),
     'nadie': ('Aquí no hay nadie.', False),
     'suelo': ('Central, aquí patio. He encontrado a uno en el suelo.', True),
+    # cambios que notan, compañero que no contesta y el empujón
+    'puerta': ('Esta puerta estaba cerrada.', False),
+    'luz': ('¿Y la luz?', False),
+    'donde': ('¿Dónde se ha metido? No contesta.', False),
+    'eh': ('¡Eh! ¿Pero qué...?', False),
 }
 # guardia -> (tono, velocidad): un sargento grave y lento, un cuartelero joven y deprisa...
 GUARDIAS = {

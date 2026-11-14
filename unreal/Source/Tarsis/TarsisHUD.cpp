@@ -53,6 +53,7 @@ void ATarsisHUD::DrawHUD()
 		DrawMenu(D);
 		return;
 	}
+	DrawHiding(D);
 	DrawBinoculars(D);
 	DrawMarked();
 	DrawHeard(D);
@@ -61,6 +62,7 @@ void ATarsisHUD::DrawHUD()
 	DrawGuardMarks();
 	DrawMessage(D);
 	DrawObjective(D);
+	DrawHint(D);
 	DrawPrompt(D);
 	DrawKeypad(D);
 	DrawExtras(D);
@@ -500,4 +502,37 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 			Text(Lines[i], X0 + 14.0f * S, Y0 + 8.0f * S + (i + 1) * LH, FLinearColor(0.75f, 1.0f, 0.8f, A), 0.72f * S, false);
 		}
 	}
+}
+
+void ATarsisHUD::DrawHint(ATarsisDirector* D)
+{
+	// consejo del principio, bajo el objetivo (ATarsisDirector::HintTick)
+	if (!D || D->Hint.IsEmpty() || D->bMenu) return;
+	const float S = UiScale();
+	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+	float W = 300.0f * S, H = 0.0f;
+	if (F) GetTextSize(D->Hint, W, H, F, 0.8f * S);
+	const float X = 32.0f * S, Y = (D->SideObjective().IsEmpty() ? 98.0f : 124.0f) * S;
+	Panel(X, Y, W + 28.0f * S, 34.0f * S, FLinearColor(0.05f, 0.08f, 0.02f, 0.55f));
+	Text(D->Hint, X + 14.0f * S, Y + 7.0f * S, FLinearColor(0.85f, 1.0f, 0.6f), 0.8f * S);
+}
+
+void ATarsisHUD::DrawHiding(ATarsisDirector* D)
+{
+	// dentro de la taquilla: todo a oscuras salvo las rendijas de la puerta, a la altura de los ojos
+	if (!D || !D->bHiding) return;
+	const float X = Canvas->ClipX, Y = Canvas->ClipY;
+	const FLinearColor Dark(0.0f, 0.0f, 0.0f, 0.97f);
+	const float Top = Y * 0.36f, SlitH = Y * 0.035f, Gap = Y * 0.03f, L = X * 0.18f, R = X * 0.82f;
+	Panel(0.0f, 0.0f, X, Top, Dark);
+	float Yc = Top;
+	for (int32 i = 0; i < 4; ++i)
+	{
+		Panel(0.0f, Yc, L, SlitH, Dark);
+		Panel(R, Yc, X - R, SlitH, Dark);
+		Yc += SlitH;
+		Panel(0.0f, Yc, X, Gap, Dark);
+		Yc += Gap;
+	}
+	Panel(0.0f, Yc, X, Y - Yc, Dark);
 }

@@ -233,11 +233,17 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 		break;
 	}
 	if (bRepairing && RepairLookT > 0.0f) Want = Toward(RepairLook);
+	if (StunT > 0.0f) { Want = 25.0f * FMath::Sin(StateT * 7.0f); WantLean = -12.0f; }   // tambaleándose hacia atrás
+	if (BodyTarget)
+	{
+		Want = Toward(BodyTarget->GetActorLocation());
+		if (BodyCheckT > 0.0f) WantLean = 30.0f;   // agachado sobre el cuerpo
+	}
 	if (State == ETarsisGuardState::Down) { Want = 0.0f; LookYaw = 0.0f; Lean = 0.0f; }
 	LookTarget = FMath::Clamp(Want, -75.0f, 75.0f);
 	LookYaw = FMath::FInterpTo(LookYaw, LookTarget, DeltaSeconds, 4.0f);
 	Lean = FMath::FInterpTo(Lean, WantLean, DeltaSeconds, 2.5f);
-	if (FMath::Abs(LookYaw) < 0.2f && Lean < 0.2f) return;
+	if (FMath::Abs(LookYaw) < 0.2f && FMath::Abs(Lean) < 0.2f) return;
 	// ejes del guardia en el espacio de la malla (que va girada respecto al actor)
 	const FTransform CT = Pose->GetComponentTransform();
 	const FVector Up = CT.InverseTransformVectorNoScale(FVector::UpVector);
@@ -248,7 +254,7 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 		const FQuat Cur = Pose->GetBoneRotationByName(Bone, EBoneSpaces::ComponentSpace).Quaternion();
 		Pose->SetBoneRotationByName(Bone, (Q * Cur).Rotator(), EBoneSpaces::ComponentSpace);
 	};
-	if (Lean > 0.2f) Turn(SpineBone, FQuat(Right, FMath::DegreesToRadians(Lean)));
+	if (FMath::Abs(Lean) > 0.2f) Turn(SpineBone, FQuat(Right, FMath::DegreesToRadians(Lean)));
 	Turn(NeckBone, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.4f)));
 	Turn(HeadBone, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.6f)));
 }
@@ -306,6 +312,8 @@ void ATarsisGuard::BeginPlay()
 void ATarsisGuard::Alarm(const FVector& Where)
 {
 	if (bTowerSentry || State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down) return;
+	BodyTarget = nullptr;   // una alarma (radio, torre) manda más que ir a mirar un cuerpo
+	BodyCheckT = 0.0f;
 	LastSeen = Where;
 	UnseenT = 0.0f;
 	Meter = 1.0f;
@@ -366,6 +374,8 @@ bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
 {
 	if (!Who || bTowerSentry || bAlly || State == ETarsisGuardState::Down) return false;   // a un aliado (Ramos) no se le derriba por error
 	const FVector D = Who->GetActorLocation() - GetActorLocation();
+	// aturdido por un empujón: se le derriba por cualquier lado
+	if (StunT > 0.0f) return D.Size2D() <= 170.0f && FMath::Abs(D.Z) <= 120.0f;
 	if (D.Size2D() > 160.0f || FMath::Abs(D.Z) > 120.0f) return false;
 	// por la espalda: el jugador queda detrás de él (o de lado-atrás); de frente solo si no te ve venir
 	return FVector::DotProduct(GetActorForwardVector(), D.GetSafeNormal2D()) < -0.2f;
@@ -379,6 +389,9 @@ void ATarsisGuard::KnockOut()
 	StateT = 0.0f;
 	DownT = KnockOutTime;
 	bNoiseSearch = false;
+	StunT = 0.0f;
+	BodyTarget = nullptr;
+	BodyCheckT = 0.0f;
 	KnockLoc = GetActorLocation();
 	Meter = 0.0f;
 	bFound = false;
@@ -415,7 +428,7 @@ void ATarsisGuard::WakeUp()
 
 void ATarsisGuard::LookForBodies()
 {
-	if (State == ETarsisGuardState::Alert || bAlly) return;
+	if (State == ETarsisGuardState::Alert || bAlly || BodyTarget || StunT > 0.0f) return;
 	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
@@ -431,18 +444,93 @@ void ATarsisGuard::LookForBodies()
 		Q.AddIgnoredActor(O);
 		FHitResult Hit;
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, P, ECC_Visibility, Q)) continue;
-		// lo ha visto: da la voz, va corriendo y el caído se despierta pronto
 		O->bFound = true;
-		O->DownT = FMath::Min(O->DownT, 6.0f);
-		Alarm(P);
+		if (bTowerSentry)
+		{
+			// el de la torre no puede bajar: da la voz desde arriba
+			O->DownT = FMath::Min(O->DownT, 6.0f);
+			Alarm(P);
+			for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
+			{
+				Dt->GuardSay(this, TEXT("suelo"), true);
+				Dt->ShowMessage(FString::Printf(TEXT("%s HA ENCONTRADO A %s EN EL SUELO\nToda la base te busca."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 5.0f);
+				break;
+			}
+			break;
+		}
+		// lo ha visto: va a mirarlo, se agacha sobre él y avisa por radio (BodyTick); el caído se despierta pronto
+		O->DownT = FMath::Min(O->DownT, 14.0f);
+		BodyTarget = O;
+		BodyCheckT = 0.0f;
+		MoveDest = FVector(1e9f);
+		Mark->SetHiddenInGame(false);
+		Mark->SetText(FText::FromString(TEXT("?")));
+		Mark->SetTextRenderColor(FColor(255, 210, 58));
 		for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
 		{
-			Dt->GuardSay(this, TEXT("suelo"), true);
-			Dt->ShowMessage(FString::Printf(TEXT("%s HA ENCONTRADO A %s EN EL SUELO\nToda la base te busca."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 5.0f);
+			Dt->ShowMessage(FString::Printf(TEXT("%s HA VISTO A %s EN EL SUELO\nVa a mirarlo. Mientras se agacha sobre el, aun puedes irte."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 4.0f);
 			break;
 		}
 		break;
 	}
+}
+
+void ATarsisGuard::BodyTick(float DeltaSeconds, APawn* Player, float V)
+{
+	// si te ve mientras tanto, va a por ti
+	if (Meter >= 1.0f && V > 0.0f && Player)
+	{
+		BodyTarget = nullptr;
+		BodyCheckT = 0.0f;
+		LastSeen = Player->GetActorLocation();
+		SetState(ETarsisGuardState::Alert);
+		return;
+	}
+	// se ha levantado antes de que llegara: da la alarma igual
+	if (!BodyTarget || BodyTarget->State != ETarsisGuardState::Down)
+	{
+		const FVector P = BodyTarget ? BodyTarget->GetActorLocation() : GetActorLocation();
+		BodyTarget = nullptr;
+		BodyCheckT = 0.0f;
+		Alarm(P);
+		return;
+	}
+	const FVector P = BodyTarget->GetActorLocation();
+	if (BodyCheckT <= 0.0f && !Near2D(P, 130.0f))
+	{
+		Walk(P, RunSpeed * 0.6f);
+		return;
+	}
+	if (BodyCheckT <= 0.0f)
+	{
+		if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+	}
+	FaceTowards(P, DeltaSeconds);
+	BodyCheckT += DeltaSeconds;   // agachado sobre él (LookTick inclina la espalda)
+	if (BodyCheckT < 2.0f) return;
+	ATarsisGuard* O = BodyTarget;
+	BodyTarget = nullptr;
+	BodyCheckT = 0.0f;
+	for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
+	{
+		Dt->GuardSay(this, TEXT("suelo"), true);
+		Dt->ShowMessage(FString::Printf(TEXT("%s HA ENCONTRADO A %s EN EL SUELO\nAvisa por radio: toda la base te busca."), *GuardName.ToUpper(), *O->GuardName.ToUpper()), 5.0f);
+		break;
+	}
+	Alarm(P);
+}
+
+void ATarsisGuard::Stun(float Seconds)
+{
+	if (State == ETarsisGuardState::Down || bTowerSentry) return;
+	StunT = Seconds;
+	BodyTarget = nullptr;
+	BodyCheckT = 0.0f;
+	bRepairing = false;
+	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+	Mark->SetHiddenInGame(false);
+	Mark->SetText(FText::FromString(TEXT("?!")));
+	Mark->SetTextRenderColor(FColor(255, 150, 60));
 }
 
 void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
@@ -663,7 +751,8 @@ void ATarsisGuard::SetFlashlight(bool bOn)
 
 float ATarsisGuard::Visibility(const AActor* Target) const
 {
-	if (!Target || State == ETarsisGuardState::Down || bAlly || Target->IsHidden()) return 0.0f;   // oculto: durante una cinemática
+	// oculto: durante una cinemática o metido en una taquilla; aturdido por un empujón no ve nada
+	if (!Target || State == ETarsisGuardState::Down || bAlly || Target->IsHidden() || StunT > 0.0f) return 0.0f;
 	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
 	const FVector Aim = Target->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f);
 	const float D = FVector::Dist(Eye, Aim);
@@ -740,6 +829,18 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	UpdateAnim();
 	LookTick(DeltaSeconds);
 	FootTick(DeltaSeconds);
+	// aturdido por un empujón: tambaleándose, no ve ni anda; al rehacerse va a por ti
+	if (StunT > 0.0f)
+	{
+		StunT -= DeltaSeconds;
+		if (StunT <= 0.0f)
+		{
+			APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+			if (Pl && !Pl->IsHidden()) { Meter = 1.0f; UnseenT = 0.0f; LastSeen = Pl->GetActorLocation(); SetState(ETarsisGuardState::Alert); }
+			else { LastSeen = GetActorLocation(); Meter = 0.6f; SetState(ETarsisGuardState::Search); }   // te has escondido: busca alrededor
+		}
+		return;
+	}
 	if (HoldT > 0.0f)
 	{
 		HoldT -= DeltaSeconds;
@@ -769,6 +870,12 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	if (bTowerSentry)
 	{
 		TowerTick(DeltaSeconds, Player, V);
+		return;
+	}
+
+	if (BodyTarget)
+	{
+		BodyTick(DeltaSeconds, Player, V);
 		return;
 	}
 

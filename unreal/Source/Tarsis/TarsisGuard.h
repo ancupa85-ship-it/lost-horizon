@@ -198,6 +198,22 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
 	bool bTurnStepping = false;
 
+	/** Empujón de frente (E, si aún no está en alerta): aturdido Seconds segundos, sin ver; se le puede derribar por
+	 *  cualquier lado. Si nadie lo derriba, al rehacerse va a por ti (alerta hacia donde estabas). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Stun(float Seconds);
+
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	bool IsStunned() const { return StunT > 0.0f; }
+
+	/** Ha visto un cuerpo y va a mirarlo antes de dar la alarma (se agacha 2 s sobre él y avisa por radio). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	bool IsCheckingBody() const { return BodyTarget != nullptr; }
+
+	/** Segundos que lleva agachado sobre el cuerpo (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
+	float BodyCheckT = 0.0f;
+
 	/** Tiene cuerpo con esqueleto y sus pasos salen de la animación (si no, el director los cuenta por distancia). */
 	bool HasFootSync() const { return Pose != nullptr; }
 
@@ -254,6 +270,10 @@ protected:
 	TObjectPtr<class UPoseableMeshComponent> Pose;
 
 private:
+	float StunT = 0.0f;
+	UPROPERTY()
+	TObjectPtr<ATarsisGuard> BodyTarget;
+	void BodyTick(float DeltaSeconds, APawn* Player, float V);
 	void SetupPose();
 	void LookTick(float DeltaSeconds);
 	void FootTick(float DeltaSeconds);

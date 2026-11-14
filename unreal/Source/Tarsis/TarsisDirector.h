@@ -383,6 +383,10 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
 	int32 VoicesPlayed = 0;
 
+	/** Últimas 30 frases dichas («moya_ruido»...), para las pruebas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sonido")
+	TArray<FString> VoiceLog;
+
 	/** Subtítulos de sonido (opción del menú); para las pruebas. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sonido")
 	void SetSubtitles(bool bOn) { bSubtitles = bOn; }
@@ -412,6 +416,43 @@ public:
 	TObjectPtr<class USkeletalMeshComponent> Arms;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
 	TObjectPtr<class UStaticMeshComponent> Pistol;
+
+	// ---- empezar sin armas: consejos, empujón de frente y escondites
+
+	/** Consejo de la esquina («CONSEJO: ...»): agacharse, la piedra y la E por la espalda, hasta que los usas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ayuda")
+	FString Hint;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ayuda")
+	int32 HintStep = 0;
+
+	/** Guardia al que puedes empujar ahora con la E (de frente, cerca, sin estar en alerta) o nullptr. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	class ATarsisGuard* ShoveTarget() const;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	int32 Shoves = 0;
+
+	/** Metido en una taquilla: no te ven, oyes amortiguado y la vista va por las rendijas. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Escondites")
+	bool bHiding = false;
+
+	/** Taquillas (punto del suelo y hacia dónde abren): barracón oeste y sala de guardia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	TArray<FVector> HideSpots = { FVector(1500.0f, 2965.0f, 0.0f), FVector(1700.0f, 2965.0f, 0.0f), FVector(5330.0f, 1235.0f, 0.0f) };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	TArray<float> HideYaws = { -90.0f, -90.0f, 90.0f };
+
+	/** Taquilla a mano (índice) o -1. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Escondites")
+	int32 HideSpotNear() const;
+
+	/** Cambios que han notado los guardias (puertas que estaban cerradas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
+	int32 ChangesNoticed = 0;
+
+	/** Pruebas: una tecla de verdad por PlayerController::InputKey (pasa por toda la pila de entrada, no como PressKey). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void SimulateKey(FName Key, bool bPress = true, bool bRelease = true);
 
 protected:
 	virtual void BeginPlay() override;
@@ -517,6 +558,8 @@ private:
 	TObjectPtr<class UAudioComponent> RumbleComp;
 	UPROPERTY()
 	TMap<TObjectPtr<class ATarsisGuard>, float> VoiceNext;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, FString> VoicePrev;
 	float VoiceSubT = 0.0f;
 	int32 PlayerSurface = 0;
 	// brazos
@@ -526,6 +569,25 @@ private:
 	float RecoilT = 0.0f;
 	FRotator LastViewRot = FRotator::ZeroRotator;
 	FVector Sway = FVector::ZeroVector;
+	// empezar: consejos, empujón, escondites y cambios que notan los guardias
+	void HintTick();
+	void Shove(class ATarsisGuard* G);
+	class ATarsisGuard* FacingAlertGuard() const;
+	float FrontMsgT = 0.0f;
+	void SetupHiding();
+	void EnterHide(int32 Index);
+	void ExitHide();
+	void HideTick();
+	int32 HideIdx = -1;
+	bool bHideSeen = false;
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> Lockers;
+	void AddChange(const FVector& Where, const TCHAR* Key);
+	void ChangesTick(float DeltaSeconds);
+	TArray<FVector> ChangeLocs;
+	TArray<FString> ChangeKeys;
+	TArray<bool> ChangeSeen;
+	float ChangeT = 0.0f;
 	bool IndoorAt(const FVector& P, const AActor* Ignore) const;
 	void SoundTick(class ACharacter* C, float DeltaSeconds);
 	void RainTick(float DeltaSeconds);
@@ -542,7 +604,8 @@ private:
 	TObjectPtr<class UAudioComponent> HumComp;
 	UPROPERTY()
 	TArray<TObjectPtr<class ULightComponent>> OffLights;
-	UPROPERTY()
+	/** El que han mandado a arreglar el generador (visible para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, Category = "Tarsis|Luz")
 	TObjectPtr<class ATarsisGuard> Repairer;
 	float RepairT = 0.0f;
 	UPROPERTY()

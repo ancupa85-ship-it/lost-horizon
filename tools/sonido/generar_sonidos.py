@@ -168,6 +168,24 @@ def rumor(sec=16):
     g = 0.6 + 0.4 * np.sin(2 * np.pi * t / 9.0) * np.sin(2 * np.pi * t / 4.1 + 0.5)
     return bucle(lp(lp(b, 0.97), 0.95) * g)
 
+def empujon():
+    # empujón: golpe sordo contra la ropa y el roce de las botas al trastabillar
+    n = int(0.6 * SR); x = golpe(n, 85, 0.07, 1.0); t = np.arange(n) / SR
+    o = int(0.08 * SR); m = int(0.35 * SR)
+    x[o:o + m] += lp(rng.normal(0, 1, m), 0.7) * env(m, 0.01, 0.08) * 0.6
+    o = int(0.3 * SR); x[o:] += golpe(n - o, 140, 0.03, 0.4)
+    return x
+
+def taquilla():
+    # puerta de taquilla metálica: chirrido corto de bisagra y golpe de chapa
+    n = int(0.7 * SR); t = np.arange(n) / SR
+    f = 700 + 300 * np.sin(2 * np.pi * 1.6 * t)
+    creak = lp(np.sign(np.sin(2 * np.pi * np.cumsum(f) / SR)), 0.7) * (t < 0.35) * 0.25
+    x = creak + 0.0
+    o = int(0.38 * SR); x[o:] += golpe(n - o, 320, 0.08, 0.8)
+    x[o:] += 0.3 * np.sin(2 * np.pi * 1450 * t[:n - o]) * np.exp(-t[:n - o] / 0.12)
+    return x
+
 def piedra():
     n = int(0.5 * SR); t = np.arange(n) / SR; x = np.zeros(n)
     for d, a in ((0.0, 1.0), (0.11, 0.45), (0.19, 0.2)):   # golpe y dos botes
@@ -300,3 +318,5 @@ if __name__ == '__main__':
                             ('tecla', tecla, 0.5), ('clave_ok', clave_ok, 0.6), ('clave_mal', clave_mal, 0.5), ('recoger', recoger, 0.6),
                             ('llaves', llaves, 0.55), ('reja', reja, 0.8), ('barrera', barrera, 0.6), ('grillos', grillos, 0.35), ('rumor', rumor, 0.5)):
         save(nombre, f(), pico)
+    save('empujon', empujon(), 0.7)
+    save('taquilla', taquilla(), 0.6)
