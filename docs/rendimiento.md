@@ -94,3 +94,21 @@ algún pico de 3823 MB en la primera medida tras abrir el editor (texturas aún 
 El anillo nuevo no baja nada de 30 fps; los portones son lo más ligero (poca geometría a la vista). La VRAM (toda la
 tarjeta, con el editor abierto) pasa de 3,8 GB en la primera medida tras abrir el editor (3893 MB) y vuelve a 3,74 en la
 segunda: la grava nueva (gravel_floor_02 a 2K) suma; si hiciera falta, bajarla a 1K.
+
+## 0021: farolas, malla de las vallas, guardias del anillo y camión
+
+`tools/unreal/medir.py` con un sitio más (el camión entrando por el portón con los faros hacia la cámara, jugador en
+1500 6150), calidad Media, una pasada (medio / peor 1 %):
+
+| Sitio | fps | VRAM (MB) |
+|---|---|---|
+| Entrada | 40,0 / 37,1 | 3769 |
+| Patio central | 39,4 / 37,4 | 3650 |
+| Barracón oeste | 32,7 / 30,4 | 3780 |
+| Portón de entrada | 40,8 / 37,9 | 3780 |
+| Portón de salida | 42,1 / 39,0 | 3781 |
+| Camino con el camión | 37,6 / 33,2 | 3782 |
+
+Las tres farolas (sin sombra), la malla recortada de las vallas (sin sombra propia) y los tres guardias nuevos no se
+notan. Los faros del camión, que son la única luz nueva con sombra, cuestan unos 3 fps de media cuando viene de frente;
+no hizo falta apagar su sombra (`bTruckShadows`). Con la grava a 1K la VRAM ya no pasa de 3,8 GB.

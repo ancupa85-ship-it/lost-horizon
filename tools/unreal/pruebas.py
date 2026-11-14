@@ -850,7 +850,8 @@ def prueba_anillo():
     check('cada uno empieza en su puesto', all(v < 400 for v in lejos.values()), lejos)
     check('tienen cuerpo (no el cilindro)', all(g.get_editor_property('body_mesh') for g in gs.values()))
     voces = ['voz_%s_%s' % (n.lower(), k) for n in gs for k in ('quien', 'alto', 'perdido')]
-    faltan = [v for v in voces if not unreal.EditorAssetLibrary.does_asset_exist('/Game/Tarsis/Sonidos/' + v)]
+    # load_object y no EditorAssetLibrary: durante el PIE esta responde que no existe («The Editor is currently in a play mode»)
+    faltan = [v for v in voces if not unreal.load_object(None, '/Game/Tarsis/Sonidos/%s.%s' % (v, v))]
     check('cada uno tiene su voz', not faltan, faltan)
     c0 = gs['Carmona'].get_actor_location()
     pisan = set()

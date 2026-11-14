@@ -2142,7 +2142,9 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 	case 2:
 		TruckWaitT += DeltaSeconds;
 		StopX = TruckGateStopX;
-		if (EntryGateT > 0.98f && TruckWaitT > 1.5f) { TruckState = 3; TruckWaitT = 0.0f; }
+		// al pasar a 3 la parada es la del control: con la del portón (Left ~ 0) saltaba enseguida a 4 y levantaba la barrera
+		// del control con el camión aún en el portón de entrada
+		if (EntryGateT > 0.98f && TruckWaitT > 1.5f) { TruckState = 3; TruckWaitT = 0.0f; StopX = TruckBarrierStopX; }
 		break;
 	case 3:
 		Want = TruckSpeed;
