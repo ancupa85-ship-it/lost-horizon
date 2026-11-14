@@ -349,7 +349,8 @@ def maestro_movil(defecto):
     p3 = E(unreal.MaterialExpressionAppendVector, -1150, -780)
     mel.connect_material_expressions(uv0, '', p3, 'A')
     mel.connect_material_expressions(cero, '', p3, 'B')
-    if not mel.connect_material_expressions(p3, '', ruido, 'Position'):
+    # en UE 5.8 la entrada del nodo Noise se llama «World Position» (antes, «Position»)
+    if not (mel.connect_material_expressions(p3, '', ruido, 'World Position') or mel.connect_material_expressions(p3, '', ruido, 'Position')):
         log('AVISO: M_LH_Movil: el ruido del barro va por la posición del mundo (resbala un poco al moverse la pieza)')
     rk = E(unreal.MaterialExpressionMultiply, -860, -800)
     rk.set_editor_property('const_b', 1.3)

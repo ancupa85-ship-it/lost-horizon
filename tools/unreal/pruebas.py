@@ -960,6 +960,15 @@ def prueba_camion():
     if sanz:
         sanz.hold(0.0)
     c0 = d.get_editor_property('truck_checks')
+    # los que vinieron por el claxon y te vieron plantado delante del camión se quedan en alerta (hold congela su estado)
+    # y con un guardia en alerta la base está en guardia: en el control registrarían la caja. Se les calma aquí (GoTo a su
+    # sitio los pasa a «volver») y la tensión se pone a cero: lo que se prueba ahora es el control con la base tranquila
+    for g in guardias():
+        if g.get_editor_property('tower_sentry') or g == sanz:
+            continue
+        if estado(g) in ('ALERT', 'SEARCH', 'SUSPICIOUS'):
+            g.go_to(g.get_actor_location()); g.hold(3600.0)
+    d.set_editor_property('tension_t', 0.0)
     yield ('hasta', lambda: estado_c() == 4, 40.0)
     check('para en el control de salida', estado_c() == 4 and abs(cx() - 8270) < 40, '%s en x %d' % (estado_c(), cx()))
     check('el portón de entrada ya está cerrado', d.get_editor_property('entry_gate_t') < 0.02 and abs(hoja[0].get_actor_location().y) < 5, d.get_editor_property('entry_gate_t'))

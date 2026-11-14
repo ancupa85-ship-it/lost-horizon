@@ -243,16 +243,22 @@ def material_mancha():
     """M_Mancha: calcomanía de mancha irregular (máscara redonda difusa x ruido del mundo), oscura y algo húmeda.
     Parámetros: Color y Fuerza (opacidad)."""
     ruta = DM + '/M_Mancha'
+    # versión 2 (tanda 22): el color va premultiplicado por la opacidad. Sin eso, con alfa premultiplicado el color se
+    # sumaba en toda la caja de la calcomanía (fuera de la mancha también): las rodadas del camino salían como tiras
+    # claras rectangulares bajo las farolas. Si el material es de antes, se rehace (las instancias siguen colgando de él)
     if eal.does_asset_exist(ruta):
-        return unreal.load_asset(ruta)
-    m = tools.create_asset('M_Mancha', DM, unreal.Material, unreal.MaterialFactoryNew())
+        m = unreal.load_asset(ruta)
+        if any(isinstance(e, unreal.MaterialExpressionMultiply) and e.get_editor_property('desc') == 'premultiplicado' for e in mel.get_material_expressions(m)):
+            return m
+        mel.delete_all_material_expressions(m)
+    else:
+        m = tools.create_asset('M_Mancha', DM, unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
-    # las calcomanías en 5.8 solo admiten transmitancia o alfa premultiplicado; con colores tan oscuros da igual premultiplicar
+    # las calcomanías en 5.8 solo admiten transmitancia o alfa premultiplicado: el color hay que multiplicarlo por la opacidad
     m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
     E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
     col = E(unreal.MaterialExpressionVectorParameter, -600, -200)
     col.set_editor_property('parameter_name', 'Color'); col.set_editor_property('default_value', unreal.LinearColor(0.045, 0.038, 0.028, 1))
-    mel.connect_material_property(col, '', unreal.MaterialProperty.MP_BASE_COLOR)
     # sin rugosidad: con alfa premultiplicado se escribiría en toda la caja de la calcomanía (se vería un rectángulo)
     uv = E(unreal.MaterialExpressionTextureCoordinate, -900, 200)
     sm = E(unreal.MaterialExpressionSphereMask, -700, 200)
@@ -276,6 +282,11 @@ def material_mancha():
     sat = E(unreal.MaterialExpressionSaturate, -220, 350)
     uno(mu2, sat)
     mel.connect_material_property(sat, '', unreal.MaterialProperty.MP_OPACITY)
+    pre = E(unreal.MaterialExpressionMultiply, -100, -150)
+    pre.set_editor_property('desc', 'premultiplicado')
+    mel.connect_material_expressions(col, '', pre, 'A')
+    mel.connect_material_expressions(sat, '', pre, 'B')
+    mel.connect_material_property(pre, '', unreal.MaterialProperty.MP_BASE_COLOR)
     mel.recompile_material(m)
     eal.save_loaded_asset(m)
     return m

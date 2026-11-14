@@ -112,3 +112,20 @@ segunda: la grava nueva (gravel_floor_02 a 2K) suma; si hiciera falta, bajarla a
 Las tres farolas (sin sombra), la malla recortada de las vallas (sin sombra propia) y los tres guardias nuevos no se
 notan. Los faros del camión, que son la única luz nueva con sombra, cuestan unos 3 fps de media cuando viene de frente;
 no hizo falta apagar su sombra (`bTruckShadows`). Con la grava a 1K la VRAM ya no pasa de 3,8 GB.
+
+## 0022: camino gastado (juntas, rodadas, hierbajos) y viaje en la caja del camión
+
+`tools/unreal/medir.py`, calidad Media, ventana 1080p del PIE, una pasada (medio / peor 1 %). VRAM de toda la tarjeta con
+el editor abierto.
+
+| Sitio | fps | VRAM (MB) |
+|---|---|---|
+| Entrada | 39,7 / 36,9 | 3734 |
+| Patio central | 38,8 / 36,8 | 3606 |
+| Barracón oeste | 33,3 / 31,4 | 3731 |
+| Portón de entrada | 39,9 / 36,7 | 3731 |
+| Portón de salida | 41,2 / 37,6 | 3731 |
+| Camino con el camión | 36,6 / 33,8 | 3731 |
+
+Igual que en la 0021 (dentro del margen de una medida a otra): los hierbajos (recortados, con viento), las 51
+calcomanías del perímetro, la caja hueca y el material de las piezas móviles no se notan.

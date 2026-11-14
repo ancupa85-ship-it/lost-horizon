@@ -57,7 +57,7 @@ def tope_entrada():
 MANCHA_TAG = 'mancha_perimetro'
 # tipo -> (color lineal, fuerza). Una instancia por tipo (no por mancha): el dibujo de cada una sale del ruido del mundo
 TIPOS = {
-    'Rodada': ((0.028, 0.027, 0.026), 0.42),    # goma y polvo por donde pisan las ruedas
+    'Rodada': ((0.028, 0.027, 0.026), 0.6),     # goma y polvo por donde pisan las ruedas (0.42 antes de premultiplicar M_Mancha)
     'Aceite': ((0.010, 0.009, 0.008), 0.9),
     'Barro': ((0.075, 0.058, 0.036), 0.62),
     'Charco': ((0.02, 0.02, 0.019), 0.6),       # cerco oscuro de agua junto al bordillo
