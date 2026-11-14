@@ -402,7 +402,16 @@ class Persona:
 
     def guantes(self):
         dedos = ('hand', 'index', 'middle', 'ring', 'pinky', 'thumb')
-        P, W, T = self.funda(lambda P, W: sum(self.wsum(W, d) for d in dedos) > 0.45, 0.0035, suave=0)
+
+        def sel(P, W):
+            mano = sum(self.wsum(W, d) for d in dedos) > 0.45
+            # puño del guante: sube 6 cm por el antebrazo para que no asome piel entre el guante y la manga
+            ante = np.flatnonzero(~mano & (self.wsum(W, 'lowerarm') > 0.3))
+            H = P[mano]
+            d = np.concatenate([np.sqrt(((P[ante[i:i + 500], None, :] - H[None]) ** 2).sum(2)).min(1) for i in range(0, len(ante), 500)])
+            mano[ante[d < 0.06]] = True
+            return mano
+        P, W, T = self.funda(sel, 0.0035, suave=0)
         UV = np.c_[P[:, 1] * 6.0, P[:, 2] * 6.0]
         self.emit('guantes', P, UV, T, W, 'cuero')
 
@@ -875,6 +884,11 @@ def vestir(nombre):
             ti = g.j['textures'][mt['pbrMetallicRoughness']['baseColorTexture']['index']]['source']
             g.set_image(ti, texturas.retinte(g.image(ti)))
             mt['pbrMetallicRoughness']['roughnessFactor'] = 0.86
+    # piel curtida y algo más oscura: lo único que asoma es el contorno de los ojos, y con la piel clara de
+    # MakeHuman brillaba como un antifaz
+    for mt in g.j['materials']:
+        if mt['name'].endswith(('_body', '_ears', '_lips')):
+            mt.setdefault('pbrMetallicRoughness', {})['baseColorFactor'] = [0.66, 0.62, 0.60, 1.0]
     p.pasamontanas()
     p.guantes()
     p.camiseta()
