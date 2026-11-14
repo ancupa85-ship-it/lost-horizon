@@ -679,6 +679,14 @@ private:
 	bool bHideSeen = false;
 	UPROPERTY()
 	TArray<TObjectPtr<class UStaticMeshComponent>> Lockers;
+public:
+	/** Malla de la taquilla (chapa biselada con rendijas de verdad, tools/unreal/ambiente.py); sin ella, cubos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	TSoftObjectPtr<class UStaticMesh> LockerMesh = TSoftObjectPtr<class UStaticMesh>(FSoftObjectPath(TEXT("/Game/Tarsis/Atrezo/Taquilla/SM_Taquilla.SM_Taquilla")));
+	/** Pruebas: componentes que parpadean, que callan sin luz y que suenan con lluvia. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	FIntVector ZoneCounts() const { return FIntVector(FlickerLights.Num(), PowerSounds.Num(), RainSounds.Num()); }
+private:
 	void AddChange(const FVector& Where, const TCHAR* Key);
 	void ChangesTick(float DeltaSeconds);
 	TArray<FVector> ChangeLocs;
@@ -710,6 +718,15 @@ private:
 	bool IndoorAt(const FVector& P, const AActor* Ignore) const;
 	void SoundTick(class ACharacter* C, float DeltaSeconds);
 	void RainTick(float DeltaSeconds);
+	// ---- ambiente de las zonas (tanda 18): luces con la etiqueta «parpadeo» (fluorescente viejo), sonidos con
+	// «electrico» (callan sin luz) y con «lluvia» (gotera: solo si llueve). Los coloca tools/unreal/ambiente.py
+	void SetupZones();
+	void ZonesTick(float DeltaSeconds);
+	UPROPERTY() TArray<TObjectPtr<class ULightComponent>> FlickerLights;
+	TArray<float> FlickerBase;
+	TArray<float> FlickerT;
+	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> PowerSounds;
+	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> RainSounds;
 	void RadioTick(float DeltaSeconds);
 	UPROPERTY()
 	TSet<TObjectPtr<class ATarsisGuard>> Called;

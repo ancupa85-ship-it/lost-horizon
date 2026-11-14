@@ -296,6 +296,64 @@ def musica_alerta():
         x[p:p + m] += 0.12 * sq * env(m, 0.003, 0.08)
     return x
 
+# ---- tanda 18: el barracón oeste (fluorescente, la radio de la mesa y la gotera cuando llueve)
+
+def fluorescente(sec=6):
+    # tubo fluorescente con reactancia vieja: zumbido de 100 Hz (red de 50 Hz) con armónicos impares ásperos,
+    # un siseo fino y algún chisporroteo del cebador
+    n = int((sec + 1) * SR); t = np.arange(n) / SR
+    x = sum(a * np.sin(2 * np.pi * f * t + i) for i, (f, a) in enumerate(((100, 1.0), (200, 0.5), (300, 0.35), (500, 0.15), (700, 0.08))))
+    x = np.tanh(x * 1.6) + hp(rng.normal(0, 1, n), 0.3) * 0.05
+    for _ in range(sec * 2):
+        p = int(rng.uniform(0, n - 2000)); m = int(rng.uniform(300, 1500))
+        x[p:p + m] += rng.normal(0, 1, m) * env(m, 0.0005, 0.004) * rng.uniform(0.3, 0.9)
+    return bucle(x)
+
+def radio_barracon(sec=24):
+    # radio de mesa sintonizada en una emisora de música (un pasodoble que suena lejos): melodía de trompeta y
+    # bajo de «um-pa» a 104 ppm, pasada por un altavoz pequeño (banda de 400-2800 Hz, saturación), con soplido
+    # de onda media y chasquidos de estática
+    n = int((sec + 1) * SR); t = np.arange(n) / SR; x = np.zeros(n)
+    beat = 60.0 / 104
+    escala = [293.66, 329.63, 349.23, 392.0, 440.0, 466.16, 554.37, 587.33]   # re menor armónico
+    frase = [4, 4, 5, 4, 3, 2, 1, 2, 3, 3, 4, 3, 2, 1, 0, 0, 4, 5, 6, 7, 6, 5, 4, 3, 2, 3, 4, 2, 1, 0, 0, 0]
+    k = 0; pos = 0.0
+    while pos < sec:
+        f = escala[frase[k % len(frase)]]; d = beat * (0.5 if k % 4 in (1, 2) else 1.0)
+        p = int(pos * SR); m = int(d * 0.95 * SR)
+        if p + m >= n: break
+        tt = np.arange(m) / SR
+        vib = 1 + 0.004 * np.sin(2 * np.pi * 5.5 * tt)
+        ph = 2 * np.pi * f * np.cumsum(vib) / SR
+        tr = sum(np.sin(h * ph) / h ** 0.8 for h in range(1, 7))            # trompeta: muchos armónicos
+        x[p:p + m] += 0.5 * tr * env(m, 0.02, d * 0.9)
+        pos += d; k += 1
+    for b in range(int(sec / beat)):                                          # um-pa: bajo en la parte fuerte, acorde en la débil
+        p = int(b * beat * SR); m = int(beat * 0.45 * SR)
+        if p + m >= n: break
+        tt = np.arange(m) / SR
+        f = (73.42, 110.0)[(b // 2) % 2] if b % 2 == 0 else 220.0
+        x[p:p + m] += (0.6 if b % 2 == 0 else 0.25) * np.sin(2 * np.pi * f * tt) * env(m, 0.005, 0.12)
+    x = np.tanh(hp(lp(x, 0.55), 0.94) * 2.0)
+    x = x * (0.85 + 0.15 * np.sin(2 * np.pi * t / 7.0))                       # la onda media va y viene
+    x += hp(rng.normal(0, 1, n), 0.5) * 0.08
+    for _ in range(sec * 3):
+        p = int(rng.uniform(0, n - 800)); m = int(rng.uniform(80, 600))
+        x[p:p + m] += rng.normal(0, 1, m) * env(m, 0.0002, 0.003) * rng.uniform(0.3, 1.2)
+    return bucle(x)
+
+def gotera(sec=9):
+    # gotas que caen del techo en un cubo de chapa, a ritmo irregular (entre 0,6 y 1,6 s)
+    n = int((sec + 1) * SR); x = np.zeros(n); pos = 0.2
+    while pos < sec:
+        p = int(pos * SR); m = int(0.35 * SR)
+        if p + m >= n: break
+        tt = np.arange(m) / SR
+        f = rng.uniform(900, 1300)
+        x[p:p + m] += np.sin(2 * np.pi * f * tt * (1 + 0.6 * tt)) * env(m, 0.0005, 0.04) + 0.25 * np.sin(2 * np.pi * 2.7 * f * tt) * env(m, 0.0003, 0.015)
+        pos += rng.uniform(0.6, 1.6)
+    return bucle(x, 0.2)
+
 if __name__ == '__main__':
     for k in range(3):
         save('paso_grava_%d' % (k + 1), grava(k), 0.7)
@@ -320,3 +378,6 @@ if __name__ == '__main__':
         save(nombre, f(), pico)
     save('empujon', empujon(), 0.7)
     save('taquilla', taquilla(), 0.6)
+    save('fluorescente', fluorescente(), 0.35)
+    save('radio_barracon', radio_barracon(), 0.55)
+    save('gotera', gotera(), 0.6)

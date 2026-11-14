@@ -1,0 +1,525 @@
+{
+ "_leeme": "Atrezo de Poly Haven (CC0). tools/unreal/atrezo.py descarga los modelos (no van a git), los importa en /Game/Tarsis/Atrezo (una malla SM_<id> por modelo, o «parte» para una sola pieza) y coloca las piezas: pos en cm, giro en grados, escala. Se apoya solo: baja desde pos hasta lo que haya debajo (suelo, mesa, caja), salvo «colgar» (se queda en pos). pequeno: sin colision. Ojo con la ronda de Ramos, que cruza el barracon por y=2700: ese pasillo, libre.",
+ "modelos": [
+  "old_bed_frame",
+  "metal_office_desk",
+  "metal_stool_01",
+  "steel_frame_shelves_01",
+  "mounted_fluorescent_lights",
+  "caged_hanging_light",
+  "vintage_radio_transceiver",
+  "modified_thermos",
+  "cigarette_pack",
+  "wall_clock",
+  "old_gas_mask",
+  "ammo_box",
+  "wooden_military_crate",
+  "metal_jerrycan_green",
+  "barrel_03",
+  "old_tyre",
+  "clipboard",
+  "vintage_flashlight",
+  "industrial_wall_lamp",
+  "barrel_stove",
+  "pot_enamel_01",
+  "can_rusted",
+  "desk_lamp_arm_01",
+  "rubber_boots",
+  "wooden_bucket_02",
+  "drawer_cabinet",
+  "binder_notebook",
+  "hanging_picture_frame_02",
+  "russian_food_cans_01"
+ ],
+ "piezas": [
+  {
+   "nombre": "litera_1",
+   "modelo": "old_bed_frame",
+   "pos": [
+    300,
+    2897,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "litera_2",
+   "modelo": "old_bed_frame",
+   "pos": [
+    530,
+    2897,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "litera_ramos",
+   "modelo": "old_bed_frame",
+   "pos": [
+    1130,
+    2897,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "mascara",
+   "modelo": "old_gas_mask",
+   "pos": [
+    415,
+    2992,
+    175
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "estanteria",
+   "modelo": "steel_frame_shelves_01",
+   "pos": [
+    172,
+    2470,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "municion_1",
+   "modelo": "ammo_box",
+   "pos": [
+    200,
+    2600,
+    40
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "municion_2",
+   "modelo": "ammo_box",
+   "pos": [
+    200,
+    2627,
+    40
+   ],
+   "giro": 8,
+   "pequeno": true
+  },
+  {
+   "nombre": "mesa",
+   "modelo": "metal_office_desk",
+   "pos": [
+    1000,
+    2470,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "radio",
+   "modelo": "vintage_radio_transceiver",
+   "pos": [
+    925,
+    2455,
+    140
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "termo",
+   "modelo": "modified_thermos",
+   "pos": [
+    1060,
+    2430,
+    140
+   ],
+   "giro": 30,
+   "pequeno": true
+  },
+  {
+   "nombre": "tabaco",
+   "modelo": "cigarette_pack",
+   "pos": [
+    1095,
+    2500,
+    140
+   ],
+   "giro": -20,
+   "pequeno": true
+  },
+  {
+   "nombre": "partes",
+   "modelo": "clipboard",
+   "pos": [
+    1150,
+    2465,
+    140
+   ],
+   "giro": 12,
+   "pequeno": true
+  },
+  {
+   "nombre": "linterna",
+   "modelo": "vintage_flashlight",
+   "pos": [
+    1035,
+    2505,
+    140
+   ],
+   "giro": 70,
+   "pequeno": true
+  },
+  {
+   "nombre": "taburete_1",
+   "modelo": "metal_stool_01",
+   "pos": [
+    1010,
+    2580,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "taburete_2",
+   "modelo": "metal_stool_01",
+   "pos": [
+    870,
+    2385,
+    60
+   ],
+   "giro": 25
+  },
+  {
+   "nombre": "reloj",
+   "modelo": "wall_clock",
+   "pos": [
+    1000,
+    2204,
+    235
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "caja",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    2125,
+    2895,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "municion_3",
+   "modelo": "ammo_box",
+   "pos": [
+    2120,
+    2880,
+    120
+   ],
+   "giro": 80,
+   "pequeno": true
+  },
+  {
+   "nombre": "bidon",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    2160,
+    2350,
+    60
+   ],
+   "giro": 95
+  },
+  {
+   "nombre": "fluorescente",
+   "modelo": "mounted_fluorescent_lights",
+   "parte": "mounted_fluorescent_lights_a",
+   "pos": [
+    1150,
+    2570,
+    356
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true,
+   "sin_sombra": true
+  },
+  {
+   "nombre": "lampara_puerta",
+   "modelo": "industrial_wall_lamp",
+   "pos": [
+    1500,
+    1993,
+    265
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true,
+   "sin_sombra": true
+  },
+  {
+   "nombre": "barril_1",
+   "modelo": "barrel_03",
+   "pos": [
+    620,
+    1880,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "barril_2",
+   "modelo": "barrel_03",
+   "pos": [
+    700,
+    1920,
+    60
+   ],
+   "giro": 40
+  },
+  {
+   "nombre": "rueda",
+   "modelo": "old_tyre",
+   "pos": [
+    1010,
+    1982,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "caja_patio",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    430,
+    1700,
+    60
+   ],
+   "giro": 12
+  },
+  {
+   "nombre": "colchon_1",
+   "modelo": "colchon",
+   "pos": [
+    300,
+    2897,
+    140
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "colchon_2",
+   "modelo": "colchon",
+   "pos": [
+    530,
+    2897,
+    140
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "colchon_ramos",
+   "modelo": "colchon",
+   "pos": [
+    1130,
+    2897,
+    140
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "manta_1",
+   "modelo": "manta",
+   "pos": [
+    300,
+    2960,
+    160
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "manta_2",
+   "modelo": "manta",
+   "pos": [
+    530,
+    2960,
+    160
+   ],
+   "giro": 4,
+   "pequeno": true
+  },
+  {
+   "nombre": "manta_ramos",
+   "modelo": "manta",
+   "pos": [
+    1110,
+    2840,
+    160
+   ],
+   "giro": -25,
+   "pequeno": true
+  },
+  {
+   "nombre": "botas_1",
+   "modelo": "rubber_boots",
+   "pos": [
+    300,
+    2790,
+    40
+   ],
+   "giro": 90,
+   "pequeno": true
+  },
+  {
+   "nombre": "botas_ramos",
+   "modelo": "rubber_boots",
+   "pos": [
+    1175,
+    2785,
+    40
+   ],
+   "giro": 70,
+   "pequeno": true
+  },
+  {
+   "nombre": "estufa",
+   "modelo": "barrel_stove",
+   "pos": [
+    560,
+    2260,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "cafetera",
+   "modelo": "pot_enamel_01",
+   "pos": [
+    548,
+    2255,
+    150
+   ],
+   "giro": 30,
+   "pequeno": true
+  },
+  {
+   "nombre": "vaso",
+   "modelo": "can_rusted",
+   "pos": [
+    580,
+    2275,
+    150
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "flexo",
+   "modelo": "desk_lamp_arm_01",
+   "pos": [
+    1195,
+    2430,
+    140
+   ],
+   "giro": 200,
+   "pequeno": true,
+   "sin_sombra": true
+  },
+  {
+   "nombre": "carpeta",
+   "modelo": "binder_notebook",
+   "pos": [
+    990,
+    2510,
+    140
+   ],
+   "giro": -10,
+   "pequeno": true
+  },
+  {
+   "nombre": "archivador",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    1380,
+    2232,
+    60
+   ],
+   "giro": 180
+  },
+  {
+   "nombre": "cuadrante",
+   "modelo": "hanging_picture_frame_02",
+   "pos": [
+    760,
+    2203,
+    170
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "latas",
+   "modelo": "russian_food_cans_01",
+   "pos": [
+    172,
+    2440,
+    250
+   ],
+   "giro": 90,
+   "pequeno": true
+  },
+  {
+   "nombre": "cubo",
+   "modelo": "wooden_bucket_02",
+   "pos": [
+    1960,
+    2930,
+    60
+   ],
+   "giro": 0,
+   "pequeno": true
+  }
+ ],
+ "vaciar": {
+  "_leeme": "Cajas [x0,y0,z0,x1,y1,z1] en cm: lo que la base de Blender tenía dentro (literas, taquillas, mesa, cajas, lámpara) se borra de las mallas fusionadas por piezas enteras (componentes conectados que tocan la caja). Sin tocar paredes, suelo, techo, ventanas ni las hojas de las puertas.",
+  "barracon_oeste": [
+   [
+    150,
+    2205,
+    6,
+    1150,
+    2995,
+    350
+   ],
+   [
+    1450,
+    2205,
+    6,
+    2100,
+    2995,
+    350
+   ],
+   [
+    1150,
+    2330,
+    6,
+    1450,
+    2995,
+    350
+   ]
+  ]
+ },
+ "escala_import": {
+  "steel_frame_shelves_01": 0.1
+ },
+ "mallas_propias": [
+  "colchon",
+  "manta"
+ ]
+}

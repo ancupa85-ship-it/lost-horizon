@@ -2,7 +2,8 @@
 Uso: python3 tools/blender/texturas.py [resolución]   (1k, 2k, 4k)"""
 import json, os, sys, urllib.request
 R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); D = os.path.join(R, 'assets', 'texturas')
-IDS = ['asphalt_02', 'concrete_wall_008', 'painted_plaster_wall', 'wood_planks_dirt', 'rusty_metal_02', 'green_metal_rust', 'corrugated_iron_02', 'concrete_floor_worn_001']
+IDS = ['asphalt_02', 'concrete_wall_008', 'painted_plaster_wall', 'wood_planks_dirt', 'rusty_metal_02', 'green_metal_rust', 'corrugated_iron_02', 'concrete_floor_worn_001',
+       'poly_wool_herringbone', 'rough_linen']   # tanda 18: mantas y colchones
 MAPS = {'Diffuse': 'diff', 'nor_gl': 'nor', 'Rough': 'rough', 'Displacement': 'disp'}
 def get(url):
     return urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'lost-horizon-build'}), timeout=120).read()

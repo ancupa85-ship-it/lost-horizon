@@ -30,6 +30,14 @@ FAROL = V(6840, 5216, 380)      # farol de la garita
 SALIDA = V(6900, 5300, 0)       # celda G (34, 26)
 
 
+def sin_freno():
+    """«Usar menos CPU en segundo plano» del editor, apagado: si no, sin el foco el PIE va a 3 fps y las medidas y las
+    pruebas no valen. No está expuesto a Python, se cambia por reflexión en el objeto por defecto (dura la sesión)."""
+    o = unreal.find_object(None, '/Script/UnrealEd.Default__EditorPerformanceSettings')
+    if o:
+        o.set_editor_property('bThrottleCPUWhenNotForeground', False)
+
+
 # ---------------------------------------------------------------- acceso al juego
 
 def mundo():
@@ -155,6 +163,32 @@ def prueba_datos():
     check('y los %d puntos y %d objetivos' % (len(MISION['puntos']), len(MISION['objetivos'])),
           len(d.get_editor_property('points')) == len(MISION['puntos']) and len(d.get_editor_property('objectives')) == len(MISION['objetivos']))
     yield 0.1
+
+def prueba_zona():
+    """El barracón oeste vestido (tanda 18): atrezo, taquillas de verdad, el fluorescente que titila y sus sonidos."""
+    d = director()
+    z = d.zone_counts()
+    check('fluorescente que titila, zumbido eléctrico y gotera', (z.x, z.y, z.z) == (1, 1, 1), (z.x, z.y, z.z))
+    piezas = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'atrezo.json'), encoding='utf-8'))['piezas']
+    puestas = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.StaticMeshActor) if a.get_actor_label().startswith('Atrezo_')]
+    check('atrezo colocado (%d piezas)' % len(piezas), len(puestas) == len(piezas), len(puestas))
+    taq = unreal.load_asset('/Game/Tarsis/Atrezo/Taquilla/SM_Taquilla')
+    usan = [c for c in d.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh == taq]
+    check('las taquillas usan la malla de chapa', taq is not None and len(usan) == len(d.get_editor_property('hide_spots')), len(usan))
+    # la gotera solo con lluvia
+    w0 = d.get_editor_property('weather')
+    gotera = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.AmbientSound) if a.actor_has_tag('lluvia')]
+    while d.get_editor_property('weather') != 1:
+        d.simulate_key('Y'); yield 0.2
+    yield 0.3
+    con = gotera and gotera[0].get_component_by_class(unreal.AudioComponent).is_playing()
+    while d.get_editor_property('weather') != 0:
+        d.simulate_key('Y'); yield 0.2
+    yield 0.3
+    sin = gotera and gotera[0].get_component_by_class(unreal.AudioComponent).is_playing()
+    check('la gotera suena con lluvia y calla sin ella', con and not sin, (con, sin))
+    while d.get_editor_property('weather') != w0:
+        d.simulate_key('Y'); yield 0.2
 
 def aparte():
     """Aparca al jugador lejos de todas las rondas (en la marisma, al oeste): entre pruebas, que nadie le vea ni le coja."""
@@ -462,9 +496,10 @@ def prueba_guardias():
     v = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and x != m][0]
     lv = v.get_actor_location()
     v.alarm(V(lv.x + 300, lv.y, lv.z)); yield 0.3   # a su lado, lejos de ti: que no te capture (la 1.ª captura es al calabozo)
-    check('al dar la alarma: "¡alto!"', d.get_editor_property('last_voice').endswith('_alto') and any('Alto' in str(x) for x in d.get_editor_property('subtitle_log')),
-          '%s | %s' % (d.get_editor_property('last_voice'), list(d.get_editor_property('subtitle_log'))[-2:]))
     check('base en alerta (indicador del HUD)', d.base_state() == 2, d.base_state())
+    yield ('hasta', lambda: any('Alto' in str(x) for x in director().get_editor_property('subtitle_log')), 6.0)   # puede ir en cola
+    check('al dar la alarma: "¡alto!"', any(str(x).endswith('_alto') for x in d.get_editor_property('voice_log')) and any('Alto' in str(x) for x in d.get_editor_property('subtitle_log')),
+          '%s | %s' % (list(d.get_editor_property('voice_log'))[-3:], list(d.get_editor_property('subtitle_log'))[-2:]))
     faltan = ['%s_%s' % (g, k) for g in ('ibarra', 'moya', 'peris', 'vega', 'ramos', 'centinela')
               for k in ('quien', 'ruido', 'viento', 'alto', 'nadie', 'suelo', 'puerta', 'luz', 'donde', 'eh',
                         'farol', 'cuerpo', 'despierta', 'tengo', 'perdido', 'yacasi')]
@@ -669,7 +704,11 @@ def prueba_reserva():
     check('vuelve la luz a medias', 'A MEDIAS' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     check('la central: "entra la reserva"', 'central_reserva' in list(d.get_editor_property('voice_log')), list(d.get_editor_property('voice_log'))[-4:])
     check('los focos de las torres vuelven', 'foco_torreta_12' in on and 'foco_torreta_13' in on, on)
-    check('queda apagada la mitad del resto', 4 <= len(off) <= 7, 'apagadas %s' % off)
+    # la mitad de las que estaban encendidas (sin las de las torres ni interior_0, que el barracón oeste tiene apagada)
+    resto_on = [x for x in on if not x.startswith('foco_torreta') and x != 'interior_0']
+    resto_off = [x for x in off if x != 'interior_0']
+    k = len(resto_off) / max(1, len(resto_on) + len(resto_off))
+    check('queda apagada la mitad del resto', 0.3 <= k <= 0.7, '%.0f %% apagadas: %s' % (k * 100, resto_off))
     check('el reparador sigue en el suelo', estado(rep) == 'DOWN', estado(rep))
     yield 6.0
     llegan = [g.get_actor_label()[8:] for g in guardias() if dist2d(g.get_actor_location(), GEN) < 400 and estado(g) != 'DOWN']
@@ -812,7 +851,7 @@ def prueba_opciones():
 
 
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
-FAMILIAS = [[prueba_intro, prueba_datos, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
+FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva]]
 PRUEBAS = []
@@ -846,6 +885,9 @@ def _limpieza(siguiente):
             d.press_key('P'); yield 0.1
     if d and d.get_editor_property('menu'):
         check('limpieza: el menú no se cierra', False, ' / '.join(d.menu_lines()))
+    # si la prueba anterior acabó con una captura, su escena (unos 2 s sin control y con la E ignorada) termina antes
+    if d and d.get_editor_property('capturing'):
+        yield ('hasta', lambda: not director().get_editor_property('capturing'), 5.0)
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 
@@ -932,6 +974,7 @@ PRUEBAS.extend(FAMILIAS.pop(0) + [_textos])
 R['familia'] = 1
 if PRUEBAS[0] is not prueba_intro:
     PRUEBAS.insert(0, _arranque)
+sin_freno()
 if mundo():
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()
     R['estado'] = 'reiniciando'

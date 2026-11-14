@@ -60,6 +60,7 @@ void ATarsisDirector::BeginPlay()
 	SetupSound();
 	SetupPlayer();
 	SetWeather(Weather);
+	SetupZones();
 }
 
 void ATarsisDirector::SetupPlayer()
@@ -268,6 +269,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	ArmsTick(C, DeltaSeconds);
 	SoundTick(C, DeltaSeconds);
 	RainTick(DeltaSeconds);
+	ZonesTick(DeltaSeconds);
 	RadioTick(DeltaSeconds);
 	PowerTick(DeltaSeconds);
 	BarrierTick(DeltaSeconds);
@@ -1001,6 +1003,19 @@ void ATarsisDirector::SetupHiding()
 		// taquilla metálica de 60 x 50 x 190 cm con la puerta (más clara) hacia donde abre
 		const FRotator R(0.0f, Yaw - 90.0f, 0.0f);
 		const FVector Dir = FRotator(0.0f, Yaw, 0.0f).Vector();
+		// malla de verdad (chapa pintada y gastada, cantos biselados, rendijas abiertas); la puerta mira hacia Dir (+Y de la malla)
+		if (UStaticMesh* LM = LockerMesh.LoadSynchronous())
+		{
+			UStaticMeshComponent* L = NewObject<UStaticMeshComponent>(this);
+			L->SetStaticMesh(LM);
+			L->SetMobility(EComponentMobility::Movable);
+			L->SetWorldLocationAndRotation(P, FRotator(0.0f, Yaw - 90.0f, 0.0f));
+			L->SetCanEverAffectNavigation(false);
+			L->SetCollisionProfileName(TEXT("BlockAll"));
+			L->RegisterComponent();
+			Lockers.Add(L);
+			continue;
+		}
 		if (UStaticMeshComponent* L = AddBlock(P + FVector(0.0f, 0.0f, 95.0f), FVector(0.6f, 0.5f, 1.9f), FLinearColor(0.09f, 0.11f, 0.08f), true))
 		{
 			L->SetWorldRotation(R);
@@ -2806,4 +2821,55 @@ void ATarsisDirector::CaptureTick(float DeltaSeconds)
 		return;
 	}
 	if (CaptureT >= 2.1f) { bCapturing = false; Captor = nullptr; }
+}
+
+
+// ---------------------------------------------------------------- ambiente de las zonas
+
+void ATarsisDirector::SetupZones()
+{
+	static const FName Flicker(TEXT("parpadeo")), Power(TEXT("electrico")), Rain(TEXT("lluvia"));
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(Flicker))
+		{
+			TInlineComponentArray<ULightComponent*> Ls(*It);
+			for (ULightComponent* L : Ls) { FlickerLights.Add(L); FlickerBase.Add(L->Intensity); FlickerT.Add(FMath::FRandRange(2.0f, 9.0f)); }
+		}
+		const bool bPower = It->ActorHasTag(Power), bRain = It->ActorHasTag(Rain);
+		if (!bPower && !bRain) continue;
+		TInlineComponentArray<UAudioComponent*> As(*It);
+		for (UAudioComponent* A : As) (bRain ? RainSounds : PowerSounds).Add(A);
+	}
+}
+
+void ATarsisDirector::ZonesTick(float DeltaSeconds)
+{
+	// fluorescente viejo: casi siempre fijo; de vez en cuando titila unas décimas (sin luz no hace nada: está apagado)
+	for (int32 i = 0; i < FlickerLights.Num(); ++i)
+	{
+		ULightComponent* L = FlickerLights[i];
+		if (!L || !L->IsVisible()) continue;
+		FlickerT[i] -= DeltaSeconds;
+		float K = 1.0f;
+		if (FlickerT[i] < 0.0f)
+		{
+			K = FMath::FRand() < 0.5f ? 0.15f : 0.7f;
+			if (FlickerT[i] < -0.35f) FlickerT[i] = FMath::FRandRange(3.0f, 12.0f);
+		}
+		L->SetIntensity(FlickerBase[i] * K);
+	}
+	// el zumbido del fluorescente calla con el apagón; la gotera solo suena si llueve
+	for (UAudioComponent* A : PowerSounds)
+	{
+		if (!A) continue;
+		if (bPowerOff && A->IsPlaying()) A->Stop();
+		else if (!bPowerOff && !A->IsPlaying()) A->Play();
+	}
+	for (UAudioComponent* A : RainSounds)
+	{
+		if (!A) continue;
+		if (Weather != 1 && A->IsPlaying()) A->Stop();
+		else if (Weather == 1 && !A->IsPlaying()) A->Play();
+	}
 }
