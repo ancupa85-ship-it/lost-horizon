@@ -208,5 +208,5 @@ if __name__ == '__main__':
     import sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import personas
-    for n in ('ibarra', 'moya', 'peris'):
+    for n in ('ibarra', 'moya', 'peris', 'vega', 'ramos', 'centinela'):
         preparar(n, personas.cargar(n))

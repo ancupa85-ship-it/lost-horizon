@@ -19,8 +19,8 @@ GUARDIAS = {
     'Peris': ([[28, 7], [28, 8], [23, 8], [28, 8]], [9.0, 0.5, 16.0, 0.5], 'peris'),   # cuartelero: sale a fumar a la puerta y vuelve a la mesa
     # Vega y Ramos se asoman a un rincón y vuelven: allí se paran a mirar (6 s); en la esquina de paso, apenas.
     # Con la misma espera en todos los puntos, ese ir y volver de pocos metros parecía un guardia en bucle.
-    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], [2.5, 1.0, 6.0, 1.0], 'moya'),   # portón
-    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], [3.0, 1.0, 6.0, 1.0], 'peris'),   # barracón
+    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], [2.5, 1.0, 6.0, 1.0], 'vega'),   # portón
+    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], [3.0, 1.0, 6.0, 1.0], 'ramos'),   # barracón
 }
 
 def log(*a):
@@ -113,7 +113,7 @@ def centinelas(eas, cls):
                 g.set_editor_property('tower_light', f)
             else:
                 log('AVISO: no encuentro el foco de', t['name'])
-        cuerpo(g, 'moya')
+        cuerpo(g, 'centinela')
         n += 1
     return n
 
