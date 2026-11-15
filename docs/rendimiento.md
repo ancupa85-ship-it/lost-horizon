@@ -183,3 +183,41 @@ sin tocar (memoria de toda la tarjeta con `nvidia-smi`, fps en tres sitios). Can
 virtuales (4096 → 2048), atlas de la caché de superficies de Lumen (4096 → 2048), reserva de transmisión de Nanite
 (512 → 128 MB), tope de la reserva de texturas (400 MB), resolución interna al 80 % y niebla volumétrica con celdas más
 gordas.
+
+Medida de los candidatos (`render.py`, editor recién abierto, calidad Media, GTX 1050 de 4 GB; cada uno solo, en una
+partida limpia, contra la partida sin tocar: 3021 a 3023 MB y unos 81 fps en los tres sitios de la medida):
+
+| Candidato | Valor de serie en Media → probado | VRAM | fps |
+|---|---|---|---|
+| sombras | `r.Shadow.Virtual.MaxPhysicalPages` 512 → 2048 | +91 MB | −1,9 |
+| lumen_cache | `r.LumenScene.SurfaceCache.AtlasSize` 4096 → 2048 | +82 MB | −5,2 (peor 1 % hasta 16) |
+| nanite | `r.Nanite.Streaming.StreamingPoolSize` 512 → 128 | **−291 MB** | −1,0 |
+| texturas | `r.Streaming.PoolSize` (ya valía 400: no pone nada) | +92 MB | −0,6 |
+| resolucion | `r.ScreenPercentage` 50 → 80 | +95 MB | −30,8 |
+| niebla | `GridPixelSize` 8 → 16, `GridSizeZ` 128 → 64 | +130 MB | −4,8 |
+| todo | | −226 MB | −29 |
+
+Lo que enseña la tabla:
+
+- **La calidad Media ya venía por debajo de varios candidatos** (sombras con 512 páginas, pantalla al 50 %): ponerlos
+  «más bajos» era subirlos. Los valores de serie que supuse eran los de calidad alta.
+- **Cada partida después de la primera gasta unos 90 MB más sin tocar nada** («texturas» no pone ninguna variable y da
+  +92 MB): las diferencias de menos de 100 MB de esta tabla son ruido de esa deriva, no del ajuste.
+- **Solo la reserva de Nanite devuelve memoria de verdad** (−291 MB, casi sin coste). Es el único que queda aplicado en
+  el director del nivel (`render.aplicar(['nanite'])`). La captura del patio antes y después es idéntica.
+- **La resolución interna está al 50 %** con el reescalado temporal. Subirla al 80 % cuesta 31 fps en esta tarjeta: no
+  se aplica. Es buena parte de por qué la imagen se ve blanda; queda como decisión de calidad para cuando haya tarjeta.
+
+`medir.py` con el presupuesto aplicado, editor recién abierto, ventana 2032x1125 (medio / peor 1 %):
+
+| Sitio | fps | VRAM (MB) |
+|---|---|---|
+| Entrada | 40,2 / 37,1 | 3668 |
+| Patio central | 39,1 / 36,4 | 3540 |
+| Barracón oeste | 33,6 / 30,7 | 3668 |
+| Portón de entrada | 40,4 / 36,9 | 3668 |
+| Portón de salida | 41,2 / 37,8 | 3669 |
+| Camino con el camión | 36,8 / 33,2 | 3669 |
+
+Frente a la 0023, con la misma ventana: entre 5 y 9 fps más y unos 120 MB menos, con 93 piezas de cobertura, 24 carteles
+y el mojado de la lluvia añadidos.
