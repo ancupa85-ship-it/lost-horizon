@@ -47,6 +47,8 @@
 #include "TimerManager.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/DecalComponent.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Kismet/KismetMaterialLibrary.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -63,6 +65,44 @@ void ATarsisDirector::BeginPlay()
 	SetupPlayer();
 	SetWeather(Weather);
 	SetupZones();
+	ApplyRenderCVars();
+}
+
+void ATarsisDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// las variables de consola del presupuesto de render, como estaban (en el editor siguen puestas al salir del PIE)
+	for (int32 i = RenderSaved.Num() - 1; i >= 0; --i)
+	{
+		if (IConsoleVariable* CV = IConsoleManager::Get().FindConsoleVariable(*RenderSaved[i].Key)) CV->Set(*RenderSaved[i].Value, ECVF_SetByCode);
+	}
+	RenderSaved.Reset();
+	// y la base seca para el editor
+	if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Mojado"), 0.0f);
+	Super::EndPlay(EndPlayReason);
+}
+
+void ATarsisDirector::ApplyRenderCVars()
+{
+	RenderApplied.Reset();
+	for (const FString& Line : RenderCVars)
+	{
+		FString Name, Value;
+		if (!Line.Split(TEXT("="), &Name, &Value)) continue;
+		Name.TrimStartAndEndInline();
+		Value.TrimStartAndEndInline();
+		IConsoleVariable* CV = IConsoleManager::Get().FindConsoleVariable(*Name);
+		if (!CV)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Tarsis: presupuesto de render: no existe la variable %s"), *Name);
+			continue;
+		}
+		const FString Before = CV->GetString();
+		if (Before == Value) continue;
+		RenderSaved.Emplace(Name, Before);
+		CV->Set(*Value, ECVF_SetByCode);
+		RenderApplied.Add(FString::Printf(TEXT("%s=%s->%s"), *Name, *Before, *CV->GetString()));
+	}
+	if (RenderApplied.Num() > 0) UE_LOG(LogTemp, Display, TEXT("Tarsis: presupuesto de render: %s"), *FString::Join(RenderApplied, TEXT(", ")));
 }
 
 void ATarsisDirector::SetupPlayer()
@@ -2302,9 +2342,14 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 	const FVector CabFace(TruckX + 62.0f, TruckStart.Y, TruckStart.Z);
 	const FVector Tail(TruckX - 320.0f, TruckStart.Y - 140.0f, TruckStart.Z);
 	const FVector TailFace(TruckX - 150.0f, TruckStart.Y, TruckStart.Z);
-	auto Lift = [this]()
+	// Keep: segundos que el guardia se queda todavía en su sitio (acabando el gesto) antes de volver a la ronda
+	auto Lift = [this](float Keep = 0.0f)
 	{
-		if (TruckInspector) TruckInspector->EndErrand();
+		if (TruckInspector)
+		{
+			if (Keep > 0.0f) TruckInspector->EndErrandIn(Keep);
+			else TruckInspector->EndErrand();
+		}
 		TruckCheck = 5;
 		TruckCheckT = 0.0f;
 		if (BarrierTarget < 1.0f)
@@ -2337,6 +2382,7 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 		}
 		if (Best && Best->Errand(Cab, CabFace, 45.0f))
 		{
+			Best->PlayGesture(TEXT("alto"), 1.8f);   // va hacia la cabina con la mano en alto
 			TruckInspector = Best;
 			TruckCheck = 1;
 			TruckCheckT = 0.0f;
@@ -2362,6 +2408,8 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 		else if (TruckCheckT > 20.0f) Lift();   // no llega (algo le corta el paso): da paso desde donde está
 		break;
 	case 2:
+		// tiende la mano, coge los papeles y los mira (el gesto se renueva cada tick: si deja el recado, se deshace solo)
+		G->PlayGesture(TruckCheckT < 1.3f ? TEXT("papeles") : TEXT("leer"), 0.4f);
 		if (TruckCheckT < TruckPapersTime) break;
 		if (BaseState() >= 1 && G->Errand(Tail, TailFace, 30.0f))
 		{
@@ -2372,12 +2420,14 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 		}
 		else
 		{
+			// da paso con el brazo hacia el portón y se queda un momento viendo arrancar el camión
 			GuardSay(G, TEXT("pase"));
-			Lift();
+			G->PlayGesture(TEXT("pase"), 2.4f, ExitLoc);
+			Lift(2.2f);
 		}
 		break;
 	case 3:
-		if (G->AtErrand()) { TruckCheck = 4; TruckCheckT = 0.0f; }
+		if (G->AtErrand()) { TruckCheck = 4; TruckCheckT = 0.0f; G->PlayGesture(TEXT("lona"), 1.5f); }
 		else if (TruckCheckT > 14.0f) Lift();
 		break;
 	case 4:
@@ -2387,7 +2437,13 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 			BeginCapture(G);       // te baja de la caja (LeaveTruck) y la escena de siempre
 			bCaptureTruck = true;
 		}
-		else GuardSay(G, TEXT("nadie"));
+		else
+		{
+			GuardSay(G, TEXT("nadie"));
+			G->PlayGesture(TEXT("pase"), 2.2f, ExitLoc);
+			Lift(2.0f);
+			break;
+		}
 		Lift();
 		break;
 	default:
@@ -2751,6 +2807,7 @@ bool ATarsisDirector::LoadCheckpoint()
 		OffLights.Remove(GateLamp->GetLightComponent());
 	}
 	if (S->Weather != Weather) SetWeather(S->Weather);
+	bWetInit = false;   // el mojado, de golpe al que toque con el clima cargado
 	bHasCheck = true;
 	CheckLoc = S->Loc;
 	CheckRot = S->Rot;
@@ -3555,4 +3612,36 @@ void ATarsisDirector::ZonesTick(float DeltaSeconds)
 		if (Weather != 1 && A->IsPlaying()) A->Stop();
 		else if (Weather == 1 && !A->IsPlaying()) A->Play();
 	}
+	WetTick(DeltaSeconds);
+}
+
+void ATarsisDirector::WetTick(float DeltaSeconds)
+{
+	// tanda 24: con lluvia la base entera se moja poco a poco y al escampar se seca despacio
+	const float Target = Weather == 1 ? 1.0f : 0.0f;
+	const float Prev = Wetness;
+	if (!bWetInit)
+	{
+		bWetInit = true;
+		if (!WetMPC) WetMPC = WetCollection.LoadSynchronous();
+		if (!WetMPC) UE_LOG(LogTemp, Warning, TEXT("Tarsis: falta MPC_Tarsis (tools/unreal/materiales.py): la lluvia no moja el suelo"));
+		Wetness = Target;
+		if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Mojado"), Wetness);
+		return;
+	}
+	Wetness = FMath::FInterpConstantTo(Wetness, Target, DeltaSeconds, 1.0f / FMath::Max(1.0f, Target > Wetness ? WetSeconds : DrySeconds));
+	if (WetMPC && Wetness != Prev) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Mojado"), Wetness);
+}
+
+void ATarsisDirector::SetWetnessNow(float Value)
+{
+	if (!WetMPC) WetMPC = WetCollection.LoadSynchronous();
+	bWetInit = true;
+	Wetness = FMath::Clamp(Value, 0.0f, 1.0f);
+	if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Mojado"), Wetness);
+}
+
+float ATarsisDirector::WetnessInCollection() const
+{
+	return WetMPC ? UKismetMaterialLibrary::GetScalarParameterValue(const_cast<ATarsisDirector*>(this), WetMPC, TEXT("Mojado")) : -1.0f;
 }

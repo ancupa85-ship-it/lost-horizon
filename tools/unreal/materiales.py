@@ -69,6 +69,32 @@ SUCIEDAD = {'camino': 1.25, 'tierra': 1.0, 'muro': 1.0, 'suelo': 0.85}
 # se nota. Para medir lo que ahorra en la GTX 1050 Ti: False lo deja como hasta la tanda 22.
 RUIDO_RAPIDO = True
 
+# tanda 24: con lluvia se moja la base entera. El director sube el parámetro «Mojado» de la colección MPC_Tarsis (0-1,
+# en unos 25 s; al escampar baja en minuto y medio) y el maestro oscurece el color y baja la rugosidad de lo que está a
+# la intemperie: cuánto, por instancia (parámetro Mojable; las que no salen aquí, 0: interiores y fachadas bajo el alero).
+# En el suelo el brillo sale a parches (el mismo ruido de la suciedad): zonas encharcadas y zonas solo húmedas.
+CON_MOJADO = True
+MPC = DM + '/MPC_Tarsis'
+MOJABLE = {'suelo': 1.0, 'camino': 1.0, 'tierra': 1.0, 'tejado': 1.0, 'muro': 0.7, 'hormigon': 0.7, 'oliva': 0.6, 'hierro': 0.6,
+           'contenedor_0': 1.0, 'contenedor_1': 1.0, 'contenedor_2': 1.0, 'contenedor_3': 1.0}
+
+def coleccion():
+    """MPC_Tarsis con el escalar «Mojado» (0 por defecto: en el editor, todo seco). La crea si falta."""
+    c = eal.load_asset(MPC) if eal.does_asset_exist(MPC) else tools.create_asset(
+        'MPC_Tarsis', DM, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
+    if c is None:
+        return None
+    ps = list(c.get_editor_property('scalar_parameters'))
+    if not any(str(q.get_editor_property('parameter_name')) == 'Mojado' for q in ps):
+        q = unreal.CollectionScalarParameter()        # el constructor le da su identificador
+        q.set_editor_property('parameter_name', 'Mojado')
+        q.set_editor_property('default_value', 0.0)
+        ps.append(q)
+        c.set_editor_property('scalar_parameters', ps)
+        eal.save_loaded_asset(c)
+        log('MPC_Tarsis: parámetro Mojado creado')
+    return c
+
 def lin(c):
     c /= 255.0
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -238,7 +264,48 @@ def maestro(defecto):
     mel.connect_material_expressions(sucio0, '', sucio, 'A')
     mel.connect_material_expressions(ztc, '', sucio, 'B')
     mel.connect_material_expressions(zpar, '', sucio, 'Alpha')
-    mel.connect_material_property(sucio if CON_SUCIEDAD else mul, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    color_fin = sucio if CON_SUCIEDAD else mul
+    # mojado (tanda 24): w = Mojado (colección) x Mojable (instancia) x (0,6 en vertical, 1 en horizontal)
+    moj_w = moj_h = None
+    mpc = coleccion() if CON_MOJADO else None
+    if mpc is not None:
+        cp = E(unreal.MaterialExpressionCollectionParameter, -1200, -1700)
+        cp.set_editor_property('collection', mpc)           # la colección, antes que el nombre
+        cp.set_editor_property('parameter_name', 'Mojado')
+        mojable = E(unreal.MaterialExpressionScalarParameter, -1200, -1600)
+        mojable.set_editor_property('parameter_name', 'Mojable'); mojable.set_editor_property('default_value', 0.0)
+        mm_ = E(unreal.MaterialExpressionMultiply, -1000, -1650)
+        mel.connect_material_expressions(cp, '', mm_, 'A')
+        mel.connect_material_expressions(mojable, '', mm_, 'B')
+        vert = E(unreal.MaterialExpressionLinearInterpolate, -850, -1550)
+        vert.set_editor_property('const_a', 0.6); vert.set_editor_property('const_b', 1.0)
+        mel.connect_material_expressions(nza, '', vert, 'Alpha')
+        moj_w = E(unreal.MaterialExpressionMultiply, -700, -1650)
+        mel.connect_material_expressions(mm_, '', moj_w, 'A')
+        mel.connect_material_expressions(vert, '', moj_w, 'B')
+        # en horizontal, a parches: donde el ruido es alto, encharcado
+        par = E(unreal.MaterialExpressionMultiply, -850, -1800)
+        par.set_editor_property('const_b', 1.5)
+        mel.connect_material_expressions(ruido, '', par, 'A')
+        par2 = E(unreal.MaterialExpressionSubtract, -720, -1800)
+        par2.set_editor_property('const_b', 0.2)
+        mel.connect_material_expressions(par, '', par2, 'A')
+        par3 = E(unreal.MaterialExpressionSaturate, -600, -1800)
+        uno(par2, par3)
+        moj_h = E(unreal.MaterialExpressionMultiply, -470, -1800)       # parche x horizontal
+        mel.connect_material_expressions(par3, '', moj_h, 'A')
+        mel.connect_material_expressions(nza, '', moj_h, 'B')
+        # color: lo mojado es más oscuro (hasta x 0,58)
+        osc_m = E(unreal.MaterialExpressionLinearInterpolate, -470, -1650)
+        osc_m.set_editor_property('const_a', 1.0); osc_m.set_editor_property('const_b', 0.58)
+        mel.connect_material_expressions(moj_w, '', osc_m, 'Alpha')
+        cm = E(unreal.MaterialExpressionMultiply, -20, -420)
+        mel.connect_material_expressions(color_fin, '', cm, 'A')
+        mel.connect_material_expressions(osc_m, '', cm, 'B')
+        color_fin = cm
+    elif CON_MOJADO:
+        log('AVISO: M_LH: no hay MPC_Tarsis; el maestro se queda sin el mojado de la lluvia')
+    mel.connect_material_property(color_fin, '', unreal.MaterialProperty.MP_BASE_COLOR)
     # relieve: si una instancia no tiene normal, se queda con la normal plana por defecto del parámetro
     nor = wat(tex_obj('Normal', -1000, 0, 'nor'), -700, 0, WAN)
     mel.connect_material_property(nor, 'XYZ Texture', unreal.MaterialProperty.MP_NORMAL)
@@ -268,7 +335,21 @@ def maestro(defecto):
     mel.connect_material_expressions(rv3, '', radd, 'B')
     rsat = E(unreal.MaterialExpressionSaturate, 0, 400)
     uno(radd, rsat)
-    mel.connect_material_property(rsat if CON_SUCIEDAD else mask, '', unreal.MaterialProperty.MP_ROUGHNESS)
+    rug_fin = rsat if CON_SUCIEDAD else mask
+    if moj_w is not None:
+        # rugosidad de lo mojado: 0,40 (húmedo) -> 0,10 (encharcado, solo en horizontal); nunca más mate que en seco
+        rmoj = E(unreal.MaterialExpressionLinearInterpolate, 0, 600)
+        rmoj.set_editor_property('const_a', 0.40); rmoj.set_editor_property('const_b', 0.10)
+        mel.connect_material_expressions(moj_h, '', rmoj, 'Alpha')
+        rmin = E(unreal.MaterialExpressionMin, 130, 520)
+        mel.connect_material_expressions(rug_fin, '', rmin, 'A')
+        mel.connect_material_expressions(rmoj, '', rmin, 'B')
+        rl_ = E(unreal.MaterialExpressionLinearInterpolate, 260, 420)
+        mel.connect_material_expressions(rug_fin, '', rl_, 'A')
+        mel.connect_material_expressions(rmin, '', rl_, 'B')
+        mel.connect_material_expressions(moj_w, '', rl_, 'Alpha')
+        rug_fin = rl_
+    mel.connect_material_property(rug_fin, '', unreal.MaterialProperty.MP_ROUGHNESS)
     met = E(unreal.MaterialExpressionScalarParameter, -400, 600)
     met.set_editor_property('parameter_name', 'Metal'); met.set_editor_property('default_value', 0.0)
     mel.connect_material_property(met, '', unreal.MaterialProperty.MP_METALLIC)
@@ -518,6 +599,7 @@ def instancias():
             mel.set_material_instance_vector_parameter_value(mi, 'ZocaloTinte', unreal.LinearColor(0.42, 0.55, 0.47, 1))
         if clave in SUCIEDAD:
             mel.set_material_instance_scalar_parameter_value(mi, 'Suciedad', SUCIEDAD[clave])
+        mel.set_material_instance_scalar_parameter_value(mi, 'Mojable', MOJABLE.get(clave, 0.0) if CON_MOJADO else 0.0)
         if clave == 'suelo_int':   # hormigón mate: el brillo uniforme del fluorescente en el suelo parecía plástico
             mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', 1.6)
         eal.save_loaded_asset(mi)

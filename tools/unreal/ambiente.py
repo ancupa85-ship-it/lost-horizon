@@ -318,6 +318,17 @@ class Grafo:
         self.uno(a, n)
         return n
 
+    def lerp(self, a, b, alfa, x, y):
+        """a y b: nodo o número; alfa: nodo."""
+        n = self.E(unreal.MaterialExpressionLinearInterpolate, x, y)
+        for v, ent, const in ((a, 'A', 'const_a'), (b, 'B', 'const_b')):
+            if isinstance(v, (int, float)):
+                n.set_editor_property(const, float(v))
+            else:
+                self.une(v, n, ent)
+        self.une(alfa, n, 'Alpha')
+        return n
+
     def canal(self, src, k, x, y):
         n = self.E(unreal.MaterialExpressionComponentMask, x, y, **{q: q == k for q in 'rgba'})
         self.uno(src, n)
@@ -354,72 +365,85 @@ CHARCO_NORMAL = True     # tanda 23: con la mezcla puesta antes que el dominio, 
 
 
 def material_charco():
-    """M_Charco: agua quieta sobre el suelo. Contorno irregular y nítido (máscara redonda x ruido del mundo, con umbral),
-    color oscuro del suelo mojado, casi sin rugosidad y con el relieve plano: lo que se ve de noche es el reflejo de la
-    farola y del cielo. Parámetros: Color, Fuerza y Rugosidad.
-    Con CHARCO_NORMAL la mezcla es «translúcida»: es la única de las calcomanías que deja escribir el relieve (con alfa
-    compuesto el motor solo mezcla color y rugosidad, y el agua saldría con los granos de la losa); el color va entonces sin
-    multiplicar, lo mezcla el motor con la opacidad. Sin CHARCO_NORMAL, alfa compuesto como M_Mancha: color multiplicado
-    por la opacidad y el relieve que haya debajo."""
-    g = Grafo(DM + '/M_Charco', 'M_Charco', 'charco v4' + (' plano' if CHARCO_NORMAL else ''))
+    """M_Charco: agua quieta sobre el suelo, con su cerco de suelo mojado alrededor. Del centro hacia fuera: el agua
+    (oscura, casi sin rugosidad y con el relieve plano: de noche lo que se ve es el reflejo de la farola y del cielo), que
+    se va haciendo fina hacia la orilla y deja ver el suelo, y un cerco húmedo (suelo algo más oscuro y satinado, con su
+    grano) que se pierde poco a poco. El contorno sale de una máscara redonda por el ruido del mundo: ninguno es igual.
+    Parámetros: Color, Fuerza, Rugosidad (la del agua), Fondo (cuánto tapa el agua en el centro), Cerco (cuánto oscurece
+    el suelo mojado) y RugosidadCerco.
+    Mezcla «translúcida»: es la única de las calcomanías que deja escribir el relieve y que, con Substrate, toca solo lo
+    que hay dentro de la máscara (con alfa compuesto escribía la rugosidad en toda la caja); el color va sin multiplicar,
+    lo mezcla el motor con la opacidad. Sin CHARCO_NORMAL (motor que no la compile), alfa compuesto como en la tanda 22:
+    solo oscurece."""
+    # v5 (tanda 24): la v4 tenía la orilla cortada a cuchillo (umbral x 9) y sin cerco: de noche se leía como una mancha
+    # negra de borde duro salvo en el ángulo del reflejo
+    g = Grafo(DM + '/M_Charco', 'M_Charco', 'charco v5' + (' plano' if CHARCO_NORMAL else ''))
     if g.hecho:
         return g.m
-    # mezcla antes que el dominio (si no, la primera compilación da error). En 5.8 no hay BLEND_TRANSLUCENT_GREY_TRANSMITTANCE
-    # en Python (solo BLEND_TRANSLUCENT, que la calcomanía no admite, y BLEND_TRANSLUCENT_COLORED_TRANSMITTANCE)
+    M, A, S = unreal.MaterialExpressionMultiply, unreal.MaterialExpressionAdd, unreal.MaterialExpressionSubtract
+    # mezcla antes que el dominio (si no, la primera compilación da error)
     g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT if CHARCO_NORMAL else unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
     g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
     col = g.E(unreal.MaterialExpressionVectorParameter, -700, -300, parameter_name='Color', default_value=unreal.LinearColor(0.012, 0.012, 0.011, 1))
-    uv = g.E(unreal.MaterialExpressionTextureCoordinate, -1500, 200)
-    c05 = g.E(unreal.MaterialExpressionConstant2Vector, -1500, 320, r=0.5, g=0.5)
-    sm = g.E(unreal.MaterialExpressionSphereMask, -1300, 200, attenuation_radius=0.5, hardness_percent=25.0)
+    uv = g.E(unreal.MaterialExpressionTextureCoordinate, -1700, 200)
+    c05 = g.E(unreal.MaterialExpressionConstant2Vector, -1700, 320, r=0.5, g=0.5)
+    sm = g.E(unreal.MaterialExpressionSphereMask, -1500, 200, attenuation_radius=0.5, hardness_percent=10.0)
     g.une(uv, sm, 'A'); g.une(c05, sm, 'B')
-    ruido = g.ruido(-1300, 400, 0.018, 2, 0.0, 1.0, rapido=True)
-    forma = g.op(unreal.MaterialExpressionMultiply, sm, g.op(unreal.MaterialExpressionAdd, ruido, 0.38, -1100, 400), -950, 300)
-    borde = g.sat(g.op(unreal.MaterialExpressionMultiply, g.op(unreal.MaterialExpressionSubtract, forma, 0.4, -800, 300), 9.0, -650, 300), -500, 300)
-    opa = g.sat(g.op(unreal.MaterialExpressionMultiply, borde, g.esc('Fuerza', 1.0, -650, 480), -350, 350), -200, 350)
+    ruido = g.ruido(-1500, 400, 0.018, 2, 0.0, 1.0, rapido=True)
+    forma = g.op(M, sm, g.op(A, ruido, 0.38, -1300, 400), -1150, 300)
+    # el agua: entra en forma > 0,40 y está entera en 0,62 (antes en 0,51: la orilla era un escalón)
+    agua0 = g.sat(g.op(M, g.op(S, forma, 0.40, -1000, 250), 4.5, -850, 250), -700, 250)
+    agua = g.op(M, g.op(M, agua0, agua0, -560, 250), g.esc('Fondo', 0.9, -700, 120), -420, 250)      # al cuadrado: orilla fina
+    # el cerco: empieza mucho antes (forma > 0,16) y sube despacio
+    cerco0 = g.sat(g.op(M, g.op(S, forma, 0.16, -1000, 520), 3.2, -850, 520), -700, 520)
+    cerco = g.op(M, cerco0, g.esc('Cerco', 0.5, -700, 660), -560, 560)
+    opa0 = g.E(unreal.MaterialExpressionMax, -280, 380)
+    g.une(agua, opa0, 'A'); g.une(cerco, opa0, 'B')
+    opa = g.sat(g.op(M, opa0, g.esc('Fuerza', 1.0, -280, 560), -140, 420), -20, 420)
     g.sale(opa, unreal.MaterialProperty.MP_OPACITY)
-    rug = g.esc('Rugosidad', 0.05, -350, 560)
     if CHARCO_NORMAL:
         g.sale(col, unreal.MaterialProperty.MP_BASE_COLOR)
+        # rugosidad: la del cerco (satinado) fuera del agua y la del agua dentro
+        rug = g.lerp(g.esc('RugosidadCerco', 0.32, -560, 800), g.esc('Rugosidad', 0.05, -560, 900), agua0, -380, 840)
         g.sale(rug, unreal.MaterialProperty.MP_ROUGHNESS)
+        # relieve plano: como la opacidad del cerco es baja, ahí queda casi entero el grano del suelo
+        g.sale(g.E(unreal.MaterialExpressionConstant3Vector, -380, 1000, constant=unreal.LinearColor(0, 0, 1, 0)), unreal.MaterialProperty.MP_NORMAL)
     else:
-        g.sale(g.op(unreal.MaterialExpressionMultiply, col, opa, -100, -200, desc='premultiplicado'), unreal.MaterialProperty.MP_BASE_COLOR)
-        # sin rugosidad (v3): con alfa compuesto la calcomanía escribe la rugosidad en TODA su caja (aunque vaya multiplicada
-        # por la opacidad, fuera de la mancha la deja en 0, como un espejo): el charco salía dentro de un rectángulo brillante.
-        # Así el agua solo oscurece; el brillo del reflejo necesitaría otra mezcla o un plano de agua de verdad
-        rug = None
-    if CHARCO_NORMAL:
-        g.sale(g.E(unreal.MaterialExpressionConstant3Vector, -350, 700, constant=unreal.LinearColor(0, 0, 1, 0)), unreal.MaterialProperty.MP_NORMAL)
+        # con alfa compuesto la calcomanía escribe la rugosidad en TODA su caja: aquí el agua solo oscurece
+        g.sale(g.op(M, col, opa, -100, -200, desc='premultiplicado'), unreal.MaterialProperty.MP_BASE_COLOR)
     return g.fin()
 
 
 def material_chorreton():
     """M_Chorreton: los regueros oscuros que deja el agua al escurrir por un muro. No usa las UV de la calcomanía sino la
     posición en el mundo (vale para un muro que mire a cualquier lado): hilos verticales finos (ruido muy estirado en
-    vertical), que salen a grupos y cada uno baja una distancia distinta desde lo alto del muro (Techo, en cm del mundo).
-    Parámetros: Color, Fuerza, Techo, Largo y Contraste. La caja de la calcomanía solo limita dónde puede haberlos."""
-    g = Grafo(DM + '/M_Chorreton', 'M_Chorreton', 'chorreton v3 modulado')
+    vertical), que salen a grupos y cada uno baja una distancia distinta desde lo alto del muro (Techo, en cm del mundo),
+    y una franja de humedad irregular pegada a la coronación, de donde nacen.
+    Parámetros: Color, Fuerza, Techo, Largo, Contraste, Grupos (umbral: más bajo, más tramos de muro con regueros) y
+    Franja (fuerza de la humedad de arriba). La caja de la calcomanía solo limita dónde puede haberlos."""
+    # v4 (tanda 24): en las capturas de la 23 casi no se leían. Hilos más finos (11 cm en vez de 17) y con más contraste,
+    # más tramos con regueros, color más oscuro y la franja de arriba. v3: modulado (ver M_Mancha)
+    g = Grafo(DM + '/M_Chorreton', 'M_Chorreton', 'chorreton v4 marcado')
     if g.hecho:
         return g.m
-    # v2 (tanda 23): modulado (ver M_Mancha): Color mezclado con la opacidad; con alfa compuesto se sumaba y no oscurecía.
-    # Antes que el dominio
+    # la mezcla, antes que el dominio
     g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MODULATE)
     g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
     M, A, S, D, AP = (unreal.MaterialExpressionMultiply, unreal.MaterialExpressionAdd, unreal.MaterialExpressionSubtract,
                       unreal.MaterialExpressionDivide, unreal.MaterialExpressionAppendVector)
-    col = g.E(unreal.MaterialExpressionVectorParameter, -500, -400, parameter_name='Color', default_value=unreal.LinearColor(0.03, 0.027, 0.022, 1))
+    col = g.E(unreal.MaterialExpressionVectorParameter, -500, -400, parameter_name='Color', default_value=unreal.LinearColor(0.018, 0.016, 0.013, 1))
     wp = g.E(unreal.MaterialExpressionWorldPosition, -2300, 0)
     mx, my, mz = g.canal(wp, 'r', -2100, -80), g.canal(wp, 'g', -2100, 20), g.canal(wp, 'b', -2100, 120)
     h = g.op(A, mx, my, -1950, -40)                       # a lo largo del muro, mire a donde mire
     cero = g.E(unreal.MaterialExpressionConstant, -1950, 260, r=0.0)
     hc = g.op(AP, h, cero, -1800, 0)
-    # los hilos: 17 cm de ancho medio, y cada uno dura metros en vertical
+    # los hilos: 11 cm de ancho medio, y cada uno dura metros en vertical
     p1 = g.op(AP, hc, g.op(M, mz, 0.03, -1950, 140), -1650, 60)
-    n1 = g.ruido(-1500, 60, 0.06, 2, -0.4, 1.0, pos=p1)
-    hilo = g.sat(g.op(M, n1, g.esc('Contraste', 1.8, -1500, 240), -1300, 100), -1150, 100)
+    n1 = g.ruido(-1500, 60, 0.09, 2, -0.45, 1.0, pos=p1)
+    hilo = g.sat(g.op(M, n1, g.esc('Contraste', 2.6, -1500, 240), -1300, 100), -1150, 100)
     # los grupos: tramos de muro con regueros y tramos limpios
     n2 = g.ruido(-1500, 380, 0.0045, 1, 0.0, 1.0, pos=g.op(AP, hc, cero, -1650, 380), rapido=True)
-    grupo = g.sat(g.op(M, g.op(S, n2, 0.38, -1300, 380), 3.5, -1150, 380), -1000, 380)
+    grupo = g.sat(g.op(M, g.op(S, n2, g.esc('Grupos', 0.30, -1500, 500), -1300, 380), 3.5, -1150, 380), -1000, 380)
     # lo que baja cada hilo: Largo x (0,12 + 1,9 x ruido²)
     p3 = g.op(AP, g.op(AP, h, g.E(unreal.MaterialExpressionConstant, -1950, 600, r=40.0), -1800, 600), cero, -1650, 600)
     n3 = g.ruido(-1500, 600, 0.021, 1, 0.0, 1.0, pos=p3, rapido=True)
@@ -429,8 +453,16 @@ def material_chorreton():
     g.uno(g.op(D, dz, largo, -850, 800), baja)
     f = g.sat(baja, -560, 800)
     arriba = g.sat(g.op(M, dz, 0.25, -850, 980), -700, 980)          # nada por encima de lo alto del muro
-    o = g.op(M, g.op(M, g.op(M, hilo, grupo, -850, 200), f, -420, 400), arriba, -300, 500)
-    opa = g.sat(g.op(M, o, g.esc('Fuerza', 0.8, -300, 660), -160, 500), -40, 500)
+    hilos = g.op(M, g.op(M, hilo, grupo, -850, 200), f, -420, 400)
+    # la franja de arriba: 1 - dz / (25 + 70 x ruido) cm, solo en los tramos con regueros
+    alto_f = g.op(A, g.op(M, n3, 70.0, -1300, 1100), 25.0, -1150, 1100)
+    fr = g.E(unreal.MaterialExpressionOneMinus, -850, 1100)
+    g.uno(g.op(D, dz, alto_f, -1000, 1100), fr)
+    franja = g.op(M, g.op(M, g.sat(fr, -700, 1100), grupo, -560, 1100), g.esc('Franja', 0.6, -700, 1240), -420, 1150)
+    mx_ = g.E(unreal.MaterialExpressionMax, -300, 700)
+    g.une(hilos, mx_, 'A'); g.une(franja, mx_, 'B')
+    o = g.op(M, mx_, arriba, -200, 600)
+    opa = g.sat(g.op(M, o, g.esc('Fuerza', 1.0, -200, 760), -80, 600), 40, 600)
     g.sale(opa, unreal.MaterialProperty.MP_OPACITY)
     g.sale(col, unreal.MaterialProperty.MP_BASE_COLOR)
     return g.fin()

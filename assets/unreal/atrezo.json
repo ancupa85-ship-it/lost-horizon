@@ -29,7 +29,9 @@
   "drawer_cabinet",
   "binder_notebook",
   "hanging_picture_frame_02",
-  "russian_food_cans_01"
+  "russian_food_cans_01",
+  "concrete_road_barrier_02",
+  "cement_bag"
  ],
  "piezas": [
   {
@@ -853,6 +855,936 @@
    "giro": 0,
    "colgar": true,
    "pequeno": true
+  },
+  {
+   "nombre": "cob_A_01",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    138.4,
+    6116.0,
+    60
+   ],
+   "giro": 2.4
+  },
+  {
+   "nombre": "cob_A_02",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    302.7,
+    6123.7,
+    60
+   ],
+   "giro": -0.2
+  },
+  {
+   "nombre": "cob_A_03",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    661.0,
+    6120.8,
+    60
+   ],
+   "giro": -0.2
+  },
+  {
+   "nombre": "cob_A_04",
+   "modelo": "cement_bag",
+   "pos": [
+    476.2,
+    6463.4,
+    30
+   ],
+   "giro": -5.9
+  },
+  {
+   "nombre": "cob_A_05",
+   "modelo": "cement_bag",
+   "pos": [
+    473.7,
+    6536.6,
+    30
+   ],
+   "giro": 1.9
+  },
+  {
+   "nombre": "cob_A_06",
+   "modelo": "cement_bag",
+   "pos": [
+    523.5,
+    6466.6,
+    30
+   ],
+   "giro": 3.6
+  },
+  {
+   "nombre": "cob_A_07",
+   "modelo": "cement_bag",
+   "pos": [
+    523.2,
+    6533.4,
+    30
+   ],
+   "giro": 6.3
+  },
+  {
+   "nombre": "cob_A_08",
+   "modelo": "cement_bag",
+   "pos": [
+    475.1,
+    6464.0,
+    48
+   ],
+   "giro": -5.6
+  },
+  {
+   "nombre": "cob_A_09",
+   "modelo": "cement_bag",
+   "pos": [
+    474.3,
+    6539.0,
+    48
+   ],
+   "giro": 0.7
+  },
+  {
+   "nombre": "cob_A_10",
+   "modelo": "cement_bag",
+   "pos": [
+    522.7,
+    6462.9,
+    48
+   ],
+   "giro": -1.6
+  },
+  {
+   "nombre": "cob_A_11",
+   "modelo": "cement_bag",
+   "pos": [
+    521.5,
+    6538.8,
+    48
+   ],
+   "giro": 5.2
+  },
+  {
+   "nombre": "cob_A_12",
+   "modelo": "cement_bag",
+   "pos": [
+    475.4,
+    6465.2,
+    66
+   ],
+   "giro": -1.9
+  },
+  {
+   "nombre": "cob_A_13",
+   "modelo": "cement_bag",
+   "pos": [
+    477.2,
+    6537.6,
+    66
+   ],
+   "giro": 1.4
+  },
+  {
+   "nombre": "cob_A_14",
+   "modelo": "cement_bag",
+   "pos": [
+    521.1,
+    6463.3,
+    66
+   ],
+   "giro": 3.1
+  },
+  {
+   "nombre": "cob_A_15",
+   "modelo": "cement_bag",
+   "pos": [
+    525.7,
+    6535.9,
+    66
+   ],
+   "giro": 2.4
+  },
+  {
+   "nombre": "cob_A_16",
+   "modelo": "cement_bag",
+   "pos": [
+    478.5,
+    6465.3,
+    84
+   ],
+   "giro": -1.9
+  },
+  {
+   "nombre": "cob_A_17",
+   "modelo": "cement_bag",
+   "pos": [
+    474.4,
+    6536.1,
+    84
+   ],
+   "giro": 1.2
+  },
+  {
+   "nombre": "cob_A_18",
+   "modelo": "cement_bag",
+   "pos": [
+    522.6,
+    6465.5,
+    84
+   ],
+   "giro": 0.7
+  },
+  {
+   "nombre": "cob_A_19",
+   "modelo": "cement_bag",
+   "pos": [
+    524.4,
+    6535.5,
+    84
+   ],
+   "giro": -6.3
+  },
+  {
+   "nombre": "cob_A_20",
+   "modelo": "cement_bag",
+   "pos": [
+    473.7,
+    6461.1,
+    102
+   ],
+   "giro": -2.4
+  },
+  {
+   "nombre": "cob_A_21",
+   "modelo": "cement_bag",
+   "pos": [
+    474.9,
+    6535.4,
+    102
+   ],
+   "giro": -4.1
+  },
+  {
+   "nombre": "cob_A_22",
+   "modelo": "cement_bag",
+   "pos": [
+    521.8,
+    6465.7,
+    102
+   ],
+   "giro": 5.6
+  },
+  {
+   "nombre": "cob_A_23",
+   "modelo": "cement_bag",
+   "pos": [
+    524.6,
+    6534.5,
+    102
+   ],
+   "giro": 5.1
+  },
+  {
+   "nombre": "cob_A_24",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    66.6,
+    7025.3,
+    60
+   ],
+   "giro": 79.6
+  },
+  {
+   "nombre": "cob_A_25",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    13.4,
+    7034.7,
+    60
+   ],
+   "giro": 82.1
+  },
+  {
+   "nombre": "cob_A_26",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    70.3,
+    7024.3,
+    86
+   ],
+   "giro": 72.0
+  },
+  {
+   "nombre": "cob_A_27",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    64.7,
+    7026.2,
+    132
+   ],
+   "giro": 75.6
+  },
+  {
+   "nombre": "cob_A_28",
+   "modelo": "barrel_03",
+   "pos": [
+    640,
+    7110,
+    60
+   ],
+   "giro": 220.2
+  },
+  {
+   "nombre": "cob_A_29",
+   "modelo": "barrel_03",
+   "pos": [
+    712,
+    7085,
+    60
+   ],
+   "giro": 68.4
+  },
+  {
+   "nombre": "cob_A_30",
+   "modelo": "barrel_03",
+   "pos": [
+    672,
+    7178,
+    60
+   ],
+   "giro": 72.6
+  },
+  {
+   "nombre": "cob_B_31",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    1760.7,
+    6496.5,
+    60
+   ],
+   "giro": 0.0
+  },
+  {
+   "nombre": "cob_B_32",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    1928.5,
+    6503.2,
+    60
+   ],
+   "giro": 2.5
+  },
+  {
+   "nombre": "cob_B_33",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    2092.4,
+    6501.0,
+    60
+   ],
+   "giro": -3.4
+  },
+  {
+   "nombre": "cob_B_34",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    2054.7,
+    7123.4,
+    60
+   ],
+   "giro": 9.1
+  },
+  {
+   "nombre": "cob_B_35",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    2045.3,
+    7176.6,
+    60
+   ],
+   "giro": 9.8
+  },
+  {
+   "nombre": "cob_B_36",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    2053.9,
+    7125.5,
+    86
+   ],
+   "giro": 4.6
+  },
+  {
+   "nombre": "cob_B_37",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    2055.1,
+    7119.7,
+    132
+   ],
+   "giro": 16.6
+  },
+  {
+   "nombre": "cob_B_38",
+   "modelo": "barrel_03",
+   "pos": [
+    1790,
+    7210,
+    60
+   ],
+   "giro": 286.2
+  },
+  {
+   "nombre": "cob_C_39",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    3563.0,
+    6117.3,
+    60
+   ],
+   "giro": -0.7
+  },
+  {
+   "nombre": "cob_C_40",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    3724.3,
+    6117.7,
+    60
+   ],
+   "giro": -1.2
+  },
+  {
+   "nombre": "cob_C_41",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    3950.0,
+    6473.0,
+    60
+   ],
+   "giro": -2.2
+  },
+  {
+   "nombre": "cob_C_42",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    3950.0,
+    6527.0,
+    60
+   ],
+   "giro": 0.6
+  },
+  {
+   "nombre": "cob_C_43",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    3950.3,
+    6469.1,
+    86
+   ],
+   "giro": -1.6
+  },
+  {
+   "nombre": "cob_C_44",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    3948.1,
+    6476.1,
+    132
+   ],
+   "giro": -5.9
+  },
+  {
+   "nombre": "cob_C_45",
+   "modelo": "cement_bag",
+   "pos": [
+    3674.3,
+    6971.9,
+    30
+   ],
+   "giro": 1.7
+  },
+  {
+   "nombre": "cob_C_46",
+   "modelo": "cement_bag",
+   "pos": [
+    3676.4,
+    7045.1,
+    30
+   ],
+   "giro": 3.9
+  },
+  {
+   "nombre": "cob_C_47",
+   "modelo": "cement_bag",
+   "pos": [
+    3722.3,
+    6975.5,
+    30
+   ],
+   "giro": -0.4
+  },
+  {
+   "nombre": "cob_C_48",
+   "modelo": "cement_bag",
+   "pos": [
+    3725.7,
+    7043.7,
+    30
+   ],
+   "giro": -4.7
+  },
+  {
+   "nombre": "cob_C_49",
+   "modelo": "cement_bag",
+   "pos": [
+    3676.1,
+    6975.8,
+    48
+   ],
+   "giro": -4.1
+  },
+  {
+   "nombre": "cob_C_50",
+   "modelo": "cement_bag",
+   "pos": [
+    3677.5,
+    7043.2,
+    48
+   ],
+   "giro": 6.1
+  },
+  {
+   "nombre": "cob_C_51",
+   "modelo": "cement_bag",
+   "pos": [
+    3724.0,
+    6971.4,
+    48
+   ],
+   "giro": -3.2
+  },
+  {
+   "nombre": "cob_C_52",
+   "modelo": "cement_bag",
+   "pos": [
+    3721.4,
+    7046.8,
+    48
+   ],
+   "giro": 4.7
+  },
+  {
+   "nombre": "cob_C_53",
+   "modelo": "cement_bag",
+   "pos": [
+    3673.4,
+    6976.9,
+    66
+   ],
+   "giro": 3.6
+  },
+  {
+   "nombre": "cob_C_54",
+   "modelo": "cement_bag",
+   "pos": [
+    3678.0,
+    7048.3,
+    66
+   ],
+   "giro": -0.2
+  },
+  {
+   "nombre": "cob_C_55",
+   "modelo": "cement_bag",
+   "pos": [
+    3724.7,
+    6972.4,
+    66
+   ],
+   "giro": -4.6
+  },
+  {
+   "nombre": "cob_C_56",
+   "modelo": "cement_bag",
+   "pos": [
+    3724.4,
+    7045.7,
+    66
+   ],
+   "giro": 1.0
+  },
+  {
+   "nombre": "cob_C_57",
+   "modelo": "cement_bag",
+   "pos": [
+    3673.1,
+    6976.6,
+    84
+   ],
+   "giro": 3.8
+  },
+  {
+   "nombre": "cob_C_58",
+   "modelo": "cement_bag",
+   "pos": [
+    3673.6,
+    7048.3,
+    84
+   ],
+   "giro": -4.6
+  },
+  {
+   "nombre": "cob_C_59",
+   "modelo": "cement_bag",
+   "pos": [
+    3721.5,
+    6974.9,
+    84
+   ],
+   "giro": 0.9
+  },
+  {
+   "nombre": "cob_C_60",
+   "modelo": "cement_bag",
+   "pos": [
+    3723.2,
+    7043.8,
+    84
+   ],
+   "giro": -4.0
+  },
+  {
+   "nombre": "cob_C_61",
+   "modelo": "cement_bag",
+   "pos": [
+    3675.2,
+    6974.2,
+    102
+   ],
+   "giro": -3.9
+  },
+  {
+   "nombre": "cob_C_62",
+   "modelo": "cement_bag",
+   "pos": [
+    3678.8,
+    7047.2,
+    102
+   ],
+   "giro": -6.0
+  },
+  {
+   "nombre": "cob_C_63",
+   "modelo": "cement_bag",
+   "pos": [
+    3722.9,
+    6973.0,
+    102
+   ],
+   "giro": 4.3
+  },
+  {
+   "nombre": "cob_C_64",
+   "modelo": "barrel_03",
+   "pos": [
+    4200,
+    7150,
+    60
+   ],
+   "giro": 228.0
+  },
+  {
+   "nombre": "cob_C_65",
+   "modelo": "barrel_03",
+   "pos": [
+    4268,
+    7192,
+    60
+   ],
+   "giro": 351.5
+  },
+  {
+   "nombre": "cob_D_66",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    5647.2,
+    6502.6,
+    60
+   ],
+   "giro": -1.5
+  },
+  {
+   "nombre": "cob_D_67",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    5818.4,
+    6494.4,
+    60
+   ],
+   "giro": -2.4
+  },
+  {
+   "nombre": "cob_D_68",
+   "modelo": "cement_bag",
+   "pos": [
+    6087.3,
+    6465.8,
+    30
+   ],
+   "giro": -2.8
+  },
+  {
+   "nombre": "cob_D_69",
+   "modelo": "cement_bag",
+   "pos": [
+    6087.1,
+    6540.4,
+    30
+   ],
+   "giro": 3.1
+  },
+  {
+   "nombre": "cob_D_70",
+   "modelo": "cement_bag",
+   "pos": [
+    6133.8,
+    6468.9,
+    30
+   ],
+   "giro": -1.0
+  },
+  {
+   "nombre": "cob_D_71",
+   "modelo": "cement_bag",
+   "pos": [
+    6131.4,
+    6535.4,
+    30
+   ],
+   "giro": 1.1
+  },
+  {
+   "nombre": "cob_D_72",
+   "modelo": "cement_bag",
+   "pos": [
+    6083.2,
+    6463.4,
+    48
+   ],
+   "giro": -6.2
+  },
+  {
+   "nombre": "cob_D_73",
+   "modelo": "cement_bag",
+   "pos": [
+    6086.6,
+    6536.2,
+    48
+   ],
+   "giro": 6.8
+  },
+  {
+   "nombre": "cob_D_74",
+   "modelo": "cement_bag",
+   "pos": [
+    6132.2,
+    6464.8,
+    48
+   ],
+   "giro": 3.0
+  },
+  {
+   "nombre": "cob_D_75",
+   "modelo": "cement_bag",
+   "pos": [
+    6133.0,
+    6539.8,
+    48
+   ],
+   "giro": 2.2
+  },
+  {
+   "nombre": "cob_D_76",
+   "modelo": "cement_bag",
+   "pos": [
+    6086.6,
+    6464.6,
+    66
+   ],
+   "giro": -6.2
+  },
+  {
+   "nombre": "cob_D_77",
+   "modelo": "cement_bag",
+   "pos": [
+    6088.8,
+    6540.1,
+    66
+   ],
+   "giro": 4.5
+  },
+  {
+   "nombre": "cob_D_78",
+   "modelo": "cement_bag",
+   "pos": [
+    6131.1,
+    6466.6,
+    66
+   ],
+   "giro": 3.0
+  },
+  {
+   "nombre": "cob_D_79",
+   "modelo": "cement_bag",
+   "pos": [
+    6137.0,
+    6540.9,
+    66
+   ],
+   "giro": -0.3
+  },
+  {
+   "nombre": "cob_D_80",
+   "modelo": "cement_bag",
+   "pos": [
+    6086.8,
+    6468.3,
+    84
+   ],
+   "giro": 2.8
+  },
+  {
+   "nombre": "cob_D_81",
+   "modelo": "cement_bag",
+   "pos": [
+    6134.1,
+    6465.9,
+    84
+   ],
+   "giro": 2.0
+  },
+  {
+   "nombre": "cob_D_82",
+   "modelo": "cement_bag",
+   "pos": [
+    6132.1,
+    6540.5,
+    84
+   ],
+   "giro": -2.9
+  },
+  {
+   "nombre": "cob_D_83",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5694.4,
+    7093.6,
+    60
+   ],
+   "giro": -13.7
+  },
+  {
+   "nombre": "cob_D_84",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5705.6,
+    7146.4,
+    60
+   ],
+   "giro": -9.8
+  },
+  {
+   "nombre": "cob_D_85",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5695.4,
+    7091.2,
+    86
+   ],
+   "giro": -17.5
+  },
+  {
+   "nombre": "cob_E_86",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    7398.2,
+    6119.1,
+    60
+   ],
+   "giro": 0.1
+  },
+  {
+   "nombre": "cob_E_87",
+   "modelo": "concrete_road_barrier_02",
+   "pos": [
+    7568.2,
+    6125.7,
+    60
+   ],
+   "giro": -1.5
+  },
+  {
+   "nombre": "cob_E_88",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    7762.4,
+    6473.1,
+    60
+   ],
+   "giro": 4.0
+  },
+  {
+   "nombre": "cob_E_89",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    7757.6,
+    6526.9,
+    60
+   ],
+   "giro": 3.8
+  },
+  {
+   "nombre": "cob_E_90",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    7764.2,
+    6476.1,
+    86
+   ],
+   "giro": 4.1
+  },
+  {
+   "nombre": "cob_E_91",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    7759.2,
+    6471.1,
+    132
+   ],
+   "giro": 6.6
+  },
+  {
+   "nombre": "cob_E_92",
+   "modelo": "barrel_03",
+   "pos": [
+    7480,
+    6512,
+    60
+   ],
+   "giro": 238.8
+  },
+  {
+   "nombre": "cob_E_93",
+   "modelo": "barrel_03",
+   "pos": [
+    7548,
+    6478,
+    60
+   ],
+   "giro": 161.6
   }
  ],
  "vaciar": {
@@ -890,5 +1822,11 @@
  "mallas_propias": [
   "colchon",
   "manta"
- ]
+ ],
+ "giro_modelo": {
+  "_leeme": "Grados que se suman al giro de todas las piezas de un modelo. Con giro 0 lo largo de la pieza debe ir a lo largo de X (lo comprueba prueba_cobertura).",
+  "concrete_road_barrier_02": 0,
+  "cement_bag": 0,
+  "wooden_military_crate": 0
+ }
 }

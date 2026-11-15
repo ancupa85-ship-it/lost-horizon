@@ -933,6 +933,232 @@ def prueba_charcos():
     check('sonidos de la caja del camión importados', all(unreal.load_object(None, '/Game/Tarsis/Sonidos/%s.%s' % (n, n)) for n in ('camion_junta', 'camion_caja')))
 
 
+def prueba_mojado():
+    """Tanda 24 (arte): la lluvia moja la base entera. El director sube «Mojado» en la colección MPC_Tarsis mientras
+    llueve y lo baja despacio al escampar; el material maestro oscurece y da brillo a lo que está a la intemperie
+    (parámetro Mojable de cada instancia) y deja como estaban los interiores."""
+    d = director()
+    mel = unreal.MaterialEditingLibrary
+    mpc = unreal.load_object(None, '/Game/Tarsis/Materiales/MPC_Tarsis.MPC_Tarsis')
+    check('la colección MPC_Tarsis existe y el director la tiene', mpc is not None and d.wetness_in_collection() >= 0.0, d.wetness_in_collection())
+    def mojable(n):
+        mi = unreal.load_object(None, '/Game/Tarsis/Materiales/MI_%s.MI_%s' % (n, n))
+        return round(mel.get_material_instance_scalar_parameter_value(mi, 'Mojable'), 2) if mi else None
+    val = {n: mojable(n) for n in ('suelo', 'tejado', 'muro', 'oliva', 'suelo_int', 'pared', 'madera')}
+    check('se moja lo que está a la intemperie y no los interiores', val['suelo'] == 1.0 and val['tejado'] == 1.0 and 0.5 < (val['muro'] or 0) < 1.0
+          and 0.3 < (val['oliva'] or 0) < 1.0 and val['suelo_int'] == 0.0 and val['pared'] == 0.0 and val['madera'] == 0.0, val)
+    w0, ws, ds = d.get_editor_property('weather'), d.get_editor_property('wet_seconds'), d.get_editor_property('dry_seconds')
+    moj = lambda: director().get_editor_property('wetness')
+    while d.get_editor_property('weather') != 0:
+        d.simulate_key('Y'); yield 0.2
+    d.set_wetness_now(0.0); yield 0.2
+    check('en seco la colección vale 0', moj() < 0.01 and abs(d.wetness_in_collection()) < 0.01, '%.2f, %.2f' % (moj(), d.wetness_in_collection()))
+    d.set_editor_property('wet_seconds', 2.0); d.set_editor_property('dry_seconds', 3.0)   # para no esperar 25 s y 90 s
+    while d.get_editor_property('weather') != 1:
+        d.simulate_key('Y'); yield 0.2
+    yield 0.7
+    medio = moj()
+    check('con la lluvia se va mojando poco a poco', 0.15 < medio < 0.9, '%.2f' % medio)
+    yield 2.2
+    check('y acaba empapada (la colección vale 1)', moj() > 0.99 and d.wetness_in_collection() > 0.99, '%.2f, %.2f' % (moj(), d.wetness_in_collection()))
+    while d.get_editor_property('weather') != 0:
+        d.simulate_key('Y'); yield 0.2
+    yield 0.8
+    medio = moj()
+    check('al escampar no se seca de golpe', 0.3 < medio < 0.95, '%.2f' % medio)
+    yield 3.4
+    check('y vuelve a estar seca', moj() < 0.01 and abs(d.wetness_in_collection()) < 0.01, '%.2f, %.2f' % (moj(), d.wetness_in_collection()))
+    d.set_wetness_now(0.7); yield 0.1
+    visto = d.wetness_in_collection()
+    d.set_wetness_now(0.0)
+    check('SetWetnessNow lo pone de golpe (capturas y pruebas)', abs(visto - 0.7) < 0.01, '%.2f' % visto)
+    d.set_editor_property('wet_seconds', ws); d.set_editor_property('dry_seconds', ds)
+    while d.get_editor_property('weather') != w0:
+        d.simulate_key('Y'); yield 0.2
+    # presupuesto de render: lo que el director del nivel tenga apuntado, puesto de verdad (o ya valía eso)
+    quiere = [str(x) for x in d.get_editor_property('render_c_vars')]
+    puestas = [str(x) for x in d.get_editor_property('render_applied')]
+    mal = []
+    for linea in quiere:
+        n, _, v = linea.partition('=')
+        try:
+            ahora = unreal.SystemLibrary.get_console_variable_float_value(n.strip())
+            if abs(ahora - float(v)) > 1e-4:
+                mal.append('%s=%s (quiere %s)' % (n, ahora, v))
+        except Exception as ex:
+            mal.append('%s: %r' % (linea, ex))
+    check('el presupuesto de render del nivel (%d variables) está puesto' % len(quiere), not mal, mal or puestas)
+
+
+def prueba_carteles():
+    """Tanda 24 (mundo): carteles, rótulos y etiquetas. Chapas esmaltadas en los dinteles y en el muro, señales en poste,
+    pintura de plantilla en el muro y en la losa del control y etiquetas en las taquillas (assets/unreal/carteles.json)."""
+    w = mundo()
+    lista = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'carteles.json'), encoding='utf-8'))['carteles']
+    mel = unreal.MaterialEditingLibrary
+    por = {}
+    for cls in (unreal.StaticMeshActor, unreal.DecalActor):
+        for a in actores('cartel', cls):
+            por[a.get_actor_label()] = a
+    faltan = [c['nombre'] for c in lista if 'Cartel_' + c['nombre'] not in por]
+    check('los %d carteles de carteles.json están en el nivel' % len(lista), len(lista) >= 20 and not faltan, faltan)
+    torcidos, sin_tex, al_aire, chocan, sin_poste = [], [], [], [], []
+    for c in lista:
+        a = por.get('Cartel_' + c['nombre'])
+        if not a:
+            continue
+        if c['clase'] != 'placa':
+            mi = a.decal.get_decal_material()
+        else:
+            comp = a.get_component_by_class(unreal.StaticMeshComponent)
+            mi = comp.get_material(0)
+            r = math.radians(c['mira'])
+            nx, ny = math.cos(r), math.sin(r)
+            up, der = a.get_actor_up_vector(), a.get_actor_right_vector()
+            # de cara a quien lo lee y derecho: la normal del plano hacia «mira» y su Y local (la v de la textura) hacia abajo
+            if up.x * nx + up.y * ny < 0.99 or der.z > -0.99:
+                torcidos.append(c['nombre'])
+            if comp.get_collision_enabled() != unreal.CollisionEnabled.NO_COLLISION:
+                chocan.append(c['nombre'])
+            p = a.get_actor_location()
+            if c.get('poste'):
+                poste = por.get('Cartel_' + c['nombre'] + '_poste')
+                if not poste or dist2d(poste.get_actor_location(), V(c['pos'][0], c['pos'][1], 0)) > 5 or abs(p.y - 5700) < 320:
+                    sin_poste.append(c['nombre'])
+            else:
+                # pegado a algo: la pared (o la taquilla) queda justo detrás de la chapa, ni a un palmo ni por delante
+                h = unreal.SystemLibrary.line_trace_single(w, V(p.x + nx * 30, p.y + ny * 30, p.z), V(p.x - nx * 30, p.y - ny * 30, p.z),
+                                                           unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [jugador()], unreal.DrawDebugTrace.NONE, True)
+                if h:
+                    l = h.to_tuple()[4]
+                    sep = (l.x - p.x) * nx + (l.y - p.y) * ny
+                if not h or not (-10.0 <= sep <= 1.0):
+                    al_aire.append('%s %s' % (c['nombre'], ('%.1f' % sep) if h else 'sin pared'))
+        tx = mel.get_material_instance_texture_parameter_value(mi, 'Textura') if mi else None
+        if not tx or tx.get_name() != 'T_Cartel_' + c['tex']:
+            sin_tex.append(c['nombre'])
+    check('cada uno lleva su textura', not sin_tex, sin_tex)
+    check('las placas miran a quien las lee y están derechas', not torcidos, torcidos)
+    check('cada placa está pegada a su pared o a su taquilla (detrás, a menos de 10 cm)', not al_aire, al_aire)
+    check('las señales de poste tienen su poste, fuera del camino', not sin_poste, sin_poste)
+    check('ningún cartel estorba el paso', not chocan, chocan)
+    B = unreal.BlendMode
+    pla = unreal.load_object(None, '/Game/Tarsis/Materiales/M_Cartel.M_Cartel')
+    rot = unreal.load_object(None, '/Game/Tarsis/Materiales/M_Rotulo.M_Rotulo')
+    check('chapa recortada y pintura modulada (Substrate)', pla is not None and rot is not None and pla.get_editor_property('blend_mode') == B.BLEND_MASKED
+          and rot.get_editor_property('blend_mode') == B.BLEND_MODULATE and rot.get_editor_property('material_domain') == unreal.MaterialDomain.MD_DEFERRED_DECAL,
+          [m.get_editor_property('blend_mode') if m else None for m in (pla, rot)])
+    en_puertas = [n for n in ('Jefatura', 'Archivo', 'Dormitorio', 'CuerpoGuardia', 'Calabozo') if 'Cartel_' + n in por
+                  and 225 < por['Cartel_' + n].get_actor_location().z < 300]
+    check('las cinco puertas con nombre tienen su placa en el dintel', len(en_puertas) == 5, en_puertas)
+    suelo = [a for a in por.values() if isinstance(a, unreal.DecalActor) and a.get_actor_location().z < 20]
+    check('ALTO y la línea, pintados en la losa del control', len(suelo) == 2 and all(abs(a.get_actor_location().y - 5700) < 10 and 8200 < a.get_actor_location().x < 8600 for a in suelo),
+          [int(a.get_actor_location().x) for a in suelo])
+    yield 0.1
+
+
+def prueba_cobertura():
+    """Tanda 24 (juego): el anillo sur deja de ser un llano. Barreras de hormigón, pilas de cajas y de sacos y bidones en
+    cinco grupos entre el camino y el muro: se cruza de cobertura en cobertura mientras Carmona hace su ronda."""
+    w = mundo()
+    quietos('Lobato', 'Sanz', 'Carmona')
+    aparte()
+    piezas = {p['nombre']: p for p in json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'atrezo.json'), encoding='utf-8'))['piezas'] if p.get('nombre', '').startswith('cob_')}
+    cob = {a.get_actor_label()[7:]: a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor) if a.get_actor_label().startswith('Atrezo_cob_')}
+    check('las %d piezas de cobertura están en el anillo sur' % len(piezas), len(piezas) >= 90 and len(cob) == len(piezas), '%d de %d' % (len(cob), len(piezas)))
+    if not cob:
+        return
+    caja = {n: a.get_actor_bounds(False) for n, a in cob.items()}     # (centro, media caja)
+    fuera = [n for n, (o, e) in caja.items() if o.y - e.y < 6010 or o.y + e.y > 7450 or not -1800 < o.x < 9000]
+    check('todas entre el camino y el muro sur (ninguna pisa el camino)', not fuera, fuera)
+    # las dos calles de la ronda de Carmona (y 6300 y 6700, de x -900 a 8100), libres: medio cuerpo a cada lado
+    calle = [n for n, (o, e) in caja.items() if any(o.y + e.y > y - 60 and o.y - e.y < y + 60 for y in (6300.0, 6700.0)) and o.x + e.x > -1000 and o.x - e.x < 8200]
+    check('las dos calles de la ronda de Carmona quedan libres', not calle, calle)
+    # barreras: tumbadas a lo largo (X) y de un metro largo de alto: tapan a uno agachado, no a uno de pie
+    barr = {n: caja[n] for n, p in piezas.items() if p['modelo'] == 'concrete_road_barrier_02' and n in caja}
+    mal = ['%s %dx%dx%d' % (n, e.x * 2, e.y * 2, e.z * 2) for n, (o, e) in barr.items() if not (e.x * 2 > 130 and e.x > e.y * 2 and 95 < e.z * 2 < 130 and o.z - e.z < 12)]
+    check('las %d barreras, a lo largo del camino, apoyadas y de un metro de alto' % len(barr), len(barr) >= 10 and not mal, mal)
+    # pilas: las piezas de arriba han caído sobre las de abajo (ni flotan ni se han hundido hasta el suelo)
+    # alto de cada pieza y capa que le toca según la z de atrezo.json (los sacos, de 18 en 18 cm desde 30; las cajas, 60, 86 y 132)
+    capas = []
+    for n, p in piezas.items():
+        if p['modelo'] in ('cement_bag', 'wooden_military_crate') and n in caja:
+            if p['modelo'] == 'cement_bag':
+                alto, capa = 18.0, int(round((p['pos'][2] - 30) / 18.0))
+            else:
+                alto, capa = 46.0, {60: 0, 86: 1, 132: 2}.get(p['pos'][2], 0)
+            o, e = caja[n]
+            pie = o.z - e.z
+            if abs(pie - capa * alto) > 4.0 + capa * 5.0:
+                capas.append('%s capa %d, pie a %d cm' % (n, capa, pie))
+    check('las pilas de cajas y sacos se apoyan unas en otras', not capas, capas[:6])
+    altas = [n for n, (o, e) in caja.items() if o.z + e.z > 125]
+    check('hay pilas que tapan a uno de pie (más de 1,25 m)', len(altas) >= 4, len(altas))
+    # y sirven: Carmona parado en el camino, mirando a una barrera del medio; detrás, de pie te ve y agachado no
+    g = guardia('Carmona')
+    n = next((k for k in sorted(barr) if 6400 < barr[k][0].y < 6600), None)
+    if not g or not n:
+        check('una barrera del medio y Carmona para probarla', False, (n, bool(g)))
+        return
+    o, e = barr[n]
+    g.set_actor_location_and_rotation(V(o.x, o.y - 800, g.get_actor_location().z), unreal.Rotator(0.0, 0.0, 90.0), False, True)
+    tp(o.x, o.y + e.y + 48, -90); yield 0.6
+    if agachado():
+        director().simulate_key('C'); yield 0.4
+    de_pie = g.visibility(jugador())
+    director().simulate_key('C'); yield 0.5
+    abajo = g.visibility(jugador())
+    check('detrás de una barrera: de pie te ve, agachado no', de_pie > 0.0 and abajo == 0.0 and agachado(), 'de pie %.2f, agachado %.2f (%s)' % (de_pie, abajo, n))
+    if agachado():
+        director().simulate_key('C'); yield 0.4
+    aparte()
+
+
+def prueba_gestos():
+    """Tanda 24 (juego): los guardias mueven los brazos. Gestos puestos encima de la animación (mano en alto, tender la
+    mano, leer los papeles, dar paso, levantar la lona); en el control del camión los hace Sanz (prueba_camion)."""
+    aparte()
+    g = guardia('Moya')
+    if not g:
+        check('Moya está en el nivel', False)
+        return
+    g.hold(3600.0); yield 1.0
+    nombre = lambda: str(g.current_gesture())
+    h0, i0 = g.hand_height(True), g.hand_height(False)
+    check('en reposo, las manos a los lados', 55 < h0 < 115 and 55 < i0 < 115 and nombre() == 'None', 'derecha %d cm, izquierda %d cm, %s' % (h0, i0, nombre()))
+    g.play_gesture('alto', 2.0, V(0, 0, 0)); yield 0.9
+    h1 = g.hand_height(True)
+    check('«alto»: la mano derecha por encima de la cabeza', h1 > 160 and h1 > h0 + 60 and nombre() == 'alto' and g.get_editor_property('gesture_w') > 0.95,
+          '%d cm (en reposo %d), %s, peso %.2f' % (h1, h0, nombre(), g.get_editor_property('gesture_w')))
+    check('y la izquierda sigue en su sitio', abs(g.hand_height(False) - i0) < 10, '%d cm' % g.hand_height(False))
+    yield 1.9
+    h2 = g.hand_height(True)
+    check('al acabar el gesto, el brazo vuelve a su sitio', abs(h2 - h0) < 10 and nombre() == 'None' and g.get_editor_property('gesture_w') < 0.01, '%d cm, %s' % (h2, nombre()))
+    g.play_gesture('leer', 1.6, V(0, 0, 0)); yield 0.9
+    hd, hi = g.hand_height(True), g.hand_height(False)
+    check('«leer»: las dos manos delante del pecho', 95 < hd < 160 and 95 < hi < 160 and hd > h0 + 12 and hi > i0 + 12 and nombre() == 'leer', 'derecha %d cm, izquierda %d cm' % (hd, hi))
+    yield 1.3
+    # dar paso hacia su derecha: el antebrazo derecho va y viene
+    l, r = g.get_actor_location(), g.get_actor_right_vector()
+    g.play_gesture('pase', 2.4, V(l.x + r.x * 500, l.y + r.y * 500, l.z)); yield 0.5
+    hs, his = [], []
+    for _ in range(10):
+        hs.append(g.hand_height(True)); his.append(g.hand_height(False)); yield 0.1
+    check('«pase»: el brazo del lado hacia donde manda va y viene', max(hs) - min(hs) > 10 and max(his) - min(his) < 8 and nombre() == 'pase',
+          'derecha de %d a %d cm, izquierda de %d a %d' % (min(hs), max(hs), min(his), max(his)))
+    # hacia su izquierda, el otro brazo
+    yield 2.2
+    g.play_gesture('pase', 1.2, V(l.x - r.x * 500, l.y - r.y * 500, l.z)); yield 0.7
+    check('hacia el otro lado, con el otro brazo', g.hand_height(False) > i0 + 25 and abs(g.hand_height(True) - h0) < 10, 'izquierda %d cm, derecha %d cm' % (g.hand_height(False), g.hand_height(True)))
+    yield 1.2
+    # derribado no gesticula
+    g.play_gesture('alto', 3.0, V(0, 0, 0)); yield 0.6
+    derribar(g); yield 0.8
+    check('derribado no gesticula', estado(g) == 'DOWN' and g.get_editor_property('gesture_w') < 0.05 and nombre() == 'None', '%s, peso %.2f, %s' % (estado(g), g.get_editor_property('gesture_w'), nombre()))
+    registro = [str(x) for x in g.get_editor_property('gesture_log')]
+    check('el registro de gestos los cuenta por orden', registro == ['alto', 'leer', 'pase', 'pase', 'alto'], registro)
+
+
 def prueba_anillo():
     """Tanda 21: el anillo deja de estar vacío y a oscuras: farolas en el camino, aplique en el portillo, la tela de las
     vallas como malla de verdad y tres guardias (uno en cada garita y la ronda del sur)."""
@@ -1067,9 +1293,16 @@ def prueba_camion():
     cab = V(cx() + 62, 5700 - 185, 0)
     check('llega a la puerta del conductor y pide los papeles', sanz and d.get_editor_property('truck_checks') == c0 + 1 and dist2d(sanz.get_actor_location(), cab) < 120
           and 'sanz_papeles' in list(d.get_editor_property('voice_log')), '%d cm, %s' % (dist2d(sanz.get_actor_location(), cab) if sanz else -1, list(d.get_editor_property('voice_log'))[-2:]))
+    # tanda 24: lo hace con gestos
+    yield 0.7
+    check('tiende la mano hacia la ventanilla', sanz and str(sanz.current_gesture()) in ('papeles', 'leer') and sanz.get_editor_property('gesture_w') > 0.5,
+          '%s, peso %.2f' % (sanz.current_gesture(), sanz.get_editor_property('gesture_w')) if sanz else '')
     yield ('hasta', lambda: director().get_editor_property('barrier_t') > 0.95, 14.0)
     check('mira los papeles y le levanta la barrera', d.get_editor_property('barrier_t') > 0.95 and 'sanz_pase' in list(d.get_editor_property('voice_log')),
           '%.2f, %s' % (d.get_editor_property('barrier_t'), list(d.get_editor_property('voice_log'))[-2:]))
+    gl = [str(x) for x in sanz.get_editor_property('gesture_log')] if sanz else []
+    check('mano en alto al acercarse, tiende la mano, lee los papeles y da paso con el brazo', [k for k in ('alto', 'papeles', 'leer', 'pase') if k in gl] == ['alto', 'papeles', 'leer', 'pase']
+          and gl.index('alto') < gl.index('papeles') < gl.index('leer') < gl.index('pase') and 'lona' not in gl, gl)
     check('con la base tranquila no registra la caja', d.get_editor_property('truck_searches') == 0, d.get_editor_property('truck_searches'))
     yield ('hasta', lambda: director().get_editor_property('truck_passes') >= 1, 30.0)
     check('sale por el portón del este y desaparece', d.get_editor_property('truck_passes') == 1 and estado_c() == 0 and all(a.get_editor_property('hidden') for a in piezas),
@@ -1186,6 +1419,8 @@ def prueba_viaje():
     yield ('hasta', lambda: director().get_editor_property('capturing'), 16.0)
     check('levanta la lona y te coge', d.get_editor_property('capturing') and not d.get_editor_property('riding') and not jugador().get_editor_property('hidden'),
           '%s, %s' % (d.get_editor_property('capturing'), d.get_editor_property('riding')))
+    gl = [str(x) for x in guardia('Sanz').get_editor_property('gesture_log')] if guardia('Sanz') else []
+    check('y lo hace con el brazo (gesto «lona»)', 'lona' in gl, gl[-4:])
     yield ('hasta', lambda: director().get_editor_property('captures') > c0, 5.0)
     check('el aviso dice de dónde te sacan', d.get_editor_property('captures') == c0 + 1 and 'LEVANTA LA LONA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
     yield ('hasta', lambda: not director().get_editor_property('capturing'), 5.0)
@@ -1305,8 +1540,6 @@ def prueba_opciones():
     check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < 100 %' in ' '.join(lineas(d)))
 
 
-# cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
-
 # ---------------------------------------------------------------- puertas (arreglo de la 0024)
 
 def _barrido_de_pie(a, b):
@@ -1405,9 +1638,11 @@ def prueba_puertas():
     aparte()
 
 
+# cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
-            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas]]
+            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos]]
 PRUEBAS = []
 
 

@@ -71,10 +71,12 @@ CAMINO_Y, RUEDA = 5700.0, 86.0       # eje del camino y media vía del camión (
 LOSA_Z = 4.0
 # tanda 23. tipo -> (material: 'mancha', 'charco' o 'chorreton'; color lineal; fuerza; resto de parámetros de la instancia)
 TIPOS_23 = {
-    'Agua': ('charco', (0.012, 0.012, 0.011), 1.0, {'Rugosidad': 0.05}),            # charco en la losa o el asfalto
-    'AguaBarro': ('charco', (0.03, 0.024, 0.015), 1.0, {'Rugosidad': 0.09}),        # agua turbia en la grava del anillo
-    'Chorreton': ('chorreton', (0.03, 0.027, 0.022), 0.8, {'Techo': 462.0, 'Largo': 280.0, 'Contraste': 1.8}),          # muro de 4,6 m
-    'ChorretonGarita': ('chorreton', (0.03, 0.027, 0.022), 0.75, {'Techo': 251.0, 'Largo': 130.0, 'Contraste': 1.8}),   # garitas de 2,5 m
+    # tanda 24: el charco lleva cerco húmedo (Cerco, RugosidadCerco) y el agua deja ver algo del fondo (Fondo)
+    'Agua': ('charco', (0.012, 0.012, 0.011), 1.0, {'Rugosidad': 0.05, 'Fondo': 0.9, 'Cerco': 0.5, 'RugosidadCerco': 0.32}),       # charco en la losa o el asfalto
+    'AguaBarro': ('charco', (0.03, 0.024, 0.015), 1.0, {'Rugosidad': 0.09, 'Fondo': 0.95, 'Cerco': 0.6, 'RugosidadCerco': 0.4}),  # agua turbia en la grava del anillo
+    # tanda 24: regueros más marcados (más oscuros, hilos más finos, más tramos y la franja húmeda bajo la coronación)
+    'Chorreton': ('chorreton', (0.018, 0.016, 0.013), 1.0, {'Techo': 462.0, 'Largo': 300.0, 'Contraste': 2.6, 'Grupos': 0.30, 'Franja': 0.6}),          # muro de 4,6 m
+    'ChorretonGarita': ('chorreton', (0.018, 0.016, 0.013), 0.95, {'Techo': 251.0, 'Largo': 140.0, 'Contraste': 2.6, 'Grupos': 0.26, 'Franja': 0.5}),   # garitas de 2,5 m
     'Junta': ('mancha', (0.022, 0.021, 0.02), 0.5, {}),                              # junta de la losa que rezuma
 }
 MURO_ALTO = 460.0

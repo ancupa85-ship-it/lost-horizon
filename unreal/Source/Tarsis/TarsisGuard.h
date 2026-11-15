@@ -143,6 +143,33 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis")
 	bool AtErrand() const { return bErrand && bErrandThere; }
 
+	/** El recado se acaba dentro de Seconds como mucho (para que termine un gesto antes de volver a la ronda). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void EndErrandIn(float Seconds) { if (bErrand) ErrandT = FMath::Min(ErrandT, Seconds); }
+
+	/** Gesto con los brazos (tanda 24), encima de la animación que tenga: «alto» (mano en alto; también andando),
+	 *  «papeles» (tiende la mano), «leer» (mira lo que tiene en las manos), «pase» (da paso con el brazo hacia el punto
+	 *  Toward) y «lona» (levanta el brazo para mirar dentro de la caja). Dura Seconds; se deshace solo si deja de estar
+	 *  tranquilo o echa a andar. No cambia lo que ve ni lo que oye. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Cuerpo")
+	void PlayGesture(FName Name, float Seconds, FVector Toward = FVector::ZeroVector);
+
+	/** Gesto que se le ve ahora (None si ninguno). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	FName CurrentGesture() const { return GestureW > 0.05f ? Gesture : NAME_None; }
+
+	/** Cuánto pesa el gesto ahora, 0-1 (entra y sale suave). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	float GestureW = 0.0f;
+
+	/** Gestos que ha hecho, por orden (pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	TArray<FName> GestureLog;
+
+	/** Altura de una mano sobre sus pies, en cm (pruebas: con «alto» la derecha pasa de la cabeza). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Cuerpo")
+	float HandHeight(bool bRight = true);
+
 	/** Marcado con los prismáticos: el HUD muestra su nombre y estado aunque esté detrás de una pared. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Estado")
 	bool bMarked = false;
@@ -293,6 +320,18 @@ private:
 	void SetupPose();
 	void LookTick(float DeltaSeconds);
 	void FootTick(float DeltaSeconds);
+	void GestureTick(float DeltaSeconds);
+	void AimBone(FName Bone, FName Child, const FVector& DirCS, float W);
+	FName ArmBones[2][3];      // [derecho, izquierdo][brazo, antebrazo, mano]
+	FName Gesture;
+	float GestureLeft = 0.0f;
+	float GestureT = 0.0f;
+	FVector GestureDir = FVector::ZeroVector;
+	float ArmW[2] = { 0.0f, 0.0f };      // peso del gesto en cada brazo
+	FVector ArmDir[2][2];                // dirección suavizada de brazo y antebrazo, en ejes del guardia
+	float GestureHead = 0.0f;
+	float GestureLean = 0.0f;
+	void StopGesture();
 	float LookTarget = 0.0f;
 	float Lean = 0.0f;
 	float PrevYaw = 0.0f;

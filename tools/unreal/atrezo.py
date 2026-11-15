@@ -181,6 +181,7 @@ def colocar():
         if str(a.get_folder_path()) == 'Atrezo':
             eas.destroy_actor(a)
     n = 0
+    gm = {k: v for k, v in datos().get('giro_modelo', {}).items() if not k.startswith('_')}   # corrección de giro por modelo
     for p in datos()['piezas']:
         m = malla(p['modelo'])
         if p.get('parte'):
@@ -195,7 +196,8 @@ def colocar():
                                                        True, [], unreal.DrawDebugTrace.NONE, True)
             if h:
                 z = h.to_tuple()[4].z
-        a = eas.spawn_actor_from_object(m, unreal.Vector(x, y, z), unreal.Rotator(0.0, 0.0, p.get('giro', 0.0)))
+        giro = p.get('giro', 0.0) + float(gm.get(p['modelo'], 0.0))
+        a = eas.spawn_actor_from_object(m, unreal.Vector(x, y, z), unreal.Rotator(0.0, 0.0, giro))
         a.set_actor_scale3d(unreal.Vector(*([p.get('escala', 1.0)] * 3)))
         a.set_actor_label('Atrezo_' + p.get('nombre', p['modelo']))
         a.set_folder_path('Atrezo')

@@ -87,6 +87,32 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 
 **Pruebas.** `prueba_charcos` (charcos fijos y de lluvia, regueros en las cuatro caras, juntas en su sitio, un solo material de hierbajos, la mezcla de cada material) y, en `prueba_viaje`, el traqueteo, la luz, el sonido apagado y el golpe de cada eje en cada junta.
 
+### Puertas, lluvia que moja, carteles, cobertura y gestos (tanda 24)
+
+**Puertas (fallo arreglado).** No se podía salir del archivo de pie. La malla `base_pared` lleva Nanite y colisión «compleja como simple»: la colisión compleja sale de la malla de reserva de Nanite, y esa malla, simplificada en automático, había bajado los dinteles de 2,20 m a entre 1,85 y 2,15 m. La cápsula de pie no cabía; agachado se pasaba. `montar_base.py` deja ahora la reserva de Nanite de las mallas de estructura sin simplificar (error relativo 0) y `prueba_puertas` cruza las puertas de pie en los dos sentidos. Lección: con colisión compleja, la reserva de Nanite es la colisión.
+
+**Arte: la lluvia moja la base entera.**
+
+- **Mojado.** `materiales.py` crea la colección `MPC_Tarsis` con el escalar `Mojado`. El maestro `M_LH` lo multiplica por el parámetro `Mojable` de cada instancia (tabla `MOJABLE`: 1 en suelo, camino, tierra, tejados y contenedores; 0,6 a 0,7 en muros y chapa; 0 en interiores y fachadas) y por la inclinación (los planos verticales, el 60 %). Lo mojado se oscurece (hasta × 0,58) y baja de rugosidad: 0,40 húmedo y hasta 0,10 en los parches encharcados del suelo, que salen del mismo ruido que la suciedad. Nunca queda más mate que en seco.
+- **El director** (`WetTick`) sube `Wetness` mientras llueve (`WetSeconds`, 25 s) y lo baja al escampar (`DrySeconds`, 90 s). Al empezar y al cargar partida se pone de golpe en su sitio; al salir del PIE vuelve a 0. `SetWetnessNow()` lo fija para capturas y pruebas.
+- **Charcos con cerco** (`M_Charco` v5): el agua ya no acaba en un borde duro. Hay un centro de agua lisa (rugosidad 0,05) y alrededor un cerco húmedo más ancho, oscuro y satinado (`Cerco`, `RugosidadCerco`).
+- **Regueros marcados** (`M_Chorreton` v4): hilos más oscuros y contrastados, en grupos (`Grupos`), y una franja húmeda bajo la albardilla (`Franja`).
+
+**Mundo: carteles, rótulos y etiquetas.**
+
+- `python tools/carteles/generar.py` (Python normal, con Pillow y numpy) dibuja 21 texturas en `assets/unreal/carteles/`: chapas esmaltadas con óxido en los bordes y en los tornillos, chorretones y desconchones; pintura de plantilla gastada, y etiquetas de papel. La fuente de plantilla es Stardos Stencil (OFL, en `tools/carteles/fuentes/`).
+- `py tools/unreal/carteles.py` (en el editor) las importa a `/Game/Tarsis/Carteles`, crea `M_Cartel` (chapa recortada por el alfa) y `M_Rotulo` (calcomanía modulada, como las manchas) y coloca lo que dice `assets/unreal/carteles.json`: placas en los dinteles (Jefatura, Archivo, Dormitorio, Cuerpo de guardia, Calabozo), «zona militar» en el muro, señales en poste (alto del control, 20 km/h, alta tensión, gasóleo), el lema y el número del portillo pintados en el muro, «ALTO» y la línea en la losa del control, y etiquetas en las taquillas. Todo va a la carpeta `Carteles` con la etiqueta `cartel`.
+- Si un cartel sale en espejo o cabeza abajo se corrige en `ESPEJO` (por clase: placa, pintado, suelo), no cartel a cartel.
+
+**Juego: cobertura en el anillo sur y gestos.**
+
+- **Cobertura.** 93 piezas (`cob_*` en `atrezo.json`): barreras de hormigón, pilas de cajas, sacos de cemento y bidones en cinco grupos entre el camino y el muro sur. Las barreras tapan a uno agachado y no a uno de pie; las pilas de tres cajas tapan de pie. Las dos calles de la ronda de Carmona quedan libres. `giro_modelo` corrige el giro de un modelo entero si viene con lo largo en el otro eje.
+- **Gestos.** `ATarsisGuard::PlayGesture(nombre, segundos, hacia)` pone los brazos encima de la animación que tenga el guardia (no hay grafo de animación: se apunta cada hueso del brazo en la malla visible, después de copiar la pose). Gestos: `alto`, `papeles`, `leer`, `pase` y `lona`. Cada brazo tiene su peso y su dirección suavizada, así que de un gesto a otro el brazo va y no salta. En el control del camión, Sanz va hacia la cabina con la mano en alto, tiende la mano, lee los papeles y da paso con el brazo hacia el portón (o levanta la lona si la base está en guardia). `GestureLog` y `HandHeight()` son para las pruebas.
+
+**Técnica: presupuesto de render.** El director tiene `RenderCVars` (variables de consola «nombre=valor»): las pone al empezar la partida y las deja como estaban al acabar. `py tools/unreal/render.py` mide cada candidato solo, en una partida limpia (memoria de la tarjeta con `nvidia-smi` y fps en tres sitios), y `render.aplicar([...])` escribe los elegidos en el director del nivel. Cambiar el presupuesto no pide compilar. Las medidas están en `docs/rendimiento.md`. Ojo: una variable puesta a mano en la consola manda sobre el código, y una puesta por código manda sobre la escalabilidad (con `r.ScreenPercentage` en el presupuesto, la opción de resolución del menú dejaría de mandar).
+
+**Pruebas.** `prueba_puertas`, `prueba_mojado`, `prueba_carteles`, `prueba_cobertura`, `prueba_gestos` y los gestos de Sanz en `prueba_camion` y `prueba_viaje`.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

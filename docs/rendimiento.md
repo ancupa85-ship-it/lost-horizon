@@ -167,3 +167,19 @@ Mezclas de las calcomanías con Substrate (`r.Substrate=True`), probado en esta 
 
 Memoria (`tools/unreal/memoria.py`, todo cargado): 292 texturas, 228,3 MB. Las 30 de más de 1K piden 91,4 MB; con un
 tope de 1K se ahorrarían 64,1 MB. Hay 4 texturas que no usa nadie. Por carpetas: Atrezo 102 MB y Texturas 94,1 MB.
+
+## 0024: puertas, lluvia que moja, carteles, cobertura, gestos y presupuesto de render
+
+**La colisión de una malla Nanite es su malla de reserva.** `base_pared` lleva Nanite y colisión «compleja como simple».
+La colisión compleja no sale de la malla Nanite, sino de su malla de reserva (la que se dibuja donde no hay Nanite), y con
+el objetivo automático esa reserva se simplifica: los dinteles de tres puertas (archivo, despacho y barracón) bajaron de
+2,20 m a entre 1,85 y 2,15 m y de pie no se pasaba. Arreglo: reserva con error relativo 0 en las mallas de estructura
+(`base_*`). No se pone en todo: en los camiones la reserva pasaba de unos 1.200 a unos 30.000 triángulos por malla sin
+arreglar nada.
+
+**Presupuesto de render.** Las texturas no eran el problema (228 MB de 3,8 GB, tanda 23): lo que llena la tarjeta son los
+búferes del render y el editor. `tools/unreal/render.py` prueba cada ajuste solo, en una partida limpia, contra la partida
+sin tocar (memoria de toda la tarjeta con `nvidia-smi`, fps en tres sitios). Candidatos: páginas físicas de las sombras
+virtuales (4096 → 2048), atlas de la caché de superficies de Lumen (4096 → 2048), reserva de transmisión de Nanite
+(512 → 128 MB), tope de la reserva de texturas (400 MB), resolución interna al 80 % y niebla volumétrica con celdas más
+gordas.

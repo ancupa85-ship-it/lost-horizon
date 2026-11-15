@@ -183,6 +183,8 @@ void ATarsisGuard::SetupPose()
 	HeadBone = Pick({ TEXT("head") });
 	NeckBone = Pick({ TEXT("neck_01"), TEXT("neck") });
 	SpineBone = Pick({ TEXT("spine_03"), TEXT("spine_02"), TEXT("spine_01") });
+	ArmBones[0][0] = Pick({ TEXT("upperarm_r") }); ArmBones[0][1] = Pick({ TEXT("lowerarm_r") }); ArmBones[0][2] = Pick({ TEXT("hand_r") });
+	ArmBones[1][0] = Pick({ TEXT("upperarm_l") }); ArmBones[1][1] = Pick({ TEXT("lowerarm_l") }); ArmBones[1][2] = Pick({ TEXT("hand_l") });
 	Pose = NewObject<UPoseableMeshComponent>(this, TEXT("CuerpoVisible"));
 	Pose->SetupAttachment(M);
 	Pose->SetSkinnedAssetAndUpdate(BodyMesh);
@@ -257,6 +259,165 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 	if (FMath::Abs(Lean) > 0.2f) Turn(SpineBone, FQuat(Right, FMath::DegreesToRadians(Lean)));
 	Turn(NeckBone, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.4f)));
 	Turn(HeadBone, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.6f)));
+}
+
+// ---------------------------------------------------------------- gestos (tanda 24)
+
+void ATarsisGuard::PlayGesture(FName Name, float Seconds, FVector Toward)
+{
+	if (Name.IsNone() || Seconds <= 0.0f) { GestureLeft = 0.0f; return; }
+	if (Gesture != Name || GestureLeft <= 0.0f)
+	{
+		GestureT = 0.0f;
+		GestureLog.Add(Name);
+		if (GestureLog.Num() > 40) GestureLog.RemoveAt(0);
+	}
+	Gesture = Name;
+	GestureLeft = Seconds;
+	GestureDir = Toward;
+}
+
+float ATarsisGuard::HandHeight(bool bRight)
+{
+	const FName Hand = ArmBones[bRight ? 0 : 1][2];
+	if (!Pose || Hand.IsNone()) return 0.0f;
+	const float Feet = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	return Pose->GetBoneLocationByName(Hand, EBoneSpaces::WorldSpace).Z - Feet;
+}
+
+void ATarsisGuard::AimBone(FName Bone, FName Child, const FVector& DirCS, float W)
+{
+	// gira el hueso para que apunte (hacia su hijo) en la dirección pedida, en el espacio de la malla
+	if (!Pose || Bone.IsNone() || Child.IsNone() || W <= 0.001f) return;
+	const FVector A = Pose->GetBoneLocationByName(Bone, EBoneSpaces::ComponentSpace);
+	const FVector B = Pose->GetBoneLocationByName(Child, EBoneSpaces::ComponentSpace);
+	const FVector Cur = (B - A).GetSafeNormal();
+	const FVector Want = DirCS.GetSafeNormal();
+	if (Cur.IsNearlyZero() || Want.IsNearlyZero()) return;
+	const FQuat Q = FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(Cur, Want), FMath::Clamp(W, 0.0f, 1.0f));
+	const FQuat R = Pose->GetBoneRotationByName(Bone, EBoneSpaces::ComponentSpace).Quaternion();
+	Pose->SetBoneRotationByName(Bone, (Q * R).Rotator(), EBoneSpaces::ComponentSpace);
+}
+
+void ATarsisGuard::GestureTick(float DeltaSeconds)
+{
+	// Después de LookTick: la pose visible ya es la de la animación con la cabeza girada; aquí se le ponen los brazos.
+	// Sin grafo de animación (SingleNode) no hay capas: se apunta cada hueso del brazo hacia donde debe ir. Cada brazo
+	// tiene su peso y su dirección suavizada: de un gesto a otro (tender la mano -> leer) el brazo va, no salta.
+	static const FName NAlto(TEXT("alto")), NPapeles(TEXT("papeles")), NLeer(TEXT("leer")), NPase(TEXT("pase")), NLona(TEXT("lona"));
+	if (!Pose) return;
+	if (GestureLeft > 0.0f) GestureLeft -= DeltaSeconds;
+	const bool bCalm = (State == ETarsisGuardState::Patrol || State == ETarsisGuardState::Return) && StunT <= 0.0f
+		&& (Gesture == NAlto || GetVelocity().Size2D() < 45.0f);
+	const bool bOn = GestureLeft > 0.0f && bCalm;
+	if (!bOn && ArmW[0] <= 0.0f && ArmW[1] <= 0.0f && FMath::Abs(GestureHead) < 0.05f && FMath::Abs(GestureLean) < 0.05f)
+	{
+		GestureW = 0.0f;
+		return;
+	}
+	GestureT += DeltaSeconds;
+	// lo que pide el gesto: hacia dónde van el brazo y el antebrazo de cada lado, en los ejes del guardia
+	// (X al frente, Y a su derecha, Z arriba)
+	FVector Want[2][2];
+	bool bUse[2] = { false, false };
+	float HeadPitch = 0.0f, SpineLean = 0.0f;
+	if (bOn)
+	{
+		if (Gesture == NAlto)
+		{
+			// la mano derecha en alto, la palma al frente
+			bUse[0] = true;
+			Want[0][0] = FVector(0.65f, 0.35f, 0.6f);
+			Want[0][1] = FVector(0.35f, 0.0f, 0.92f);
+		}
+		else if (Gesture == NPapeles)
+		{
+			// tiende la mano: el codo algo doblado, el antebrazo al frente
+			bUse[0] = true;
+			Want[0][0] = FVector(0.7f, 0.25f, -0.65f);
+			Want[0][1] = FVector(0.95f, -0.1f, 0.15f);
+		}
+		else if (Gesture == NLeer)
+		{
+			// los dos antebrazos delante del pecho y la cabeza baja: mira los papeles
+			for (int32 Side = 0; Side < 2; ++Side)
+			{
+				const float S = Side == 0 ? 1.0f : -1.0f;
+				bUse[Side] = true;
+				Want[Side][0] = FVector(0.3f, 0.2f * S, -0.92f);
+				Want[Side][1] = FVector(0.75f, -0.4f * S, 0.5f);
+			}
+			HeadPitch = 24.0f;
+		}
+		else if (Gesture == NLona)
+		{
+			// levanta la lona con la derecha y se asoma
+			bUse[0] = true;
+			Want[0][0] = FVector(0.55f, 0.2f, 0.78f);
+			Want[0][1] = FVector(0.6f, 0.0f, 0.75f);
+			SpineLean = 8.0f;
+			HeadPitch = -8.0f;
+		}
+		else if (Gesture == NPase)
+		{
+			// da paso: el brazo del lado hacia donde manda, y el antebrazo va y viene de arriba hacia allí
+			FVector D = GestureDir - GetActorLocation();
+			D.Z = 0.0f;
+			D = D.IsNearlyZero() ? GetActorRightVector() : D.GetSafeNormal();
+			const FVector L(D | GetActorForwardVector(), D | GetActorRightVector(), 0.0f);
+			const int32 Side = L.Y >= 0.0f ? 0 : 1;
+			const float S = 0.5f + 0.5f * FMath::Sin(GestureT * 6.5f);
+			bUse[Side] = true;
+			Want[Side][0] = L * 0.85f + FVector(0.2f, 0.0f, 0.25f);
+			Want[Side][1] = FMath::Lerp(FVector(0.0f, 0.0f, 0.9f) + L * 0.3f, L * 0.95f + FVector(0.0f, 0.0f, 0.1f), S);
+		}
+	}
+	const FVector F = GetActorForwardVector(), R = GetActorRightVector();
+	const FTransform CT = Pose->GetComponentTransform();
+	GestureW = 0.0f;
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		if (bUse[Side])
+		{
+			for (int32 k = 0; k < 2; ++k)
+			{
+				const FVector N = Want[Side][k].GetSafeNormal();
+				ArmDir[Side][k] = ArmW[Side] <= 0.0f ? N : FMath::VInterpTo(ArmDir[Side][k], N, DeltaSeconds, 9.0f);
+			}
+		}
+		ArmW[Side] = FMath::FInterpConstantTo(ArmW[Side], bUse[Side] ? 1.0f : 0.0f, DeltaSeconds, bUse[Side] ? 3.2f : 2.6f);
+		GestureW = FMath::Max(GestureW, ArmW[Side]);
+		if (ArmW[Side] <= 0.0f) continue;
+		const float W = ArmW[Side] * ArmW[Side] * (3.0f - 2.0f * ArmW[Side]);
+		for (int32 k = 0; k < 2; ++k)
+		{
+			const FVector World = F * ArmDir[Side][k].X + R * ArmDir[Side][k].Y + FVector::UpVector * ArmDir[Side][k].Z;
+			AimBone(ArmBones[Side][k], ArmBones[Side][k + 1], CT.InverseTransformVectorNoScale(World), W);
+		}
+	}
+	GestureHead = FMath::FInterpTo(GestureHead, HeadPitch, DeltaSeconds, 5.0f);
+	GestureLean = FMath::FInterpTo(GestureLean, SpineLean, DeltaSeconds, 5.0f);
+	auto Turn = [this](FName Bone, const FQuat& Q)
+	{
+		if (Bone.IsNone()) return;
+		const FQuat Cur = Pose->GetBoneRotationByName(Bone, EBoneSpaces::ComponentSpace).Quaternion();
+		Pose->SetBoneRotationByName(Bone, (Q * Cur).Rotator(), EBoneSpaces::ComponentSpace);
+	};
+	const FVector Right = CT.InverseTransformVectorNoScale(R);
+	if (FMath::Abs(GestureLean) > 0.05f) Turn(SpineBone, FQuat(Right, FMath::DegreesToRadians(GestureLean)));
+	if (FMath::Abs(GestureHead) > 0.05f)
+	{
+		Turn(NeckBone, FQuat(Right, FMath::DegreesToRadians(GestureHead * 0.4f)));
+		Turn(HeadBone, FQuat(Right, FMath::DegreesToRadians(GestureHead * 0.6f)));
+	}
+}
+
+void ATarsisGuard::StopGesture()
+{
+	GestureLeft = 0.0f;
+	GestureW = 0.0f;
+	ArmW[0] = ArmW[1] = 0.0f;
+	GestureHead = GestureLean = 0.0f;
 }
 
 void ATarsisGuard::FootTick(float DeltaSeconds)
@@ -850,12 +1011,14 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	if (State == ETarsisGuardState::Down)
 	{
 		LookTick(DeltaSeconds);   // el cuerpo visible sigue copiando la caída
+		if (GestureW > 0.0f || GestureLeft > 0.0f) StopGesture();   // en el suelo no hay gesto que valga, ni al levantarse
 		DownT -= DeltaSeconds;
 		if (DownT <= 0.0f) WakeUp();
 		return;
 	}
 	UpdateAnim();
 	LookTick(DeltaSeconds);
+	GestureTick(DeltaSeconds);
 	FootTick(DeltaSeconds);
 	// aturdido por un empujón: tambaleándose, no ve ni anda; al rehacerse va a por ti
 	if (StunT > 0.0f)

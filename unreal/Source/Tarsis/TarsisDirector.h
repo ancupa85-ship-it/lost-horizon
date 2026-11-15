@@ -179,6 +179,39 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void SetWeather(int32 NewWeather);
 
+	/** Cuánto está mojada la base, 0-1 (tanda 24). Sube mientras llueve (WetSeconds para empaparse) y baja despacio al
+	 *  escampar (DrySeconds). Va al escalar «Mojado» de la colección MPC_Tarsis: el material maestro oscurece y da brillo
+	 *  a lo que está a la intemperie. Al empezar y al cargar partida se pone de golpe en su sitio. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Clima")
+	float Wetness = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Clima")
+	float WetSeconds = 25.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Clima")
+	float DrySeconds = 90.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Clima")
+	TSoftObjectPtr<class UMaterialParameterCollection> WetCollection = TSoftObjectPtr<class UMaterialParameterCollection>(FSoftObjectPath(TEXT("/Game/Tarsis/Materiales/MPC_Tarsis.MPC_Tarsis")));
+
+	/** Pruebas: pone el mojado de golpe (0-1) sin esperar a la lluvia. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void SetWetnessNow(float Value);
+
+	/** Lo que vale ahora «Mojado» en la colección (pruebas): -1 si no hay colección. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	float WetnessInCollection() const;
+
+	/** Presupuesto de render (tanda 24): variables de consola «nombre=valor» que se ponen al empezar la partida y se dejan
+	 *  como estaban al acabar (en el editor las variables sobreviven al PIE). Las elige tools/unreal/render.py midiendo en
+	 *  esta tarjeta y las escribe en el director del nivel: cambiar el presupuesto no pide compilar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Render")
+	TArray<FString> RenderCVars;
+
+	/** Las que se han puesto de verdad esta partida, con el valor que tenían antes («nombre=antes->ahora»). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Render")
+	TArray<FString> RenderApplied;
+
 	/** Base en guardia tras una alarma (segundos que quedan): la sospecha sube un 50 % más deprisa, las rondas van a paso
 	 *  ligero y en el control registran la caja del camión. Editable para que las pruebas la pongan en guardia a mano. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
@@ -726,6 +759,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	UPROPERTY()
@@ -905,6 +939,11 @@ private:
 	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> PowerSounds;
 	UPROPERTY() TArray<TObjectPtr<class UAudioComponent>> RainSounds;
 	UPROPERTY() TArray<TObjectPtr<class UDecalComponent>> RainDecals;   // charco y pisadas mojadas: solo con lluvia
+	UPROPERTY() TObjectPtr<class UMaterialParameterCollection> WetMPC;
+	bool bWetInit = false;
+	void WetTick(float DeltaSeconds);
+	void ApplyRenderCVars();
+	TArray<TPair<FString, FString>> RenderSaved;      // variable y valor de antes, para dejarlo como estaba
 	void RadioTick(float DeltaSeconds);
 	UPROPERTY()
 	TSet<TObjectPtr<class ATarsisGuard>> Called;
