@@ -476,7 +476,10 @@ if moviles.get('camionmovil') and ext.get('camino'):
 # Ajuste 25e: luz ambiente de 4,0 a 2,0. A 4,0 aclaraba todas las sombras por igual: se veía todo, pero plano y gris,
 # y a Andres le parecían más reales las capturas oscuras de antes (patio de la segunda pasada, chapa del contenedor en
 # sombra). Poca luz de relleno y la luna con dirección: contraste de noche de verdad sin volver al negro total
-EXPO = {'ev': 0.5, 'luna': 0.8, 'cielo': 2.0}
+# Ajuste 25f: exposición un paso abajo (0,5 a -0,5: la mitad de luz en toda la imagen, farolas incluidas). Medido en la
+# 0025e, la luz ambiente casi no oscurecía (patio 18 a 17); lo que hacía más creíble la segunda pasada era el nivel
+# general. Así vuelve la noche oscura con los materiales buenos. Solo es imagen: el sigilo no la usa
+EXPO = {'ev': -0.5, 'luna': 0.8, 'cielo': 2.0}
 # tanda 25: las luces fuertes de fuera se pintan diez veces más flojas de lo que cuentan para el sigilo (etiqueta
 # «luz_fuerte»; ATarsisGuard::LightAt multiplica por 10). Con 3000 lm bajo cada farola el suelo salía blanco quemado y a
 # cinco metros negro: 140 veces más luz que la de la luna, cuando una imagen aguanta unas 20. Ahora el suelo devuelve
