@@ -1231,11 +1231,16 @@ def prueba_cielo():
     # el relleno no alumbra para el sigilo: a 12 m de la farola del camino, fuera de su cono, da lo mismo con él que sin él
     p = V(f[0] * 100 + 1200, 5700, 100)
     cerca = [a for a in rell if dist2d(a.get_actor_location(), V(f[0] * 100, f[1] * 100, 0)) < 300]
+    # ajuste 25d: los focos de torre se apagan mientras se mide. Ese punto queda a 19 m de la torre 14 y, según adónde
+    # mire su centinela al arrancar, el foco le cae encima (0,92 en vez de 0,12) y la prueba fallaba sin que el relleno
+    # tuviera nada que ver
+    for a in tor:
+        a.get_component_by_class(unreal.LocalLightComponent).set_visibility(False)
     con = luz_en(p)
     for a in cerca:
         a.get_component_by_class(unreal.LocalLightComponent).set_visibility(False)
     sin = luz_en(p)
-    for a in cerca:
+    for a in cerca + tor:
         a.get_component_by_class(unreal.LocalLightComponent).set_visibility(True)
     check('el relleno no cuenta para el sigilo (misma luz con él que sin él)', len(cerca) == 1 and abs(con - sin) < 0.001 and con < 0.5, '%.3f y %.3f, %d cerca' % (con, sin, len(cerca)))
     # romper el farol de la garita apaga su halo (lo hace el dardo en prueba_farol; aquí, que el recuento baja al apagarla)

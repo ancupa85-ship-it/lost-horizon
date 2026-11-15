@@ -526,7 +526,14 @@ for i, l in enumerate(DATA['lights']):
         c.set_editor_property('cast_shadows', False)
         c.set_editor_property('volumetric_scattering_intensity', 1.5)
     else:
-        a = spawn(unreal.PointLight, ue(l['pos']), '%s_%d' % (l['name'], i))
+        pos = list(l['pos'])
+        # ajuste 25d: la bombilla del archivo (17, -35) iba en el eje de su puerta, a 3,75 m del hueco, y por el canto del
+        # marco alumbraba las jambas del pasillo de fuera (placa_archivo: 31 y 51 de 255 con la pared a 21; 133 en la
+        # 0025c). Tres metros más al fondo del cuarto (20, -35) las jambas quedan en sombra (8 y 35, lo que da la luna) y
+        # el archivo sale algo más alumbrado (54 de media frente a 44)
+        if l['name'] == 'interior' and abs(pos[0] - 17.0) < 0.01 and abs(pos[1] + 35.0) < 0.01:
+            pos[0] = 20.0
+        a = spawn(unreal.PointLight, ue(pos), '%s_%d' % (l['name'], i))
         c = a.get_component_by_class(unreal.PointLightComponent)
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
         c.set_editor_property('intensity', min(l['power'] * 2.0, 4000.0))

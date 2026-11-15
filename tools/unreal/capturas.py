@@ -17,7 +17,7 @@ CAMARAS = [
 PREFIJO = sys.argv[1] if len(sys.argv) > 1 else time.strftime('%H%M%S')
 OUT = os.path.join(unreal.Paths.project_saved_dir(), 'Capturas')
 SHOTS = os.path.join(unreal.Paths.project_saved_dir(), 'Screenshots')
-C = {'estado': 'arrancando', 'h': None, 'gen': None, 'espera': 0.0, 'hechas': []}
+C = {'estado': 'arrancando', 'h': None, 'gen': None, 'espera': 0.0, 'hechas': [], 'blur': None}
 builtins._tarsis_capturas = C
 
 
@@ -32,6 +32,10 @@ def pasos():
         d.interact()
     yield 1.5
     unreal.SystemLibrary.execute_console_command(w, 'showhud')   # sin HUD en las capturas
+    # sin desenfoque de movimiento mientras se captura (al colocar la cámara de golpe, lo que brilla deja estela). Solo
+    # aquí: la variable se guarda y se repone al acabar (_fin); el juego no cambia
+    C['blur'] = unreal.SystemLibrary.get_console_variable_int_value('r.MotionBlurQuality')
+    unreal.SystemLibrary.execute_console_command(w, 'r.MotionBlurQuality 0')
     gcls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
     os.makedirs(OUT, exist_ok=True)
     for nombre, pos, mira in CAMARAS:
@@ -54,6 +58,12 @@ def pasos():
             C['hechas'].append(destino)
 
 
+def _fin():
+    if C.get('blur') is not None:
+        unreal.SystemLibrary.execute_console_command(None, 'r.MotionBlurQuality %d' % C['blur'])
+        C['blur'] = None
+
+
 def _tick(dt):
     try:
         w = mundo()
@@ -68,10 +78,12 @@ def _tick(dt):
             C['espera'] = time.time() + next(C['gen'])
         except StopIteration:
             C['estado'] = 'terminado'
+            _fin()
             unreal.unregister_slate_post_tick_callback(C['h'])
             unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()
     except Exception as ex:
         C['estado'] = 'error: %r' % ex
+        _fin()
         unreal.unregister_slate_post_tick_callback(C['h'])
 
 
