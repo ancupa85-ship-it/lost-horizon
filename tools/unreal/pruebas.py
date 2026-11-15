@@ -884,6 +884,11 @@ def prueba_charcos():
     lejos = [f for f in ((1070, 5770), (3600, 5770), (6130, 5770), (-1460, 5640), (8660, 5640))
              if not any(dist2d(a.get_actor_location(), V(f[0], f[1], 0)) < 520 for a in fijos)]
     check('cada farola del camino tiene un charco al lado que la refleja', not lejos, lejos)
+    # ajuste 25d: los charcos turbios fijos, junto a las farolas del centro del camino (donde estaban solo había luna)
+    turbios = [a for a in por.get('MI_Per_AguaBarro', []) if not a.actor_has_tag('lluvia')]
+    sin_luz = [str(a.get_actor_label()) for a in turbios
+               if not any(dist2d(a.get_actor_location(), V(f[0], f[1], 0)) < 800 for f in ((1070, 5770), (3600, 5770), (6130, 5770)))]
+    check('los charcos turbios fijos están a la luz de una farola', len(turbios) >= 3 and not sin_luz, '%d turbios fijos; lejos: %s' % (len(turbios), sin_luz))
     patio = [a for a in fijos if 0 < a.get_actor_location().x < 7200 and 0 < a.get_actor_location().y < 5300]
     check('y hay charcos en los patios de la base', len(patio) >= 3, len(patio))
     mi = unreal.load_asset('/Game/Tarsis/Materiales/Manchas/MI_Per_Agua')
@@ -1140,6 +1145,9 @@ def prueba_materia():
           and losas['muro'][2] >= 250 and losas['muro'][3] > 0.05 and losas['hormigon'][3] > 0.03, losas)
     cho = {n: esc(n, 'Chorreo') for n in ('muro', 'hormigon', 'pared', 'suelo', 'suelo_int', 'contenedor_0')}
     check('regueros en lo vertical y no en el suelo', cho['muro'] >= 0.4 and cho['hormigon'] >= 0.3 and cho['contenedor_0'] > 0.1 and cho['suelo'] == 0.0 and cho['suelo_int'] == 0.0, cho)
+    # ajuste 25d: la grava trae rugosidad 0,47 y con la luna rasante parecía nieve; escalada queda mate
+    gr = esc('tierra', 'RugosidadEscala')
+    check('la grava es mate (la luna no la vuelve nieve)', gr is not None and gr >= 1.5, gr)
     rel = {n: esc(n, 'Relieve') for n in ('suelo', 'camino', 'muro')}
     check('relieve reforzado (se lee con la luz rasante de las farolas)', all(v and v > 1.2 for v in rel.values()), rel)
     # el camión: verde oliva oscuro (antes salía verde lima)

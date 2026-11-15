@@ -55,7 +55,7 @@ CIELO = {
 # 1,2 y manchas más prietas (tools/texturas/estrellas.py), que las deja en 4 o 5 px a las fuertes y 1 o 2 al resto.
 # EstiraNubes: cuánto se encoge el dibujo de las nubes a lo largo del viento (menos de 1 = bandas largas). NubeDura: lo
 # cortado que es su borde.
-ESCALARES = {'Brillo': 1.0, 'Claros': 0.60, 'EscalaNubes': 1.1, 'VelNubes': 0.006, 'EstrellasRep': 1.2, 'EstrellasFuerza': 0.85,
+ESCALARES = {'Brillo': 1.0, 'Claros': 0.60, 'EscalaNubes': 1.1, 'VelNubes': 0.006, 'EstrellasRep': 1.2, 'EstrellasFuerza': 1.15,
              'DiscoFuerza': 3.2, 'EstiraNubes': 0.35, 'NubeDura': 1.8}
 # lo que el director (ATarsisDirector) deja afinar sin compilar: se le pone al actor del nivel. Con 5 el haz del foco de
 # la torre seguía siendo un cono blanco macizo con lluvia (213 de 255); con 1 tiene que quedar un velo que deja ver

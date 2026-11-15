@@ -220,8 +220,16 @@ def manchas():
         agua('Agua', V(r3.uniform(-1600, 8700), CAMINO_Y + r3.uniform(-240, 240), LOSA_Z), r3.uniform(90, 190), r3.uniform(120, 300), r3.uniform(-40, 40), lluvia=True)
     cuenta['lluvia'] += 10
     # 2) grava del anillo sur y de los dos portones: charcos grandes y turbios (tres fijos; con lluvia, cuatro más)
+    #    Ajuste 25d: los tres fijos van al lado de las tres farolas del centro del camino, en la grava. Donde caían (al azar
+    #    por todo el anillo) solo llegaba la luna y el agua turbia sobre grava oscura no se veía (tres capturas seguidas).
+    #    Junto a la farola el charco devuelve su luz y la del cielo. Se sacan los mismos números al azar que antes, para
+    #    que no se mueva nada de lo que viene después (charcos de los patios, juntas, regueros)
     for k in range(7):
-        agua('AguaBarro', V(r3.uniform(-1300, 8500), r3.uniform(6260, 7230), 1.0), r3.uniform(180, 340), r3.uniform(230, 430), r3.uniform(0, 180), lluvia=k >= 3)
+        px, py = r3.uniform(-1300, 8500), r3.uniform(6260, 7230)
+        if k < 3:
+            fx, fy = FAROLAS_CAMINO[k]
+            px, py = fx + (260 if k % 2 == 0 else -260), 6330 + (py - 6260) / 970.0 * 120
+        agua('AguaBarro', V(px, py, 1.0), r3.uniform(180, 340), r3.uniform(230, 430), r3.uniform(0, 180), lluvia=k >= 3)
         cuenta['lluvia' if k >= 3 else 'agua'] += 1
     # 3) patios de la base: un charco junto a cada farola (en una casilla despejada) y, con lluvia, ocho más repartidos
     datos = {}

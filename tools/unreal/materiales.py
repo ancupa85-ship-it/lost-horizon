@@ -162,6 +162,11 @@ def lin(c):
 # lado máximo (píxeles) de las texturas que no lucen sus 2K: la grava del anillo se ve de noche y a ras de suelo, y con
 # 1K la tarjeta de 4 GB recupera unos 30 MB (tanda 21). El fichero descargado no cambia: lo reduce Unreal al cocinarla.
 LADO_MAX = {'gravel_floor_02': 1024}
+# ajuste 25d: escala de rugosidad por clave (la textura x esto). La grava de Poly Haven trae una rugosidad media de 0,47
+# (medida en el JPG de 1K): con la luna rasante cada piedra devolvía un punto blanco y el anillo parecía nevado (mediana
+# 67/255 en la captura alto_losa, con el suelo al lado en 20). La grava suelta seca es mate: x 1,8 la deja en 0,85.
+# El hormigón del interior ya iba a 1,6 desde la tanda 24 (el fluorescente le daba brillo de plástico)
+RUGOSIDAD = {'tierra': 1.8, 'suelo_int': 1.6}
 
 def limitar(tx, nombre):
     lado = LADO_MAX.get(nombre)
@@ -645,7 +650,7 @@ def instancias():
             mel.set_material_instance_texture_parameter_value(mi, 'Normal', n)
         if r:
             mel.set_material_instance_texture_parameter_value(mi, 'Rugosidad', r)
-        mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', 1.0 if r else rough)
+        mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', RUGOSIDAD.get(clave, 1.0) if r else rough)
         mel.set_material_instance_scalar_parameter_value(mi, 'Metal', metal)
         mel.set_material_instance_scalar_parameter_value(mi, 'Tamano', rep * 100.0)
         mel.set_material_instance_vector_parameter_value(mi, 'Tinte', tinte)
@@ -655,8 +660,6 @@ def instancias():
         if clave in SUCIEDAD:
             mel.set_material_instance_scalar_parameter_value(mi, 'Suciedad', SUCIEDAD[clave])
         mel.set_material_instance_scalar_parameter_value(mi, 'Mojable', MOJABLE.get(clave, 0.0) if CON_MOJADO else 0.0)
-        if clave == 'suelo_int':   # hormigón mate: el brillo uniforme del fluorescente en el suelo parecía plástico
-            mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', 1.6)
         eal.save_loaded_asset(mi, False)
         out[clave] = mi
     return out
