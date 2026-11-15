@@ -879,6 +879,13 @@ def prueba_charcos():
     rug = unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(mi, 'Rugosidad') if mi else 9.0
     check('el agua es un material propio, liso (refleja)', padre is not None and padre.get_name() == 'M_Charco' and rug < 0.15
           and padre.get_editor_property('material_domain') == unreal.MaterialDomain.MD_DEFERRED_DECAL, '%s, rugosidad %.2f' % (padre.get_name() if padre else None, rug))
+    # mezclas (Substrate): el agua translúcida (escribe color, rugosidad y relieve dentro de la máscara: refleja la farola);
+    # manchas y regueros modulados (oscurecen dentro de la máscara). Con alfa compuesto el color se sumaba y no oscurecía
+    B = unreal.BlendMode
+    mezclas = {n: (unreal.load_object(None, '/Game/Tarsis/Materiales/%s.%s' % (n, n)) or None) for n in ('M_Charco', 'M_Mancha', 'M_Chorreton')}
+    mezclas = {n: (m.get_editor_property('blend_mode') if m else None) for n, m in mezclas.items()}
+    check('agua translúcida; manchas y regueros modulados (oscurecen, sin caja)', mezclas == {'M_Charco': B.BLEND_TRANSLUCENT,
+          'M_Mancha': B.BLEND_MODULATE, 'M_Chorreton': B.BLEND_MODULATE}, mezclas)
     # con lluvia salen más
     w0 = d.get_editor_property('weather')
     while d.get_editor_property('weather') != 0:
@@ -919,10 +926,11 @@ def prueba_charcos():
     check('el camión sabe dónde están las juntas (golpe de cada eje)', len(juntas) >= 15 and paso > 1 and not desfase and abs(juntas[1] - juntas[0] - paso) < 1.0,
           'paso %s, fase %s, %d fuera' % (paso, fase, len(desfase)))
     # hierbajos: un solo material (los de tandas anteriores se borran al montar)
-    viejos = [str(p).split('/')[-1].split('.')[0] for p in unreal.EditorAssetLibrary.list_assets('/Game/Tarsis/Materiales', False, False)]
-    viejos = sorted(n for n in viejos if n.startswith('M_Hierbajo_'))
+    # registro de recursos y load_object, no EditorAssetLibrary: durante el PIE esta responde vacío («The Editor is currently in a play mode»)
+    reg = unreal.AssetRegistryHelpers.get_asset_registry()
+    viejos = sorted(str(a.asset_name) for a in reg.get_assets_by_path('/Game/Tarsis/Materiales', recursive=False) if str(a.asset_name).startswith('M_Hierbajo_'))
     check('un solo material de hierbajos (el de esta tanda)', len(viejos) == 1, viejos)
-    check('sonidos de la caja del camión importados', all(unreal.EditorAssetLibrary.does_asset_exist('/Game/Tarsis/Sonidos/' + n) for n in ('camion_junta', 'camion_caja')))
+    check('sonidos de la caja del camión importados', all(unreal.load_object(None, '/Game/Tarsis/Sonidos/%s.%s' % (n, n)) for n in ('camion_junta', 'camion_caja')))
 
 
 def prueba_anillo():

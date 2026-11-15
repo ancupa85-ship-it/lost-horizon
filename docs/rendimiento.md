@@ -129,3 +129,41 @@ el editor abierto.
 
 Igual que en la 0021 (dentro del margen de una medida a otra): los hierbajos (recortados, con viento), las 51
 calcomanías del perímetro, la caja hueca y el material de las piezas móviles no se notan.
+
+## 0023: agua en el suelo y los muros, caja del camión por dentro
+
+`tools/unreal/medir.py` con el editor recién abierto, calidad Media, una pasada (medio / peor 1 %). **Ojo:** la ventana
+del PIE es ahora de 2032x1125 (en la 0022 era 1080p), un 10 % más de píxeles; por eso las cifras no se comparan una a una
+con la tabla anterior. VRAM de toda la tarjeta con el editor abierto.
+
+| Sitio | fps | VRAM (MB) |
+|---|---|---|
+| Entrada | 31,1 / 12,5 | 3787 |
+| Patio central | 34,7 / 28,8 | 3725 |
+| Barracón oeste | 29,7 / 27,5 | 3803 |
+| Portón de entrada | 36,1 / 30,7 | 3802 |
+| Portón de salida | 35,3 / 32,0 | 3803 |
+| Camino con el camión | 32,7 / 29,7 | 3840 |
+
+El 12,5 de peor 1 % en la entrada es un tirón suelto al empezar (el primer sitio que se mide); en otra pasada fue 17,8.
+
+Comparaciones A/B en la misma sesión (jugador en 1500 6150, mirando al camino; ventana 1080p):
+
+- Las 88 calcomanías nuevas (charcos, regueros, juntas), ocultas o no: 36,7 / 37,1 sin ellas y 36,8 / 37,0 con ellas.
+  No cuestan nada medible. (Antes del arreglo de mezclas, con alfa compuesto: 37,1 / 37,5 frente a 35,0 / 36,5).
+- `RUIDO_RAPIDO` (ruido de textura 3D en los materiales del suelo) True frente a False: entre 33 y 38 fps en los dos
+  casos, sin diferencia clara; se queda en True.
+
+Mezclas de las calcomanías con Substrate (`r.Substrate=True`), probado en esta tanda:
+
+- **Alfa compuesto** (lo de antes): el color se SUMA a lo de debajo. Las manchas oscuras casi no se ven y, si se conecta
+  la rugosidad, se escribe en toda la caja (sale un rectángulo).
+- **Modulado** (`BLEND_MODULATE`, en Substrate es la transmitancia de color sola): en calcomanía no multiplica, sino que
+  mezcla el color con lo de debajo según la opacidad. Con un color absoluto oscuro y la máscara en la opacidad, oscurece
+  solo dentro de la máscara: así quedan M_Mancha (v4) y M_Chorreton (v3).
+- **Translúcido** (`BLEND_TRANSLUCENT`): escribe color, rugosidad y relieve dentro de la máscara. Es el del agua (M_Charco
+  v4): oscuro, liso, y desde el ángulo bueno se ve el reflejo de la farola dentro del charco. El «Failed to compile» de
+  antes era el orden: la mezcla tiene que ponerse ANTES que el dominio de calcomanía.
+
+Memoria (`tools/unreal/memoria.py`, todo cargado): 292 texturas, 228,3 MB. Las 30 de más de 1K piden 91,4 MB; con un
+tope de 1K se ahorrarían 64,1 MB. Hay 4 texturas que no usa nadie. Por carpetas: Atrezo 102 MB y Texturas 94,1 MB.

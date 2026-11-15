@@ -240,56 +240,29 @@ def taquilla():
 # ---------------------------------------------------------------- manchas: humedad, salitre y mugre (calcomanías)
 
 def material_mancha():
-    """M_Mancha: calcomanía de mancha irregular (máscara redonda difusa x ruido del mundo), oscura y algo húmeda.
-    Parámetros: Color y Fuerza (opacidad)."""
-    ruta = DM + '/M_Mancha'
-    # versión 2 (tanda 22): el color va premultiplicado por la opacidad. Sin eso, con alfa premultiplicado el color se
-    # sumaba en toda la caja de la calcomanía (fuera de la mancha también): las rodadas del camino salían como tiras
-    # claras rectangulares bajo las farolas. Si el material es de antes, se rehace (las instancias siguen colgando de él)
-    if eal.does_asset_exist(ruta):
-        m = unreal.load_asset(ruta)
-        if any(isinstance(e, unreal.MaterialExpressionMultiply) and e.get_editor_property('desc') == 'premultiplicado' for e in mel.get_material_expressions(m)):
-            return m
-        mel.delete_all_material_expressions(m)
-    else:
-        m = tools.create_asset('M_Mancha', DM, unreal.Material, unreal.MaterialFactoryNew())
-    m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
-    # las calcomanías en 5.8 solo admiten transmitancia o alfa premultiplicado: el color hay que multiplicarlo por la opacidad
-    m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
-    E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
-    col = E(unreal.MaterialExpressionVectorParameter, -600, -200)
-    col.set_editor_property('parameter_name', 'Color'); col.set_editor_property('default_value', unreal.LinearColor(0.045, 0.038, 0.028, 1))
-    # sin rugosidad: con alfa premultiplicado se escribiría en toda la caja de la calcomanía (se vería un rectángulo)
-    uv = E(unreal.MaterialExpressionTextureCoordinate, -900, 200)
-    sm = E(unreal.MaterialExpressionSphereMask, -700, 200)
-    c05 = E(unreal.MaterialExpressionConstant2Vector, -900, 320)
-    c05.set_editor_property('r', 0.5); c05.set_editor_property('g', 0.5)
-    mel.connect_material_expressions(uv, '', sm, 'A')
-    mel.connect_material_expressions(c05, '', sm, 'B')
-    sm.set_editor_property('attenuation_radius', 0.5); sm.set_editor_property('hardness_percent', 15.0)
-    ruido = E(unreal.MaterialExpressionNoise, -700, 400)
-    ruido.set_editor_property('scale', 0.03); ruido.set_editor_property('levels', 3)
-    ruido.set_editor_property('noise_function', unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX)
-    ruido.set_editor_property('output_min', -0.4); ruido.set_editor_property('output_max', 1.0)
-    mu = E(unreal.MaterialExpressionMultiply, -500, 300)
-    mel.connect_material_expressions(sm, '', mu, 'A')
-    mel.connect_material_expressions(ruido, '', mu, 'B')
-    fu = E(unreal.MaterialExpressionScalarParameter, -500, 450)
-    fu.set_editor_property('parameter_name', 'Fuerza'); fu.set_editor_property('default_value', 0.85)
-    mu2 = E(unreal.MaterialExpressionMultiply, -350, 350)
-    mel.connect_material_expressions(mu, '', mu2, 'A')
-    mel.connect_material_expressions(fu, '', mu2, 'B')
-    sat = E(unreal.MaterialExpressionSaturate, -220, 350)
-    uno(mu2, sat)
-    mel.connect_material_property(sat, '', unreal.MaterialProperty.MP_OPACITY)
-    pre = E(unreal.MaterialExpressionMultiply, -100, -150)
-    pre.set_editor_property('desc', 'premultiplicado')
-    mel.connect_material_expressions(col, '', pre, 'A')
-    mel.connect_material_expressions(sat, '', pre, 'B')
-    mel.connect_material_property(pre, '', unreal.MaterialProperty.MP_BASE_COLOR)
-    mel.recompile_material(m)
-    eal.save_loaded_asset(m)
-    return m
+    """M_Mancha: calcomanía de mancha irregular (máscara redonda difusa x ruido del mundo). Parámetros: Color y Fuerza.
+    Mezcla «modulada»: con Substrate (r.Substrate=True) es la transmitancia de color sola, y en la calcomanía se porta
+    como una mezcla normal: lo de debajo pasa a Color en la proporción de la opacidad. Fuera de la máscara no toca nada
+    (no se ve la caja) y dentro oscurece de verdad."""
+    # v4 (tanda 23; la v3 fue una prueba). La v2 era alfa compuesto con el color premultiplicado: con Substrate ese color se SUMA a lo de debajo
+    # (no oscurece) y las manchas oscuras casi no se veían. Probado también Lerp(1, tinte, máscara) como multiplicador:
+    # no multiplica, y en paredes oscuras aclaraba. Las instancias siguen colgando de él con su Color
+    g = Grafo(DM + '/M_Mancha', 'M_Mancha', 'mancha v4 modulado')
+    if g.hecho:
+        return g.m
+    g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MODULATE)       # antes que el dominio
+    g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    col = g.E(unreal.MaterialExpressionVectorParameter, -600, -200, parameter_name='Color', default_value=unreal.LinearColor(0.045, 0.038, 0.028, 1))
+    uv = g.E(unreal.MaterialExpressionTextureCoordinate, -900, 200)
+    c05 = g.E(unreal.MaterialExpressionConstant2Vector, -900, 320, r=0.5, g=0.5)
+    sm = g.E(unreal.MaterialExpressionSphereMask, -700, 200, attenuation_radius=0.5, hardness_percent=15.0)
+    g.une(uv, sm, 'A'); g.une(c05, sm, 'B')
+    ruido = g.ruido(-700, 400, 0.03, 3, -0.4, 1.0)
+    mu = g.op(unreal.MaterialExpressionMultiply, sm, ruido, -500, 300)
+    opa = g.sat(g.op(unreal.MaterialExpressionMultiply, mu, g.esc('Fuerza', 0.85, -500, 450), -350, 350), -220, 350)
+    g.sale(opa, unreal.MaterialProperty.MP_OPACITY)
+    g.sale(col, unreal.MaterialProperty.MP_BASE_COLOR)
+    return g.fin()
 
 
 # ---------------------------------------------------------------- tanda 23: charcos y chorretones (calcomanías)
@@ -377,7 +350,7 @@ class Grafo:
         return self.m
 
 
-CHARCO_NORMAL = True     # el charco aplana el relieve del suelo (agua quieta). Si en el PC saliera un rectángulo, a False
+CHARCO_NORMAL = True     # tanda 23: con la mezcla puesta antes que el dominio, BLEND_TRANSLUCENT sí compila (el fallo era el orden)
 
 
 def material_charco():
@@ -388,11 +361,13 @@ def material_charco():
     compuesto el motor solo mezcla color y rugosidad, y el agua saldría con los granos de la losa); el color va entonces sin
     multiplicar, lo mezcla el motor con la opacidad. Sin CHARCO_NORMAL, alfa compuesto como M_Mancha: color multiplicado
     por la opacidad y el relieve que haya debajo."""
-    g = Grafo(DM + '/M_Charco', 'M_Charco', 'charco v2' + (' plano' if CHARCO_NORMAL else ''))
+    g = Grafo(DM + '/M_Charco', 'M_Charco', 'charco v4' + (' plano' if CHARCO_NORMAL else ''))
     if g.hecho:
         return g.m
-    g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    # mezcla antes que el dominio (si no, la primera compilación da error). En 5.8 no hay BLEND_TRANSLUCENT_GREY_TRANSMITTANCE
+    # en Python (solo BLEND_TRANSLUCENT, que la calcomanía no admite, y BLEND_TRANSLUCENT_COLORED_TRANSMITTANCE)
     g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT if CHARCO_NORMAL else unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
+    g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
     col = g.E(unreal.MaterialExpressionVectorParameter, -700, -300, parameter_name='Color', default_value=unreal.LinearColor(0.012, 0.012, 0.011, 1))
     uv = g.E(unreal.MaterialExpressionTextureCoordinate, -1500, 200)
     c05 = g.E(unreal.MaterialExpressionConstant2Vector, -1500, 320, r=0.5, g=0.5)
@@ -409,7 +384,10 @@ def material_charco():
         g.sale(rug, unreal.MaterialProperty.MP_ROUGHNESS)
     else:
         g.sale(g.op(unreal.MaterialExpressionMultiply, col, opa, -100, -200, desc='premultiplicado'), unreal.MaterialProperty.MP_BASE_COLOR)
-        g.sale(g.op(unreal.MaterialExpressionMultiply, rug, opa, -100, 500), unreal.MaterialProperty.MP_ROUGHNESS)
+        # sin rugosidad (v3): con alfa compuesto la calcomanía escribe la rugosidad en TODA su caja (aunque vaya multiplicada
+        # por la opacidad, fuera de la mancha la deja en 0, como un espejo): el charco salía dentro de un rectángulo brillante.
+        # Así el agua solo oscurece; el brillo del reflejo necesitaría otra mezcla o un plano de agua de verdad
+        rug = None
     if CHARCO_NORMAL:
         g.sale(g.E(unreal.MaterialExpressionConstant3Vector, -350, 700, constant=unreal.LinearColor(0, 0, 1, 0)), unreal.MaterialProperty.MP_NORMAL)
     return g.fin()
@@ -420,11 +398,13 @@ def material_chorreton():
     posición en el mundo (vale para un muro que mire a cualquier lado): hilos verticales finos (ruido muy estirado en
     vertical), que salen a grupos y cada uno baja una distancia distinta desde lo alto del muro (Techo, en cm del mundo).
     Parámetros: Color, Fuerza, Techo, Largo y Contraste. La caja de la calcomanía solo limita dónde puede haberlos."""
-    g = Grafo(DM + '/M_Chorreton', 'M_Chorreton', 'chorreton v1')
+    g = Grafo(DM + '/M_Chorreton', 'M_Chorreton', 'chorreton v3 modulado')
     if g.hecho:
         return g.m
+    # v2 (tanda 23): modulado (ver M_Mancha): Color mezclado con la opacidad; con alfa compuesto se sumaba y no oscurecía.
+    # Antes que el dominio
+    g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MODULATE)
     g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
-    g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
     M, A, S, D, AP = (unreal.MaterialExpressionMultiply, unreal.MaterialExpressionAdd, unreal.MaterialExpressionSubtract,
                       unreal.MaterialExpressionDivide, unreal.MaterialExpressionAppendVector)
     col = g.E(unreal.MaterialExpressionVectorParameter, -500, -400, parameter_name='Color', default_value=unreal.LinearColor(0.03, 0.027, 0.022, 1))
@@ -452,12 +432,13 @@ def material_chorreton():
     o = g.op(M, g.op(M, g.op(M, hilo, grupo, -850, 200), f, -420, 400), arriba, -300, 500)
     opa = g.sat(g.op(M, o, g.esc('Fuerza', 0.8, -300, 660), -160, 500), -40, 500)
     g.sale(opa, unreal.MaterialProperty.MP_OPACITY)
-    g.sale(g.op(M, col, opa, 100, -200, desc='premultiplicado'), unreal.MaterialProperty.MP_BASE_COLOR)
+    g.sale(col, unreal.MaterialProperty.MP_BASE_COLOR)
     return g.fin()
 
 
 def mancha(nombre, pos, ancho, alto, hacia, fuerza=0.85, color_=None, rug=0.35, giro=0.0):
-    """hacia: 'abajo' (suelo), 'arriba' (techo) o el yaw al que mira la pared que recibe la mancha (la calcomanía
+    """color_: color de la mancha (M_Mancha modulado lo mezcla con la opacidad). rug ya no se usa.
+    hacia: 'abajo' (suelo), 'arriba' (techo) o el yaw al que mira la pared que recibe la mancha (la calcomanía
     proyecta a lo largo de su X)."""
     base = material_mancha()
     # unreal.Rotator(roll, pitch, yaw)

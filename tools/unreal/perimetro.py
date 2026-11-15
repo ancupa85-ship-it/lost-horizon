@@ -86,7 +86,8 @@ def _tipos():
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
         sys.path.insert(0, here)
-    import ambiente
+    import ambiente, importlib
+    importlib.reload(ambiente)   # en la misma sesión del editor, que coja los cambios de ambiente.py (CHARCO_NORMAL...)
     base = ambiente.material_mancha()
     eal = unreal.EditorAssetLibrary
     mel = unreal.MaterialEditingLibrary
