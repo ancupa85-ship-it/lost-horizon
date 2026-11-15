@@ -265,7 +265,9 @@ def todo():
     placa('calabozo', 1024, 256, BLANCO, [('CALABOZO', 1.0)], filete=NEGRO, oxido=0.45, mugre=0.5)
     placa('zona_restringida', 1024, 512, ROJO, [('ZONA RESTRINGIDA', 1.2), ('SOLO PERSONAL AUTORIZADO', 0.62)], color=BLANCO, filete=BLANCO, oxido=0.6, mugre=0.55)
     # perímetro
-    placa('zona_militar', 1024, 512, AMARILLO, [('ZONA MILITAR', 1.25), ('PROHIBIDO ACERCARSE AL MURO', 0.6)], filete=NEGRO, oxido=0.7, mugre=0.6)
+    # tanda 25: de noche no se leía. La chapa pasa a 2 x 1 m (carteles.json), el rótulo grande ocupa casi todo el ancho
+    # y lleva menos óxido y menos mugre encima (lo que se come el contraste de noche es el velo, no el tamaño solo)
+    placa('zona_militar', 1024, 512, AMARILLO, [('ZONA MILITAR', 1.5), ('PROHIBIDO ACERCARSE AL MURO', 0.5)], filete=NEGRO, oxido=0.45, mugre=0.3)
     placa('portillo', 1024, 512, BLANCO, [('PORTILLO N.º 2', 1.1), ('MANTENER CERRADO', 0.7, ROJO)], filete=NEGRO, oxido=0.75, mugre=0.7)
     # control de salida y camino
     placa('alto_control', 512, 1024, BLANCO, [('CONTROL', 1.0), ('DE SALIDA', 1.0), ('PRESENTE SU', 0.62), ('DOCUMENTACIÓN', 0.62)], filete=NEGRO, dibujo=d_alto, oxido=0.5, mugre=0.5)
@@ -275,7 +277,7 @@ def todo():
     placa('gasoleo', 1024, 512, BLANCO, [('PROHIBIDO FUMAR', 1.1, ROJO), ('GASÓLEO · INFLAMABLE', 0.7)], filete=ROJO, oxido=0.65, mugre=0.6)
     placa('botiquin', 1024, 512, BLANCO, [('BOTIQUÍN', 1.0)], filete=NEGRO, dibujo=d_cruz, oxido=0.3, mugre=0.35)
     # pintado con plantilla
-    pintado('lema', 2048, 256, [('TODO POR LA PATRIA', 1.0)], gasto=0.5)
+    pintado('lema', 2048, 256, [('TODO POR LA PATRIA', 1.0)], gasto=0.3)      # tanda 25: menos comido (0,5): se leía a trozos
     pintado('alto_suelo', 1024, 512, [('ALTO', 1.0)], gasto=0.6)
     pintado('linea_alto', 512, 64, [], gasto=0.55, dibujo=d_linea)
     pintado('numero_2', 256, 256, [('2', 1.0)], gasto=0.45)

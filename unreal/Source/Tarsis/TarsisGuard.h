@@ -162,6 +162,23 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
 	float GestureW = 0.0f;
 
+	/** Bastón luminoso de señales (tanda 25): lo lleva encendido en la mano derecha durante Seconds (se renueva
+	 *  llamando otra vez). Sigue al antebrazo, así que con «alto» queda en alto y con «pase» hace la señal. Se guarda
+	 *  solo si deja la ronda. Su luz no cuenta para el sigilo. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Cuerpo")
+	void HoldBaton(float Seconds);
+
+	/** Lleva el bastón encendido ahora. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	bool BatonOn() const;
+
+	/** Largo del bastón (cm) y lo que alumbra (lúmenes: poco, tiñe de rojo el brazo y la cara del que lo lleva). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float BatonLength = 36.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float BatonLumens = 16.0f;
+
 	/** Gestos que ha hecho, por orden (pruebas). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
 	TArray<FName> GestureLog;
@@ -307,6 +324,12 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class USpotLightComponent> Flashlight;
 
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> Baton;
+
+	UPROPERTY()
+	TObjectPtr<class UPointLightComponent> BatonGlow;
+
 	/** Cuerpo que se ve en el juego: copia la pose de la malla animada (oculta) y le añade el giro de cabeza y cuello y
 	 *  la inclinación al buscar. Con SingleNode no hay grafo de animación donde meter un LookAt. */
 	UPROPERTY()
@@ -321,6 +344,8 @@ private:
 	void LookTick(float DeltaSeconds);
 	void FootTick(float DeltaSeconds);
 	void GestureTick(float DeltaSeconds);
+	void BatonTick(float DeltaSeconds);
+	float BatonLeft = 0.0f;
 	void AimBone(FName Bone, FName Child, const FVector& DirCS, float W);
 	FName ArmBones[2][3];      // [derecho, izquierdo][brazo, antebrazo, mano]
 	FName Gesture;

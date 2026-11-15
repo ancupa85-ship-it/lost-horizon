@@ -320,17 +320,61 @@ malla('valla_hierro', hierro, 'hierro')
 # contenedores de 20 pies, cuatro colores como en el visor; los dobles llevan otro encima algo girado
 KC = [(0x6a, 0x2c, 0x20), (0x28, 0x46, 0x5a), (0x3a, 0x55, 0x37), (0x77, 0x67, 0x2a)]
 kont = [[] for _ in KC]
+# tanda 25: la chapa de verdad. Cada contenedor era una caja lisa; ahora lleva encima, en otra malla (contenedordet_N, que
+# en Unreal no tiene colisión: se anda, se dispara y se mira contra la caja de siempre), los pilares de las esquinas, los
+# largueros de arriba y de abajo, las costillas de la chapa ondulada en los costados, el testero y el techo, y en el otro
+# testero las puertas con sus cuatro barras de cierre. Unos 80 prismas por contenedor.
+kdet = [[] for _ in KC]
+def detalle_contenedor(col, largo, alto, ancho, cx, cy, cz, giro, puertas):
+    c_, s_ = math.cos(giro), math.sin(giro)
+    D = kdet[col % 4]
+    def B(sx, sy, sz, ox, oy, oz):     # prisma en los ejes del contenedor (x a lo largo, y arriba, z a lo ancho)
+        D.append((sx, sy, sz, cx + ox * c_ + oz * s_, cy + oy, cz - ox * s_ + oz * c_, 0, giro, 0))
+    hx, hy, hz = largo / 2, alto / 2, ancho / 2
+    for ex in (-1, 1):
+        for ez in (-1, 1):             # pilares: sobresalen 2,5 cm por los dos lados
+            B(0.17, alto + 0.03, 0.17, ex * (hx - 0.06), 0, ez * (hz - 0.06))
+    for ey in (-1, 1):                 # largueros y travesaños
+        for ez in (-1, 1):
+            B(largo - 0.3, 0.15, 0.06, 0, ey * (hy - 0.075), ez * (hz + 0.005))
+        for ex in (-1, 1):
+            B(0.06, 0.15, ancho - 0.3, ex * (hx + 0.005), ey * (hy - 0.075), 0)
+    n = int((largo - 0.5) / 0.26)      # costillas de los costados, cada 26 cm
+    for i in range(n):
+        ox = (i - (n - 1) / 2) * 0.26
+        for ez in (-1, 1):
+            B(0.11, alto - 0.3, 0.036, ox, 0, ez * (hz + 0.012))
+    m_ = int((ancho - 0.4) / 0.26)
+    for i in range(m_):                # testero ciego
+        B(0.036, alto - 0.3, 0.11, -puertas * (hx + 0.012), 0, (i - (m_ - 1) / 2) * 0.26)
+    # puertas: el canto de las dos hojas, las cuatro barras de cierre con su maneta y las bisagras
+    px = puertas * (hx + 0.02)
+    B(0.03, alto - 0.32, 0.035, px - puertas * 0.005, 0, 0)
+    for oz in (-0.66, -0.24, 0.24, 0.66):
+        B(0.04, alto - 0.2, 0.04, px + puertas * 0.012, 0, oz)
+        B(0.035, 0.05, 0.2, px + puertas * 0.03, -0.25, oz + (0.09 if oz < 0 else -0.09))
+        for oy in (-0.8, 0.8):
+            B(0.05, 0.09, 0.07, px + puertas * 0.012, oy, oz)
+    for ez in (-1, 1):
+        for oy in (-0.95, -0.3, 0.35, 0.98):
+            B(0.05, 0.12, 0.05, px, oy, ez * (hz - 0.2))
+    t = int((largo - 0.4) / 0.52)      # techo: costillas atravesadas, cada 52 cm
+    for i in range(t):
+        B(0.12, 0.03, ancho - 0.28, (i - (t - 1) / 2) * 0.52, hy + 0.008, 0)
 for i, k in enumerate(KONT):
     L = k[3]
     def caja(col, y, dx, ry):
-        kont[col % 4].append((L * TT - 0.12, 2.6, TT - 0.1, (k[0] + (L / 2 if k[2] else 0.5)) * TT + dx, y,
-                              (k[1] + (0.5 if k[2] else L / 2)) * TT, 0, (0 if k[2] else PI / 2) + ry, 0))
+        q = (L * TT - 0.12, 2.6, TT - 0.1, (k[0] + (L / 2 if k[2] else 0.5)) * TT + dx, y,
+             (k[1] + (0.5 if k[2] else L / 2)) * TT, 0, (0 if k[2] else PI / 2) + ry, 0)
+        kont[col % 4].append(q)
+        detalle_contenedor(col, q[0], q[1], q[2], q[3], q[4], q[5], q[7], 1 if (i + col) % 2 else -1)
     caja(i, 1.3, 0, 0)
     if k[4]:
         caja(i + 2, 3.9, 0.12, 0.03)
 for c, L in enumerate(kont):
     if L:
         malla('contenedor_%d' % c, L, None, mat_rgb('lh_contenedor_%d' % c, KC[c], 0.62, 0.35))
+        malla('contenedordet_%d' % c, kdet[c], None, mat_rgb('lh_contenedor_%d' % c, KC[c], 0.62, 0.35))
 
 # 4d) tanda 22: hierbajos al pie de las vallas y del muro, en los bordes del camino y en alguna junta de la losa. Una sola malla
 #     («hierbajos») de planos cruzados con sus propias UV sobre la textura de cuatro matas (tools/texturas/hierbajo.py); cada plano

@@ -23,6 +23,10 @@ Con el editor abierto y el nivel Tarsis cargado, en este orden (cada uno se pued
 3. `py tools/unreal/ambiente.py`: la taquilla de chapa (Geometry Script), las luces de la zona, sus sonidos (zumbido,
    radio, gotera), el posprocesado y las manchas. Necesita el plugin **GeometryScripting** activo en el proyecto.
 4. Reconstruir la navegación (`RebuildNavigation`) y guardar el nivel.
+5. `py tools/unreal/cielo.py` (tanda 25): la cúpula del cielo (estrellas, luna y nubes), el halo de cada luminaria de
+   fuera, el relleno de las farolas y el material del bastón luminoso. `montar_base.py` ya lo llama, pero hay que volver
+   a pasarlo después de `ambiente.py`: la bombilla de la puerta norte la pone `ambiente.py`, y sin esta segunda pasada
+   se queda sin halo. La textura de estrellas sale de `python tools/texturas/estrellas.py` (Python normal).
 
 Para comprobar: `py tools/unreal/medir.py` (fps y VRAM en tres sitios; tabla en `docs/rendimiento.md`),
 `py tools/unreal/capturas.py <prefijo>` (tres cámaras fijas, en `Saved/Capturas`) y `py tools/unreal/pruebas.py`.

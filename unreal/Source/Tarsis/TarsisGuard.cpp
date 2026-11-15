@@ -10,6 +10,9 @@
 #include "Engine/SkeletalMesh.h"
 #include "Components/LocalLightComponent.h"
 #include "Components/SpotLightComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/Engine.h"
@@ -325,10 +328,11 @@ void ATarsisGuard::GestureTick(float DeltaSeconds)
 	{
 		if (Gesture == NAlto)
 		{
-			// la mano derecha en alto, la palma al frente
+			// la mano derecha en alto y separada del cuerpo (tanda 25: con el brazo por delante del pecho, de frente y
+			// de espaldas la silueta era la misma que sin gesto): el brazo sale hacia su derecha y el antebrazo sube recto
 			bUse[0] = true;
-			Want[0][0] = FVector(0.65f, 0.35f, 0.6f);
-			Want[0][1] = FVector(0.35f, 0.0f, 0.92f);
+			Want[0][0] = FVector(0.2f, 0.8f, 0.55f);
+			Want[0][1] = FVector(0.1f, 0.12f, 0.98f);
 		}
 		else if (Gesture == NPapeles)
 		{
@@ -418,6 +422,70 @@ void ATarsisGuard::StopGesture()
 	GestureW = 0.0f;
 	ArmW[0] = ArmW[1] = 0.0f;
 	GestureHead = GestureLean = 0.0f;
+}
+
+// ---------------------------------------------------------------- bastón luminoso (tanda 25)
+
+void ATarsisGuard::HoldBaton(float Seconds)
+{
+	BatonLeft = FMath::Max(BatonLeft, Seconds);
+}
+
+bool ATarsisGuard::BatonOn() const
+{
+	return Baton && Baton->IsVisible();
+}
+
+void ATarsisGuard::BatonTick(float DeltaSeconds)
+{
+	// Después de GestureTick: el bastón sigue al antebrazo derecho de la pose que se ve, con gesto o sin él. De noche el
+	// brazo en alto no se leía (silueta oscura contra fondo oscuro); un bastón rojo encendido sí, y de lejos.
+	if (BatonLeft > 0.0f) BatonLeft -= DeltaSeconds;
+	const bool bCalm = (State == ETarsisGuardState::Patrol || State == ETarsisGuardState::Return) && StunT <= 0.0f;
+	const FName Hand = ArmBones[0][2], Fore = ArmBones[0][1];
+	if (BatonLeft <= 0.0f || !bCalm || !Pose || Hand.IsNone() || Fore.IsNone())
+	{
+		BatonLeft = bCalm ? BatonLeft : 0.0f;      // si deja la ronda (te ve, lo tumban) lo guarda
+		if (Baton && Baton->IsVisible()) Baton->SetVisibility(false);
+		if (BatonGlow && BatonGlow->IsVisible()) BatonGlow->SetVisibility(false);
+		return;
+	}
+	if (!Baton)
+	{
+		Baton = NewObject<UStaticMeshComponent>(this, TEXT("Baston"));
+		Baton->SetMobility(EComponentMobility::Movable);
+		Baton->SetupAttachment(GetRootComponent());
+		Baton->SetUsingAbsoluteLocation(true);
+		Baton->SetUsingAbsoluteRotation(true);
+		Baton->SetUsingAbsoluteScale(true);
+		Baton->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
+		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/M_Baston.M_Baston"))) Baton->SetMaterial(0, M);
+		Baton->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Baton->SetCastShadow(false);
+		Baton->RegisterComponent();
+		Baton->SetWorldScale3D(FVector(0.034f, 0.034f, BatonLength / 100.0f));
+		// su resplandor: es un componente del guardia, no una luz del nivel, así que no cuenta para LightAt
+		BatonGlow = NewObject<UPointLightComponent>(this, TEXT("BastonLuz"));
+		BatonGlow->SetMobility(EComponentMobility::Movable);
+		BatonGlow->SetupAttachment(GetRootComponent());
+		BatonGlow->SetUsingAbsoluteLocation(true);
+		BatonGlow->SetIntensityUnits(ELightUnits::Lumens);
+		BatonGlow->SetIntensity(BatonLumens);
+		BatonGlow->SetAttenuationRadius(280.0f);
+		BatonGlow->SetLightColor(FLinearColor(1.0f, 0.16f, 0.05f));
+		BatonGlow->SetCastShadows(false);
+		BatonGlow->SetVolumetricScatteringIntensity(0.0f);
+		BatonGlow->RegisterComponent();
+	}
+	const FVector H = Pose->GetBoneLocationByName(Hand, EBoneSpaces::WorldSpace);
+	const FVector E = Pose->GetBoneLocationByName(Fore, EBoneSpaces::WorldSpace);
+	FVector Dir = (H - E).GetSafeNormal();
+	if (Dir.IsNearlyZero()) Dir = FVector::UpVector;
+	// sale del puño siguiendo el antebrazo
+	Baton->SetWorldLocationAndRotation(H + Dir * (BatonLength * 0.5f + 5.0f), FRotationMatrix::MakeFromZ(Dir).Rotator());
+	BatonGlow->SetWorldLocation(H + Dir * (BatonLength * 0.6f) + GetActorForwardVector() * 6.0f);
+	if (!Baton->IsVisible()) Baton->SetVisibility(true);
+	if (!BatonGlow->IsVisible()) BatonGlow->SetVisibility(true);
 }
 
 void ATarsisGuard::FootTick(float DeltaSeconds)
@@ -836,8 +904,17 @@ void ATarsisGuard::FaceTowards(const FVector& Dest, float DeltaSeconds)
 	SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.0f, Want.Yaw, 0.0f), DeltaSeconds, 200.0f));
 }
 
+// Tanda 25: lo que se pinta y lo que cuenta para el sigilo van por separado en las luces fuertes de fuera. Con los
+// lúmenes de antes (farola 3000, foco de torre 8000, linterna 2500) el suelo bajo cada luz salía quemado y el resto
+// negro; ahora se pintan diez veces más flojas (etiqueta «luz_fuerte» en el actor; las linternas, siempre) y para el
+// sigilo cuentan lo mismo que contaban. Las luces con la etiqueta «decorado» (el resplandor de relleno de cada farola,
+// tools/unreal/cielo.py) no cuentan nada.
+static const float StrongLightBoost = 10.0f;
+static const FName NStrongLight(TEXT("luz_fuerte"));
+static const FName NDecorLight(TEXT("decorado"));
+
 // lo que aporta una luz local al punto: 0 si queda fuera de su radio o de su cono, o si algo hace sombra
-static float LightContribution(const UWorld* World, const ULocalLightComponent* L, const FVector& Point, const AActor* Owner, FCollisionQueryParams& Q)
+static float LightContribution(const UWorld* World, const ULocalLightComponent* L, const FVector& Point, const AActor* Owner, FCollisionQueryParams& Q, bool bStrong)
 {
 	if (!L || !L->IsVisible() || L->Intensity <= 0.0f) return 0.0f;
 	const FVector LP = L->GetComponentLocation();
@@ -852,8 +929,8 @@ static float LightContribution(const UWorld* World, const ULocalLightComponent* 
 		if (CosA < CosOut) return 0.0f;
 		F *= 1.5f;   // dentro de un foco (torre, farola, linterna) se ve de lejos
 	}
-	// las luces están en lúmenes: una farola (~3000) cuenta como 1 a su pie
-	F *= FMath::Clamp(L->Intensity / 3000.0f, 0.2f, 2.0f);
+	// las luces están en lúmenes: una farola (3000 de sigilo; se pinta con 300) cuenta como 1 a su pie
+	F *= FMath::Clamp(L->Intensity * (bStrong ? StrongLightBoost : 1.0f) / 3000.0f, 0.2f, 2.0f);
 	if (F < 0.02f) return 0.0f;
 	Q.ClearIgnoredSourceObjects();   // ClearIgnoredActors está obsoleto en 5.8
 	if (Owner) Q.AddIgnoredActor(Owner);
@@ -873,12 +950,13 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLuz), false);
 	for (TActorIterator<ALight> It(World); It; ++It)
 	{
-		Sum += LightContribution(World, Cast<ULocalLightComponent>(It->GetLightComponent()), Point, *It, Q);
+		if (It->ActorHasTag(NDecorLight)) continue;
+		Sum += LightContribution(World, Cast<ULocalLightComponent>(It->GetLightComponent()), Point, *It, Q, It->ActorHasTag(NStrongLight));
 	}
 	// linternas de los guardias
 	for (TActorIterator<ATarsisGuard> It(World); It; ++It)
 	{
-		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->Flashlight, Point, *It, Q);
+		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->Flashlight, Point, *It, Q, true);
 	}
 	return FMath::Clamp(Sum, 0.0f, 1.0f);
 }
@@ -923,13 +1001,13 @@ void ATarsisGuard::SetFlashlight(bool bOn)
 		Flashlight->SetupAttachment(GetRootComponent());
 		Flashlight->SetRelativeLocationAndRotation(FVector(35.0f, 18.0f, 55.0f), FRotator(-12.0f, 0.0f, 0.0f));   // a la altura del pecho, algo hacia abajo
 		Flashlight->SetIntensityUnits(ELightUnits::Lumens);
-		Flashlight->SetIntensity(2500.0f);
+		Flashlight->SetIntensity(2500.0f / StrongLightBoost);   // para el sigilo cuenta 2500 (LightAt)
 		Flashlight->SetAttenuationRadius(2600.0f);   // más que la vista normal (ViewDistance 2000): de frente te ve antes
 		Flashlight->SetInnerConeAngle(10.0f);
 		Flashlight->SetOuterConeAngle(20.0f);
 		Flashlight->SetLightColor(FLinearColor(1.0f, 0.93f, 0.8f));
 		Flashlight->SetCastShadows(false);   // sin sombras: la 1050 no da para siete linternas con sombra
-		Flashlight->SetVolumetricScatteringIntensity(3.0f);
+		Flashlight->SetVolumetricScatteringIntensity(12.0f);    // con la lluvia el haz se sigue viendo
 		Flashlight->RegisterComponent();
 	}
 	Flashlight->SetVisibility(true);
@@ -1012,6 +1090,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	{
 		LookTick(DeltaSeconds);   // el cuerpo visible sigue copiando la caída
 		if (GestureW > 0.0f || GestureLeft > 0.0f) StopGesture();   // en el suelo no hay gesto que valga, ni al levantarse
+		BatonTick(DeltaSeconds);   // y el bastón se apaga
 		DownT -= DeltaSeconds;
 		if (DownT <= 0.0f) WakeUp();
 		return;
@@ -1019,6 +1098,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	UpdateAnim();
 	LookTick(DeltaSeconds);
 	GestureTick(DeltaSeconds);
+	BatonTick(DeltaSeconds);
 	FootTick(DeltaSeconds);
 	// aturdido por un empujón: tambaleándose, no ve ni anda; al rehacerse va a por ti
 	if (StunT > 0.0f)

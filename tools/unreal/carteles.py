@@ -97,9 +97,12 @@ def _uv(g, x, y):
 
 
 def material_cartel(defecto):
-    """M_Cartel: chapa esmaltada. Textura (RGB color, A recorte), Rugosidad (satinado: 0,42) y Tinte."""
+    """M_Cartel: chapa esmaltada. Textura (RGB color, A recorte), Rugosidad (satinado: 0,42), Tinte y Brillo.
+    Brillo (tanda 25): la chapa devuelve un poco de luz propia, del color de su pintura, como las señales con pintura
+    reflectante. Es lo que deja leer «ZONA MILITAR» de noche sin poner un foco (una luz más cambiaría el sigilo): con
+    0,12 el amarillo queda entre el suelo a la luna y el suelo bajo una farola, y la letra negra sigue negra. 0 = nada."""
     amb = _ambiente()
-    g = amb.Grafo(amb.DM + '/M_Cartel', 'M_Cartel', 'cartel v1')
+    g = amb.Grafo(amb.DM + '/M_Cartel', 'M_Cartel', 'cartel v2 brillo')
     if g.hecho:
         return g.m
     g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MASKED)
@@ -111,6 +114,7 @@ def material_cartel(defecto):
     col = g.E(unreal.MaterialExpressionMultiply, -200, -100)
     g.une(t, col, 'A', 'RGB'); g.une(tinte, col, 'B')
     g.sale(col, unreal.MaterialProperty.MP_BASE_COLOR)
+    g.sale(g.op(unreal.MaterialExpressionMultiply, col, g.esc('Brillo', 0.0, -200, 120), 0, 60), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     g.sale(t, unreal.MaterialProperty.MP_OPACITY_MASK, 'A')
     g.sale(g.esc('Rugosidad', 0.42, -500, 320), unreal.MaterialProperty.MP_ROUGHNESS)
     return g.fin()
@@ -134,7 +138,7 @@ def material_rotulo(defecto):
     return g.fin()
 
 
-def instancia(nombre, base, tx, clase, fuerza=None):
+def instancia(nombre, base, tx, clase, fuerza=None, brillo=None):
     ruta = '%s/MI_%s' % (DC, nombre)
     mi = eal.load_asset(ruta) if eal.does_asset_exist(ruta) else tools.create_asset(
         'MI_' + nombre, DC, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
@@ -144,6 +148,8 @@ def instancia(nombre, base, tx, clase, fuerza=None):
     mel.set_material_instance_scalar_parameter_value(mi, 'EspejoV', ESPEJO[clase][1])
     if fuerza is not None:
         mel.set_material_instance_scalar_parameter_value(mi, 'Fuerza', fuerza)
+    if clase == 'placa':
+        mel.set_material_instance_scalar_parameter_value(mi, 'Brillo', float(brillo or 0.0))
     eal.save_loaded_asset(mi)
     return mi
 
@@ -205,10 +211,12 @@ def colocar():
         if tx is None:
             continue
         clase = c['clase']
-        clave = (c['tex'], clase, c.get('fuerza'))
+        clave = (c['tex'], clase, c.get('fuerza'), c.get('brillo'))
         if clave not in mis:
             sufijo = '' if c.get('fuerza') is None else '_%d' % round(c['fuerza'] * 100)
-            mis[clave] = instancia('%s_%s%s' % (clase, c['tex'], sufijo), m_placa if clase == 'placa' else m_rot, tx, clase, c.get('fuerza'))
+            if c.get('brillo'):
+                sufijo += '_b%d' % round(c['brillo'] * 100)
+            mis[clave] = instancia('%s_%s%s' % (clase, c['tex'], sufijo), m_placa if clase == 'placa' else m_rot, tx, clase, c.get('fuerza'), c.get('brillo'))
         mi = mis[clave]
         x, y, z = c['pos']
         an, al = c['tam']

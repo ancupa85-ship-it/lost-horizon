@@ -1,5 +1,5 @@
 {
- "_leeme": "Carteles, rótulos y etiquetas (tanda 24). Texturas: tools/carteles/generar.py -> assets/unreal/carteles/<tex>.png. Los coloca tools/unreal/carteles.py. clase «placa»: chapa (plano) en pos, mirando hacia «mira» (yaw de la normal, grados), tam [ancho, alto] en cm; «poste»: alto del poste en cm (la placa va en un poste clavado en el suelo); «panel» [x, y, ancho, alto, grosor]: murete que se levanta detrás si no hay pared. clase «pintado»: calcomanía en una pared que mira hacia «mira». clase «suelo»: calcomanía en el suelo, tam [a lo ancho del camino (Y), a lo largo (X)], «giro» en grados. «fuerza»: cuánta pintura (0-1). «orden»: orden de dibujo de la calcomanía.",
+ "_leeme": "Carteles, rótulos y etiquetas (tanda 24). Texturas: tools/carteles/generar.py -> assets/unreal/carteles/<tex>.png. Los coloca tools/unreal/carteles.py. clase «placa»: chapa (plano) en pos, mirando hacia «mira» (yaw de la normal, grados), tam [ancho, alto] en cm; «poste»: alto del poste en cm (la placa va en un poste clavado en el suelo); «panel» [x, y, ancho, alto, grosor]: murete que se levanta detrás si no hay pared. clase «pintado»: calcomanía en una pared que mira hacia «mira». clase «suelo»: calcomanía en el suelo, tam [a lo ancho del camino (Y), a lo largo (X)], «giro» en grados. «fuerza»: cuánta pintura (0-1). «orden»: orden de dibujo de la calcomanía. «brillo» (tanda 25, solo placas): luz propia de la chapa, como pintura reflectante (0 = nada; 0,12 se lee de noche sin foco).",
  "carteles": [
   {
    "nombre": "Jefatura",
@@ -98,13 +98,14 @@
    "pos": [
     1500,
     7453.5,
-    190
+    200
    ],
    "mira": -90,
    "tam": [
-    100,
-    50
-   ]
+    200,
+    100
+   ],
+   "brillo": 0.12
   },
   {
    "nombre": "ZonaMilitar_S2",
@@ -113,13 +114,14 @@
    "pos": [
     4800,
     7453.5,
-    190
+    200
    ],
    "mira": -90,
    "tam": [
-    100,
-    50
-   ]
+    200,
+    100
+   ],
+   "brillo": 0.12
   },
   {
    "nombre": "ZonaMilitar_S3",
@@ -128,13 +130,14 @@
    "pos": [
     7600,
     7453.5,
-    190
+    200
    ],
    "mira": -90,
    "tam": [
-    100,
-    50
-   ]
+    200,
+    100
+   ],
+   "brillo": 0.12
   },
   {
    "nombre": "ZonaMilitar_O",
@@ -143,13 +146,14 @@
    "pos": [
     -1853.5,
     4700,
-    190
+    200
    ],
    "mira": 0,
    "tam": [
-    100,
-    50
-   ]
+    200,
+    100
+   ],
+   "brillo": 0.12
   },
   {
    "nombre": "ZonaMilitar_E",
@@ -158,13 +162,14 @@
    "pos": [
     9053.5,
     6450,
-    190
+    200
    ],
    "mira": 180,
    "tam": [
-    100,
-    50
-   ]
+    200,
+    100
+   ],
+   "brillo": 0.12
   },
   {
    "nombre": "Portillo",
@@ -211,7 +216,7 @@
     800,
     100
    ],
-   "fuerza": 0.8,
+   "fuerza": 1.0,
    "orden": -1
   },
   {
@@ -228,7 +233,8 @@
     55,
     110
    ],
-   "poste": 250
+   "poste": 250,
+   "brillo": 0.08
   },
   {
    "nombre": "Velocidad",

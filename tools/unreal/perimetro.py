@@ -72,14 +72,18 @@ LOSA_Z = 4.0
 # tanda 23. tipo -> (material: 'mancha', 'charco' o 'chorreton'; color lineal; fuerza; resto de parámetros de la instancia)
 TIPOS_23 = {
     # tanda 24: el charco lleva cerco húmedo (Cerco, RugosidadCerco) y el agua deja ver algo del fondo (Fondo)
-    'Agua': ('charco', (0.012, 0.012, 0.011), 1.0, {'Rugosidad': 0.05, 'Fondo': 0.9, 'Cerco': 0.5, 'RugosidadCerco': 0.32}),       # charco en la losa o el asfalto
-    'AguaBarro': ('charco', (0.03, 0.024, 0.015), 1.0, {'Rugosidad': 0.09, 'Fondo': 0.95, 'Cerco': 0.6, 'RugosidadCerco': 0.4}),  # agua turbia en la grava del anillo
+    # tanda 25: charcos con lóbulos (M_Charco v6) que dejan ver más fondo, y regueros con hilos anchos (M_Chorreton v5)
+    'Agua': ('charco', (0.014, 0.014, 0.013), 1.0, {'Rugosidad': 0.04, 'Fondo': 0.75, 'Cerco': 0.5, 'RugosidadCerco': 0.28, 'Lobulos': 0.85}),       # charco en la losa o el asfalto
+    'AguaBarro': ('charco', (0.032, 0.026, 0.017), 1.0, {'Rugosidad': 0.08, 'Fondo': 0.85, 'Cerco': 0.6, 'RugosidadCerco': 0.36, 'Lobulos': 0.95}),  # agua turbia en la grava del anillo
     # tanda 24: regueros más marcados (más oscuros, hilos más finos, más tramos y la franja húmeda bajo la coronación)
-    'Chorreton': ('chorreton', (0.018, 0.016, 0.013), 1.0, {'Techo': 462.0, 'Largo': 300.0, 'Contraste': 2.6, 'Grupos': 0.30, 'Franja': 0.6}),          # muro de 4,6 m
-    'ChorretonGarita': ('chorreton', (0.018, 0.016, 0.013), 0.95, {'Techo': 251.0, 'Largo': 140.0, 'Contraste': 2.6, 'Grupos': 0.26, 'Franja': 0.5}),   # garitas de 2,5 m
+    'Chorreton': ('chorreton', (0.014, 0.012, 0.010), 1.0, {'Techo': 462.0, 'Largo': 340.0, 'Contraste': 2.6, 'Grupos': 0.28, 'Franja': 0.7, 'Ancho': 0.85, 'ContrasteAncho': 2.2}),          # muro de 4,6 m
+    'ChorretonGarita': ('chorreton', (0.014, 0.012, 0.010), 0.95, {'Techo': 251.0, 'Largo': 150.0, 'Contraste': 2.6, 'Grupos': 0.26, 'Franja': 0.55, 'Ancho': 0.7, 'ContrasteAncho': 2.2}),   # garitas de 2,5 m
     'Junta': ('mancha', (0.022, 0.021, 0.02), 0.5, {}),                              # junta de la losa que rezuma
 }
 MURO_ALTO = 460.0
+# tanda 25: con M_Charco v6 el agua ocupa de media algo más de la mitad del radio de su caja (antes casi dos tercios) y
+# los charcos tenían que crecer: las cajas de los charcos se multiplican por esto (el sitio no cambia)
+CHARCO_ESCALA = 1.7
 # farolas del camino y faroles de los dos portones (x, y de la luminaria, en cm): los charcos de al lado las reflejan
 FAROLAS_CAMINO = ((1070, 5770), (3600, 5770), (6130, 5770), (-1460, 5640), (8660, 5640))
 
@@ -195,7 +199,7 @@ def manchas():
     # ------------------------------------------------------------ tanda 23 (otra semilla: lo de la 22 no se mueve)
     r3 = random.Random(2323)
     def agua(tipo, pos, ancho, largo, giro=0.0, lluvia=False):
-        a = calco(tipo, pos, ancho, largo, giro=giro)
+        a = calco(tipo, pos, ancho * CHARCO_ESCALA, largo * CHARCO_ESCALA, giro=giro)
         a.decal.set_editor_property('sort_order', 2)          # el agua, por encima de las manchas mates
         if lluvia:
             a.tags = [unreal.Name(MANCHA_TAG), unreal.Name('lluvia')]

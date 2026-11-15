@@ -97,6 +97,8 @@ def luces():
             continue
         if a.actor_has_tag('camion'):
             continue   # los faros del camión (tanda 21): van y vienen con él y no dependen del generador
+        if a.actor_has_tag('decorado'):
+            continue   # tanda 25: el relleno que acompaña a cada farola (no alumbra para el sigilo; sigue a su farola)
         n = a.get_actor_label()
         if n.startswith('SpotLight'):
             n = 'farol_garita'
@@ -116,6 +118,11 @@ def quietos(*nombres):
 
 def actores(tag, clase=None):
     return [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), clase or unreal.StaticMeshActor) if a.actor_has_tag(tag)]
+
+def relleno_encendido():
+    """Las luces de relleno (etiqueta «decorado», tanda 25) que están encendidas."""
+    return [a.get_actor_label() for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.Light)
+            if a.actor_has_tag('decorado') and a.get_component_by_class(unreal.LocalLightComponent) and a.get_component_by_class(unreal.LocalLightComponent).is_visible()]
 
 def reparador_cercano():
     best = None
@@ -682,6 +689,7 @@ def prueba_perdido():
 def prueba_generador():
     d = director()
     on0, off0 = luces()
+    halos0 = d.halo_counts()
     tp(4300, 1910, -90); yield 0.1
     d.interact(); yield 0.1
     aparte()
@@ -689,6 +697,8 @@ def prueba_generador():
     yield 3.0
     on, off = luces()
     check('apagón en cadena: todas las luces fuera', len(on) == 0, 'encendidas %s' % on)
+    # tanda 25: sin farola no hay halo ni brillo en el suelo mojado
+    check('y con ellas sus halos y su brillo en el suelo', d.halo_counts().y == 0 and not relleno_encendido(), '%d halos, %d de relleno' % (d.halo_counts().y, len(relleno_encendido())))
     # la central habla 1,6 s después del corte; su subtítulo espera en cola a que acaben los de los guardias
     yield ('hasta', lambda: any('Se ha ido la luz' in str(x) for x in director().get_editor_property('subtitle_log')), 10.0)
     check('la central por radio (voz y subtítulo)', 'central_luz' in list(d.get_editor_property('voice_log'))
@@ -701,6 +711,8 @@ def prueba_generador():
     on, off = luces()
     msg = str(d.get_editor_property('message'))
     check('un guardia lo arregla y vuelven todas', 'ha arrancado' in msg and len(on) == len(on0), '%s | %d de %d' % (msg[:40], len(on), len(on0)))
+    yield 0.2
+    check('y los halos', d.halo_counts().y == halos0.y and halos0.y >= 6, '%d de %d' % (d.halo_counts().y, halos0.y))
 
 def prueba_reserva():
     d = director()
@@ -1052,10 +1064,153 @@ def prueba_carteles():
     en_puertas = [n for n in ('Jefatura', 'Archivo', 'Dormitorio', 'CuerpoGuardia', 'Calabozo') if 'Cartel_' + n in por
                   and 225 < por['Cartel_' + n].get_actor_location().z < 300]
     check('las cinco puertas con nombre tienen su placa en el dintel', len(en_puertas) == 5, en_puertas)
+    # tanda 25: «ZONA MILITAR» a 2 x 1 m y con luz propia (pintura reflectante): se lee de noche sin poner un foco
+    zm = [c for c in lista if c['tex'] == 'zona_militar']
+    mal = []
+    for c in zm:
+        a = por.get('Cartel_' + c['nombre'])
+        if not a:
+            mal.append(c['nombre']); continue
+        e = a.get_actor_scale3d()
+        mi = a.get_component_by_class(unreal.StaticMeshComponent).get_material(0)
+        br = mel.get_material_instance_scalar_parameter_value(mi, 'Brillo') if mi else 0.0
+        if abs(e.x - 2.0) > 0.01 or abs(e.y - 1.0) > 0.01 or not 0.05 <= br <= 0.3:
+            mal.append('%s %.1fx%.1f brillo %.2f' % (c['nombre'], e.x, e.y, br))
+    check('«ZONA MILITAR»: cinco chapas de 2 x 1 m que se leen de noche (brillo propio)', len(zm) == 5 and not mal, mal)
+    sin_brillo = mel.get_material_instance_scalar_parameter_value(por['Cartel_Jefatura'].get_component_by_class(unreal.StaticMeshComponent).get_material(0), 'Brillo') if 'Cartel_Jefatura' in por else -1
+    check('las placas de interior no brillan', sin_brillo == 0.0, sin_brillo)
     suelo = [a for a in por.values() if isinstance(a, unreal.DecalActor) and a.get_actor_location().z < 20]
     check('ALTO y la línea, pintados en la losa del control', len(suelo) == 2 and all(abs(a.get_actor_location().y - 5700) < 10 and 8200 < a.get_actor_location().x < 8600 for a in suelo),
           [int(a.get_actor_location().x) for a in suelo])
     yield 0.1
+
+
+def prueba_materia():
+    """Tanda 25 (arte): las superficies grandes dejan de ser un color plano. El material maestro (M_LH) pinta con el
+    albedo de verdad de cada material (Tinte) sobre la textura normalizada (Medio), y encima la variación que se ve de
+    lejos: losas y paneles de distinto tono con su junta, nubes, manchas, zócalo sucio y regueros. Los contenedores
+    tienen costillas, pilares y puertas; el camión es verde oliva."""
+    w = mundo()
+    mel = unreal.MaterialEditingLibrary
+    def mi(n):
+        return unreal.load_object(None, '/Game/Tarsis/Materiales/MI_%s.MI_%s' % (n, n))
+    def esc(n, p):
+        m = mi(n)
+        return round(mel.get_material_instance_scalar_parameter_value(m, p), 3) if m else None
+    def lum(n, p):
+        m = mi(n)
+        if not m:
+            return None
+        c = mel.get_material_instance_vector_parameter_value(m, p)
+        return round(0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b, 3)
+    claves = ('suelo', 'camino', 'muro', 'hormigon', 'pared', 'tejado', 'oliva', 'suelo_int')
+    padres = {n: (mi(n).get_editor_property('parent').get_name() if mi(n) and mi(n).get_editor_property('parent') else None) for n in claves}
+    check('las instancias cuelgan del material maestro', all(v == 'M_LH' for v in padres.values()), padres)
+    alb = {n: lum(n, 'Tinte') for n in claves}
+    # albedos de verdad: asfalto y losa 4-10 %, hormigón y yeso 9-16 %, pintura oliva y tela asfáltica 2-5 %
+    check('cada material pinta con su albedo real (ni negro ni tiza)', all(v is not None and 0.02 <= v <= 0.2 for v in alb.values())
+          and alb['muro'] > alb['suelo'] and alb['pared'] > alb['muro'] and alb['tejado'] < alb['suelo'], alb)
+    med = {n: lum(n, 'Medio') for n in claves}
+    check('la textura va normalizada por su color medio', all(v is not None and 0.03 < v < 0.6 for v in med.values()), med)
+    losas = {n: (esc(n, 'Losa'), esc(n, 'LosaTono'), esc(n, 'Panel'), esc(n, 'PanelTono'), esc(n, 'Junta')) for n in ('suelo', 'camino', 'muro', 'hormigon')}
+    check('losas de distinto tono en el suelo y paneles en los muros', losas['suelo'][0] >= 400 and losas['suelo'][1] > 0.05 and losas['camino'][0] == 600
+          and losas['muro'][2] >= 250 and losas['muro'][3] > 0.05 and losas['hormigon'][3] > 0.03, losas)
+    cho = {n: esc(n, 'Chorreo') for n in ('muro', 'hormigon', 'pared', 'suelo', 'suelo_int', 'contenedor_0')}
+    check('regueros en lo vertical y no en el suelo', cho['muro'] >= 0.4 and cho['hormigon'] >= 0.3 and cho['contenedor_0'] > 0.1 and cho['suelo'] == 0.0 and cho['suelo_int'] == 0.0, cho)
+    rel = {n: esc(n, 'Relieve') for n in ('suelo', 'camino', 'muro')}
+    check('relieve reforzado (se lee con la luz rasante de las farolas)', all(v and v > 1.2 for v in rel.values()), rel)
+    # el camión: verde oliva oscuro (antes salía verde lima)
+    m = unreal.load_object(None, '/Game/Tarsis/Materiales/MI_oliva_camion.MI_oliva_camion')
+    c = mel.get_material_instance_vector_parameter_value(m, 'Tinte') if m else None
+    check('el camión es verde oliva oscuro', c is not None and c.g > c.r > c.b and c.g < 0.09 and c.g / max(c.r, 1e-4) < 1.35, (round(c.r, 3), round(c.g, 3), round(c.b, 3)) if c else None)
+    # contenedores: el detalle se ve y no se toca; la caja de siempre sigue siendo lo que choca
+    det = actores('contenedor_detalle')
+    cajas = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor)
+             if a.get_actor_label().startswith('contenedor_') and not a.actor_has_tag('contenedor_detalle')]
+    check('los contenedores de cada color tienen sus costillas, pilares y puertas', len(det) >= 3 and len(det) == len(cajas), '%d de %d' % (len(det), len(cajas)))
+    mal = []
+    for a in det:
+        comp = a.get_component_by_class(unreal.StaticMeshComponent)
+        mat = comp.get_material(0).get_name() if comp and comp.get_material(0) else ''
+        o, e = a.get_actor_bounds(False)
+        caja = next((b for b in cajas if dist2d(b.get_actor_bounds(False)[0], o) < 60), None)
+        if a.get_actor_enable_collision() or not mat.startswith('MI_contenedor_') or a.get_editor_property('hidden') or caja is None \
+                or caja.get_component_by_class(unreal.StaticMeshComponent).get_material(0).get_name() != mat:
+            mal.append('%s %s' % (a.get_actor_label(), mat))
+    check('el detalle se ve, no estorba y va del color de su caja', not mal, mal)
+    yield 0.1
+
+
+def prueba_cielo():
+    """Tanda 25 (luz y cielo): la noche tiene cielo (cúpula con estrellas, luna y nubes que se cubre con la lluvia y la
+    niebla), las farolas tienen halo y dejan de quemar el suelo (se pintan a un décimo; para el sigilo cuentan lo de
+    siempre) y cada una lleva un relleno que da brillo en el suelo mojado sin alumbrar a nadie."""
+    d = director()
+    w = mundo()
+    aparte()
+    cup = actores('cielo')
+    c = cup[0].get_component_by_class(unreal.StaticMeshComponent) if cup else None
+    mat = c.get_material(0) if c else None
+    check('la cúpula del cielo está puesta, con su material', len(cup) == 1 and mat is not None and mat.get_name() == 'MI_Cielo'
+          and not cup[0].get_actor_enable_collision() and not c.get_editor_property('cast_shadow'), [a.get_actor_label() for a in cup])
+    if cup:
+        o, e = cup[0].get_actor_bounds(False)
+        check('y cubre toda la base (más de un kilómetro de radio)', e.x > 100000 and e.z > 100000, int(e.x))
+    # nubes: con lluvia o niebla el cielo se cubre poco a poco y al despejar se abre
+    w0, cs = d.get_editor_property('weather'), d.get_editor_property('cloud_seconds')
+    while d.get_editor_property('weather') != 0:
+        d.simulate_key('Y'); yield 0.2
+    d.set_cloudiness_now(0.0); yield 0.2
+    check('con el cielo raso «Nublado» vale 0', abs(d.cloudiness_in_collection()) < 0.01 and d.get_editor_property('cloudiness') < 0.01, '%.2f' % d.cloudiness_in_collection())
+    d.set_editor_property('cloud_seconds', 2.0)
+    while d.get_editor_property('weather') != 1:
+        d.simulate_key('Y'); yield 0.2
+    yield 0.6
+    medio = d.get_editor_property('cloudiness')
+    yield 2.0
+    check('con la lluvia se cubre poco a poco', 0.1 < medio < 0.9 and d.cloudiness_in_collection() > 0.99, '%.2f y luego %.2f' % (medio, d.cloudiness_in_collection()))
+    while d.get_editor_property('weather') != 0:
+        d.simulate_key('Y'); yield 0.2
+    yield 3.6
+    check('y al escampar se abre', d.cloudiness_in_collection() < 0.01, '%.2f' % d.cloudiness_in_collection())
+    d.set_editor_property('cloud_seconds', cs)
+    while d.get_editor_property('weather') != w0:
+        d.simulate_key('Y'); yield 0.2
+    # farolas: se pintan a un décimo (no queman la losa) y para el sigilo cuentan lo de siempre
+    focos = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Light) if a.get_component_by_class(unreal.LocalLightComponent)]
+    lm = lambda a: a.get_component_by_class(unreal.LocalLightComponent).get_editor_property('intensity')
+    far = [a for a in focos if a.get_actor_label().startswith('farola')]
+    tor = [a for a in focos if a.get_actor_label().startswith('foco_torreta')]
+    mal = [(a.get_actor_label(), int(lm(a))) for a in far + tor if not a.actor_has_tag('luz_fuerte') or lm(a) > 1000]
+    check('farolas (%d) y focos de torre (%d) pintan a un décimo, marcados «luz_fuerte»' % (len(far), len(tor)), len(far) >= 6 and len(tor) >= 2 and not mal, mal)
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    f = ext['farolas'][1]
+    pie = luz_en(V(f[0] * 100, 5700, 100))
+    check('al pie de una farola sigues a plena luz para los guardias', pie > 0.5, '%.2f' % pie)
+    # halos y relleno
+    hc = d.halo_counts()
+    halos = actores('halo')
+    check('cada luminaria de fuera tiene su halo, encendido', hc.x == len(halos) and hc.x >= len(far) + len(tor) and hc.y == hc.x, '%d halos, %d encendidos, %d en el nivel' % (hc.x, hc.y, len(halos)))
+    rell = [a for a in focos if a.actor_has_tag('decorado')]
+    sombra = [a.get_actor_label() for a in rell if a.get_component_by_class(unreal.LocalLightComponent).get_editor_property('cast_shadows')]
+    check('cada farola tiene su relleno (sin sombras: casi no cuesta)', len(rell) >= len(far) and not sombra, '%d de relleno, %d farolas, con sombra %s' % (len(rell), len(far), sombra))
+    # el relleno no alumbra para el sigilo: a 12 m de la farola del camino, fuera de su cono, da lo mismo con él que sin él
+    p = V(f[0] * 100 + 1200, 5700, 100)
+    cerca = [a for a in rell if dist2d(a.get_actor_location(), V(f[0] * 100, f[1] * 100, 0)) < 300]
+    con = luz_en(p)
+    for a in cerca:
+        a.get_component_by_class(unreal.LocalLightComponent).set_visibility(False)
+    sin = luz_en(p)
+    for a in cerca:
+        a.get_component_by_class(unreal.LocalLightComponent).set_visibility(True)
+    check('el relleno no cuenta para el sigilo (misma luz con él que sin él)', len(cerca) == 1 and abs(con - sin) < 0.001 and con < 0.5, '%.3f y %.3f, %d cerca' % (con, sin, len(cerca)))
+    # romper el farol de la garita apaga su halo (lo hace el dardo en prueba_farol; aquí, que el recuento baja al apagarla)
+    if far:
+        comp = far[0].get_component_by_class(unreal.LocalLightComponent)
+        comp.set_visibility(False); yield 0.3
+        menos = d.halo_counts().y
+        comp.set_visibility(True); yield 0.3
+        check('una farola apagada pierde su halo, y lo recupera', menos == hc.y - 1 and d.halo_counts().y == hc.y, '%d -> %d -> %d' % (hc.y, menos, d.halo_counts().y))
 
 
 def prueba_cobertura():
@@ -1152,10 +1307,17 @@ def prueba_gestos():
     g.play_gesture('pase', 1.2, V(l.x - r.x * 500, l.y - r.y * 500, l.z)); yield 0.7
     check('hacia el otro lado, con el otro brazo', g.hand_height(False) > i0 + 25 and abs(g.hand_height(True) - h0) < 10, 'izquierda %d cm, derecha %d cm' % (g.hand_height(False), g.hand_height(True)))
     yield 1.2
+    # tanda 25: el bastón luminoso (lo que deja leer el alto de noche) se enciende el tiempo que se le pide y se guarda
+    check('sin pedirlo, el bastón está guardado', not g.baton_on())
+    g.hold_baton(1.0); yield 0.4
+    check('HoldBaton lo enciende', g.baton_on())
+    yield 1.1
+    check('y se apaga solo al acabar el tiempo', not g.baton_on())
     # derribado no gesticula
-    g.play_gesture('alto', 3.0, V(0, 0, 0)); yield 0.6
+    g.play_gesture('alto', 3.0, V(0, 0, 0)); g.hold_baton(3.0); yield 0.6
     derribar(g); yield 0.8
     check('derribado no gesticula', estado(g) == 'DOWN' and g.get_editor_property('gesture_w') < 0.05 and nombre() == 'None', '%s, peso %.2f, %s' % (estado(g), g.get_editor_property('gesture_w'), nombre()))
+    check('ni lleva el bastón encendido', not g.baton_on())
     registro = [str(x) for x in g.get_editor_property('gesture_log')]
     check('el registro de gestos los cuenta por orden', registro == ['alto', 'leer', 'pase', 'pase', 'alto'], registro)
 
@@ -1298,6 +1460,7 @@ def prueba_camion():
     yield 0.7
     check('tiende la mano hacia la ventanilla', sanz and str(sanz.current_gesture()) in ('papeles', 'leer') and sanz.get_editor_property('gesture_w') > 0.5,
           '%s, peso %.2f' % (sanz.current_gesture(), sanz.get_editor_property('gesture_w')) if sanz else '')
+    check('lleva el bastón luminoso encendido durante el control', sanz and sanz.baton_on())
     yield ('hasta', lambda: director().get_editor_property('barrier_t') > 0.95, 14.0)
     check('mira los papeles y le levanta la barrera', d.get_editor_property('barrier_t') > 0.95 and 'sanz_pase' in list(d.get_editor_property('voice_log')),
           '%.2f, %s' % (d.get_editor_property('barrier_t'), list(d.get_editor_property('voice_log'))[-2:]))
@@ -1314,6 +1477,7 @@ def prueba_camion():
     if sanz:
         yield ('hasta', lambda: estado(sanz) == 'PATROL' and min(dist2d(sanz.get_actor_location(), V(8500, 5300, 0)), dist2d(sanz.get_actor_location(), V(8100, 5300, 0))) < 450, 12.0)
         check('Sanz vuelve a su ronda', estado(sanz) == 'PATROL' and abs(sanz.get_actor_location().y - 5300) < 200, '%s en y %d' % (estado(sanz), sanz.get_actor_location().y))
+        check('y ha guardado el bastón', not sanz.baton_on())
 
 
 def prueba_viaje():
@@ -1643,7 +1807,7 @@ def prueba_puertas():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo]]
 PRUEBAS = []
 
 

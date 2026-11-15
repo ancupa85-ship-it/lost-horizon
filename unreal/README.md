@@ -113,6 +113,38 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 
 **Pruebas.** `prueba_puertas`, `prueba_mojado`, `prueba_carteles`, `prueba_cobertura`, `prueba_gestos` y los gestos de Sanz en `prueba_camion` y `prueba_viaje`.
 
+### Materia, noche con cielo, agua y señales que se leen (tanda 25)
+
+**El diagnóstico (medido).** Las texturas de Poly Haven que usa la base son casi un color liso (desviación relativa del 9 % en el hormigón y el yeso), y el color del visor multiplicado por la textura daba albedos imposibles: el suelo y el camino devolvían un 2 % de la luz, el muro un 6 %, el tejado un 1,3 %. Con farolas 140 veces más fuertes que la luna, la noche solo tenía dos valores: círculo quemado o negro.
+
+**Arte: materia en lo grande** (`materiales.py`, `M_LH` «lh v25c»).
+
+- **Albedo de verdad.** El color es `Tinte` (el albedo lineal del material, tabla `ALBEDO`) por la textura dividida por su color medio (`Medio`, tabla `MEDIO`), con `Contraste` alrededor de 1. La textura ya no decide el tono, solo el grano.
+- **Variación que se ve de lejos**, toda en el material y sin texturas nuevas: nubes de tono (`Macro`), manchas, zócalo sucio irregular de 20 a 90 cm, **losas** en lo horizontal (`Losa`, `LosaTono`, `LosaFaseX`) y **paneles de encofrado** en lo vertical (`Panel`, `PanelTono`) con su junta oscura (`Junta`), regueros verticales que bajan por muros y chapa (`Chorreo`) y relieve reforzado (`Relieve`). Cada losa desplaza la textura al azar (`Desfase`): la grieta del asfalto ya no se repite cada tres metros.
+- **Contenedores.** `exportar_base.py` añade una malla de detalle por color (`contenedordet_N`): pilares de esquina, largueros, costillas cada 26 cm, puertas con sus cuatro barras de cierre y bisagras. Solo se ve: se choca y se dispara contra la caja de siempre.
+- **Camión** verde oliva militar oscuro (antes, verde lima): `M_LH_Movil` usa el mismo esquema de albedo.
+
+**Luz y cielo.**
+
+- **Farolas que no queman.** Farolas (300 lm), focos de torre (800 lm), farol del control (300 lm), faros del camión y linternas se pintan a un décimo de lo que eran. Para el sigilo cuentan lo mismo: las luces con la etiqueta `luz_fuerte` valen × 10 en `ATarsisGuard::LightAt` (`StrongLightBoost`). La exposición, la luna y la luz del cielo no cambian: lo que cambia es que el suelo ya devuelve luz.
+- **Relleno.** Cada farola lleva una luz puntual sin sombras de 250 lm (`Brillo_<farola>`, etiqueta `decorado`): saca la luz fuera del cono y es la que se refleja en el suelo mojado. `LightAt` la ignora, se apaga con su farola y no entra en el apagón como luz propia.
+- **Halos** (`M_Halo`): una esfera aditiva alrededor de cada luminaria de fuera (etiqueta `halo`), que crece con la humedad (`Nublado`) y se apaga con su luz.
+- **Cielo** (`cielo.py`, `M_Cielo`): cúpula de 1,2 km sin iluminar con degradado de cenit a horizonte, estrellas (textura propia de 1024, `tools/texturas/estrellas.py`), disco y halo de la luna en la dirección contraria a la luz `Luna`, y nubes de ruido que se mueven. Con lluvia o niebla se cubre: el director sube `Nublado` en `MPC_Tarsis` (`CloudTick`, `CloudSeconds`).
+- **Posprocesado:** algo de grano, florecimiento suave y un punto frío en las sombras y cálido en las luces.
+
+**Agua.**
+
+- El suelo mojado se oscurece más (`MojadoOscuro` 0,5) y los parches encharcados del maestro son espejo (rugosidad 0,06, relieve plano) con forma de mancha amplia, no de lunares.
+- **Charcos** (`M_Charco` v6): la forma es la distancia al centro más un ruido lento (lóbulos de un metro), no una máscara redonda comida por ruido fino; dejan ver más fondo y son más grandes (`CHARCO_ESCALA` 1,7 en `perimetro.py`).
+- **Regueros** (`M_Chorreton` v5): además de los hilos finos llevan regueros anchos de un palmo largo, que son los que se ven a diez metros, y la franja húmeda de arriba es más alta.
+
+**Juego.**
+
+- **El alto de Sanz.** Brazo más separado del cuerpo y, sobre todo, un **bastón luminoso rojo** en la mano derecha durante todo el control del camión (`HoldBaton`, `BatonOn`): de noche un brazo oscuro contra un fondo oscuro no se lee; un bastón encendido, sí. Su resplandor (16 lm) es un componente del guardia y no cuenta para el sigilo.
+- **«ZONA MILITAR»** pasa a 2 × 1 m, con menos óxido encima, y lleva luz propia como la pintura reflectante (`brillo` en `carteles.json`, parámetro `Brillo` de `M_Cartel`): se lee de noche sin añadir un foco, que cambiaría el sigilo. El lema del muro, menos comido.
+
+**Pruebas.** `prueba_materia` y `prueba_cielo` (familia nueva), el bastón en `prueba_gestos` y `prueba_camion`, los halos y el relleno en `prueba_generador`, y el tamaño y el brillo de las chapas en `prueba_carteles`.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

@@ -375,9 +375,12 @@ def material_charco():
     que hay dentro de la máscara (con alfa compuesto escribía la rugosidad en toda la caja); el color va sin multiplicar,
     lo mezcla el motor con la opacidad. Sin CHARCO_NORMAL (motor que no la compile), alfa compuesto como en la tanda 22:
     solo oscurece."""
-    # v5 (tanda 24): la v4 tenía la orilla cortada a cuchillo (umbral x 9) y sin cerco: de noche se leía como una mancha
-    # negra de borde duro salvo en el ángulo del reflejo
-    g = Grafo(DM + '/M_Charco', 'M_Charco', 'charco v5' + (' plano' if CHARCO_NORMAL else ''))
+    # v6 (tanda 25): la v5 seguía leyéndose como una mancha de tinta: la forma era la máscara redonda POR un ruido
+    # fino (bordes deshilachados) y el agua tapaba casi todo el suelo (negro salvo en el ángulo del reflejo). Ahora la
+    # forma es la distancia al centro MÁS un ruido lento (lóbulos de un metro, como el agua que busca lo hondo de la
+    # losa), con un segundo ruido más fino y flojo que solo muerde la orilla; el cerco es más ancho y el agua deja ver
+    # más fondo (Fondo 0,75 en las instancias). v5: orilla blanda y cerco. v4: orilla cortada a cuchillo y sin cerco
+    g = Grafo(DM + '/M_Charco', 'M_Charco', 'charco v6' + (' plano' if CHARCO_NORMAL else ''))
     if g.hecho:
         return g.m
     M, A, S = unreal.MaterialExpressionMultiply, unreal.MaterialExpressionAdd, unreal.MaterialExpressionSubtract
@@ -385,18 +388,23 @@ def material_charco():
     g.m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT if CHARCO_NORMAL else unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
     g.m.set_editor_property('material_domain', unreal.MaterialDomain.MD_DEFERRED_DECAL)
     col = g.E(unreal.MaterialExpressionVectorParameter, -700, -300, parameter_name='Color', default_value=unreal.LinearColor(0.012, 0.012, 0.011, 1))
-    uv = g.E(unreal.MaterialExpressionTextureCoordinate, -1700, 200)
-    c05 = g.E(unreal.MaterialExpressionConstant2Vector, -1700, 320, r=0.5, g=0.5)
-    sm = g.E(unreal.MaterialExpressionSphereMask, -1500, 200, attenuation_radius=0.5, hardness_percent=10.0)
+    uv = g.E(unreal.MaterialExpressionTextureCoordinate, -1900, 200)
+    c05 = g.E(unreal.MaterialExpressionConstant2Vector, -1900, 320, r=0.5, g=0.5)
+    # 1 en el centro de la calcomanía y 0 en el borde de la caja (dureza 0: baja en línea recta)
+    sm = g.E(unreal.MaterialExpressionSphereMask, -1700, 200, attenuation_radius=0.5, hardness_percent=0.0)
     g.une(uv, sm, 'A'); g.une(c05, sm, 'B')
-    ruido = g.ruido(-1500, 400, 0.018, 2, 0.0, 1.0, rapido=True)
-    forma = g.op(M, sm, g.op(A, ruido, 0.38, -1300, 400), -1150, 300)
-    # el agua: entra en forma > 0,40 y está entera en 0,62 (antes en 0,51: la orilla era un escalón)
-    agua0 = g.sat(g.op(M, g.op(S, forma, 0.40, -1000, 250), 4.5, -850, 250), -700, 250)
-    agua = g.op(M, g.op(M, agua0, agua0, -560, 250), g.esc('Fondo', 0.9, -700, 120), -420, 250)      # al cuadrado: orilla fina
-    # el cerco: empieza mucho antes (forma > 0,16) y sube despacio
-    cerco0 = g.sat(g.op(M, g.op(S, forma, 0.16, -1000, 520), 3.2, -850, 520), -700, 520)
-    cerco = g.op(M, cerco0, g.esc('Cerco', 0.5, -700, 660), -560, 560)
+    lento = g.ruido(-1700, 400, 0.0065, 2, -0.5, 0.5, rapido=True)        # lóbulos de un metro y medio
+    fino = g.ruido(-1700, 560, 0.035, 1, -0.5, 0.5, rapido=True)          # mordiscos de un palmo en la orilla
+    onda = g.op(A, g.op(M, lento, g.esc('Lobulos', 0.85, -1500, 480), -1350, 400), g.op(M, fino, 0.14, -1500, 600), -1200, 460)
+    # pegado al borde de la caja el ruido no puede sacar agua (se vería el corte recto de la caja)
+    borde = g.sat(g.op(M, sm, 5.0, -1500, 100), -1350, 100)
+    forma = g.op(M, g.op(A, sm, onda, -1050, 300), borde, -900, 300)
+    # el agua: entra en forma > 0,44 y está entera en 0,58
+    agua0 = g.sat(g.op(M, g.op(S, forma, 0.44, -750, 250), 7.0, -620, 250), -500, 250)
+    agua = g.op(M, g.op(M, agua0, agua0, -380, 250), g.esc('Fondo', 0.75, -500, 120), -260, 250)      # al cuadrado: orilla fina
+    # el cerco de suelo mojado: empieza bastante antes (forma > 0,20) y sube despacio
+    cerco0 = g.sat(g.op(M, g.op(S, forma, 0.20, -750, 520), 3.4, -620, 520), -500, 520)
+    cerco = g.op(M, cerco0, g.esc('Cerco', 0.5, -500, 660), -380, 560)
     opa0 = g.E(unreal.MaterialExpressionMax, -280, 380)
     g.une(agua, opa0, 'A'); g.une(cerco, opa0, 'B')
     opa = g.sat(g.op(M, opa0, g.esc('Fuerza', 1.0, -280, 560), -140, 420), -20, 420)
@@ -423,7 +431,10 @@ def material_chorreton():
     Franja (fuerza de la humedad de arriba). La caja de la calcomanía solo limita dónde puede haberlos."""
     # v4 (tanda 24): en las capturas de la 23 casi no se leían. Hilos más finos (11 cm en vez de 17) y con más contraste,
     # más tramos con regueros, color más oscuro y la franja de arriba. v3: modulado (ver M_Mancha)
-    g = Grafo(DM + '/M_Chorreton', 'M_Chorreton', 'chorreton v4 marcado')
+    # v5 (tanda 25): a diez metros seguían sin leerse: los hilos de 11 cm se pierden al 50 % de resolución. Ahora van
+    # dos anchos a la vez (regueros de un palmo largo, 35 cm, que son los que se ven de lejos, y los hilos finos dentro)
+    # y la franja de arriba es más alta
+    g = Grafo(DM + '/M_Chorreton', 'M_Chorreton', 'chorreton v5 ancho')
     if g.hecho:
         return g.m
     # la mezcla, antes que el dominio
@@ -440,7 +451,14 @@ def material_chorreton():
     # los hilos: 11 cm de ancho medio, y cada uno dura metros en vertical
     p1 = g.op(AP, hc, g.op(M, mz, 0.03, -1950, 140), -1650, 60)
     n1 = g.ruido(-1500, 60, 0.09, 2, -0.45, 1.0, pos=p1)
-    hilo = g.sat(g.op(M, n1, g.esc('Contraste', 2.6, -1500, 240), -1300, 100), -1150, 100)
+    hilo_fino = g.sat(g.op(M, n1, g.esc('Contraste', 2.6, -1500, 240), -1300, 100), -1150, 100)
+    # los regueros anchos: el mismo dibujo tres veces más ancho; el fino queda dentro y en los bordes
+    p1b = g.op(AP, g.op(AP, h, g.E(unreal.MaterialExpressionConstant, -1950, -260, r=170.0), -1800, -260), g.op(M, mz, 0.012, -1950, -160), -1650, -220)
+    n1b = g.ruido(-1500, -220, 0.028, 2, -0.35, 1.0, pos=p1b)
+    hilo_ancho = g.sat(g.op(M, n1b, g.esc('ContrasteAncho', 2.2, -1500, -60), -1300, -180), -1150, -180)
+    hilo_mx = g.E(unreal.MaterialExpressionMax, -1000, -40)
+    g.une(g.op(M, hilo_ancho, g.esc('Ancho', 0.85, -1150, -320), -1000, -220), hilo_mx, 'A'); g.une(hilo_fino, hilo_mx, 'B')
+    hilo = hilo_mx
     # los grupos: tramos de muro con regueros y tramos limpios
     n2 = g.ruido(-1500, 380, 0.0045, 1, 0.0, 1.0, pos=g.op(AP, hc, cero, -1650, 380), rapido=True)
     grupo = g.sat(g.op(M, g.op(S, n2, g.esc('Grupos', 0.30, -1500, 500), -1300, 380), 3.5, -1150, 380), -1000, 380)
@@ -454,8 +472,8 @@ def material_chorreton():
     f = g.sat(baja, -560, 800)
     arriba = g.sat(g.op(M, dz, 0.25, -850, 980), -700, 980)          # nada por encima de lo alto del muro
     hilos = g.op(M, g.op(M, hilo, grupo, -850, 200), f, -420, 400)
-    # la franja de arriba: 1 - dz / (25 + 70 x ruido) cm, solo en los tramos con regueros
-    alto_f = g.op(A, g.op(M, n3, 70.0, -1300, 1100), 25.0, -1150, 1100)
+    # la franja de arriba: 1 - dz / (35 + 110 x ruido) cm, solo en los tramos con regueros
+    alto_f = g.op(A, g.op(M, n3, 110.0, -1300, 1100), 35.0, -1150, 1100)
     fr = g.E(unreal.MaterialExpressionOneMinus, -850, 1100)
     g.uno(g.op(D, dz, alto_f, -1000, 1100), fr)
     franja = g.op(M, g.op(M, g.sat(fr, -700, 1100), grupo, -560, 1100), g.esc('Franja', 0.6, -700, 1240), -420, 1150)

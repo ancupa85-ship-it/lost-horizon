@@ -427,6 +427,15 @@ for m in meshes:
     if name.startswith('hierbajos'):
         a.set_folder_path('Recintos')
         hierbajos(a)
+    if name.startswith('contenedordet'):
+        # tanda 25: costillas, pilares y puertas de los contenedores. Solo se ven: se choca, se dispara y se mira contra
+        # la caja de siempre (contenedor_N), y el mapa de navegación no se entera
+        c = a.get_component_by_class(unreal.StaticMeshComponent)
+        a.set_actor_enable_collision(False)
+        if c:
+            c.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+            c.set_editor_property('can_ever_affect_navigation', False)
+        a.tags = [unreal.Name('contenedor_detalle')]
     for k in ('lh_marca_o', 'lh_marca_x', 'lh_marca_y', 'lh_marca_z'):
         if name.startswith(k):
             o, _ = a.get_actor_bounds(False)
@@ -461,6 +470,12 @@ if moviles.get('camionmovil') and ext.get('camino'):
 
 # noche: exposición manual (EV) e intensidades de luna y luz ambiente, ajustadas con capturas en el patio
 EXPO = {'ev': 0.5, 'luna': 0.6, 'cielo': 2.5}
+# tanda 25: las luces fuertes de fuera se pintan diez veces más flojas de lo que cuentan para el sigilo (etiqueta
+# «luz_fuerte»; ATarsisGuard::LightAt multiplica por 10). Con 3000 lm bajo cada farola el suelo salía blanco quemado y a
+# cinco metros negro: 140 veces más luz que la de la luna, cuando una imagen aguanta unas 20. Ahora el suelo devuelve
+# más (materiales.py, ALBEDO) y la farola da menos: el charco de luz tiene color y alrededor queda penumbra.
+LUZ_FUERTE = 'luz_fuerte'
+FAROLA_LM, FOCO_LM, APLIQUE_LM = 300.0, 800.0, 150.0
 
 def spawn(cls, loc, label, rot=None):
     a = eas.spawn_actor_from_class(cls, loc, rot or unreal.Rotator(0, 0, 0))
@@ -477,6 +492,10 @@ for i, l in enumerate(DATA['lights']):
         c.set_editor_property('intensity', EXPO['luna'])
         c.set_light_color(col)
         c.set_editor_property('atmosphere_sun_light', True)
+        try:
+            c.set_editor_property('light_source_angle', 1.2)      # sombras de luna con algo de penumbra (0,54 por defecto)
+        except Exception as e:
+            log('AVISO: luna sin light_source_angle:', repr(e))
         continue
     if l['kind'] == 'SPOT':
         rot = unreal.MathLibrary.make_rot_from_x(ue_dir(l['dir']))
@@ -485,19 +504,21 @@ for i, l in enumerate(DATA['lights']):
         c.set_editor_property('outer_cone_angle', 13.0)
         c.set_editor_property('inner_cone_angle', 9.0)
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
-        c.set_editor_property('intensity', 8000.0)   # con 60000 el suelo bajo las torretas queda quemado con exposición nocturna
+        c.set_editor_property('intensity', FOCO_LM)   # 8000 de sigilo (LUZ_FUERTE); pintados quemaban el suelo y las fachadas
         c.set_editor_property('attenuation_radius', 4000.0)
+        a.tags = [unreal.Name(LUZ_FUERTE)]
     elif l['name'] == 'farola':
         # farola: foco hacia abajo (una puntual no dibuja haz en la niebla). Va 25 cm al lado del poste y 20 cm más
         # baja: en la posición original queda dentro del poste, que tapa el cono y la traza de LightAt
         a = spawn(unreal.SpotLight, ue(l['pos']) + unreal.Vector(25, 0, -20), '%s_%d' % (l['name'], i), unreal.Rotator(roll=0, pitch=-90, yaw=0))
         a.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)   # r.AllowStaticLighting=False con Lumen
         c = a.get_component_by_class(unreal.SpotLightComponent)
-        c.set_editor_property('outer_cone_angle', 55.0)
-        c.set_editor_property('inner_cone_angle', 35.0)
+        c.set_editor_property('outer_cone_angle', 55.0)       # el cono de fuera es el que cuenta para el sigilo: no se toca
+        c.set_editor_property('inner_cone_angle', 18.0)       # 35 hasta la tanda 24: el borde del charco de luz era un escalón
         c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
-        c.set_editor_property('intensity', 3000.0)
+        c.set_editor_property('intensity', FAROLA_LM)         # 3000 de sigilo (LUZ_FUERTE)
         c.set_editor_property('attenuation_radius', 1800.0)
+        a.tags = [unreal.Name(LUZ_FUERTE)]
         c.set_editor_property('cast_shadows', False)
         c.set_editor_property('volumetric_scattering_intensity', 1.5)
     else:
@@ -509,6 +530,9 @@ for i, l in enumerate(DATA['lights']):
         if l['name'] == 'aplique':   # bombilla de pared (portillo): alumbra la puerta y poco más, sin sombras
             c.set_editor_property('attenuation_radius', 700.0)
             c.set_editor_property('cast_shadows', False)
+            # a medio metro del muro, 520 lm lo dejaban blanco. Para el sigilo cuenta igual: por debajo de 600 lm
+            # toda luz vale el mínimo (0,2)
+            c.set_editor_property('intensity', APLIQUE_LM)
     c.set_light_color(col)
 
 # noche: cielo, luz ambiente tenue y niebla
@@ -531,6 +555,15 @@ st.set_editor_property('override_auto_exposure_apply_physical_camera_exposure', 
 st.set_editor_property('auto_exposure_apply_physical_camera_exposure', False)
 st.set_editor_property('override_auto_exposure_bias', True)
 st.set_editor_property('auto_exposure_bias', EXPO['ev'])
+# tanda 25: un punto de película en toda la base (grano fino, que además rompe las bandas del degradado del cielo y de
+# la niebla), sombras algo frías y luces algo cálidas. Lo del barracón oeste lo pone su propio volumen (ambiente.py)
+for k, val in (('film_grain_intensity', 0.12), ('bloom_intensity', 0.8),
+               ('color_gain_shadows', unreal.Vector4(0.95, 0.99, 1.06, 1.0)), ('color_gain_highlights', unreal.Vector4(1.04, 1.0, 0.94, 1.0))):
+    try:
+        st.set_editor_property('override_' + k, True)
+        st.set_editor_property(k, val)
+    except Exception as e:
+        log('AVISO: posproceso sin', k, repr(e))
 pp.set_editor_property('settings', st)
 
 # salida de Cuttlas (casilla P del plano), un poco por encima del suelo, mirando hacia el espacio libre más cercano
@@ -561,6 +594,15 @@ try:
     import guardias
     importlib.reload(guardias)
     guardias.colocar()
+    # tanda 25: la bóveda del cielo, los halos de las luminarias y su resplandor de relleno (después del director: de él
+    # sale dónde está el farol del control). ambiente.py pone luego la lámpara de la puerta del barracón: para que tenga
+    # halo, ejecutar cielo.py otra vez al final
+    try:
+        import cielo
+        importlib.reload(cielo)
+        cielo.todo()
+    except Exception as e:
+        log('AVISO: cielo no puesto:', repr(e))
     guardias.guardar_tras_navegacion()   # guarda ahora y otra vez cuando acaba el mapa de navegación
 except Exception as e:
     log('AVISO: guardias no colocados:', repr(e))

@@ -202,6 +202,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
 	float WetnessInCollection() const;
 
+	/** Cuánto está cubierto el cielo, 0-1 (tanda 25): 1 con lluvia o niebla. Va al escalar «Nublado» de MPC_Tarsis: el
+	 *  cielo tapa las estrellas y la luna con nubes y los halos de las farolas crecen (tools/unreal/cielo.py). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Clima")
+	float Cloudiness = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Clima")
+	float CloudSeconds = 14.0f;
+
+	/** Pruebas: pone el nublado de golpe (0-1). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void SetCloudinessNow(float Value);
+
+	/** Lo que vale ahora «Nublado» en la colección (pruebas): -1 si no hay colección. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	float CloudinessInCollection() const;
+
+	/** Halos de luminarias que hay en el nivel (etiqueta «halo») y cuántos están encendidos ahora (pruebas: se apagan
+	 *  con su luz). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
+	FIntPoint HaloCounts() const { return FIntPoint(Halos.Num(), HalosLit()); }
+
 	/** Presupuesto de render (tanda 24): variables de consola «nombre=valor» que se ponen al empezar la partida y se dejan
 	 *  como estaban al acabar (en el editor las variables sobreviven al PIE). Las elige tools/unreal/render.py midiendo en
 	 *  esta tarjeta y las escribe en el director del nivel: cambiar el presupuesto no pide compilar. */
@@ -281,7 +302,7 @@ public:
 
 	/** Faros: lúmenes y si dan sombra (una sola luz con sombra; si pesa en la tarjeta, se quita aquí). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
-	float TruckLampLumens = 6000.0f;
+	float TruckLampLumens = 600.0f;      // lo que se pinta (tanda 25); para el sigilo cuenta diez veces más («luz_fuerte»)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
 	bool bTruckShadows = true;
@@ -942,6 +963,15 @@ private:
 	UPROPERTY() TObjectPtr<class UMaterialParameterCollection> WetMPC;
 	bool bWetInit = false;
 	void WetTick(float DeltaSeconds);
+	bool bCloudInit = false;
+	void CloudTick(float DeltaSeconds);
+	// halos de las luminarias (tanda 25) y la luz de cada uno
+	UPROPERTY() TArray<TObjectPtr<AActor>> Halos;
+	UPROPERTY() TArray<TObjectPtr<class ULightComponent>> HaloLights;
+	// resplandores de relleno de las farolas (luces con la etiqueta «decorado») y la farola de cada uno
+	UPROPERTY() TArray<TObjectPtr<class ULightComponent>> DecorLights;
+	UPROPERTY() TArray<TObjectPtr<class ULightComponent>> DecorOf;
+	int32 HalosLit() const;
 	void ApplyRenderCVars();
 	TArray<TPair<FString, FString>> RenderSaved;      // variable y valor de antes, para dejarlo como estaba
 	void RadioTick(float DeltaSeconds);

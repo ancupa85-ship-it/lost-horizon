@@ -78,6 +78,7 @@ void ATarsisDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	RenderSaved.Reset();
 	// y la base seca para el editor
 	if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Mojado"), 0.0f);
+	if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Nublado"), 0.0f);   // y el cielo raso
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -881,7 +882,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 		if (GateLamp && GateLamp->GetLightComponent())
 		{
 			// que el plano final se vea aunque cortaras la luz; si rompiste el farol, solo la bombilla de dentro de la garita
-			if (bLampBroken) GateLamp->GetLightComponent()->SetIntensity(700.0f);
+			if (bLampBroken) GateLamp->GetLightComponent()->SetIntensity(70.0f);   // 700 de sigilo (luz fuerte: se pinta la décima parte)
 			GateLamp->GetLightComponent()->SetVisibility(true);
 		}
 		ATarsisGuard* Best = nullptr;
@@ -1350,7 +1351,10 @@ void ATarsisDirector::SetupSound()
 	{
 		if (ULightComponent* L = It->GetLightComponent())
 		{
-			if (L->IsA<USpotLightComponent>()) L->SetVolumetricScatteringIntensity(4.0f);
+			// tanda 25: las luces fuertes se pintan diez veces más flojas (ATarsisGuard::LightAt): dispersan más para que
+			// el haz se siga viendo con lluvia; el resplandor de relleno («decorado») no hace halo en la niebla
+			if (It->ActorHasTag(FName(TEXT("decorado")))) L->SetVolumetricScatteringIntensity(0.0f);
+			else if (L->IsA<USpotLightComponent>()) L->SetVolumetricScatteringIntensity(It->ActorHasTag(FName(TEXT("luz_fuerte"))) ? 16.0f : 4.0f);
 			else if (L->IsA<UPointLightComponent>()) L->SetVolumetricScatteringIntensity(1.0f);   // una puntual no hace haz: solo un halo suave
 		}
 	}
@@ -1679,12 +1683,14 @@ void ATarsisDirector::SetWeather(int32 NewWeather)
 		UExponentialHeightFogComponent* F = It->GetComponent();
 		if (!F) continue;
 		if (BaseFog < 0.0f) { BaseFog = F->FogDensity; BaseFogColor = F->FogInscatteringLuminance; }
-		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 4.0f : (Weather == 1 ? 1.8f : 1.0f))));
+		// tanda 25: con lluvia, 1,5 (antes 1,8) y el color de la niebla más oscuro: el velo gris aclaraba toda la base
+		// y tapaba lo mojado; ahora la lluvia se lee en el suelo y en el cielo cubierto
+		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 4.0f : (Weather == 1 ? 1.5f : 1.0f))));
 		// niebla volumétrica: las farolas y los focos dibujan haces; de noche, sin ella, la niebla casi no se ve
 		F->SetVolumetricFog(Weather != 0);
 		F->SetVolumetricFogScatteringDistribution(Weather == 2 ? 0.6f : 0.4f);
 		F->SetVolumetricFogExtinctionScale(Weather == 2 ? 2.0f : 1.0f);
-		F->SetFogInscatteringColor(Weather == 2 ? FLinearColor(0.10f, 0.11f, 0.13f) : (Weather == 1 ? FLinearColor(0.05f, 0.06f, 0.07f) : BaseFogColor));
+		F->SetFogInscatteringColor(Weather == 2 ? FLinearColor(0.10f, 0.11f, 0.13f) : (Weather == 1 ? FLinearColor(0.030f, 0.036f, 0.046f) : BaseFogColor));
 		break;
 	}
 	// con escalabilidad Baja el motor desactiva la niebla volumétrica (r.VolumetricFog 0) y no hay haces:
@@ -1778,6 +1784,7 @@ void ATarsisDirector::CutPower()
 		ULocalLightComponent* L = Cast<ULocalLightComponent>(It->GetLightComponent());
 		if (!L || !L->IsVisible()) continue;
 		if (It->ActorHasTag(FName(TEXT("camion")))) continue;   // los faros del camión van con su batería
+		if (It->ActorHasTag(FName(TEXT("decorado")))) continue; // el resplandor de relleno sigue a su farola (ZonesTick)
 		PendingOff.Add(L);
 	}
 	const FVector G = GeneratorLoc;
@@ -2017,13 +2024,14 @@ void ATarsisDirector::SetupBarrier()
 	{
 		if (USceneComponent* Root = GateLamp->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
 		GateLamp->SetActorRotation(FRotator(-90.0f, 0.0f, 0.0f));   // el giro del SpawnActor no se aplica sobre la luz estática: se fija ya móvil
+		GateLamp->Tags.Add(FName(TEXT("luz_fuerte")));               // para el sigilo cuenta 3000 lm; se pinta con 300 (tanda 25)
 		if (USpotLightComponent* L = Cast<USpotLightComponent>(GateLamp->GetLightComponent()))
 		{
 			L->SetIntensityUnits(ELightUnits::Lumens);
-			L->SetIntensity(3000.0f);
+			L->SetIntensity(300.0f);
 			L->SetAttenuationRadius(1500.0f);
 			L->SetOuterConeAngle(55.0f);
-			L->SetInnerConeAngle(35.0f);
+			L->SetInnerConeAngle(18.0f);                             // del centro al borde, sin escalón
 			L->SetLightColor(FLinearColor(1.0f, 0.78f, 0.5f));
 			L->SetCastShadows(false);
 			L->SetVolumetricScatteringIntensity(1.5f);
@@ -2063,6 +2071,7 @@ void ATarsisDirector::SetupTruck()
 	if (TruckLamp)
 	{
 		TruckLamp->Tags.Add(FName(TEXT("camion")));
+		TruckLamp->Tags.Add(FName(TEXT("luz_fuerte")));   // TruckLampLumens es lo que se pinta; para el sigilo, diez veces más
 		if (USceneComponent* Root = TruckLamp->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
 		if (USpotLightComponent* L = Cast<USpotLightComponent>(TruckLamp->GetLightComponent()))
 		{
@@ -2073,7 +2082,7 @@ void ATarsisDirector::SetupTruck()
 			L->SetInnerConeAngle(14.0f);
 			L->SetLightColor(FLinearColor(1.0f, 0.88f, 0.66f));
 			L->SetCastShadows(bTruckShadows);
-			L->SetVolumetricScatteringIntensity(2.5f);
+			L->SetVolumetricScatteringIntensity(10.0f);
 		}
 	}
 	if (USoundBase* S = Sfx(TEXT("camion_motor")))
@@ -2367,6 +2376,8 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 		TruckCheck = 0;
 		TruckCheckT = 0.0f;
 	}
+	// mientras dura el control lleva el bastón encendido (tanda 25); al dar paso hace la señal con él y lo guarda
+	if (G && TruckCheck >= 1 && TruckCheck <= 4) G->HoldBaton(0.6f);
 	switch (TruckCheck)
 	{
 	case 0:
@@ -2382,7 +2393,8 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 		}
 		if (Best && Best->Errand(Cab, CabFace, 45.0f))
 		{
-			Best->PlayGesture(TEXT("alto"), 1.8f);   // va hacia la cabina con la mano en alto
+			Best->PlayGesture(TEXT("alto"), 3.2f);   // va hacia la cabina con el bastón luminoso en alto
+			Best->HoldBaton(4.0f);
 			TruckInspector = Best;
 			TruckCheck = 1;
 			TruckCheckT = 0.0f;
@@ -2423,6 +2435,7 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 			// da paso con el brazo hacia el portón y se queda un momento viendo arrancar el camión
 			GuardSay(G, TEXT("pase"));
 			G->PlayGesture(TEXT("pase"), 2.4f, ExitLoc);
+			G->HoldBaton(2.6f);
 			Lift(2.2f);
 		}
 		break;
@@ -2441,6 +2454,7 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 		{
 			GuardSay(G, TEXT("nadie"));
 			G->PlayGesture(TEXT("pase"), 2.2f, ExitLoc);
+			G->HoldBaton(2.4f);
 			Lift(2.0f);
 			break;
 		}
@@ -2808,6 +2822,7 @@ bool ATarsisDirector::LoadCheckpoint()
 	}
 	if (S->Weather != Weather) SetWeather(S->Weather);
 	bWetInit = false;   // el mojado, de golpe al que toque con el clima cargado
+	bCloudInit = false; // y el cielo
 	bHasCheck = true;
 	CheckLoc = S->Loc;
 	CheckRot = S->Rot;
@@ -3559,13 +3574,29 @@ void ATarsisDirector::CaptureTick(float DeltaSeconds)
 
 void ATarsisDirector::SetupZones()
 {
-	static const FName Flicker(TEXT("parpadeo")), Power(TEXT("electrico")), Rain(TEXT("lluvia"));
+	static const FName Flicker(TEXT("parpadeo")), Power(TEXT("electrico")), Rain(TEXT("lluvia")), Halo(TEXT("halo")), Decor(TEXT("decorado"));
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (It->ActorHasTag(Flicker))
 		{
 			TInlineComponentArray<ULightComponent*> Ls(*It);
 			for (ULightComponent* L : Ls) { FlickerLights.Add(L); FlickerBase.Add(L->Intensity); FlickerT.Add(FMath::FRandRange(2.0f, 9.0f)); }
+		}
+		const bool bHalo = It->ActorHasTag(Halo), bDecor = It->ActorHasTag(Decor);
+		if (bHalo || bDecor)
+		{
+			// tanda 25: el halo de una luminaria y su resplandor de relleno (tools/unreal/cielo.py) van con su luz, la
+			// más cercana: se apagan con el generador, con el farol roto y cuando falla
+			ULightComponent* Best = nullptr;
+			float BestD = FMath::Square(260.0f);
+			for (TActorIterator<ALight> Lt(GetWorld()); Lt; ++Lt)
+			{
+				if (Lt->ActorHasTag(Decor) || !Lt->GetLightComponent()) continue;
+				const float D = FVector::DistSquared(Lt->GetActorLocation(), It->GetActorLocation());
+				if (D < BestD) { BestD = D; Best = Lt->GetLightComponent(); }
+			}
+			if (bHalo) { Halos.Add(*It); HaloLights.Add(Best); }
+			else if (ALight* DL = Cast<ALight>(*It)) { DecorLights.Add(DL->GetLightComponent()); DecorOf.Add(Best); }
 		}
 		const bool bPower = It->ActorHasTag(Power), bRain = It->ActorHasTag(Rain);
 		if (!bPower && !bRain) continue;
@@ -3612,11 +3643,36 @@ void ATarsisDirector::ZonesTick(float DeltaSeconds)
 		if (Weather != 1 && A->IsPlaying()) A->Stop();
 		else if (Weather == 1 && !A->IsPlaying()) A->Play();
 	}
+	// los halos y los resplandores de relleno, con su luz (uno sin luz cerca se queda encendido)
+	for (int32 i = 0; i < Halos.Num(); ++i)
+	{
+		AActor* H = Halos[i];
+		if (!H) continue;
+		const ULightComponent* L = HaloLights.IsValidIndex(i) ? HaloLights[i].Get() : nullptr;
+		const bool bOff = L && (!L->IsVisible() || L->Intensity <= 0.0f);
+		if (H->IsHidden() != bOff) H->SetActorHiddenInGame(bOff);
+	}
+	for (int32 i = 0; i < DecorLights.Num(); ++i)
+	{
+		ULightComponent* D = DecorLights[i];
+		if (!D) continue;
+		const ULightComponent* L = DecorOf.IsValidIndex(i) ? DecorOf[i].Get() : nullptr;
+		const bool bOn = !L || (L->IsVisible() && L->Intensity > 0.0f);
+		if (D->IsVisible() != bOn) D->SetVisibility(bOn);
+	}
 	WetTick(DeltaSeconds);
+}
+
+int32 ATarsisDirector::HalosLit() const
+{
+	int32 N = 0;
+	for (const TObjectPtr<AActor>& H : Halos) if (H && !H->IsHidden()) ++N;
+	return N;
 }
 
 void ATarsisDirector::WetTick(float DeltaSeconds)
 {
+	CloudTick(DeltaSeconds);
 	// tanda 24: con lluvia la base entera se moja poco a poco y al escampar se seca despacio
 	const float Target = Weather == 1 ? 1.0f : 0.0f;
 	const float Prev = Wetness;
@@ -3631,6 +3687,37 @@ void ATarsisDirector::WetTick(float DeltaSeconds)
 	}
 	Wetness = FMath::FInterpConstantTo(Wetness, Target, DeltaSeconds, 1.0f / FMath::Max(1.0f, Target > Wetness ? WetSeconds : DrySeconds));
 	if (WetMPC && Wetness != Prev) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Mojado"), Wetness);
+}
+
+void ATarsisDirector::CloudTick(float DeltaSeconds)
+{
+	// tanda 25: con lluvia o niebla el cielo se cubre (parámetro «Nublado» de MPC_Tarsis: lo leen el cielo y los halos
+	// de las farolas, tools/unreal/cielo.py). Se cubre en CloudSeconds y se abre algo más despacio
+	const float Target = Weather != 0 ? 1.0f : 0.0f;
+	if (!bCloudInit)
+	{
+		bCloudInit = true;
+		if (!WetMPC) WetMPC = WetCollection.LoadSynchronous();
+		Cloudiness = Target;
+		if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Nublado"), Cloudiness);
+		return;
+	}
+	const float Prev = Cloudiness;
+	Cloudiness = FMath::FInterpConstantTo(Cloudiness, Target, DeltaSeconds, 1.0f / FMath::Max(1.0f, Target > Cloudiness ? CloudSeconds : CloudSeconds * 1.5f));
+	if (WetMPC && Cloudiness != Prev) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Nublado"), Cloudiness);
+}
+
+void ATarsisDirector::SetCloudinessNow(float Value)
+{
+	if (!WetMPC) WetMPC = WetCollection.LoadSynchronous();
+	bCloudInit = true;
+	Cloudiness = FMath::Clamp(Value, 0.0f, 1.0f);
+	if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Nublado"), Cloudiness);
+}
+
+float ATarsisDirector::CloudinessInCollection() const
+{
+	return WetMPC ? UKismetMaterialLibrary::GetScalarParameterValue(const_cast<ATarsisDirector*>(this), WetMPC, TEXT("Nublado")) : -1.0f;
 }
 
 void ATarsisDirector::SetWetnessNow(float Value)

@@ -35,7 +35,7 @@ def log(*a):
 
 # clave del visor -> (textura de Poly Haven, metros que ocupa una repetición, como tex(name, rep) en visor.js)
 TEXTURAS = {
-    'suelo': ('asphalt_02', 3.0), 'muro': ('concrete_wall_008', 3.2), 'hormigon': ('concrete_wall_008', 3.2),
+    'suelo': ('asphalt_02', 4.5), 'muro': ('concrete_wall_008', 3.2), 'hormigon': ('concrete_wall_008', 3.2),
     # pared: en la tanda 18 se probó peeling_painted_wall; sale rojiza y cambia también las fachadas
     'pared': ('painted_plaster_wall', 2.6), 'madera': ('wood_planks_dirt', 1.6), 'hierro': ('rusty_metal_02', 1.4),
     'oliva': ('green_metal_rust', 2.2), 'tejado': ('corrugated_iron_02', 2.0), 'suelo_int': ('concrete_floor_worn_001', 2.0),
@@ -48,23 +48,71 @@ TEXTURAS = {
     # la tierra del anillo es grava suelta
     'camino': ('concrete_floor_worn_001', 4.0), 'tierra': ('gravel_floor_02', 2.5),
 }
-# tinte, rugosidad y metal del visor (escenario/visor.js, tabla M; color en sRGB)
+# rugosidad y metal del visor (escenario/visor.js, tabla M). El color del visor (sRGB) ya no se usa desde la tanda 25:
+# multiplicado por la textura daba albedos imposibles (el asfalto devolvía un 2 % de la luz, el hormigón del camino
+# igual, la chapa verde un 1 %), y por eso de noche todo era «charco de luz quemado o negro». Ver ALBEDO.
 VALORES = {
     'suelo': (0x777777, 0.75, 0.0), 'muro': (0x8a8a88, 0.82, 0.0), 'hormigon': (0x8a8a88, 0.82, 0.0),
     'pared': (0xa39c8e, 0.85, 0.0), 'madera': (0xb09a80, 0.75, 0.0), 'hierro': (0x999999, 0.6, 0.55),
     'oliva': (0x6f8a4c, 0.5, 0.1), 'tejado': (0x666668, 0.6, 0.4), 'suelo_int': (0x8c8c8c, 0.55, 0.0),
     'manta': (0x6b6e58, 0.95, 0.0), 'colchon': (0xb8ab90, 0.9, 0.0),
     'camino': (0x7d7c78, 0.7, 0.0), 'tierra': (0x6f675c, 0.9, 0.0),
-    # colores de KC en visor.js, aclarados: la chapa gris ya oscurece al multiplicar
     'contenedor_0': (0xe0785c, 0.62, 0.15), 'contenedor_1': (0x78aed0, 0.62, 0.15),
     'contenedor_2': (0x94c48a, 0.62, 0.15), 'contenedor_3': (0xe8cf70, 0.62, 0.15),
 }
+
+# tanda 25. Color medio (lineal) de cada textura de Poly Haven, medido sobre el JPG de 1K. El maestro divide la textura
+# por él: queda el dibujo alrededor de 1 y el color lo pone ALBEDO. Al lado, lo que se desvía (cuánto dibujo trae): las
+# de 0,09 son prácticamente un color liso y por eso llevan Contraste.
+MEDIO = {
+    'asphalt_02': (0.112, 0.110, 0.098),               # 0,60
+    'concrete_floor_worn_001': (0.093, 0.094, 0.089),  # 0,09
+    'concrete_wall_008': (0.267, 0.238, 0.162),        # 0,09
+    'corrugated_iron_02': (0.100, 0.098, 0.083),       # 0,15
+    'gravel_floor_02': (0.424, 0.402, 0.347),          # 0,40
+    'green_metal_rust': (0.050, 0.074, 0.034),         # 0,16
+    'painted_plaster_wall': (0.407, 0.366, 0.351),     # 0,09
+    'poly_wool_herringbone': (0.194, 0.182, 0.167),    # 0,22
+    'rough_linen': (0.287, 0.410, 0.616),              # 0,14
+    'rusty_metal_02': (0.413, 0.289, 0.137),           # 0,52
+    'wood_planks_dirt': (0.183, 0.109, 0.062),         # 0,40
+}
+# albedo (color lineal, lo que de verdad devuelve la superficie). Asfalto viejo 5 %, losa de hormigón 9 %, muro de
+# hormigón 10 %, enlucido sucio 13 %. Antes (textura x color del visor): suelo y camino 2 %, muro 6 %, tejado 1,3 %,
+# chapa verde 1 %. Los contenedores, en colores de contenedor viejo (óxido rojo, azul, verde, ocre), no de juguete.
+ALBEDO = {
+    'suelo': (0.050, 0.049, 0.046), 'camino': (0.095, 0.092, 0.085), 'tierra': (0.070, 0.060, 0.045),
+    'muro': (0.105, 0.098, 0.082), 'hormigon': (0.105, 0.098, 0.082), 'pared': (0.150, 0.125, 0.100),
+    'madera': (0.085, 0.045, 0.022), 'hierro': (0.120, 0.090, 0.050), 'oliva': (0.040, 0.048, 0.028),
+    'tejado': (0.030, 0.030, 0.032), 'suelo_int': (0.045, 0.045, 0.042),
+    'manta': (0.029, 0.028, 0.016), 'colchon': (0.150, 0.140, 0.115),
+    'contenedor_0': (0.100, 0.028, 0.020), 'contenedor_1': (0.022, 0.045, 0.075),
+    'contenedor_2': (0.028, 0.055, 0.032), 'contenedor_3': (0.140, 0.100, 0.025),
+}
+# cuánto se estira el dibujo de la textura alrededor de su media, y la fuerza de su relieve (las demás, 1)
+CONTRASTE = {'camino': 2.6, 'muro': 2.6, 'hormigon': 2.6, 'pared': 2.2, 'suelo_int': 2.2, 'tejado': 1.6, 'oliva': 1.5,
+             'contenedor_0': 1.3, 'contenedor_1': 1.3, 'contenedor_2': 1.3, 'contenedor_3': 1.3}
+RELIEVE = {'suelo': 1.6, 'camino': 2.2, 'muro': 2.0, 'hormigon': 2.0, 'pared': 1.6, 'tierra': 1.4, 'suelo_int': 1.5}
+# nubes de tono de 10-15 m (±): que un patio no sea un plano de un solo gris
+MACRO = {'suelo': 0.22, 'camino': 0.16, 'tierra': 0.25, 'muro': 0.16, 'hormigon': 0.16, 'pared': 0.14, 'tejado': 0.20,
+         'suelo_int': 0.10, 'contenedor_0': 0.12, 'contenedor_1': 0.12, 'contenedor_2': 0.12, 'contenedor_3': 0.12}
+# losas y paneles: (Losa cm, LosaTono, Panel cm, PanelTono, Junta, LosaFaseX cm). El asfalto de los patios, en paños de
+# 8 m con la costura apenas marcada; el camino, losas de 6 m casadas con las juntas de alquitrán que ya tiene (x = 100 +
+# 600 k: por eso la fase, y sin junta pintada); el muro, paneles prefabricados de 3 m con su junta
+LOSAS = {'suelo': (800.0, 0.10, 300.0, 0.0, 0.30, 0.0), 'camino': (600.0, 0.12, 300.0, 0.0, 0.0, 100.0),
+         'muro': (400.0, 0.0, 300.0, 0.09, 0.30, 0.0), 'hormigon': (400.0, 0.0, 250.0, 0.07, 0.30, 0.0),
+         'suelo_int': (400.0, 0.05, 300.0, 0.0, 0.20, 0.0)}
+# la textura, corrida al azar en cada losa o panel (solo donde hay junta que tape el corte)
+DESFASE = ('suelo', 'camino', 'muro', 'hormigon')
+# regueros verticales del maestro (0 = ninguno). En los contenedores y la chapa son chorretones de óxido
+CHORREO = {'muro': 0.6, 'hormigon': 0.5, 'pared': 0.3, 'hierro': 0.2, 'oliva': 0.25,
+           'contenedor_0': 0.35, 'contenedor_1': 0.35, 'contenedor_2': 0.35, 'contenedor_3': 0.35}
 
 # tanda 23: cuánta suciedad lleva cada instancia (parámetro Suciedad del maestro; las demás se quedan con 0,6). Con más,
 # las manchas grandes de ruido oscurecen más el color y, sobre todo, abren más la rugosidad: bajo una farola el brillo de
 # la losa deja de ser un óvalo liso y sale a parches, unos mates y otros como recién mojados. En los muros sube además
 # el zócalo oscuro del pie. No cuesta nada: el ruido ya se calculaba.
-SUCIEDAD = {'camino': 1.25, 'tierra': 1.0, 'muro': 1.0, 'suelo': 0.85}
+SUCIEDAD = {'camino': 1.0, 'tierra': 1.0, 'muro': 1.0, 'suelo': 1.0, 'hormigon': 0.9, 'pared': 0.7}
 # ruido del maestro por textura 3D (una lectura por nivel en vez de ocho). Se repite cada 40 m, que en manchas difusas no
 # se nota. Para medir lo que ahorra en la GTX 1050 Ti: False lo deja como hasta la tanda 22.
 RUIDO_RAPIDO = True
@@ -75,24 +123,30 @@ RUIDO_RAPIDO = True
 # En el suelo el brillo sale a parches (el mismo ruido de la suciedad): zonas encharcadas y zonas solo húmedas.
 CON_MOJADO = True
 MPC = DM + '/MPC_Tarsis'
+# tanda 25: «Nublado» (0 raso, 1 cubierto: con lluvia o niebla) lo leen el cielo y los halos de las farolas (cielo.py)
+ESCALARES_MPC = ('Mojado', 'Nublado')
 MOJABLE = {'suelo': 1.0, 'camino': 1.0, 'tierra': 1.0, 'tejado': 1.0, 'muro': 0.7, 'hormigon': 0.7, 'oliva': 0.6, 'hierro': 0.6,
            'contenedor_0': 1.0, 'contenedor_1': 1.0, 'contenedor_2': 1.0, 'contenedor_3': 1.0}
 
 def coleccion():
-    """MPC_Tarsis con el escalar «Mojado» (0 por defecto: en el editor, todo seco). La crea si falta."""
+    """MPC_Tarsis con los escalares «Mojado» y «Nublado» (0 por defecto: en el editor, seco y raso). La crea si falta."""
     c = eal.load_asset(MPC) if eal.does_asset_exist(MPC) else tools.create_asset(
         'MPC_Tarsis', DM, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
     if c is None:
         return None
     ps = list(c.get_editor_property('scalar_parameters'))
-    if not any(str(q.get_editor_property('parameter_name')) == 'Mojado' for q in ps):
-        q = unreal.CollectionScalarParameter()        # el constructor le da su identificador
-        q.set_editor_property('parameter_name', 'Mojado')
-        q.set_editor_property('default_value', 0.0)
-        ps.append(q)
+    nuevos = []
+    for nombre in ESCALARES_MPC:
+        if not any(str(q.get_editor_property('parameter_name')) == nombre for q in ps):
+            q = unreal.CollectionScalarParameter()        # el constructor le da su identificador
+            q.set_editor_property('parameter_name', nombre)
+            q.set_editor_property('default_value', 0.0)
+            ps.append(q)
+            nuevos.append(nombre)
+    if nuevos:
         c.set_editor_property('scalar_parameters', ps)
         eal.save_loaded_asset(c)
-        log('MPC_Tarsis: parámetro Mojado creado')
+        log('MPC_Tarsis: parámetros creados:', ', '.join(nuevos))
     return c
 
 def lin(c):
@@ -145,236 +199,213 @@ def textura(nombre, tipo):
 CON_SUCIEDAD = True
 WAT = '/Engine/Functions/Engine_MaterialFunctions01/Texturing/WorldAlignedTexture.WorldAlignedTexture'
 WAN = '/Engine/Functions/Engine_MaterialFunctions01/Texturing/WorldAlignedNormal.WorldAlignedNormal'
+# versión del grafo de M_LH: si no cambia, montar la base no lo rehace (ni recompila sus sombreadores)
+VER_LH = 'lh v25c'
+
+
+def _ambiente():
+    import sys, importlib
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    import ambiente
+    importlib.reload(ambiente)
+    return ambiente
+
 
 def maestro(defecto):
     """defecto: {'diff': textura, 'nor': textura, 'rough': textura} para los valores por defecto de los parámetros.
-    Un TextureObjectParameter sin textura, o con una de otro tipo (sRGB / normal / máscara), no compila."""
-    ruta = DM + '/M_LH'
-    if eal.does_asset_exist(ruta):
-        m = eal.load_asset(ruta)
-        # se rehace el grafo en el mismo recurso (las instancias siguen apuntando a él).
-        # delete_all_material_expressions deja nodos sueltos (máscaras sin entrada, parámetros repetidos) que impiden
-        # compilar, así que se borran también uno a uno
-        mel.delete_all_material_expressions(m)
-        for e in list(mel.get_material_expressions(m)):
-            mel.delete_material_expression(m, e)
+    Un TextureObjectParameter sin textura, o con una de otro tipo (sRGB / normal / máscara), no compila.
+
+    Tanda 25: «materia en lo grande». Medidas las texturas (tools/unreal/materiales.py, MEDIO), casi todas son un color
+    liso con grano fino (desviación del 9 %): a cinco metros, de noche y a media resolución no queda nada. El maestro
+    pone ahora lo que falta a escala media y grande, todo por la posición en el mundo (no gasta memoria de vídeo):
+      - el color es Tinte (el albedo de verdad) x la textura dividida por su color medio, con Contraste alrededor de 1;
+      - Macro: nubes de tono de 10-15 m; Suciedad: manchas de 2-3 m con contraste y un zócalo sucio de altura irregular;
+      - losas (suelo) y paneles (muros): cada pieza con su tono (Losa/Panel en cm, LosaTono/PanelTono) y la junta oscura
+        entre ellas (Junta);
+      - Chorreo: regueros verticales en las caras verticales, más oscuros (y brillantes) cuando llueve;
+      - Relieve: fuerza del relieve de la textura;
+      - mojado: más oscuro, satinado, y en horizontal charcos a parches con el relieve plano (espejo: ahí se alarga el
+        reflejo de las farolas)."""
+    amb = _ambiente()
+    X = unreal
+    ver = VER_LH + ('' if CON_SUCIEDAD else ' limpio') + ('' if CON_MOJADO else ' seco') + ('' if RUIDO_RAPIDO else ' lento')
+    g = amb.Grafo(DM + '/M_LH', 'M_LH', ver)
+    if g.hecho:
+        return g.m
+    M, A, S, D = X.MaterialExpressionMultiply, X.MaterialExpressionAdd, X.MaterialExpressionSubtract, X.MaterialExpressionDivide
+    AP, MIN = X.MaterialExpressionAppendVector, X.MaterialExpressionMin
+    pos = [-2600, -1800]
+    def xy():                       # los nodos, en filas: solo para que el grafo se pueda leer en el editor
+        pos[0] += 170
+        if pos[0] > -200:
+            pos[0] = -2600; pos[1] += 150
+        return pos[0], pos[1]
+    def E(cls, **p):
+        return g.E(cls, *xy(), **p)
+    def esc(nombre, valor):
+        return g.esc(nombre, valor, *xy())
+    def vec(nombre, r, gg, b):
+        return E(X.MaterialExpressionVectorParameter, parameter_name=nombre, default_value=X.LinearColor(r, gg, b, 1))
+    def op(cls, a, b):
+        return g.op(cls, a, b, *xy())
+    def f1(cls, a, sal='', **p):    # nodo de una entrada
+        n = E(cls, **p)
+        g.une(a, n, ('Input', '', 'VectorInput'), sal)
+        return n
+    def sat(a):
+        return f1(X.MaterialExpressionSaturate, a)
+    def inv(a):
+        return f1(X.MaterialExpressionOneMinus, a)
+    def lerp(a, b, alfa):
+        return g.lerp(a, b, alfa, *xy())
+    def canal(src, k):
+        return g.canal(src, k, *xy())
+    def contraste(a, k):            # saturar((a - 0,5) x k + 0,5)
+        return sat(op(A, op(M, op(S, a, 0.5), k), 0.5))
+    def ruido(escala, niveles, posicion=None):
+        fn = X.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX
+        if RUIDO_RAPIDO:
+            fn = getattr(X.NoiseFunction, 'NOISEFUNCTION_GRADIENT_TEX3D', fn)
+        n = E(X.MaterialExpressionNoise, scale=escala, levels=niveles, noise_function=fn, quality=1, output_min=0.0, output_max=1.0)
+        if posicion is not None:
+            g.une(posicion, n, ('World Position', 'Position'))
+        return n
+    SAMPLER = {'diff': X.MaterialSamplerType.SAMPLERTYPE_COLOR, 'nor': X.MaterialSamplerType.SAMPLERTYPE_NORMAL,
+               'rough': X.MaterialSamplerType.SAMPLERTYPE_MASKS}
+    size = esc('Tamano', 300.0)
+    donde = [None]                  # posición con la que se proyectan las texturas (corrida al azar en cada losa)
+    def wat(nombre, tipo, fn=WAT):
+        o = E(X.MaterialExpressionTextureObjectParameter, parameter_name=nombre, texture=defecto[tipo], sampler_type=SAMPLER[tipo])
+        f = E(X.MaterialExpressionMaterialFunctionCall, material_function=X.load_asset(fn))
+        g.une(o, f, 'TextureObject'); g.une(size, f, 'TextureSize')
+        if donde[0] is not None:
+            g.une(donde[0], f, ('WorldPosition', 'World Position'))
+        return f1(X.MaterialExpressionComponentMask, f, 'XYZ Texture', r=True, g=True, b=True, a=False)
+
+    # ---- posición y orientación
+    wp = E(X.MaterialExpressionWorldPosition)
+    mx, my, mz = canal(wp, 'r'), canal(wp, 'g'), canal(wp, 'b')
+    nza = f1(X.MaterialExpressionAbs, canal(E(X.MaterialExpressionVertexNormalWS), 'b'))
+    pared = inv(nza)                                           # 1 en vertical
+    hor = sat(op(S, op(M, nza, 4.0), 1.5))                     # 1 en horizontal (suelos, tejados)
+    suc = esc('Suciedad', 0.6)
+    rui = ruido(0.004, 2)                                      # manchas de 2-3 m
+    ruic = contraste(rui, 1.8)
+    mac = contraste(ruido(0.0009, 2), 2.2)                     # nubes de tono de 10-15 m
+    # losas y paneles: en horizontal, casillas de Losa cm (x - LosaFaseX, y); en vertical, tramos de Panel cm a lo largo
+    # del muro (x + y vale para un muro que mire a cualquier lado). Cada pieza saca un número al azar (0-1)
+    u = op(A, mx, my)
+    tam = lerp(esc('Panel', 300.0), esc('Losa', 600.0), hor)
+    cx = op(D, lerp(u, op(S, mx, esc('LosaFaseX', 0.0)), hor), tam)
+    cy = lerp(0.5, op(D, my, tam), hor)
+    c2 = op(AP, cx, cy)
+    celda = f1(X.MaterialExpressionFloor, c2)
+    punto = E(X.MaterialExpressionDotProduct)
+    g.une(celda, punto, 'A'); g.une(E(X.MaterialExpressionConstant2Vector, r=0.129898, g=0.78233), punto, 'B')
+    azar = f1(X.MaterialExpressionFrac, op(M, f1(X.MaterialExpressionSine, punto), 43758.5453))
+    # la textura se repite cada Tamano y sus rasgos gordos (la grieta del asfalto) se veían en fila: en cada losa se
+    # proyecta corrida una distancia al azar (Desfase 1; 0 = como siempre). El corte cae en la junta
+    az2 = f1(X.MaterialExpressionFrac, op(M, azar, 7.31))
+    corr = op(M, op(AP, op(AP, azar, az2), E(X.MaterialExpressionConstant, r=0.0)), op(M, size, esc('Desfase', 0.0)))
+    donde[0] = op(A, wp, corr)
+
+    # ---- color: Tinte x (textura / su color medio), con contraste alrededor de 1
+    col = wat('Color', 'diff')
+    rel = op(D, col, vec('Medio', 1, 1, 1))
+    relc = E(X.MaterialExpressionMax, const_b=0.04)
+    g.une(op(A, op(M, op(S, rel, 1.0), esc('Contraste', 1.0)), 1.0), relc, 'A')
+    color = op(M, relc, vec('Tinte', 1, 1, 1))
+    if CON_SUCIEDAD:
+        macro = esc('Macro', 0.1)
+        color = op(M, color, lerp(inv(macro), op(A, macro, 1.0), mac))
+        # cada losa o panel, con su tono, y la junta oscura entre ellos
+        tono = lerp(esc('PanelTono', 0.0), esc('LosaTono', 0.0), hor)
+        color = op(M, color, op(A, op(M, op(S, azar, 0.5), op(M, tono, 2.0)), 1.0))
+        fr = f1(X.MaterialExpressionFrac, c2)
+        borde = E(MIN); g.une(fr, borde, 'A'); g.une(inv(fr), borde, 'B')
+        bmin = E(MIN); g.une(canal(borde, 'r'), bmin, 'A'); g.une(canal(borde, 'g'), bmin, 'B')
+        junta0 = inv(sat(op(D, op(M, bmin, tam), 3.5)))                                               # 3,5 cm a cada lado
+        junta = op(M, op(M, junta0, junta0), esc('Junta', 0.0))
+        color = op(M, color, inv(op(M, junta, 0.75)))
+        # zócalo sucio: sube más o menos según la mancha (de 20 a 90 cm), solo en vertical
+        zoc = op(M, inv(sat(op(D, mz, op(A, op(M, rui, 70.0), 20.0)))), pared)
+        color = op(M, color, inv(op(M, op(A, op(M, op(S, ruic, 0.35), 0.36), op(M, zoc, 0.5)), suc)))
+        # regueros: ruido estirado en vertical (hilos de 8-15 cm que duran metros); cada panel, corrido al azar para
+        # que el dibujo (que se repite cada 3,2 m) no se vea repetido
+        ps = op(AP, op(AP, op(A, u, op(M, canal(celda, 'r'), 137.0)), E(X.MaterialExpressionConstant, r=0.0)), op(M, mz, 0.035))
+        hilo = sat(op(M, op(S, ruido(0.05, 2, ps), 0.5), 4.5))
+        chorro = op(M, op(M, hilo, lerp(0.35, 1.0, ruic)), pared)
+        chorreo = op(M, chorro, esc('Chorreo', 0.0))
     else:
-        m = tools.create_asset('M_LH', DM, unreal.Material, unreal.MaterialFactoryNew())
-    E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
-    # tamaño de la textura (cm) como vector para las funciones alineadas al mundo
-    size = E(unreal.MaterialExpressionScalarParameter, -1200, 0)
-    size.set_editor_property('parameter_name', 'Tamano'); size.set_editor_property('default_value', 300.0)
-    SAMPLER = {'diff': unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, 'nor': unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
-               'rough': unreal.MaterialSamplerType.SAMPLERTYPE_MASKS}
-    def tex_obj(nombre, x, y, tipo):
-        p = E(unreal.MaterialExpressionTextureObjectParameter, x, y)
-        p.set_editor_property('parameter_name', nombre)
-        p.set_editor_property('texture', defecto[tipo])
-        p.set_editor_property('sampler_type', SAMPLER[tipo])
-        return p
-    def wat(obj, x, y, fn=WAT):
-        f = E(unreal.MaterialExpressionMaterialFunctionCall, x, y)
-        f.set_editor_property('material_function', unreal.load_asset(fn))
-        mel.connect_material_expressions(obj, '', f, 'TextureObject')
-        mel.connect_material_expressions(size, '', f, 'TextureSize')
-        return f
-    col = wat(tex_obj('Color', -1000, -300, 'diff'), -700, -300)
-    tint = E(unreal.MaterialExpressionVectorParameter, -700, -500)
-    tint.set_editor_property('parameter_name', 'Tinte'); tint.set_editor_property('default_value', unreal.LinearColor(1, 1, 1, 1))
-    mul = E(unreal.MaterialExpressionMultiply, -400, -350)
-    mel.connect_material_expressions(col, 'XYZ Texture', mul, 'A')
-    mel.connect_material_expressions(tint, '', mul, 'B')
-    # suciedad (tanda 18): nada de superficies uniformes. Manchas grandes de ruido en el espacio del mundo (oscurecen
-    # el color y cambian la rugosidad) y un zócalo sucio en las paredes (solo en superficies verticales, hasta ~45 cm)
-    suc = E(unreal.MaterialExpressionScalarParameter, -1200, -800)
-    suc.set_editor_property('parameter_name', 'Suciedad'); suc.set_editor_property('default_value', 0.6)
-    ruido = E(unreal.MaterialExpressionNoise, -1000, -800)
-    ruido.set_editor_property('scale', 0.004); ruido.set_editor_property('levels', 2)
-    # ruido de textura (barato): el de cálculo en cada píxel de toda la base costaba ~8 fps en una GTX 1050 Ti
-    fn = unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX
-    if RUIDO_RAPIDO:
-        fn = getattr(unreal.NoiseFunction, 'NOISEFUNCTION_GRADIENT_TEX3D', fn)
-        if fn == unreal.NoiseFunction.NOISEFUNCTION_GRADIENT_TEX:
-            log('AVISO: M_LH: este motor no tiene el ruido de textura 3D; se queda el de siempre')
-    ruido.set_editor_property('noise_function', fn)
-    ruido.set_editor_property('quality', 1)
-    ruido.set_editor_property('output_min', 0.0); ruido.set_editor_property('output_max', 1.0)
-    wp = E(unreal.MaterialExpressionWorldPosition, -1200, -1000)
-    zm = E(unreal.MaterialExpressionComponentMask, -1000, -1000)
-    for k, v in (('r', False), ('g', False), ('b', True), ('a', False)):
-        zm.set_editor_property(k, v)
-    uno(wp, zm)
-    zdiv = E(unreal.MaterialExpressionDivide, -850, -1000)
-    zdiv.set_editor_property('const_b', 45.0)
-    mel.connect_material_expressions(zm, '', zdiv, 'A')
-    zsat = E(unreal.MaterialExpressionSaturate, -720, -1000)
-    uno(zdiv, zsat)
-    zinv = E(unreal.MaterialExpressionOneMinus, -600, -1000)
-    uno(zsat, zinv)
-    vn = E(unreal.MaterialExpressionVertexNormalWS, -1000, -1150)
-    nz = E(unreal.MaterialExpressionComponentMask, -850, -1150)
-    for k, v in (('r', False), ('g', False), ('b', True), ('a', False)):
-        nz.set_editor_property(k, v)
-    uno(vn, nz)
-    nza = E(unreal.MaterialExpressionAbs, -720, -1150)
-    uno(nz, nza)
-    pared = E(unreal.MaterialExpressionOneMinus, -600, -1150)
-    uno(nza, pared)
-    zocalo = E(unreal.MaterialExpressionMultiply, -480, -1080)
-    mel.connect_material_expressions(zinv, '', zocalo, 'A')
-    mel.connect_material_expressions(pared, '', zocalo, 'B')
-    # oscurecer = 1 - Suciedad * (0,35 x ruido + 0,45 x zócalo)
-    rk = E(unreal.MaterialExpressionMultiply, -800, -800)
-    rk.set_editor_property('const_b', 0.35)
-    mel.connect_material_expressions(ruido, '', rk, 'A')
-    zk = E(unreal.MaterialExpressionMultiply, -360, -1080)
-    zk.set_editor_property('const_b', 0.45)
-    mel.connect_material_expressions(zocalo, '', zk, 'A')
-    sm_ = E(unreal.MaterialExpressionAdd, -250, -950)
-    mel.connect_material_expressions(rk, '', sm_, 'A')
-    mel.connect_material_expressions(zk, '', sm_, 'B')
-    sk = E(unreal.MaterialExpressionMultiply, -150, -900)
-    mel.connect_material_expressions(sm_, '', sk, 'A')
-    mel.connect_material_expressions(suc, '', sk, 'B')
-    osc = E(unreal.MaterialExpressionOneMinus, -50, -900)
-    uno(sk, osc)
-    sucio0 = E(unreal.MaterialExpressionMultiply, -250, -350)
-    mel.connect_material_expressions(mul, '', sucio0, 'A')
-    mel.connect_material_expressions(osc, '', sucio0, 'B')
-    # zócalo pintado (paredes de dentro): hasta ZocaloAltura cm el color se tiñe con ZocaloTinte; 0 = sin zócalo
-    zalt = E(unreal.MaterialExpressionScalarParameter, -1200, -1300)
-    zalt.set_editor_property('parameter_name', 'ZocaloAltura'); zalt.set_editor_property('default_value', 0.0)
-    ztin = E(unreal.MaterialExpressionVectorParameter, -1200, -1450)
-    ztin.set_editor_property('parameter_name', 'ZocaloTinte'); ztin.set_editor_property('default_value', unreal.LinearColor(1, 1, 1, 1))
-    zres = E(unreal.MaterialExpressionSubtract, -1000, -1300)
-    mel.connect_material_expressions(zalt, '', zres, 'A')
-    mel.connect_material_expressions(zm, '', zres, 'B')
-    zesc = E(unreal.MaterialExpressionMultiply, -880, -1300)
-    zesc.set_editor_property('const_b', 0.5)   # transición de 2 cm
-    mel.connect_material_expressions(zres, '', zesc, 'A')
-    zmsk = E(unreal.MaterialExpressionSaturate, -760, -1300)
-    uno(zesc, zmsk)
-    zpar = E(unreal.MaterialExpressionMultiply, -640, -1300)
-    mel.connect_material_expressions(zmsk, '', zpar, 'A')
-    mel.connect_material_expressions(pared, '', zpar, 'B')
-    ztc = E(unreal.MaterialExpressionMultiply, -500, -1450)
-    mel.connect_material_expressions(sucio0, '', ztc, 'A')
-    mel.connect_material_expressions(ztin, '', ztc, 'B')
-    sucio = E(unreal.MaterialExpressionLinearInterpolate, -150, -350)
-    mel.connect_material_expressions(sucio0, '', sucio, 'A')
-    mel.connect_material_expressions(ztc, '', sucio, 'B')
-    mel.connect_material_expressions(zpar, '', sucio, 'Alpha')
-    color_fin = sucio if CON_SUCIEDAD else mul
-    # mojado (tanda 24): w = Mojado (colección) x Mojable (instancia) x (0,6 en vertical, 1 en horizontal)
-    moj_w = moj_h = None
+        junta = chorro = chorreo = None
+    # ---- mojado (tanda 24): w = Mojado (colección) x Mojable (instancia) x (0,6 en vertical, 1 en horizontal)
+    w = moj_h = None
     mpc = coleccion() if CON_MOJADO else None
     if mpc is not None:
-        cp = E(unreal.MaterialExpressionCollectionParameter, -1200, -1700)
-        cp.set_editor_property('collection', mpc)           # la colección, antes que el nombre
+        cp = E(X.MaterialExpressionCollectionParameter, collection=mpc)           # la colección, antes que el nombre
         cp.set_editor_property('parameter_name', 'Mojado')
-        mojable = E(unreal.MaterialExpressionScalarParameter, -1200, -1600)
-        mojable.set_editor_property('parameter_name', 'Mojable'); mojable.set_editor_property('default_value', 0.0)
-        mm_ = E(unreal.MaterialExpressionMultiply, -1000, -1650)
-        mel.connect_material_expressions(cp, '', mm_, 'A')
-        mel.connect_material_expressions(mojable, '', mm_, 'B')
-        vert = E(unreal.MaterialExpressionLinearInterpolate, -850, -1550)
-        vert.set_editor_property('const_a', 0.6); vert.set_editor_property('const_b', 1.0)
-        mel.connect_material_expressions(nza, '', vert, 'Alpha')
-        moj_w = E(unreal.MaterialExpressionMultiply, -700, -1650)
-        mel.connect_material_expressions(mm_, '', moj_w, 'A')
-        mel.connect_material_expressions(vert, '', moj_w, 'B')
-        # en horizontal, a parches: donde el ruido es alto, encharcado
-        par = E(unreal.MaterialExpressionMultiply, -850, -1800)
-        par.set_editor_property('const_b', 1.5)
-        mel.connect_material_expressions(ruido, '', par, 'A')
-        par2 = E(unreal.MaterialExpressionSubtract, -720, -1800)
-        par2.set_editor_property('const_b', 0.2)
-        mel.connect_material_expressions(par, '', par2, 'A')
-        par3 = E(unreal.MaterialExpressionSaturate, -600, -1800)
-        uno(par2, par3)
-        moj_h = E(unreal.MaterialExpressionMultiply, -470, -1800)       # parche x horizontal
-        mel.connect_material_expressions(par3, '', moj_h, 'A')
-        mel.connect_material_expressions(nza, '', moj_h, 'B')
-        # color: lo mojado es más oscuro (hasta x 0,58)
-        osc_m = E(unreal.MaterialExpressionLinearInterpolate, -470, -1650)
-        osc_m.set_editor_property('const_a', 1.0); osc_m.set_editor_property('const_b', 0.58)
-        mel.connect_material_expressions(moj_w, '', osc_m, 'Alpha')
-        cm = E(unreal.MaterialExpressionMultiply, -20, -420)
-        mel.connect_material_expressions(color_fin, '', cm, 'A')
-        mel.connect_material_expressions(osc_m, '', cm, 'B')
-        color_fin = cm
+        w = op(M, op(M, cp, esc('Mojable', 0.0)), lerp(0.6, 1.0, nza))
+        # charcos: a parches y solo en horizontal; por zonas (la nube grande) hay más o menos
+        moj_h = op(M, sat(op(M, op(S, op(A, rui, op(M, op(S, mac, 0.5), 0.25)), 0.5), 3.5)), hor)
     elif CON_MOJADO:
         log('AVISO: M_LH: no hay MPC_Tarsis; el maestro se queda sin el mojado de la lluvia')
-    mel.connect_material_property(color_fin, '', unreal.MaterialProperty.MP_BASE_COLOR)
-    # relieve: si una instancia no tiene normal, se queda con la normal plana por defecto del parámetro
-    nor = wat(tex_obj('Normal', -1000, 0, 'nor'), -700, 0, WAN)
-    mel.connect_material_property(nor, 'XYZ Texture', unreal.MaterialProperty.MP_NORMAL)
-    # rugosidad: textura (si hay) x escala
-    rt = wat(tex_obj('Rugosidad', -1000, 300, 'rough'), -700, 300)
-    rs = E(unreal.MaterialExpressionScalarParameter, -700, 500)
-    rs.set_editor_property('parameter_name', 'RugosidadEscala'); rs.set_editor_property('default_value', 1.0)
-    rm = E(unreal.MaterialExpressionMultiply, -400, 350)
-    mel.connect_material_expressions(rt, 'XYZ Texture', rm, 'A')
-    mel.connect_material_expressions(rs, '', rm, 'B')
-    mask = E(unreal.MaterialExpressionComponentMask, -250, 350)
-    mask.set_editor_property('r', True); mask.set_editor_property('g', False)
-    mask.set_editor_property('b', False); mask.set_editor_property('a', False)
-    uno(rm, mask)   # con '' a secas no conecta («Missing ComponentMask input»): uno() prueba «Input» primero
-    # la rugosidad varía con las mismas manchas: donde hay mugre, más mate; donde no, algo más brillante (humedad)
-    rvar = E(unreal.MaterialExpressionSubtract, -400, 700)
-    rvar.set_editor_property('const_b', 0.5)
-    mel.connect_material_expressions(ruido, '', rvar, 'A')
-    rv2 = E(unreal.MaterialExpressionMultiply, -280, 700)
-    mel.connect_material_expressions(rvar, '', rv2, 'A')
-    mel.connect_material_expressions(suc, '', rv2, 'B')
-    rv3 = E(unreal.MaterialExpressionMultiply, -160, 700)
-    rv3.set_editor_property('const_b', 0.4)
-    mel.connect_material_expressions(rv2, '', rv3, 'A')
-    radd = E(unreal.MaterialExpressionAdd, -120, 400)
-    mel.connect_material_expressions(mask, '', radd, 'A')
-    mel.connect_material_expressions(rv3, '', radd, 'B')
-    rsat = E(unreal.MaterialExpressionSaturate, 0, 400)
-    uno(radd, rsat)
-    rug_fin = rsat if CON_SUCIEDAD else mask
-    if moj_w is not None:
-        # rugosidad de lo mojado: 0,40 (húmedo) -> 0,10 (encharcado, solo en horizontal); nunca más mate que en seco
-        rmoj = E(unreal.MaterialExpressionLinearInterpolate, 0, 600)
-        rmoj.set_editor_property('const_a', 0.40); rmoj.set_editor_property('const_b', 0.10)
-        mel.connect_material_expressions(moj_h, '', rmoj, 'Alpha')
-        rmin = E(unreal.MaterialExpressionMin, 130, 520)
-        mel.connect_material_expressions(rug_fin, '', rmin, 'A')
-        mel.connect_material_expressions(rmoj, '', rmin, 'B')
-        rl_ = E(unreal.MaterialExpressionLinearInterpolate, 260, 420)
-        mel.connect_material_expressions(rug_fin, '', rl_, 'A')
-        mel.connect_material_expressions(rmin, '', rl_, 'B')
-        mel.connect_material_expressions(moj_w, '', rl_, 'Alpha')
-        rug_fin = rl_
-    mel.connect_material_property(rug_fin, '', unreal.MaterialProperty.MP_ROUGHNESS)
-    met = E(unreal.MaterialExpressionScalarParameter, -400, 600)
-    met.set_editor_property('parameter_name', 'Metal'); met.set_editor_property('default_value', 0.0)
-    mel.connect_material_property(met, '', unreal.MaterialProperty.MP_METALLIC)
-    mel.recompile_material(m)
-    eal.save_loaded_asset(m)
-    return m
+    if chorreo is not None:
+        # el reguero oscurece el 45 %; mojado, el 80 %
+        color = op(M, color, inv(op(M, chorreo, lerp(0.45, 0.8, w) if w is not None else 0.45)))
+    # zócalo pintado (paredes de dentro): hasta ZocaloAltura cm el color se tiñe con ZocaloTinte; 0 = sin zócalo
+    zmsk = op(M, sat(op(M, op(S, esc('ZocaloAltura', 0.0), mz), 0.5)), pared)       # transición de 2 cm
+    color = lerp(color, op(M, color, vec('ZocaloTinte', 1, 1, 1)), zmsk)
+    if w is not None:
+        color = op(M, color, lerp(1.0, esc('MojadoOscuro', 0.5), w))                # lo mojado es más oscuro
+    g.sale(color, X.MaterialProperty.MP_BASE_COLOR)
+
+    # ---- relieve: el de la textura x Relieve; en los charcos, plano
+    nor = wat('Normal', 'nor', WAN)
+    rl = esc('Relieve', 1.0)
+    rv = op(AP, op(AP, rl, rl), E(X.MaterialExpressionConstant, r=1.0))
+    nfin = f1(X.MaterialExpressionNormalize, op(M, nor, rv))
+    if moj_h is not None:
+        nfin = lerp(nfin, E(X.MaterialExpressionConstant3Vector, constant=X.LinearColor(0, 0, 1, 0)), op(M, op(M, moj_h, w), 0.9))
+    g.sale(nfin, X.MaterialProperty.MP_NORMAL)
+
+    # ---- rugosidad: textura x escala, movida por las manchas (donde hay mugre, más mate)
+    rug = op(M, canal(wat('Rugosidad', 'rough'), 'r'), esc('RugosidadEscala', 1.0))
+    if CON_SUCIEDAD:
+        rug = sat(op(A, rug, op(M, op(M, op(S, ruic, 0.5), suc), 0.35)))
+    if w is not None:
+        # mojado: satinado (0,42); los regueros, más (0,2); los charcos, espejo (0,06). Nunca más mate que en seco
+        seco = rug
+        rm = lerp(0.42, 0.2, chorro) if chorro is not None else E(X.MaterialExpressionConstant, r=0.42)
+        rmin = E(MIN); g.une(seco, rmin, 'A'); g.une(lerp(rm, 0.06, moj_h), rmin, 'B')
+        rug = lerp(seco, rmin, w)
+    g.sale(rug, X.MaterialProperty.MP_ROUGHNESS)
+    g.sale(esc('Metal', 0.0), X.MaterialProperty.MP_METALLIC)
+    return g.fin()
 
 # ------------------------------------------------------------------ 2b. maestro de las piezas que se mueven (tanda 22)
 # prefijo de la malla -> juego de instancias
 PREFIJOS_MOVIL = {'camionmovil': 'camion', 'camiones': 'camion', 'hojaentrada': 'hoja'}
-# juego -> clave del material -> (textura, metros por repetición, tinte sRGB, escala de rugosidad, metal, barro 0-1, altura del barro en cm)
+# juego -> clave del material -> (textura, metros por repetición, albedo lineal, escala de rugosidad, metal, barro 0-1, altura del barro en cm)
+# tanda 25: el albedo va directo (antes, textura verde x verde del visor: de noche bajo una farola el camión salía verde
+# lima). Verde oliva militar apagado y con polvo; la lona, caqui; las llantas dejan de ser lo más claro del camión.
+OLIVA_MILITAR = (0.045, 0.052, 0.030)
 MOVIL = {
     'camion': {
-        'oliva': ('green_metal_rust', 2.2, 0x6f8a4c, 1.0, 0.1, 0.85, 120.0),       # cabina, laterales y portalón: chapa verde con óxido
-        'lona': ('rough_linen', 0.9, 0x6a6844, 1.0, 0.0, 0.0, 110.0),              # el toldo queda por encima de las salpicaduras
-        'bajos': ('rusty_metal_02', 1.4, 0x4a4338, 1.1, 0.3, 1.0, 130.0),          # chasis y bajos: óxido oscuro y barro
-        'goma': ('concrete_floor_worn_001', 1.0, 0x1c1c1e, 1.3, 0.0, 1.0, 110.0),  # neumáticos: negro con el polvo del camino
-        'metal': ('rusty_metal_02', 1.4, 0x8d949a, 0.9, 0.6, 0.8, 120.0),          # parachoques y llantas
-        'madera': ('wood_planks_dirt', 1.6, 0xb09a80, 1.0, 0.0, 0.0, 110.0),       # suelo de la caja y cajones
+        'oliva': ('green_metal_rust', 2.2, OLIVA_MILITAR, 1.0, 0.1, 0.85, 120.0),            # cabina, laterales y portalón: chapa verde con óxido
+        'lona': ('rough_linen', 0.9, (0.060, 0.058, 0.038), 1.0, 0.0, 0.0, 110.0),           # el toldo queda por encima de las salpicaduras
+        'bajos': ('rusty_metal_02', 1.4, (0.028, 0.018, 0.009), 1.1, 0.3, 1.0, 130.0),       # chasis y bajos: óxido oscuro y barro
+        'goma': ('concrete_floor_worn_001', 1.0, (0.010, 0.010, 0.011), 1.3, 0.0, 1.0, 110.0),  # neumáticos: negro con el polvo del camino
+        'metal': ('rusty_metal_02', 1.4, (0.055, 0.047, 0.032), 0.9, 0.6, 0.8, 120.0),       # parachoques y llantas: acero pintado y sucio
+        'madera': ('wood_planks_dirt', 1.6, (0.085, 0.045, 0.022), 1.0, 0.0, 0.0, 110.0),    # suelo de la caja y cajones
     },
     'hoja': {
-        'oliva': ('green_metal_rust', 2.2, 0x6f8a4c, 1.0, 0.1, 0.7, 45.0),
-        'hierro': ('rusty_metal_02', 1.4, 0x999999, 1.0, 0.55, 0.7, 45.0),
+        'oliva': ('green_metal_rust', 2.2, OLIVA_MILITAR, 1.0, 0.1, 0.7, 45.0),
+        'hierro': ('rusty_metal_02', 1.4, (0.120, 0.090, 0.050), 1.0, 0.55, 0.7, 45.0),
     },
 }
+# versión del grafo de M_LH_Movil (como VER_LH)
+VER_MOVIL = 'movil v25'
 
 def maestro_movil(defecto):
     """M_LH_Movil: como M_LH pero con las UV de la malla (las mallas de la base llevan UV en metros, por proyección en caja:
@@ -384,12 +415,16 @@ def maestro_movil(defecto):
     ruta = DM + '/M_LH_Movil'
     if eal.does_asset_exist(ruta):
         m = eal.load_asset(ruta)
+        if any(e.get_editor_property('desc') == VER_MOVIL for e in mel.get_material_expressions(m)):
+            return m             # ya está en esta versión: no se rehace ni se recompila
         mel.delete_all_material_expressions(m)
         for e in list(mel.get_material_expressions(m)):
             mel.delete_material_expression(m, e)
     else:
         m = tools.create_asset('M_LH_Movil', DM, unreal.Material, unreal.MaterialFactoryNew())
     E = lambda cls, x, y: mel.create_material_expression(m, cls, x, y)
+    marca = E(unreal.MaterialExpressionConstant, -1800, -600)
+    marca.set_editor_property('desc', VER_MOVIL)
     def esc(nombre, valor, x, y):
         p = E(unreal.MaterialExpressionScalarParameter, x, y)
         p.set_editor_property('parameter_name', nombre); p.set_editor_property('default_value', valor)
@@ -412,8 +447,14 @@ def maestro_movil(defecto):
     col = muestra('Color', -300, 'diff')
     tint = E(unreal.MaterialExpressionVectorParameter, -1050, -520)
     tint.set_editor_property('parameter_name', 'Tinte'); tint.set_editor_property('default_value', unreal.LinearColor(1, 1, 1, 1))
+    # tanda 25: la textura, dividida por su color medio (Medio); el color lo pone Tinte, que es el albedo
+    medio = E(unreal.MaterialExpressionVectorParameter, -1050, -700)
+    medio.set_editor_property('parameter_name', 'Medio'); medio.set_editor_property('default_value', unreal.LinearColor(1, 1, 1, 1))
+    rel = E(unreal.MaterialExpressionDivide, -900, -350)
+    mel.connect_material_expressions(col, 'RGB', rel, 'A')
+    mel.connect_material_expressions(medio, '', rel, 'B')
     mul = E(unreal.MaterialExpressionMultiply, -750, -350)
-    mel.connect_material_expressions(col, 'RGB', mul, 'A')
+    mel.connect_material_expressions(rel, '', mul, 'A')
     mel.connect_material_expressions(tint, '', mul, 'B')
     # barro: franja = saturar((BarroAltura - z) / BarroAltura)², x (0,2 + 1,3 x ruido) x Barro x 2
     alt = esc('BarroAltura', 110.0, -1500, -900)
@@ -501,7 +542,7 @@ def instancias_movil(tex, defecto):
     base = maestro_movil(defecto)
     out = {}
     for juego, claves in MOVIL.items():
-        for clave, (nombre, rep, hexc, rough, metal, barro, alto) in claves.items():
+        for clave, (nombre, rep, albedo, rough, metal, barro, alto) in claves.items():
             if nombre not in tex:
                 tex[nombre] = {t: textura(nombre, t) for t in ('diff', 'nor', 'rough')}
             c, n, r = tex[nombre]['diff'], tex[nombre]['nor'], tex[nombre]['rough']
@@ -522,7 +563,8 @@ def instancias_movil(tex, defecto):
             mel.set_material_instance_scalar_parameter_value(mi, 'Repite', 1.0 / rep)
             mel.set_material_instance_scalar_parameter_value(mi, 'Barro', barro)
             mel.set_material_instance_scalar_parameter_value(mi, 'BarroAltura', alto)
-            mel.set_material_instance_vector_parameter_value(mi, 'Tinte', unreal.LinearColor(*[lin((hexc >> s) & 255) for s in (16, 8, 0)], 1))
+            mel.set_material_instance_vector_parameter_value(mi, 'Tinte', unreal.LinearColor(*albedo, 1))
+            mel.set_material_instance_vector_parameter_value(mi, 'Medio', unreal.LinearColor(*MEDIO.get(nombre, (1.0, 1.0, 1.0)), 1))
             eal.save_loaded_asset(mi)
             out.setdefault(juego, {})[clave] = mi
     return out
@@ -580,10 +622,17 @@ def instancias():
             'MI_' + clave, DM, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
         mel.set_material_instance_parent(mi, base)
         hexc, rough, metal = VALORES[clave]
-        tinte = unreal.LinearColor(*[lin((hexc >> s) & 255) for s in (16, 8, 0)], 1)
-        if clave.startswith('contenedor'):   # la chapa gris x el color queda casi negra de noche: se permite pasar de 1
-            tinte = unreal.LinearColor(tinte.r * 1.8, tinte.g * 1.8, tinte.b * 1.8, 1)
-        # igual que en el visor: textura x color (si queda oscuro con la luz de Unreal se sube el Tinte de la instancia)
+        # tanda 25: el Tinte es el albedo y la textura va dividida por su color medio (Medio)
+        tinte = unreal.LinearColor(*ALBEDO[clave], 1) if clave in ALBEDO else unreal.LinearColor(*[lin((hexc >> s) & 255) for s in (16, 8, 0)], 1)
+        medio = MEDIO.get(nombre, (1.0, 1.0, 1.0)) if clave in ALBEDO else (1.0, 1.0, 1.0)
+        mel.set_material_instance_vector_parameter_value(mi, 'Medio', unreal.LinearColor(*medio, 1))
+        mel.set_material_instance_scalar_parameter_value(mi, 'Contraste', CONTRASTE.get(clave, 1.0))
+        mel.set_material_instance_scalar_parameter_value(mi, 'Relieve', RELIEVE.get(clave, 1.0))
+        mel.set_material_instance_scalar_parameter_value(mi, 'Macro', MACRO.get(clave, 0.1))
+        losa, ltono, panel, ptono, junta, fase = LOSAS.get(clave, (600.0, 0.0, 300.0, 0.0, 0.0, 0.0))
+        for k, v in (('Losa', losa), ('LosaTono', ltono), ('Panel', panel), ('PanelTono', ptono), ('Junta', junta), ('LosaFaseX', fase),
+                     ('Chorreo', CHORREO.get(clave, 0.0)), ('Desfase', 1.0 if clave in DESFASE else 0.0)):
+            mel.set_material_instance_scalar_parameter_value(mi, k, v)
         mel.set_material_instance_texture_parameter_value(mi, 'Color', c)
         # si falta normal o rugosidad se deja el valor por defecto del maestro (misma clase de textura)
         if n:
