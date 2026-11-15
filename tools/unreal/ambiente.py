@@ -134,7 +134,7 @@ def sonido(nombre, pos, onda, volumen, alcance, tags=()):
         log('AVISO: falta el sonido', onda, '(tools/unreal/sonidos.py)')
         return None
     s.set_editor_property('looping', True)
-    eal.save_loaded_asset(s)
+    eal.save_loaded_asset(s, False)
     a = poner(unreal.AmbientSound, nombre, pos, tags=tags)
     c = a.get_component_by_class(unreal.AudioComponent)
     c.set_editor_property('sound', s)
@@ -227,12 +227,12 @@ def taquilla():
     mel.set_material_instance_scalar_parameter_value(mi, 'Tamano', 90.0)
     mel.set_material_instance_scalar_parameter_value(mi, 'Suciedad', 0.85)
     mel.set_material_instance_scalar_parameter_value(mi, 'Metal', 0.35)
-    eal.save_loaded_asset(mi)
+    eal.save_loaded_asset(mi, False)
     sm.set_material(0, mi)
     sms = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
     sms.remove_collisions(sm)
     sms.add_simple_collisions(sm, unreal.ScriptCollisionShapeType.BOX)
-    eal.save_loaded_asset(sm)
+    eal.save_loaded_asset(sm, False)
     log('taquilla creada:', TAQUILLA)
     return sm
 
@@ -353,7 +353,7 @@ class Grafo:
     def fin(self):
         self.E(unreal.MaterialExpressionConstant, -1800, -600, r=0.0, desc=self.version)      # la marca de versión
         mel.recompile_material(self.m)
-        eal.save_loaded_asset(self.m)
+        eal.save_loaded_asset(self.m, False)
         if self.fallos:
             log('AVISO: %s: %d conexiones sin hacer: %s' % (self.nombre, len(self.fallos), '; '.join(self.fallos)))
         else:
@@ -507,7 +507,7 @@ def mancha(nombre, pos, ancho, alto, hacia, fuerza=0.85, color_=None, rug=0.35, 
     mel.set_material_instance_scalar_parameter_value(inst, 'Fuerza', fuerza)
     if color_:
         mel.set_material_instance_vector_parameter_value(inst, 'Color', unreal.LinearColor(*color_, 1))
-    eal.save_loaded_asset(inst)
+    eal.save_loaded_asset(inst, False)
     d.set_decal_material(inst)
     d.set_editor_property('decal_size', V(20, ancho / 2.0, alto / 2.0))
     return a
@@ -546,7 +546,7 @@ def _malla_tela(ruta, dx, dy, dz, bisel, material):
     mi = unreal.load_asset(DM + '/' + material)
     if sm and mi:
         sm.set_material(0, mi)
-        eal.save_loaded_asset(sm)
+        eal.save_loaded_asset(sm, False)
     return sm
 
 
@@ -599,7 +599,7 @@ def material_emisivo():
     c.set_editor_property('constant', unreal.LinearColor(7.0, 8.5, 9.5, 1))
     mel.connect_material_property(c, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     mel.recompile_material(m)
-    eal.save_loaded_asset(m)
+    eal.save_loaded_asset(m, False)
     return m
 
 
@@ -627,7 +627,7 @@ def material_barrotes():
         mel.connect_material_expressions(fr, '', st, '')
     mel.connect_material_property(st, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     mel.recompile_material(m)
-    eal.save_loaded_asset(m)
+    eal.save_loaded_asset(m, False)
     return m
 
 

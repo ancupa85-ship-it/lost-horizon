@@ -33,7 +33,7 @@ def fisicos():
         ruta = DEST + '/PM_' + nombre
         pm = eal.load_asset(ruta) if eal.does_asset_exist(ruta) else tools.create_asset('PM_' + nombre, DEST, unreal.PhysicalMaterial, unreal.PhysicalMaterialFactoryNew())
         pm.set_editor_property('friction', FRICCION[nombre])
-        eal.save_loaded_asset(pm)
+        eal.save_loaded_asset(pm, False)
         out[nombre] = pm
     return out
 
@@ -62,7 +62,7 @@ def aplicar():
         try:
             if m.get_editor_property('phys_material') != pms[sup]:
                 m.set_editor_property('phys_material', pms[sup])
-                eal.save_loaded_asset(m)
+                eal.save_loaded_asset(m, False)
             n += 1
         except Exception as e:
             log('AVISO: no se pudo poner el material físico a', nombre, repr(e))

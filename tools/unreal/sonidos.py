@@ -32,7 +32,7 @@ def importar():
         w = unreal.EditorAssetLibrary.load_asset(DEST + '/' + n)
         if w:
             w.set_editor_property('looping', True)
-            unreal.EditorAssetLibrary.save_loaded_asset(w)
+            unreal.EditorAssetLibrary.save_loaded_asset(w, False)
     unreal.log('[Tarsis] sonidos importados: %d' % len(tareas))
 
 if __name__ == '__main__':

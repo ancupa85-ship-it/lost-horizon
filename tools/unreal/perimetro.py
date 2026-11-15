@@ -106,7 +106,7 @@ def _tipos():
         mel.set_material_instance_parent(mi, base)
         mel.set_material_instance_scalar_parameter_value(mi, 'Fuerza', fuerza)
         mel.set_material_instance_vector_parameter_value(mi, 'Color', unreal.LinearColor(col[0], col[1], col[2], 1))
-        eal.save_loaded_asset(mi)
+        eal.save_loaded_asset(mi, False)
         out[tipo] = mi
     bases = {'mancha': base}
     for tipo, (mat, col, fuerza, resto) in TIPOS_23.items():
@@ -120,7 +120,7 @@ def _tipos():
         mel.set_material_instance_vector_parameter_value(mi, 'Color', unreal.LinearColor(col[0], col[1], col[2], 1))
         for k, v in resto.items():
             mel.set_material_instance_scalar_parameter_value(mi, k, v)
-        eal.save_loaded_asset(mi)
+        eal.save_loaded_asset(mi, False)
         out[tipo] = mi
     return out
 

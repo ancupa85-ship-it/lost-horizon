@@ -90,7 +90,7 @@ for m in meshes:
             m.set_editor_property('nanite_settings', ns)
     elif m.get_name().startswith('base_'):
         respaldo_completo(m)
-    eal.save_loaded_asset(m)
+    eal.save_loaded_asset(m, False)
 
 # materiales realistas (texturas de Poly Haven), si están descargadas en assets/texturas
 try:
@@ -138,7 +138,7 @@ def tela_translucida():
     op.set_editor_property('r', 0.35)
     mel.connect_material_property(op, '', unreal.MaterialProperty.MP_OPACITY)
     mel.recompile_material(m)
-    eal.save_loaded_asset(m)
+    eal.save_loaded_asset(m, False)
     return m
 
 TELA_PNG = os.path.join(ROOT, 'assets', 'unreal', 'texturas_propias', 'tela_metalica.png')
@@ -172,7 +172,7 @@ def tela_malla():
             tx.set_editor_property(prop, val)
         except Exception as e:
             log('AVISO: textura de la tela sin', prop, repr(e))
-    eal.save_loaded_asset(tx)
+    eal.save_loaded_asset(tx, False)
     m = tools.create_asset('M_TelaMalla_' + huella, dm, unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MASKED)
     m.set_editor_property('two_sided', True)
@@ -209,7 +209,7 @@ def tela_malla():
         c.set_editor_property('r', val)
         mel.connect_material_property(c, '', prop)
     mel.recompile_material(m)
-    eal.save_loaded_asset(m)
+    eal.save_loaded_asset(m, False)
     log('material de tela metálica recortada', ruta)
     return m
 
@@ -262,7 +262,7 @@ def hierbajo_material():
             tx.set_editor_property(prop, val)
         except Exception as e:
             log('AVISO: textura de hierbajos sin', prop, repr(e))
-    eal.save_loaded_asset(tx)
+    eal.save_loaded_asset(tx, False)
     m = tools.create_asset('M_Hierbajo_' + huella, dm, unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MASKED)
     m.set_editor_property('two_sided', False)     # cada plano ya viene por las dos caras, con la normal hacia arriba
@@ -372,7 +372,7 @@ def hierbajo_material():
     except Exception as e:
         log('AVISO: hierbajos sin viento:', repr(e))
     mel.recompile_material(m)
-    eal.save_loaded_asset(m)
+    eal.save_loaded_asset(m, False)
     log('material de hierbajos', ruta)
     return m
 

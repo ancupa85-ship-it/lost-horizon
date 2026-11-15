@@ -86,7 +86,7 @@ def secuencia(nombre, seg, claves, focal=24.0, fundido=None):
         except Exception as e:
             unreal.log_warning('fundido de %s: %s' % (nombre, e))
 
-    eal.save_loaded_asset(seq)
+    eal.save_loaded_asset(seq, False)
     unreal.log('cinematica %s: %d s, %d claves' % (nombre, seg, len(claves)))
     return seq
 

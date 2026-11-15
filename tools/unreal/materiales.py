@@ -145,7 +145,7 @@ def coleccion():
             nuevos.append(nombre)
     if nuevos:
         c.set_editor_property('scalar_parameters', ps)
-        eal.save_loaded_asset(c)
+        eal.save_loaded_asset(c, False)
         log('MPC_Tarsis: parámetros creados:', ', '.join(nuevos))
     return c
 
@@ -162,7 +162,7 @@ def limitar(tx, nombre):
     lado = LADO_MAX.get(nombre)
     if tx is not None and lado and tx.get_editor_property('max_texture_size') != lado:
         tx.set_editor_property('max_texture_size', lado)
-        eal.save_loaded_asset(tx)
+        eal.save_loaded_asset(tx, False)
         log('textura', tx.get_name(), 'limitada a', lado, 'px')
     return tx
 
@@ -191,7 +191,7 @@ def textura(nombre, tipo):
     elif tipo == 'rough':
         tx.set_editor_property('compression_settings', unreal.TextureCompressionSettings.TC_MASKS)
         tx.set_editor_property('srgb', False)
-    eal.save_loaded_asset(tx)
+    eal.save_loaded_asset(tx, False)
     return limitar(tx, nombre)
 
 # ------------------------------------------------------------------ 2. material maestro
@@ -534,7 +534,7 @@ def maestro_movil(defecto):
     mel.connect_material_expressions(seco, '', mm, 'B')
     mel.connect_material_property(mm, '', unreal.MaterialProperty.MP_METALLIC)
     mel.recompile_material(m)
-    eal.save_loaded_asset(m)
+    eal.save_loaded_asset(m, False)
     return m
 
 def instancias_movil(tex, defecto):
@@ -565,7 +565,7 @@ def instancias_movil(tex, defecto):
             mel.set_material_instance_scalar_parameter_value(mi, 'BarroAltura', alto)
             mel.set_material_instance_vector_parameter_value(mi, 'Tinte', unreal.LinearColor(*albedo, 1))
             mel.set_material_instance_vector_parameter_value(mi, 'Medio', unreal.LinearColor(*MEDIO.get(nombre, (1.0, 1.0, 1.0)), 1))
-            eal.save_loaded_asset(mi)
+            eal.save_loaded_asset(mi, False)
             out.setdefault(juego, {})[clave] = mi
     return out
 
@@ -589,8 +589,9 @@ def aplicar_movil(meshes, mov):
             if sm.get_editor_property('material_interface') != mi:
                 sm.set_editor_property('material_interface', mi); mats[idx] = sm; cambia = True
         if cambia:
+            m.modify()       # sin esto el paquete no se da por cambiado...
             m.set_editor_property('static_materials', mats)
-            eal.save_loaded_asset(m)
+            eal.save_loaded_asset(m, False)      # ...y con «solo si ha cambiado» (lo de serie) no se guardaba: al reabrir, lh_* otra vez
         n += 1
     log('materiales de piezas móviles en', n, 'mallas')
     return n
@@ -651,7 +652,7 @@ def instancias():
         mel.set_material_instance_scalar_parameter_value(mi, 'Mojable', MOJABLE.get(clave, 0.0) if CON_MOJADO else 0.0)
         if clave == 'suelo_int':   # hormigón mate: el brillo uniforme del fluorescente en el suelo parecía plástico
             mel.set_material_instance_scalar_parameter_value(mi, 'RugosidadEscala', 1.6)
-        eal.save_loaded_asset(mi)
+        eal.save_loaded_asset(mi, False)
         out[clave] = mi
     return out
 
@@ -677,8 +678,9 @@ def aplicar(meshes):
                     sm.set_editor_property('material_interface', mis[clave]); mats[idx] = sm; cambia = True; n += 1
                     break
         if cambia:
+            m.modify()       # sin esto el paquete no se da por cambiado...
             m.set_editor_property('static_materials', mats)
-            eal.save_loaded_asset(m)
+            eal.save_loaded_asset(m, False)      # ...y con «solo si ha cambiado» (lo de serie) no se guardaba: al reabrir, lh_* otra vez
     log('materiales realistas en', n, 'huecos de material,', len(mis), 'instancias')
     try:      # después: si algo falla aquí, el camión se queda con los materiales de siempre
         if _PARA_MOVIL:

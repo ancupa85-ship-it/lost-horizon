@@ -105,7 +105,7 @@ def textura_estrellas():
     tx.set_editor_property('srgb', False)
     tx.set_editor_property('compression_settings', unreal.TextureCompressionSettings.TC_MASKS)
     eal.set_metadata_tag(tx, 'lh_fecha', str(int(os.path.getmtime(ESTRELLAS_PNG))))
-    eal.save_loaded_asset(tx)
+    eal.save_loaded_asset(tx, False)
     return tx
 
 
@@ -285,7 +285,7 @@ def _instancia(nombre, base, escalares=(), vectores=()):
         mel.set_material_instance_scalar_parameter_value(mi, k, v)
     for k, v in vectores:
         mel.set_material_instance_vector_parameter_value(mi, k, unreal.LinearColor(v[0], v[1], v[2], 1))
-    eal.save_loaded_asset(mi)
+    eal.save_loaded_asset(mi, False)
     return mi
 
 

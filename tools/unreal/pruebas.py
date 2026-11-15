@@ -1106,6 +1106,29 @@ def prueba_materia():
     claves = ('suelo', 'camino', 'muro', 'hormigon', 'pared', 'tejado', 'oliva', 'suelo_int')
     padres = {n: (mi(n).get_editor_property('parent').get_name() if mi(n) and mi(n).get_editor_property('parent') else None) for n in claves}
     check('las instancias cuelgan del material maestro', all(v == 'M_LH' for v in padres.values()), padres)
+    # lo que se ve y lo que queda guardado. En el primer montaje de la 25 todo lo de abajo pasaba (lee las instancias)
+    # y la base seguía con el material liso del glTF: las mallas no llegaban a guardarse (poner static_materials por
+    # Python no marca el paquete como cambiado) y al reabrir el editor volvían a lh_*. Las capturas salieron sin M_LH
+    esperado = {'base_muro': 'MI_muro', 'base_suelo': 'MI_suelo', 'base_camino': 'MI_camino', 'base_tierra': 'MI_tierra',
+                'base_hormigon': 'MI_hormigon', 'camionmovil_oliva': 'MI_oliva_camion'}
+    puesto, disco = {}, {}
+    contenido = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_content_dir())
+    for d in unreal.AssetRegistryHelpers.get_asset_registry().get_assets_by_path('/Game/Tarsis/Base', recursive=True):
+        n = str(d.asset_name)
+        if n not in esperado or str(d.asset_class_path.asset_name) != 'StaticMesh':
+            continue
+        sm = d.get_asset()
+        mats = sm.get_editor_property('static_materials') if sm else []
+        m0 = mats[0].get_editor_property('material_interface') if mats else None
+        puesto[n] = m0.get_name() if m0 else None
+        f = os.path.join(contenido, str(d.package_name)[len('/Game/'):] + '.uasset')
+        try:
+            disco[n] = esperado[n].encode('ascii') in open(f, 'rb').read()
+        except Exception as e:
+            disco[n] = repr(e)
+    check('muro, suelo, camino, tierra y camión llevan su instancia (no el material liso del glTF)',
+          len(puesto) >= 5 and all(puesto[k] == esperado[k] for k in puesto), puesto)
+    check('y así están guardados en disco (al reabrir el editor no vuelven a lh_*)', len(disco) >= 5 and all(v is True for v in disco.values()), disco)
     alb = {n: lum(n, 'Tinte') for n in claves}
     # albedos de verdad: asfalto y losa 4-10 %, hormigón y yeso 9-16 %, pintura oliva y tela asfáltica 2-5 %
     check('cada material pinta con su albedo real (ni negro ni tiza)', all(v is not None and 0.02 <= v <= 0.2 for v in alb.values())

@@ -131,8 +131,8 @@ def importar(forzar=False):
             o = unreal.load_asset(a)
             if isinstance(o, unreal.Texture2D):
                 o.set_editor_property('max_texture_size', 1024)
-                unreal.EditorAssetLibrary.save_loaded_asset(o)
-        unreal.EditorAssetLibrary.save_loaded_asset(m)
+                unreal.EditorAssetLibrary.save_loaded_asset(o, False)
+        unreal.EditorAssetLibrary.save_loaded_asset(m, False)
         _log('atrezo importado:', i)
 
 
@@ -167,7 +167,7 @@ def vaciar():
             quitados += r[1] if isinstance(r, tuple) else 0
         if quitados:
             unreal.GeometryScript_AssetUtils.copy_mesh_to_static_mesh(dm, sm, unreal.GeometryScriptCopyMeshToAssetOptions(), unreal.GeometryScriptMeshWriteLOD())
-            unreal.EditorAssetLibrary.save_loaded_asset(sm)
+            unreal.EditorAssetLibrary.save_loaded_asset(sm, False)
             _log('vaciado', a.get_actor_label(), quitados, 'triángulos')
             total += quitados
     return total

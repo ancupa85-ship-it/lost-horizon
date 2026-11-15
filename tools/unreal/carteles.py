@@ -83,7 +83,7 @@ def textura(tex):
     tx.set_editor_property('compression_settings', unreal.TextureCompressionSettings.TC_DEFAULT)   # con alfa: BC3
     tx.set_editor_property('lod_group', unreal.TextureGroup.TEXTUREGROUP_WORLD)
     eal.set_metadata_tag(tx, 'lh_fecha', str(int(os.path.getmtime(f))))
-    eal.save_loaded_asset(tx)
+    eal.save_loaded_asset(tx, False)
     return tx
 
 
@@ -150,7 +150,7 @@ def instancia(nombre, base, tx, clase, fuerza=None, brillo=None):
         mel.set_material_instance_scalar_parameter_value(mi, 'Fuerza', fuerza)
     if clase == 'placa':
         mel.set_material_instance_scalar_parameter_value(mi, 'Brillo', float(brillo or 0.0))
-    eal.save_loaded_asset(mi)
+    eal.save_loaded_asset(mi, False)
     return mi
 
 
