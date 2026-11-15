@@ -40,16 +40,27 @@ RADIO_CUPULA = 120000.0
 # fuerza) con un tercio menos de azul; las nubes de noche rasa son velos algo más claros que el cielo (antes, borrones
 # más oscuros que él), estirados por el viento; y el cielo cubierto ya no es más claro que el raso (con lluvia toda la
 # base se ponía lechosa: el suelo mojado reflejaba un cielo el doble de luminoso).
+# Ajuste 25c, ya con las capturas buenas: seguía añil (cenit 5, 16, 43 de 255 en pantalla, más saturado que nada en la
+# escena). Medida ahí mismo, la curva para la bóveda es pantalla = 17 x valor^1,68: cualquier diferencia entre canales se
+# dispara, así que el cielo tiene que ir casi gris aquí para salir azul noche allí. Objetivo: cenit 9, 14, 26 y horizonte
+# 15, 21, 34 (a medio camino del cubierto, que con lluvia ya salía creíble: 21, 28, 42).
 CIELO = {
-    'Cenit': (0.0045, 0.0080, 0.0200), 'Horizonte': (0.0100, 0.0160, 0.0300),
-    'NubeLuz': (0.0150, 0.0200, 0.0300), 'NubeSombra': (0.0085, 0.0120, 0.0210),
+    'Cenit': (0.0054, 0.0072, 0.0120), 'Horizonte': (0.0077, 0.0100, 0.0156),
+    'NubeLuz': (0.0125, 0.0150, 0.0205), 'NubeSombra': (0.0075, 0.0094, 0.0140),
     'Cubierto1': (0.0055, 0.0070, 0.0100), 'Cubierto2': (0.0100, 0.0125, 0.0170), 'Resplandor': (0.0140, 0.0090, 0.0040),
     'LunaColor': (0.80, 0.88, 1.00), 'EstrellaColor': (0.85, 0.92, 1.00),
 }
-# EstrellasRep 0,8: la textura (2048 px) cubre casi todo el cielo de una vez. EstiraNubes: cuánto se encoge el dibujo de
-# las nubes a lo largo del viento (menos de 1 = bandas largas). NubeDura: lo cortado que es su borde.
-ESCALARES = {'Brillo': 1.0, 'Claros': 0.60, 'EscalaNubes': 1.1, 'VelNubes': 0.006, 'EstrellasRep': 0.8, 'EstrellasFuerza': 0.7,
+# EstrellasRep: cuántas veces cabe la textura (2048 px) de horizonte a horizonte, más o menos. Con 0,8 y manchas de más
+# de un texel, las estrellas fuertes salían discos de 8 a 10 px en una captura de 1920 (casi media luna de ancho): ahora
+# 1,2 y manchas más prietas (tools/texturas/estrellas.py), que las deja en 4 o 5 px a las fuertes y 1 o 2 al resto.
+# EstiraNubes: cuánto se encoge el dibujo de las nubes a lo largo del viento (menos de 1 = bandas largas). NubeDura: lo
+# cortado que es su borde.
+ESCALARES = {'Brillo': 1.0, 'Claros': 0.60, 'EscalaNubes': 1.1, 'VelNubes': 0.006, 'EstrellasRep': 1.2, 'EstrellasFuerza': 0.85,
              'DiscoFuerza': 3.2, 'EstiraNubes': 0.35, 'NubeDura': 1.8}
+# lo que el director (ATarsisDirector) deja afinar sin compilar: se le pone al actor del nivel. Con 5 el haz del foco de
+# la torre seguía siendo un cono blanco macizo con lluvia (213 de 255); con 1 tiene que quedar un velo que deja ver
+# detrás. Sin lluvia no hay niebla volumétrica y no cambia nada.
+DIRECTOR = {'strong_spot_scattering': 1.0}
 # luminarias: prefijo de la etiqueta del actor de luz -> (diámetro del halo en cm, fuerza, lúmenes del relleno o 0).
 # Ajuste 25b: el primer halo era una bola opaca de metro y medio colgada de cada farola (y otra tapándole la cabeza al
 # centinela de la torre). Ahora en seco es un destello corto pegado a la lámpara (M_Halo, Caida 12: se apaga a un
@@ -397,9 +408,22 @@ def luminarias():
     return nh, nr
 
 
+def director_luz():
+    """Pone en el director del nivel los ajustes de luz que no piden compilar (DIRECTOR)."""
+    for a in eas().get_all_level_actors():
+        if a.get_class().get_name() == 'TarsisDirector':
+            a.modify()
+            for k, v in DIRECTOR.items():
+                a.set_editor_property(k, v)
+            log('director:', ', '.join('%s = %s' % kv for kv in DIRECTOR.items()))
+            return True
+    log('AVISO: cielo: no hay director en el nivel; el haz de la torre se queda como estaba')
+    return False
+
+
 def todo():
     limpiar()
-    for paso in (cupula, luminarias, material_baston):
+    for paso in (cupula, luminarias, material_baston, director_luz):
         try:
             paso()
         except Exception as e:

@@ -28,6 +28,12 @@ Con el editor abierto y el nivel Tarsis cargado, en este orden (cada uno se pued
    a pasarlo después de `ambiente.py`: la bombilla de la puerta norte la pone `ambiente.py`, y sin esta segunda pasada
    se queda sin halo. La textura de estrellas sale de `python tools/texturas/estrellas.py` (Python normal).
 
+6. **Cerrar y volver a abrir el editor antes de probar, medir o capturar.** En la tanda 25 las mallas de la base no
+   llegaban a guardarse con sus instancias (poner `static_materials` por Python no marca el paquete como cambiado, y
+   `save_loaded_asset(x)` a secas solo guarda «si ha cambiado»): la batería pasaba con el editor abierto y al reabrirlo
+   la base volvía al material liso del glTF. Los guiones usan ya `x.modify()` y `save_loaded_asset(x, False)`, pero la
+   comprobación que vale es la de después de reabrir: una prueba que lee parámetros no prueba lo que se ve.
+
 Para comprobar: `py tools/unreal/medir.py` (fps y VRAM en tres sitios; tabla en `docs/rendimiento.md`),
 `py tools/unreal/capturas.py <prefijo>` (tres cámaras fijas, en `Saved/Capturas`) y `py tools/unreal/pruebas.py`.
 `py tools/unreal/memoria.py` hace el inventario de la memoria de vídeo que piden las texturas (no cambia nada).

@@ -227,17 +227,21 @@ y el mojado de la lluvia añadidos.
 
 ## 0025: materia, noche con cielo, agua y señales
 
-Compilación: 992 s, sin errores ni avisos. Batería: 336 de 336 (514 s, 34 pruebas en 15 familias).
+**Aviso: la primera medida de esta tanda no vale.** Se hizo sin el material maestro: las mallas de la base no llegaban a guardarse con sus instancias (poner `static_materials` por Python no marca el paquete como cambiado y `save_loaded_asset` solo guarda «si ha cambiado»), y al reabrir el editor volvían al material liso del glTF. Arreglado en 741bb8d; desde entonces, tras montar se reabre el editor antes de probar, medir o capturar.
 
-Medida con el editor recién abierto (GTX 1050, Media, resolución interna al 50 %; fps medio / peor 1 %; entre paréntesis, la media de la 0024):
+Compilación (741bb8d): 824 s, sin errores ni avisos. Batería: 338 de 338 (524 s).
+
+Medida con el editor recién abierto y M_LH puesto de verdad (GTX 1050, Media, resolución interna al 50 %, ventana de 2032 x 1125; fps medio / peor 1 %; entre paréntesis, la media de la 0024):
 
 | Sitio | fps | VRAM (MB) |
 |---|---|---|
-| Entrada | 36,3 / 34,6 (40,2) | 3531 |
-| Patio central | 30,9 / 9,6 (39,1) | 3531 |
-| Barracón oeste | 33,0 / 31,0 (33,6) | 3596 |
-| Portón de entrada | 38,3 / 35,9 (40,4) | 3596 |
-| Portón de salida | 39,0 / 36,3 (41,2) | 3596 |
-| Camino con el camión | 35,0 / 17,0 (36,8) | 3596 |
+| Entrada | 36,3 / 33,6 (40,2) | 3468 |
+| Patio central | 32,6 / 30,3 (39,1) | 3469 |
+| Barracón oeste | 29,6 / 27,5 (33,6) | 3533 |
+| Portón de entrada | 35,8 / 32,2 (40,4) | 3534 |
+| Portón de salida | 36,6 / 34,0 (41,2) | 3534 |
+| Camino con el camión | 33,3 / 30,7 (36,8) | 3534 |
 
-Lectura: la tanda cuesta de 2 a 4 fps en casi todo y unos 8 en el patio central, que es donde se ven a la vez más halos y el cielo entero. La memoria de vídeo baja entre 70 y 140 MB. Los peores 1 % del patio (9,6) y del camino (17,0) no valen: hubo entrada en el PC durante la medida y son tirones sueltos; hay que repetirlos. Lo que cuesta de más: los ruidos nuevos del material maestro (losas, manchas, regueros), nueve luces de relleno sin sombras y trece esferas translúcidas de halo. Pendiente: medir qué parte se lleva cada cosa en el patio central antes de recortar.
+Lectura: la tanda cuesta de 3,5 a 6,5 fps (lo más, en el patio central: cielo entero, más halos y más suelo con el material nuevo). Sin tirones: el peor 1 % va 2 o 3 fps por debajo de la media en todos los sitios. La memoria de vídeo no sube. Hubo algo de uso del PC durante la medida, sin efecto visible. Lo que cuesta: los ruidos del material maestro (losas, manchas, regueros), nueve luces de relleno sin sombras y trece esferas translúcidas de halo. El barracón oeste se queda por debajo de 30 fps: es lo primero que hay que recortar (candidatos: menos octavas de ruido en `suelo_int` y `pared`, que por dentro apenas se leen).
+
+El ajuste 25c (albedos, luna y luz ambiente, cielo, estrellas, haz de la torre) no añade luces ni material: no debería cambiar estas cifras.

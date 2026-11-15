@@ -77,17 +77,22 @@ MEDIO = {
     'rusty_metal_02': (0.413, 0.289, 0.137),           # 0,52
     'wood_planks_dirt': (0.183, 0.109, 0.062),         # 0,40
 }
-# albedo (color lineal, lo que de verdad devuelve la superficie). Asfalto viejo 5 %, losa de hormigón 9 %, muro de
-# hormigón 10 %, enlucido sucio 13 %. Antes (textura x color del visor): suelo y camino 2 %, muro 6 %, tejado 1,3 %,
-# chapa verde 1 %. Los contenedores, en colores de contenedor viejo (óxido rojo, azul, verde, ocre), no de juguete.
+# albedo (color lineal, lo que de verdad devuelve la superficie). Antes de la tanda 25 (textura x color del visor): suelo
+# y camino 2 %, muro 6 %, tejado 1,3 %, chapa verde 1 %. Los contenedores, en colores de contenedor viejo (óxido rojo,
+# azul, verde, ocre), no de juguete.
+# Ajuste 25c, con las primeras capturas hechas de verdad con M_LH: la base quedaba demasiado oscura fuera de las farolas
+# (muro a la luna 16 de 255 en pantalla, suelo 9) y por dentro. Los primeros valores (asfalto 5 %, losa 9 %, muro 10 %,
+# enlucido 13 %) eran el extremo oscuro de cada material; ahora van a media tabla: asfalto viejo 7 %, losa 13 %,
+# hormigón de muro 15 % (las barreras de hormigón del camino, que traen su propia textura, andan por el 30 % y
+# cantaban), enlucido pintado y sucio 21 %. La otra mitad del ajuste es la luna y la luz ambiente (montar_base.py, EXPO).
 ALBEDO = {
-    'suelo': (0.050, 0.049, 0.046), 'camino': (0.095, 0.092, 0.085), 'tierra': (0.070, 0.060, 0.045),
-    'muro': (0.105, 0.098, 0.082), 'hormigon': (0.105, 0.098, 0.082), 'pared': (0.150, 0.125, 0.100),
+    'suelo': (0.070, 0.069, 0.064), 'camino': (0.135, 0.131, 0.121), 'tierra': (0.100, 0.086, 0.064),
+    'muro': (0.150, 0.140, 0.117), 'hormigon': (0.150, 0.140, 0.117), 'pared': (0.240, 0.200, 0.160),
     'madera': (0.085, 0.045, 0.022), 'hierro': (0.120, 0.090, 0.050), 'oliva': (0.040, 0.048, 0.028),
-    'tejado': (0.030, 0.030, 0.032), 'suelo_int': (0.045, 0.045, 0.042),
+    'tejado': (0.040, 0.040, 0.043), 'suelo_int': (0.070, 0.070, 0.065),
     'manta': (0.029, 0.028, 0.016), 'colchon': (0.150, 0.140, 0.115),
-    'contenedor_0': (0.100, 0.028, 0.020), 'contenedor_1': (0.022, 0.045, 0.075),
-    'contenedor_2': (0.028, 0.055, 0.032), 'contenedor_3': (0.140, 0.100, 0.025),
+    'contenedor_0': (0.125, 0.035, 0.025), 'contenedor_1': (0.028, 0.056, 0.094),
+    'contenedor_2': (0.035, 0.069, 0.040), 'contenedor_3': (0.175, 0.125, 0.031),
 }
 # cuánto se estira el dibujo de la textura alrededor de su media, y la fuerza de su relieve (las demás, 1)
 CONTRASTE = {'camino': 2.6, 'muro': 2.6, 'hormigon': 2.6, 'pared': 2.2, 'suelo_int': 2.2, 'tejado': 1.6, 'oliva': 1.5,

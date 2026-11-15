@@ -1130,8 +1130,8 @@ def prueba_materia():
           len(puesto) >= 5 and all(puesto[k] == esperado[k] for k in puesto), puesto)
     check('y así están guardados en disco (al reabrir el editor no vuelven a lh_*)', len(disco) >= 5 and all(v is True for v in disco.values()), disco)
     alb = {n: lum(n, 'Tinte') for n in claves}
-    # albedos de verdad: asfalto y losa 4-10 %, hormigón y yeso 9-16 %, pintura oliva y tela asfáltica 2-5 %
-    check('cada material pinta con su albedo real (ni negro ni tiza)', all(v is not None and 0.02 <= v <= 0.2 for v in alb.values())
+    # albedos de verdad: asfalto y losa 5-14 %, hormigón 12-18 %, enlucido pintado 18-28 %, pintura oliva y tela asfáltica 2-5 %
+    check('cada material pinta con su albedo real (ni negro ni tiza)', all(v is not None and 0.02 <= v <= 0.3 for v in alb.values())
           and alb['muro'] > alb['suelo'] and alb['pared'] > alb['muro'] and alb['tejado'] < alb['suelo'], alb)
     med = {n: lum(n, 'Medio') for n in claves}
     check('la textura va normalizada por su color medio', all(v is not None and 0.03 < v < 0.6 for v in med.values()), med)
@@ -1179,6 +1179,9 @@ def prueba_cielo():
     if cup:
         o, e = cup[0].get_actor_bounds(False)
         check('y cubre toda la base (más de un kilómetro de radio)', e.x > 100000 and e.z > 100000, int(e.x))
+    # ajuste 25c: el haz de los focos de torre con lluvia es un velo, no un cono macizo (cielo.py lo deja en el nivel)
+    haz = d.get_editor_property('strong_spot_scattering')
+    check('el foco de la torre dispersa poco en la niebla (haz que deja ver detrás)', 0.2 <= haz <= 2.0, '%.1f' % haz)
     # nubes: con lluvia o niebla el cielo se cubre poco a poco y al despejar se abre
     w0, cs = d.get_editor_property('weather'), d.get_editor_property('cloud_seconds')
     while d.get_editor_property('weather') != 0:

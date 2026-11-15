@@ -469,7 +469,11 @@ if moviles.get('camionmovil') and ext.get('camino'):
     log('camión en', ini, '-', len(moviles['camionmovil']), 'piezas; hoja de entrada:', len(moviles.get('hojaentrada', [])), 'piezas')
 
 # noche: exposición manual (EV) e intensidades de luna y luz ambiente, ajustadas con capturas en el patio
-EXPO = {'ev': 0.5, 'luna': 0.6, 'cielo': 2.5}
+# Ajuste 25c: luna de 0,6 a 0,8 y luz ambiente de 2,5 a 4,0. Con los albedos de verdad lo que no alumbra una farola se
+# quedaba en negro (zona_militar_10m: muro 16 de 255, suelo 9). La exposición no se toca (las farolas ya no queman y
+# así siguen), y el sigilo tampoco cambia: para los guardias la luna y el cielo son un fijo (ATarsisGuard::LightAt,
+# 0,12). La luz ambiente sube más que la luna porque la bóveda nueva (cielo.py, menos azul) le da un quinto menos.
+EXPO = {'ev': 0.5, 'luna': 0.8, 'cielo': 4.0}
 # tanda 25: las luces fuertes de fuera se pintan diez veces más flojas de lo que cuentan para el sigilo (etiqueta
 # «luz_fuerte»; ATarsisGuard::LightAt multiplica por 10). Con 3000 lm bajo cada farola el suelo salía blanco quemado y a
 # cinco metros negro: 140 veces más luz que la de la luna, cuando una imagen aguanta unas 20. Ahora el suelo devuelve
@@ -544,6 +548,13 @@ sc.set_editor_property('intensity', EXPO['cielo'])
 fog = spawn(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), 'Niebla')
 fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
 fc.set_editor_property('fog_density', 0.03)
+# ajuste 25c: lo lejano (la marisma tras el muro) lo tiñe la niebla con el azul de la atmósfera y salía más añil que el
+# propio cielo, ya corregido. Se le quita azul a esa aportación. Sin comprobar aún en el PC: mirar el horizonte en las
+# capturas de patio_seco
+try:
+    fc.set_editor_property('sky_atmosphere_ambient_contribution_color_scale', unreal.LinearColor(1.3, 0.9, 0.6, 1.0))
+except Exception as e:
+    log('AVISO: niebla sin sky_atmosphere_ambient_contribution_color_scale:', repr(e))
 
 # exposición fija de noche: sin esto la exposición automática sube la escena hasta parecer de día (cielo azul)
 pp = spawn(unreal.PostProcessVolume, unreal.Vector(0, 0, 0), 'Exposicion')

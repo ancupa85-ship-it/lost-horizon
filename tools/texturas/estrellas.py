@@ -27,7 +27,7 @@ def generar(semilla=2526, cuantas=5200, minimo=0.005):
     # brillo: N(>F) ~ F^-1,25 (cada magnitud más débil hay unas 3 veces más estrellas)
     b = np.clip(minimo / rng.uniform(0.0, 1.0, cuantas) ** 0.8, minimo, 1.0)
     for x, y, k in zip(xs, ys, b):
-        s = 0.80 + 0.45 * k ** 0.5
+        s = 0.60 + 0.20 * k ** 0.5       # 0,80 + 0,45 hasta el ajuste 25c: las fuertes salían discos de 8 a 10 px
         r = int(np.ceil(s * 3.5))
         x0, y0 = int(np.floor(x)), int(np.floor(y))
         jj, ii = np.mgrid[y0 - r:y0 + r + 1, x0 - r:x0 + r + 1]
