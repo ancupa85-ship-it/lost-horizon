@@ -1826,7 +1826,7 @@
  "giro_modelo": {
   "_leeme": "Grados que se suman al giro de todas las piezas de un modelo. Con giro 0 lo largo de la pieza debe ir a lo largo de X (lo comprueba prueba_cobertura).",
   "concrete_road_barrier_02": 0,
-  "cement_bag": 0,
+  "cement_bag": 90,
   "wooden_military_crate": 0
  }
 }

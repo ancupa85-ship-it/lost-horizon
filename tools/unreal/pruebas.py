@@ -968,7 +968,8 @@ def prueba_mojado():
     check('al escampar no se seca de golpe', 0.3 < medio < 0.95, '%.2f' % medio)
     yield 3.4
     check('y vuelve a estar seca', moj() < 0.01 and abs(d.wetness_in_collection()) < 0.01, '%.2f, %.2f' % (moj(), d.wetness_in_collection()))
-    d.set_wetness_now(0.7); yield 0.1
+    # se lee enseguida: en seco el director sigue secando (WetTick) y en 0,1 s ya ha bajado de 0,70 a 0,66
+    d.set_wetness_now(0.7)
     visto = d.wetness_in_collection()
     d.set_wetness_now(0.0)
     check('SetWetnessNow lo pone de golpe (capturas y pruebas)', abs(visto - 0.7) < 0.01, '%.2f' % visto)

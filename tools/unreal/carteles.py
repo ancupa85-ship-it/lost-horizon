@@ -30,6 +30,10 @@ V = unreal.Vector
 
 # (u, v) -> 1 del derecho, -1 en espejo. Por clase: placa (plano), pintado (calcomanía en pared), suelo (calcomanía en la losa)
 ESPEJO = {'placa': (1.0, 1.0), 'pintado': (1.0, 1.0), 'suelo': (1.0, 1.0)}
+# calcomanía de pared: el motor pone la U de la textura a lo largo de la Z de la calcomanía (en vertical). Sin girarla, el
+# lema de 8 x 1 m salía como rayas horizontales (el texto, de lado, aplastado en 1 m de alto). Se gira la calcomanía
+# sobre su eje de proyección y se cambian ancho y alto de la caja (comprobado con capturas del 2 del portillo y del lema)
+RODAR_PINTADO = 90.0
 SEPARA = 1.5          # cm entre la placa y su poste
 
 eal = unreal.EditorAssetLibrary
@@ -235,8 +239,10 @@ def colocar():
         else:
             if clase == 'pintado':
                 # la calcomanía proyecta a lo largo de su X: hacia dentro de la pared (la contraria de «mira»)
-                rot = unreal.Rotator(c.get('giro', 0.0), 0.0, c['mira'] + 180.0)
+                rot = unreal.Rotator(c.get('giro', 0.0) + RODAR_PINTADO, 0.0, c['mira'] + 180.0)
                 fondo = 12.0
+                if RODAR_PINTADO % 180.0:
+                    an, al = al, an          # la caja girada 90: su Y va en vertical
             else:
                 rot = unreal.Rotator(0.0, -90.0, c.get('giro', 0.0))
                 fondo = 8.0
