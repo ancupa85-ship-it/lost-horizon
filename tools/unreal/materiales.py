@@ -166,7 +166,9 @@ LADO_MAX = {'gravel_floor_02': 1024}
 # (medida en el JPG de 1K): con la luna rasante cada piedra devolvía un punto blanco y el anillo parecía nevado (mediana
 # 67/255 en la captura alto_losa, con el suelo al lado en 20). La grava suelta seca es mate: x 1,8 la deja en 0,85.
 # El hormigón del interior ya iba a 1,6 desde la tanda 24 (el fluorescente le daba brillo de plástico)
-RUGOSIDAD = {'tierra': 1.8, 'suelo_int': 1.6}
+# Ajuste 25e: x 1,3 (0,62). A x 1,8 dejaba de centellear pero parecía tierra lisa o barro; Andres veía más real la
+# grava con brillo de piedra suelta. Punto medio: algo de centelleo sin que se vuelva nieve
+RUGOSIDAD = {'tierra': 1.3, 'suelo_int': 1.6}
 
 def limitar(tx, nombre):
     lado = LADO_MAX.get(nombre)

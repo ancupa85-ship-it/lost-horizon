@@ -1147,7 +1147,7 @@ def prueba_materia():
     check('regueros en lo vertical y no en el suelo', cho['muro'] >= 0.4 and cho['hormigon'] >= 0.3 and cho['contenedor_0'] > 0.1 and cho['suelo'] == 0.0 and cho['suelo_int'] == 0.0, cho)
     # ajuste 25d: la grava trae rugosidad 0,47 y con la luna rasante parecía nieve; escalada queda mate
     gr = esc('tierra', 'RugosidadEscala')
-    check('la grava es mate (la luna no la vuelve nieve)', gr is not None and gr >= 1.5, gr)
+    check('la grava es más mate que la textura (la luna no la vuelve nieve)', gr is not None and gr >= 1.2, gr)
     rel = {n: esc(n, 'Relieve') for n in ('suelo', 'camino', 'muro')}
     check('relieve reforzado (se lee con la luz rasante de las farolas)', all(v and v > 1.2 for v in rel.values()), rel)
     # el camión: verde oliva oscuro (antes salía verde lima)

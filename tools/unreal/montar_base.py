@@ -473,7 +473,10 @@ if moviles.get('camionmovil') and ext.get('camino'):
 # quedaba en negro (zona_militar_10m: muro 16 de 255, suelo 9). La exposición no se toca (las farolas ya no queman y
 # así siguen), y el sigilo tampoco cambia: para los guardias la luna y el cielo son un fijo (ATarsisGuard::LightAt,
 # 0,12). La luz ambiente sube más que la luna porque la bóveda nueva (cielo.py, menos azul) le da un quinto menos.
-EXPO = {'ev': 0.5, 'luna': 0.8, 'cielo': 4.0}
+# Ajuste 25e: luz ambiente de 4,0 a 2,0. A 4,0 aclaraba todas las sombras por igual: se veía todo, pero plano y gris,
+# y a Andres le parecían más reales las capturas oscuras de antes (patio de la segunda pasada, chapa del contenedor en
+# sombra). Poca luz de relleno y la luna con dirección: contraste de noche de verdad sin volver al negro total
+EXPO = {'ev': 0.5, 'luna': 0.8, 'cielo': 2.0}
 # tanda 25: las luces fuertes de fuera se pintan diez veces más flojas de lo que cuentan para el sigilo (etiqueta
 # «luz_fuerte»; ATarsisGuard::LightAt multiplica por 10). Con 3000 lm bajo cada farola el suelo salía blanco quemado y a
 # cinco metros negro: 140 veces más luz que la de la luna, cuando una imagen aguanta unas 20. Ahora el suelo devuelve
