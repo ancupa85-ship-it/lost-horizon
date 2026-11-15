@@ -223,6 +223,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
 	FIntPoint HaloCounts() const { return FIntPoint(Halos.Num(), HalosLit()); }
 
+	/** Ajuste de la tanda 25: cuánto dispersan en la niebla volumétrica los focos fuertes (torres; etiqueta «luz_fuerte»).
+	 *  Con 16 el haz de la torre era un cono blanco macizo que se comía un tercio de la imagen con lluvia. Va aquí, y no
+	 *  fijo en el código, para afinarlo desde el editor sin compilar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
+	float StrongSpotScattering = 5.0f;
+
+	/** Con lluvia: por cuánto se multiplica la densidad de la niebla del nivel, y de qué color se enciende. Con 1,5 y un
+	 *  gris claro la base entera quedaba lechosa y lo mojado no se leía. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
+	float RainFogMul = 1.25f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
+	FLinearColor RainFogColor = FLinearColor(0.016f, 0.020f, 0.027f);
+
 	/** Presupuesto de render (tanda 24): variables de consola «nombre=valor» que se ponen al empezar la partida y se dejan
 	 *  como estaban al acabar (en el editor las variables sobreviven al PIE). Las elige tools/unreal/render.py midiendo en
 	 *  esta tarjeta y las escribe en el director del nivel: cambiar el presupuesto no pide compilar. */

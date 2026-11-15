@@ -1,26 +1,33 @@
 """Textura de estrellas para el cielo nocturno de Tarsis (tanda 25), repetible.
 
-Puntos de brillo muy desigual (muchas débiles, pocas fuertes), cada uno una manchita gaussiana de 2-3 píxeles: a media
-resolución y con el reescalado temporal del motor, un punto de un solo píxel parpadea o desaparece. Canal único (gris):
-el color y la fuerza los pone el material M_Cielo (tools/unreal/cielo.py), que la repite sobre la bóveda.
+La primera versión salió de papel pintado: 1500 puntos gordos y casi todos igual de visibles, repetidos diez veces
+sobre la bóveda. Un cielo de verdad es al revés: por cada estrella que se ve bien hay decenas que apenas se adivinan
+(el número crece como el brillo elevado a -1,25), y ninguna es un disco. Aquí:
+  - 2048 px para una sola repetición de casi todo el cielo (no se ve el dibujo repetido);
+  - brillo por ley de potencias: de 5200 puntos, unos 20 fuertes, 150 medianos y el resto un polvillo;
+  - cada punto, una manchita gaussiana de poco más de un píxel (a media resolución y con el reescalado temporal del
+    motor, un punto de un solo píxel parpadea), que casi no crece con el brillo;
+  - el canal guarda la RAÍZ del brillo (8 bits no dan para el polvillo en lineal): el material la eleva al cuadrado.
+Canal único (gris): el color y la fuerza los pone M_Cielo (tools/unreal/cielo.py).
 Uso: python3 tools/texturas/estrellas.py   ->  assets/unreal/texturas_propias/estrellas.png
 """
 import os
 import numpy as np
 from PIL import Image
 
-N = 1024
+N = 2048
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets', 'unreal', 'texturas_propias')
 
 
-def generar(semilla=2525, cuantas=1500):
+def generar(semilla=2526, cuantas=5200, minimo=0.005):
+    """Devuelve el brillo lineal (0-1) de cada píxel."""
     rng = np.random.default_rng(semilla)
     a = np.zeros((N, N), np.float64)
     xs, ys = rng.uniform(0, N, cuantas), rng.uniform(0, N, cuantas)
-    # brillo: ley de potencias (por cada estrella fuerte, muchas débiles); el tamaño crece poco con el brillo
-    b = np.clip(0.07 / rng.uniform(0.0, 1.0, cuantas) ** 0.75, 0.07, 1.0)
+    # brillo: N(>F) ~ F^-1,25 (cada magnitud más débil hay unas 3 veces más estrellas)
+    b = np.clip(minimo / rng.uniform(0.0, 1.0, cuantas) ** 0.8, minimo, 1.0)
     for x, y, k in zip(xs, ys, b):
-        s = 0.75 + 0.75 * k
+        s = 0.80 + 0.45 * k ** 0.5
         r = int(np.ceil(s * 3.5))
         x0, y0 = int(np.floor(x)), int(np.floor(y))
         jj, ii = np.mgrid[y0 - r:y0 + r + 1, x0 - r:x0 + r + 1]
@@ -32,5 +39,5 @@ def generar(semilla=2525, cuantas=1500):
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     a = generar()
-    Image.fromarray((a * 255 + 0.5).astype(np.uint8), 'L').save(os.path.join(OUT, 'estrellas.png'), optimize=True)
-    print('estrellas.png', a.shape, 'cubierto %.2f %%' % (100.0 * (a > 0.05).mean()))
+    Image.fromarray((np.sqrt(a) * 255 + 0.5).astype(np.uint8), 'L').save(os.path.join(OUT, 'estrellas.png'), optimize=True)
+    print('estrellas.png', a.shape, 'puntos fuertes (> 0,3): %d, medianos (> 0,05): %d' % ((a > 0.3).sum() // 8, (a > 0.05).sum() // 6))

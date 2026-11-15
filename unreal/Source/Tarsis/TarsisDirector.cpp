@@ -1351,10 +1351,11 @@ void ATarsisDirector::SetupSound()
 	{
 		if (ULightComponent* L = It->GetLightComponent())
 		{
-			// tanda 25: las luces fuertes se pintan diez veces más flojas (ATarsisGuard::LightAt): dispersan más para que
-			// el haz se siga viendo con lluvia; el resplandor de relleno («decorado») no hace halo en la niebla
+			// tanda 25: las luces fuertes se pintan diez veces más flojas (ATarsisGuard::LightAt): dispersan algo más para
+			// que el haz se siga viendo con lluvia (StrongSpotScattering; con 16 era un cono blanco macizo); el resplandor
+			// de relleno («decorado») no hace halo en la niebla
 			if (It->ActorHasTag(FName(TEXT("decorado")))) L->SetVolumetricScatteringIntensity(0.0f);
-			else if (L->IsA<USpotLightComponent>()) L->SetVolumetricScatteringIntensity(It->ActorHasTag(FName(TEXT("luz_fuerte"))) ? 16.0f : 4.0f);
+			else if (L->IsA<USpotLightComponent>()) L->SetVolumetricScatteringIntensity(It->ActorHasTag(FName(TEXT("luz_fuerte"))) ? StrongSpotScattering : 4.0f);
 			else if (L->IsA<UPointLightComponent>()) L->SetVolumetricScatteringIntensity(1.0f);   // una puntual no hace haz: solo un halo suave
 		}
 	}
@@ -1683,14 +1684,14 @@ void ATarsisDirector::SetWeather(int32 NewWeather)
 		UExponentialHeightFogComponent* F = It->GetComponent();
 		if (!F) continue;
 		if (BaseFog < 0.0f) { BaseFog = F->FogDensity; BaseFogColor = F->FogInscatteringLuminance; }
-		// tanda 25: con lluvia, 1,5 (antes 1,8) y el color de la niebla más oscuro: el velo gris aclaraba toda la base
-		// y tapaba lo mojado; ahora la lluvia se lee en el suelo y en el cielo cubierto
-		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 4.0f : (Weather == 1 ? 1.5f : 1.0f))));
+		// tanda 25: con lluvia, RainFogMul (1,25; antes 1,8 y luego 1,5) y el color de la niebla más oscuro (RainFogColor):
+		// el velo gris aclaraba toda la base y tapaba lo mojado; ahora la lluvia se lee en el suelo y en el cielo cubierto
+		F->SetFogDensity(FMath::Min(0.2f, BaseFog * (Weather == 2 ? 4.0f : (Weather == 1 ? RainFogMul : 1.0f))));
 		// niebla volumétrica: las farolas y los focos dibujan haces; de noche, sin ella, la niebla casi no se ve
 		F->SetVolumetricFog(Weather != 0);
 		F->SetVolumetricFogScatteringDistribution(Weather == 2 ? 0.6f : 0.4f);
 		F->SetVolumetricFogExtinctionScale(Weather == 2 ? 2.0f : 1.0f);
-		F->SetFogInscatteringColor(Weather == 2 ? FLinearColor(0.10f, 0.11f, 0.13f) : (Weather == 1 ? FLinearColor(0.030f, 0.036f, 0.046f) : BaseFogColor));
+		F->SetFogInscatteringColor(Weather == 2 ? FLinearColor(0.10f, 0.11f, 0.13f) : (Weather == 1 ? RainFogColor : BaseFogColor));
 		break;
 	}
 	// con escalabilidad Baja el motor desactiva la niebla volumétrica (r.VolumetricFog 0) y no hay haces:

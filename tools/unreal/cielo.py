@@ -33,17 +33,29 @@ tools = unreal.AssetToolsHelpers.get_asset_tools()
 # la bóveda: radio en cm (bien lejos de todo: la base mide 110 x 96 m con el anillo)
 RADIO_CUPULA = 120000.0
 # colores del cielo (lineales, en la escala de la exposición fija del nivel)
+# Ajuste de la tanda 25 (25b), con sus capturas delante: el cielo salía azul marino de dibujo y sembrado de puntos blancos. Medido
+# en las capturas, la curva de la imagen (exposición fija + tono de película) hace con lo oscuro, más o menos,
+# pantalla = 7,4 x valor^1,6 por canal: hunde el rojo y el verde y deja el azul, así que un azul «algo saturado» aquí
+# sale añil en pantalla. Ahora el cenit lleva la misma luminancia (la luz ambiente, que recoge la bóveda, no cambia de
+# fuerza) con un tercio menos de azul; las nubes de noche rasa son velos algo más claros que el cielo (antes, borrones
+# más oscuros que él), estirados por el viento; y el cielo cubierto ya no es más claro que el raso (con lluvia toda la
+# base se ponía lechosa: el suelo mojado reflejaba un cielo el doble de luminoso).
 CIELO = {
-    'Cenit': (0.0030, 0.0080, 0.0300), 'Horizonte': (0.0090, 0.0180, 0.0450),
-    'NubeLuz': (0.0260, 0.0320, 0.0460), 'NubeSombra': (0.0050, 0.0070, 0.0130),
-    'Cubierto1': (0.0120, 0.0140, 0.0190), 'Cubierto2': (0.0250, 0.0280, 0.0350), 'Resplandor': (0.0140, 0.0090, 0.0040),
+    'Cenit': (0.0045, 0.0080, 0.0200), 'Horizonte': (0.0100, 0.0160, 0.0300),
+    'NubeLuz': (0.0150, 0.0200, 0.0300), 'NubeSombra': (0.0085, 0.0120, 0.0210),
+    'Cubierto1': (0.0055, 0.0070, 0.0100), 'Cubierto2': (0.0100, 0.0125, 0.0170), 'Resplandor': (0.0140, 0.0090, 0.0040),
     'LunaColor': (0.80, 0.88, 1.00), 'EstrellaColor': (0.85, 0.92, 1.00),
 }
-ESCALARES = {'Brillo': 1.0, 'Claros': 0.56, 'EscalaNubes': 1.4, 'VelNubes': 0.006, 'EstrellasRep': 1.6, 'EstrellasFuerza': 0.9,
-             'DiscoFuerza': 3.2}
-# luminarias: prefijo de la etiqueta del actor de luz -> (diámetro del halo en cm, fuerza, lúmenes del relleno o 0)
-LUMINARIAS = {'farola': (150.0, 0.3, 250.0), 'foco_torreta': (90.0, 0.8, 0.0), 'aplique': (80.0, 0.45, 0.0),
-              'Luz_PuertaNorte': (80.0, 0.45, 0.0)}
+# EstrellasRep 0,8: la textura (2048 px) cubre casi todo el cielo de una vez. EstiraNubes: cuánto se encoge el dibujo de
+# las nubes a lo largo del viento (menos de 1 = bandas largas). NubeDura: lo cortado que es su borde.
+ESCALARES = {'Brillo': 1.0, 'Claros': 0.60, 'EscalaNubes': 1.1, 'VelNubes': 0.006, 'EstrellasRep': 0.8, 'EstrellasFuerza': 0.7,
+             'DiscoFuerza': 3.2, 'EstiraNubes': 0.35, 'NubeDura': 1.8}
+# luminarias: prefijo de la etiqueta del actor de luz -> (diámetro del halo en cm, fuerza, lúmenes del relleno o 0).
+# Ajuste 25b: el primer halo era una bola opaca de metro y medio colgada de cada farola (y otra tapándole la cabeza al
+# centinela de la torre). Ahora en seco es un destello corto pegado a la lámpara (M_Halo, Caida 12: se apaga a un
+# palmo) y solo con el aire húmedo se abre en un velo ancho y flojo (Niebla)
+LUMINARIAS = {'farola': (170.0, 0.6, 250.0), 'foco_torreta': (40.0, 1.0, 0.0), 'aplique': (70.0, 0.5, 0.0),
+              'Luz_PuertaNorte': (70.0, 0.5, 0.0)}
 RELLENO_RADIO = 2400.0
 
 
@@ -163,7 +175,7 @@ def _ayudas(g):
 def material_cielo(estrellas):
     amb = _mod('ambiente')
     X = unreal
-    g = amb.Grafo(DM + '/M_Cielo', 'M_Cielo', 'cielo v1' + ('' if estrellas else ' sin estrellas'))
+    g = amb.Grafo(DM + '/M_Cielo', 'M_Cielo', 'cielo v2' + ('' if estrellas else ' sin estrellas'))
     if g.hecho:
         return g.m
     g.m.set_editor_property('shading_model', X.MaterialShadingModel.MSM_UNLIT)
@@ -186,10 +198,11 @@ def material_cielo(estrellas):
     lejos = h.E(X.MaterialExpressionMax, const_b=0.04)
     g.une(dz, lejos, 'A')
     uv = h.op(M, h.op(D, dxy, h.op(A, lejos, 0.22)), h.esc('EscalaNubes', ESCALARES['EscalaNubes']))
+    uv = h.op(M, uv, h.op(AP, h.esc('EstiraNubes', ESCALARES['EstiraNubes']), h.E(X.MaterialExpressionConstant, r=1.0)))   # bandas a lo largo del viento
     p = h.op(AP, uv, h.op(M, h.E(X.MaterialExpressionTime), h.esc('VelNubes', ESCALARES['VelNubes'])))
     n1 = g.ruido(*(-2400, 900), 1.0, 3, 0.0, 1.0, pos=p, rapido=True)
     umbral = h.lerp(h.esc('Claros', ESCALARES['Claros']), -0.2, nub)
-    nube = h.sat(h.op(M, h.op(S, n1, umbral), h.lerp(3.2, 1.6, nub)))
+    nube = h.sat(h.op(M, h.op(S, n1, umbral), h.lerp(h.esc('NubeDura', ESCALARES['NubeDura']), 1.6, nub)))
     # luna: disco de 1,4 grados de radio, halo corto y halo ancho
     ldir = h.f1(X.MaterialExpressionNormalize, h.vec('LunaDir', (0.5, 0.6, 0.62)))
     md = h.punto(d, ldir)
@@ -205,8 +218,11 @@ def material_cielo(estrellas):
         ts = h.E(X.MaterialExpressionTextureSampleParameter2D, parameter_name='Estrellas', texture=estrellas,
                  sampler_type=X.MaterialSamplerType.SAMPLERTYPE_MASKS)
         g.une(suv, ts, ('UVs', 'Coordinates'))
-        st = h.E(M); g.une(ts, st, 'A', 'R'); g.une(h.esc('EstrellasFuerza', ESCALARES['EstrellasFuerza']), st, 'B')
-        st = h.op(M, h.op(M, st, h.inv(nube)), h.op(M, despejado, h.sat(h.op(M, dz, 5.0))))      # ni tras las nubes ni pegadas al horizonte
+        # la textura guarda la raíz del brillo (tools/texturas/estrellas.py): al cuadrado
+        s2 = h.E(M); g.une(ts, s2, 'A', 'R'); g.une(ts, s2, 'B', 'R')
+        st = h.op(M, s2, h.esc('EstrellasFuerza', ESCALARES['EstrellasFuerza']))
+        bajo = h.sat(h.op(M, dz, 3.0))                                                            # el aire del horizonte se las come
+        st = h.op(M, h.op(M, st, h.inv(nube)), h.op(M, despejado, h.op(M, bajo, bajo)))           # ni tras las nubes ni pegadas al horizonte
         cielo = h.op(A, cielo, h.op(M, h.vec('EstrellaColor', CIELO['EstrellaColor']), st))
     # color de las nubes: claras por el borde y cerca de la luna; cubierto, grises bajas con el resplandor de la base
     cn = h.lerp(h.vec('NubeLuz', CIELO['NubeLuz']), h.vec('NubeSombra', CIELO['NubeSombra']), h.sat(h.op(S, h.op(M, nube, 1.4), 0.2)))
@@ -224,7 +240,7 @@ def material_cielo(estrellas):
 def material_halo():
     amb = _mod('ambiente')
     X = unreal
-    g = amb.Grafo(DM + '/M_Halo', 'M_Halo', 'halo v1')
+    g = amb.Grafo(DM + '/M_Halo', 'M_Halo', 'halo v2')
     if g.hecho:
         return g.m
     g.m.set_editor_property('blend_mode', X.BlendMode.BLEND_ADDITIVE)
@@ -233,10 +249,12 @@ def material_halo():
     M, A = h.M, h.A
     # de frente al centro de la esfera, 1; hacia el borde, 0: un resplandor redondo desde cualquier sitio
     nv = h.sat(h.punto(h.E(X.MaterialExpressionVertexNormalWS), h.E(X.MaterialExpressionCameraVectorWS)))
+    # en seco, un destello corto pegado a la lámpara (Caida alta: a un tercio del radio ya no queda nada)
     cae = h.E(X.MaterialExpressionPower)
-    g.une(nv, cae, 'Base'); g.une(h.esc('Caida', 3.0), cae, ('Exp', 'Exponent'))
-    humedo = h.op(A, h.op(M, h.nublado(), h.esc('Humedo', 2.0)), 1.0)             # con lluvia o niebla, más
-    fuerza = h.op(M, h.op(M, cae, h.esc('Fuerza', 0.5)), humedo)
+    g.une(nv, cae, 'Base'); g.une(h.esc('Caida', 12.0), cae, ('Exp', 'Exponent'))
+    # con lluvia o niebla (Nublado), además, un velo ancho y flojo: la luz en el aire húmedo
+    velo = h.op(M, h.op(M, h.pot(nv, 3.0), h.esc('Niebla', 0.22)), h.nublado())
+    fuerza = h.op(A, h.op(M, cae, h.esc('Fuerza', 0.6)), velo)
     try:      # que no corte en seco contra el poste o la pared
         df = h.E(X.MaterialExpressionDepthFade, fade_distance_default=35.0)
         fuerza = h.op(M, fuerza, df)
