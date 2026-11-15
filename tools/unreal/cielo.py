@@ -39,10 +39,10 @@ CIELO = {
     'Cubierto1': (0.0120, 0.0140, 0.0190), 'Cubierto2': (0.0250, 0.0280, 0.0350), 'Resplandor': (0.0140, 0.0090, 0.0040),
     'LunaColor': (0.80, 0.88, 1.00), 'EstrellaColor': (0.85, 0.92, 1.00),
 }
-ESCALARES = {'Brillo': 1.0, 'Claros': 0.56, 'EscalaNubes': 1.4, 'VelNubes': 0.006, 'EstrellasRep': 2.5, 'EstrellasFuerza': 1.6,
+ESCALARES = {'Brillo': 1.0, 'Claros': 0.56, 'EscalaNubes': 1.4, 'VelNubes': 0.006, 'EstrellasRep': 1.6, 'EstrellasFuerza': 0.9,
              'DiscoFuerza': 3.2}
 # luminarias: prefijo de la etiqueta del actor de luz -> (diámetro del halo en cm, fuerza, lúmenes del relleno o 0)
-LUMINARIAS = {'farola': (230.0, 0.5, 250.0), 'foco_torreta': (90.0, 0.8, 0.0), 'aplique': (80.0, 0.45, 0.0),
+LUMINARIAS = {'farola': (150.0, 0.3, 250.0), 'foco_torreta': (90.0, 0.8, 0.0), 'aplique': (80.0, 0.45, 0.0),
               'Luz_PuertaNorte': (80.0, 0.45, 0.0)}
 RELLENO_RADIO = 2400.0
 
@@ -122,9 +122,9 @@ def _ayudas(g):
         def op(cls, a, b):
             return g.op(cls, a, b, *xy())
         @staticmethod
-        def f1(cls, a, sal='', **p):
+        def f1(cls, ent, sal='', **p):    # «ent», no «a»: ComponentMask lleva la propiedad a=False
             n = g.E(cls, *xy(), **p)
-            g.une(a, n, ('Input', '', 'VectorInput'), sal)
+            g.une(ent, n, ('Input', '', 'VectorInput'), sal)
             return n
         @staticmethod
         def sat(a):

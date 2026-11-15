@@ -249,9 +249,9 @@ def maestro(defecto):
         return E(X.MaterialExpressionVectorParameter, parameter_name=nombre, default_value=X.LinearColor(r, gg, b, 1))
     def op(cls, a, b):
         return g.op(cls, a, b, *xy())
-    def f1(cls, a, sal='', **p):    # nodo de una entrada
+    def f1(cls, ent, sal='', **p):    # nodo de una entrada («ent», no «a»: ComponentMask lleva la propiedad a=False)
         n = E(cls, **p)
-        g.une(a, n, ('Input', '', 'VectorInput'), sal)
+        g.une(ent, n, ('Input', '', 'VectorInput'), sal)
         return n
     def sat(a):
         return f1(X.MaterialExpressionSaturate, a)

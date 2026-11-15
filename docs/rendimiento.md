@@ -224,3 +224,20 @@ Lo que enseña la tabla:
 
 Frente a la 0023, con la misma ventana: entre 5 y 9 fps más y unos 120 MB menos, con 93 piezas de cobertura, 24 carteles
 y el mojado de la lluvia añadidos.
+
+## 0025: materia, noche con cielo, agua y señales
+
+Compilación: 992 s, sin errores ni avisos. Batería: 336 de 336 (514 s, 34 pruebas en 15 familias).
+
+Medida con el editor recién abierto (GTX 1050, Media, resolución interna al 50 %; fps medio / peor 1 %; entre paréntesis, la media de la 0024):
+
+| Sitio | fps | VRAM (MB) |
+|---|---|---|
+| Entrada | 36,3 / 34,6 (40,2) | 3531 |
+| Patio central | 30,9 / 9,6 (39,1) | 3531 |
+| Barracón oeste | 33,0 / 31,0 (33,6) | 3596 |
+| Portón de entrada | 38,3 / 35,9 (40,4) | 3596 |
+| Portón de salida | 39,0 / 36,3 (41,2) | 3596 |
+| Camino con el camión | 35,0 / 17,0 (36,8) | 3596 |
+
+Lectura: la tanda cuesta de 2 a 4 fps en casi todo y unos 8 en el patio central, que es donde se ven a la vez más halos y el cielo entero. La memoria de vídeo baja entre 70 y 140 MB. Los peores 1 % del patio (9,6) y del camino (17,0) no valen: hubo entrada en el PC durante la medida y son tirones sueltos; hay que repetirlos. Lo que cuesta de más: los ruidos nuevos del material maestro (losas, manchas, regueros), nueve luces de relleno sin sombras y trece esferas translúcidas de halo. Pendiente: medir qué parte se lleva cada cosa en el patio central antes de recortar.
