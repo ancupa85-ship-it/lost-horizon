@@ -1306,9 +1306,108 @@ def prueba_opciones():
 
 
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
+
+# ---------------------------------------------------------------- puertas (arreglo de la 0024)
+
+def _barrido_de_pie(a, b):
+    """Lo que para a la cápsula del jugador, de pie, yendo de a a b (en el suelo): lista de «actor/componente@punto»."""
+    p = jugador()
+    cap = p.get_component_by_class(unreal.CapsuleComponent)
+    r, hh = cap.get_unscaled_capsule_radius(), cap.get_unscaled_capsule_half_height()
+    z = 4 + hh + 2
+    hs = unreal.SystemLibrary.capsule_trace_multi(mundo(), V(a.x, a.y, z), V(b.x, b.y, z), r, hh, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,
+                                                 False, [p], unreal.DrawDebugTrace.NONE, True) or []
+    out = []
+    for h in hs:
+        t = h.to_tuple()
+        if not t[0]:
+            continue
+        act = next((x for x in t if isinstance(x, unreal.Actor)), None)
+        pt = next((x for x in t if isinstance(x, unreal.Vector)), None)
+        out.append('%s@%s' % (act.get_actor_label() if act else None, [round(c) for c in (pt.x, pt.y, pt.z)] if pt else None))
+    return out
+
+def _anda(destino, tmax=8.0):
+    """Anda de verdad (entrada de movimiento en cada fotograma) hasta destino; False si se atasca o se acaba el tiempo."""
+    p = jugador()
+    t0 = time.time(); ult, tu = p.get_actor_location(), t0
+    while time.time() - t0 < tmax:
+        l = p.get_actor_location()
+        dv = V(destino.x - l.x, destino.y - l.y, 0)
+        if dv.length() < 60:      # 60 cm: con el editor en segundo plano (3-8 fps) cada fotograma avanza mucho y se pasa
+            return True
+        p.add_movement_input(dv.normal(), 1.0, True)
+        if time.time() - tu > 2.5:
+            if (l - ult).length() < 15:
+                return False
+            ult, tu = l, time.time()
+        yield 0.0
+    return False
+
+def _ruta(puntos):
+    for k, q in enumerate(puntos):
+        ok = yield from _anda(q)
+        if not ok:
+            l = jugador().get_actor_location()
+            return 'atascado en (%d,%d) camino del punto %d' % (l.x, l.y, k)
+    return ''
+
+def prueba_puertas():
+    """0024: en los huecos de puerta de la base se pasa DE PIE. La colisión de las mallas Nanite sale de su malla de
+    respaldo; con el respaldo simplificado, los dinteles del archivo y de dos puertas más bajaban a 1,85 m y solo se
+    pasaba agachado («entro al archivo y no puedo salir»). Desde la 0024 el respaldo va sin simplificar (montar_base.py)."""
+    d = director()
+    for g in guardias():
+        g.hold(3600.0)
+    p = jugador()
+    if agachado():
+        p.un_crouch()
+    # abrir la jefatura (L) y el archivo (V) como en el juego: llave, E y la clave en el teclado
+    tp(900, 2990); yield 0.2
+    d.set_flag('llave_jefatura'); d.interact(); yield 0.3
+    tp(1150, 3480); yield 0.2
+    d.interact(); yield 0.2
+    for c in str(d.get_editor_property('vault_code')):
+        d.keypad_digit(int(c))
+    yield 0.3
+    check('jefatura y archivo abiertos', d.has_flag('jefatura_abierta') and d.get_editor_property('vault_open'), [str(f) for f in d.flag_list()])
+    # (a) barrido de pie por cada casilla de puerta del plano, en el sentido de paso y en el contrario
+    mapa = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['map']
+    celda = lambda x, y: mapa[y][x] if 0 <= y < len(mapa) and 0 <= x < len(mapa[y]) else '#'
+    malas, n = [], 0
+    for y, fila in enumerate(mapa):
+        for x, c in enumerate(fila):
+            if c not in 'DLVbB':
+                continue
+            n += 1
+            cx, cy = (x + 0.5) * 200.0, (y + 0.5) * 200.0
+            en_x = celda(x - 1, y) in 'W#' and celda(x + 1, y) in 'W#'     # el muro va en X: se pasa en Y
+            a, b = (V(cx, cy - 160, 0), V(cx, cy + 160, 0)) if en_x else (V(cx - 160, cy, 0), V(cx + 160, cy, 0))
+            ida, vuelta = _barrido_de_pie(a, b), _barrido_de_pie(b, a)
+            if ida or vuelta:
+                malas.append('%s(%d,%d): %s' % (c, x, y, (ida or vuelta)[0]))
+    check('por todas las puertas del plano se pasa de pie (%d)' % n, n >= 8 and not malas, malas)
+    # (b) andando: entrar al archivo de pie, coger el expediente y salir de pie hasta el despacho y la puerta de la jefatura
+    tp(1100, 3500); yield 0.3
+    mal = yield from _ruta([V(1500, 3500, 0), V(1850, 3420, 0)])
+    check('se entra al archivo de pie andando', not mal and not agachado(), mal)
+    d.interact(); yield 0.5
+    check('se coge el expediente', d.get_editor_property('file'))
+    afuera = [V(1500, 3500, 0), V(1100, 3500, 0), V(900, 3300, 0), V(900, 2900, 0)]
+    mal = yield from _ruta(afuera)
+    check('y se sale de pie hasta fuera de la jefatura', not mal and not agachado(), mal)
+    # (c) lo mismo tras cargar el punto de control del expediente (que se guarda dentro del archivo)
+    ok = d.load_checkpoint(); yield 0.6
+    l = jugador().get_actor_location()
+    check('el punto de control del expediente te deja en el archivo', ok and l.x > 1350, '%s (%d,%d)' % (ok, l.x, l.y))
+    mal = yield from _ruta(afuera)
+    check('tras cargarlo se sale de pie', not mal, mal)
+    aparte()
+
+
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
-            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje]]
+            [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas]]
 PRUEBAS = []
 
 

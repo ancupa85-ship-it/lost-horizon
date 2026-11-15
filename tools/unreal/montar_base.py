@@ -57,6 +57,23 @@ log('mallas', len(meshes))
 if not meshes:
     raise RuntimeError('No se importó ninguna malla de ' + GLB)
 
+def respaldo_completo(m):
+    """Nanite: la malla de respaldo sin simplificar. La colisión «compleja como simple» de una malla Nanite sale de esa
+    malla de respaldo; con el objetivo automático se simplificaba y los dinteles de algunas puertas bajaban de 2,2 m a
+    1,85 m: de pie no se pasaba (el archivo, «entro agachado y no puedo salir»). Solo en las mallas de estructura
+    (base_*: pared, muro, hierro, tejado, suelos...), que son por donde se anda y se pasa; los camiones, las cajas, las
+    farolas y demás se quedan con el respaldo automático: sin simplificar, los camiones pasaban de ~1.200 a ~30.000
+    triángulos de respaldo por malla sin arreglar nada. Devuelve True si ha cambiado algo."""
+    ns = m.get_editor_property('nanite_settings')
+    if not ns.get_editor_property('enabled'):
+        return False
+    if ns.get_editor_property('fallback_target') == unreal.NaniteFallbackTarget.RELATIVE_ERROR and ns.get_editor_property('fallback_relative_error') == 0.0:
+        return False
+    ns.set_editor_property('fallback_target', unreal.NaniteFallbackTarget.RELATIVE_ERROR)
+    ns.set_editor_property('fallback_relative_error', 0.0)
+    m.set_editor_property('nanite_settings', ns)
+    return True
+
 # colisión: la propia malla, para poder andar por suelos, escaleras y tejados
 for m in meshes:
     # Interchange añade a cada malla un envolvente convexo automático. El mapa de navegación usa ese convexo en vez
@@ -71,6 +88,8 @@ for m in meshes:
         if ns.get_editor_property('enabled'):
             ns.set_editor_property('enabled', False)
             m.set_editor_property('nanite_settings', ns)
+    elif m.get_name().startswith('base_'):
+        respaldo_completo(m)
     eal.save_loaded_asset(m)
 
 # materiales realistas (texturas de Poly Haven), si están descargadas en assets/texturas
