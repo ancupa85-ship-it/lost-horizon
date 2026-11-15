@@ -29,7 +29,10 @@
    "truck_speed": 400.0,
    "truck_papers_time": 4.5,
    "truck_horn_wait": 8.0,
-   "truck_self_wait": 30.0
+   "truck_self_wait": 30.0,
+   "render_c_vars": [
+    "r.Nanite.Streaming.StreamingPoolSize=128"
+   ]
   },
   "guardias": {
    "*": {

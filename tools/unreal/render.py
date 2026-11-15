@@ -16,12 +16,17 @@ Uso (en el editor, con el nivel Tarsis abierto, sin PIE):
     import render; render.aplicar([])                             quita el presupuesto
 Una variable que no exista en este motor no rompe nada: el director la apunta en el registro y sigue.
 """
-import builtins, os, subprocess, sys, time
+import builtins, json, os, subprocess, sys, time
 import unreal
 
+MISION = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'assets', 'unreal', 'mision1.json')
+
 V = unreal.Vector
-# nombre -> variables. Cada una, sola frente a la partida sin tocar. Los valores de serie son los de UE 5.x en calidad
-# alta; con la calidad Media del proyecto alguna ya puede venir recortada (entonces la medida no se mueve y se descarta).
+# nombre -> variables. Cada una, sola frente a la partida sin tocar. OJO (medido en la tanda 24): los «de serie» de los
+# comentarios son los de calidad alta. Con la calidad Media del proyecto las sombras ya van a 512 páginas, la niebla a
+# celdas de 8 y la pantalla al 50 %, así que «sombras», «niebla» y «resolucion» SUBEN el gasto; y la reserva de texturas
+# ya valía 400. Solo «nanite» devolvió memoria (291 MB). Además cada partida después de la primera gasta unos 90 MB más
+# sin tocar nada (un escalón, no se acumula): por eso la partida sin tocar se mide también al final y la memoria se compara con esa.
 CANDIDATOS = {
     # sombras virtuales: el almacén físico de páginas (de serie 4096 páginas de 128 px: una textura de 8192 x 8192)
     'sombras': ['r.Shadow.Virtual.MaxPhysicalPages=2048'],
@@ -37,7 +42,7 @@ CANDIDATOS = {
     'niebla': ['r.VolumetricFog.GridPixelSize=16', 'r.VolumetricFog.GridSizeZ=64'],
 }
 SITIOS = [
-    ('patio central', V(4300, 3500, 120), V(6600, 4100, 150)),
+    ('patio central', V(4300, 3500, 120), V(5300, 3900, 140)),
     ('barracon oeste', V(1900, 2350, 120), V(300, 2800, 120)),
     ('porton de salida', V(7600, 5860, 120), V(9100, 5700, 150)),
 ]
@@ -85,6 +90,16 @@ def aplicar(nombres, guardar=True):
     d.set_editor_property('render_c_vars', lista)
     if guardar:
         unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
+        # y en mision1.json (ajustes del director): guardias.py pone un director nuevo cada vez que se monta el nivel y
+        # mision.py le vuelca esos ajustes; si el presupuesto solo estuviera en el nivel, se perdería al volver a montar
+        try:
+            m = json.load(open(MISION, encoding='utf-8'))
+            if m['ajustes']['director'].get('render_c_vars', []) != lista:
+                m['ajustes']['director']['render_c_vars'] = lista
+                open(MISION, 'w', encoding='utf-8').write(json.dumps(m, indent=1, ensure_ascii=False) + '\n')
+                log('render: presupuesto apuntado en mision1.json')
+        except Exception as ex:
+            log('AVISO: render: no se pudo apuntar el presupuesto en mision1.json:', repr(ex))
     log('render: presupuesto en el director:', lista or 'ninguno')
     return lista
 
@@ -156,11 +171,16 @@ def _tick(dt):
             M['estado'] = 'terminado'
             unreal.unregister_slate_post_tick_callback(M['h'])
             base = M['res'][0] if M['res'] else None
+            media = lambda r: (lambda v: sum(v) / len(v) if v else None)([x for x in r['vram'] if x is not None])
+            # la memoria se compara con la partida sin tocar DEL FINAL: la primera partida de la sesión gasta unos 90 MB
+            # menos que todas las demás (medido en la tanda 24: no se acumula, es un escalón tras la primera)
+            fin = M['res'][-1] if len(M['res']) > 2 and M['res'][-1]['nombre'] == 'sin tocar' else None
+            ref = fin if fin and media(fin) is not None else base
             lineas = []
+            if fin and media(fin) is not None and media(base) is not None:
+                lineas.append('escalón tras la primera partida: %+.0f MB (la memoria se compara con la partida sin tocar del final)' % (media(fin) - media(base)))
             for r in M['res']:
-                v = [x for x in r['vram'] if x is not None]
-                vb = [x for x in base['vram'] if x is not None] if base else []
-                dv = (sum(v) / len(v) - sum(vb) / len(vb)) if v and vb else 0.0
+                dv = (media(r) - media(ref)) if media(r) is not None and ref and media(ref) is not None else 0.0
                 df = (sum(r['fps']) / len(r['fps']) - sum(base['fps']) / len(base['fps'])) if r['fps'] and base and base['fps'] else 0.0
                 lineas.append('%-12s VRAM %s MB (%+.0f) | fps %s (%+.1f) | peor 1 %% %s | puestas: %s' % (
                     r['nombre'], r['vram'], dv, r['fps'], df, r['peor'], '; '.join(r['puestas']) or '-'))
@@ -187,7 +207,7 @@ def medir(nombres=None):
     if o:
         o.set_editor_property('bThrottleCPUWhenNotForeground', False)
     M.update({'estado': 'midiendo', 'res': [], 'espera': 0.0, 'dts': None})
-    M['gen'] = _plan(['sin tocar'] + list(nombres or CANDIDATOS) + ['todo'])
+    M['gen'] = _plan(['sin tocar'] + list(nombres or CANDIDATOS) + ['todo', 'sin tocar'])
     M['h'] = unreal.register_slate_post_tick_callback(_tick)
 
 

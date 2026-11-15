@@ -203,8 +203,11 @@ Lo que enseña la tabla:
   «más bajos» era subirlos. Los valores de serie que supuse eran los de calidad alta.
 - **Cada partida después de la primera gasta unos 90 MB más sin tocar nada** («texturas» no pone ninguna variable y da
   +92 MB): las diferencias de menos de 100 MB de esta tabla son ruido de esa deriva, no del ajuste.
-- **Solo la reserva de Nanite devuelve memoria de verdad** (−291 MB, casi sin coste). Es el único que queda aplicado en
-  el director del nivel (`render.aplicar(['nanite'])`). La captura del patio antes y después es idéntica.
+- **Solo la reserva de Nanite devuelve memoria de verdad** (−291 MB, casi sin coste). Es el único que queda aplicado
+  (`render.aplicar(['nanite'])` lo escribe en el director del nivel y en `mision1.json`, para que no se pierda al volver
+  a montar). La captura del patio antes y después es idéntica.
+- Desde esta medida `render.py` repite la partida sin tocar al final y compara la memoria con esa, y mira al patio y no a
+  una pared.
 - **La resolución interna está al 50 %** con el reescalado temporal. Subirla al 80 % cuesta 31 fps en esta tarjeta: no
   se aplica. Es buena parte de por qué la imagen se ve blanda; queda como decisión de calidad para cuando haya tarjeta.
 
