@@ -117,6 +117,19 @@ void ATarsisDirector::SetupPlayer()
 	C->GetCharacterMovement()->MaxWalkSpeedCrouched = 200.0f;
 	BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
 	SetupArms(C);
+	// ajuste 26e: tu sombra en tu propia vista. El cuerpo de la plantilla va como «representación en el mundo» de la
+	// primera persona, y así el motor no dibuja su sombra para su dueño (medido en el PC: ni con CastHiddenShadow). Con
+	// el truco de siempre sí: sin tipo de primera persona, oculto para ti y con sombra aunque esté oculto
+	if (bPlayerShadow)
+	{
+		if (USkeletalMeshComponent* Body = C->GetMesh())
+		{
+			Body->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::None);
+			Body->SetOwnerNoSee(true);
+			Body->SetCastShadow(true);
+			Body->SetCastHiddenShadow(true);
+		}
+	}
 	PC->ClientSetHUD(ATarsisHUD::StaticClass());
 	EnableInput(PC);
 	DefaultKeys();

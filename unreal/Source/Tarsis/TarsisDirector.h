@@ -320,6 +320,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
 	bool bTruckShadows = true;
 
+	/** Ajuste 26e: el cuerpo del jugador proyecta sombra en su propia vista (hace falta además calidad de sombras
+	 *  Media o más, o r.ShadowQuality por encima de 0: va en RenderCVars). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
+	bool bPlayerShadow = true;
+
 	/** Ajuste 26b: parte de TruckLampLumens que se pinta de verdad (el sigilo sigue contando el total). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
 	float TruckLampPaint = 1.0f;
