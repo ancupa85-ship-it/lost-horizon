@@ -1135,7 +1135,7 @@ static float LightSum(const UWorld* World, const FVector& Point, const AActor* I
 	// linternas de los guardias
 	for (TActorIterator<ATarsisGuard> It(World); It; ++It)
 	{
-		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->Flashlight, Point, *It, Q, true, -1.0f, Ignore);
+		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->FlashlightComp(), Point, *It, Q, true, -1.0f, Ignore);
 	}
 	return Sum;
 }
