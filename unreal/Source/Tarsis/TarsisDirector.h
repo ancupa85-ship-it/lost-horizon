@@ -322,7 +322,7 @@ public:
 
 	/** Ajuste 26b: parte de TruckLampLumens que se pinta de verdad (el sigilo sigue contando el total). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
-	float TruckLampPaint = 0.35f;
+	float TruckLampPaint = 1.0f;
 
 	/** Tanda 26: dos faros de verdad en vez de una sola luz. Cada uno pinta la mitad de TruckLampLumens (entre los dos
 	 *  cuentan para el sigilo lo mismo que antes la luz única) y solo el primero da sombra. Separación del eje (cm),

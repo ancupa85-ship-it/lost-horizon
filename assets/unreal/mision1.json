@@ -3,6 +3,7 @@
  "ajustes": {
   "director": {
    "vault_code": "0129",
+   "truck_lamp_paint": 1.0,
    "cell_time": 25.0,
    "repair_seconds": 12.0,
    "noise_radius": 900.0,
@@ -71,7 +72,7 @@
      2.5
     ],
     "sweep_phase": 0.0,
-    "sweep_ref_dist": 1500.0
+    "sweep_ref_dist": 1850.0
    },
    "centinela de la torre 2": {
     "sweep_path": [
@@ -93,7 +94,7 @@
      3.0
     ],
     "sweep_phase": 7.0,
-    "sweep_ref_dist": 1500.0
+    "sweep_ref_dist": 1850.0
    }
   },
   "montaje": {

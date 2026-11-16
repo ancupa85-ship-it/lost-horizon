@@ -20,14 +20,14 @@ CAMARAS = [
 # del barracón, torre 2 a media recta del camino).
 TANDA26 = [
     # los dos focos de torre y su mancha en el suelo
-    ('foco_patio', V(3400, 3900, 110), V(2500, 2600, 40)),
+    ('foco_patio', V(3156, 2950, 130), V(2600, 2600, 90)),
     ('foco_camino', V(3300, 5950, 110), V(5000, 5700, 40)),
     # tu sombra bajo la primera farola del camino (se mira al suelo, hacia donde cae)
     ('sombra_farola', V(1270, 5700, 110), V(1700, 5560, 0)),
     # la luz de dentro, un cuarto por cámara (bombillas interior_1 a interior_6 de base.json)
     ('dentro_1', V(1050, 3850, 110), V(350, 3300, 120)),
     ('dentro_2_archivo', V(1500, 3900, 110), V(2100, 3300, 120)),
-    ('dentro_3', V(6500, 1900, 110), V(5500, 1300, 120)),
+    ('dentro_3', V(5617, 1583, 110), V(5985, 1215, 120)),
     ('dentro_4', V(5300, 1850, 110), V(5900, 1500, 120)),
     ('dentro_5', V(6500, 2300, 110), V(6400, 1700, 120)),
     ('dentro_6_roja', V(6500, 2900, 110), V(6100, 2650, 120)),
