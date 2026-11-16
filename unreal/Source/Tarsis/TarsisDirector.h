@@ -320,6 +320,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
 	bool bTruckShadows = true;
 
+	/** Ajuste 26b: parte de TruckLampLumens que se pinta de verdad (el sigilo sigue contando el total). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckLampPaint = 0.35f;
+
 	/** Tanda 26: dos faros de verdad en vez de una sola luz. Cada uno pinta la mitad de TruckLampLumens (entre los dos
 	 *  cuentan para el sigilo lo mismo que antes la luz única) y solo el primero da sombra. Separación del eje (cm),
 	 *  cabeceo (grados; el perfil ya lleva el punto fuerte 2,5 grados bajo el eje) y giro sobre el eje, para poner

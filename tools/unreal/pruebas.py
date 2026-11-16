@@ -1594,7 +1594,7 @@ def prueba_camion():
     comps = [a.get_component_by_class(unreal.LocalLightComponent) for a in faros]
     total = sum(c.get_editor_property('intensity') for c in comps)
     con_sombra = sum(1 for c in comps if c.get_editor_property('cast_shadows'))
-    check('dos faros que suman los lúmenes de antes, y solo uno da sombra', fc.x == 2 and abs(total - d.get_editor_property('truck_lamp_lumens')) < 1 and con_sombra == 1,
+    check('dos faros que pintan su parte de los lúmenes, y solo uno da sombra', fc.x == 2 and abs(total - d.get_editor_property('truck_lamp_lumens') * d.get_editor_property('truck_lamp_paint')) < 1 and con_sombra == 1,
           '%d faros, %d lm, %d con sombra' % (fc.x, total, con_sombra))
     check('cada faro lleva el perfil del haz de cruce, su cristal y su destello', fc.y == 2 and fc.z == 4, '%d con perfil, %d piezas de luz' % (fc.y, fc.z))
     yield ('hasta', lambda: 'CAMION' in str(director().get_editor_property('message')), 4.0)

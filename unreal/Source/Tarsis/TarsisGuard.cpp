@@ -1114,9 +1114,24 @@ static void CollectBeams(const UWorld* World, FTarsisBeams& Out)
 	}
 }
 
+// luces que pintan menos de lo que cuentan (los faros del camión, ajuste 26b): sus lúmenes de sigilo, apuntados aparte
+static TMap<TWeakObjectPtr<const AActor>, float> GStealthLumens;
+
+void ATarsisGuard::SetStealthLumens(const AActor* LightActor, float Lumens)
+{
+	for (auto It = GStealthLumens.CreateIterator(); It; ++It) { if (!It.Key().IsValid()) It.RemoveCurrent(); }
+	if (!LightActor) return;
+	if (Lumens > 0.0f) GStealthLumens.Add(TWeakObjectPtr<const AActor>(LightActor), Lumens);
+	else GStealthLumens.Remove(TWeakObjectPtr<const AActor>(LightActor));
+}
+
 static float BeamLumensOf(const FTarsisBeams& Beams, const AActor* LightActor)
 {
 	for (const TPair<const AActor*, float>& B : Beams) if (B.Key == LightActor) return B.Value;
+	if (GStealthLumens.Num() > 0)
+	{
+		if (const float* Fixed = GStealthLumens.Find(TWeakObjectPtr<const AActor>(LightActor))) return *Fixed;
+	}
 	return -1.0f;
 }
 

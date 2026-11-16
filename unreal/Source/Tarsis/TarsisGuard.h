@@ -155,6 +155,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Torre")
 	bool CallBeam(const FVector& Where, float Seconds);
 
+	/** Ajuste 26b: una luz que pinta menos de lo que cuenta (los faros del camión). Lumens son los que valen para el
+	 *  sigilo, antes del «luz_fuerte»; 0 la borra de la lista. */
+	static void SetStealthLumens(const AActor* LightActor, float Lumens);
+
 	/** Un compañero (por ejemplo una torre) da la voz: viene corriendo a ese sitio. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Alarm(const FVector& Where);

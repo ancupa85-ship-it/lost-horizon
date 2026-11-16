@@ -2161,7 +2161,9 @@ void ATarsisDirector::SetupTruck()
 		if (USpotLightComponent* L = Cast<USpotLightComponent>(Lamp->GetLightComponent()))
 		{
 			L->SetIntensityUnits(ELightUnits::Lumens);
-			L->SetIntensity(TruckLampLumens * 0.5f);
+			// ajuste 26b: con el perfil, el punto fuerte dejaba la losa blanca; se pinta una parte y el sigilo cuenta lo de siempre
+			L->SetIntensity(TruckLampLumens * 0.5f * TruckLampPaint);
+			ATarsisGuard::SetStealthLumens(Lamp, TruckLampLumens * 0.5f);
 			L->SetAttenuationRadius(3800.0f);
 			L->SetOuterConeAngle(30.0f);
 			L->SetInnerConeAngle(14.0f);
