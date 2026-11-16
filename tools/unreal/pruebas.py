@@ -1215,7 +1215,10 @@ def prueba_cielo():
     lm = lambda a: a.get_component_by_class(unreal.LocalLightComponent).get_editor_property('intensity')
     far = [a for a in focos if a.get_actor_label().startswith('farola')]
     tor = [a for a in focos if a.get_actor_label().startswith('foco_torreta')]
-    mal = [(a.get_actor_label(), int(lm(a))) for a in far + tor if not a.actor_has_tag('luz_fuerte') or lm(a) > 1000]
+    # tanda 26: lo que pinta un foco de torre con recorrido cambia con la distancia; su base son los lúmenes de sigilo
+    base_foco = {g.get_editor_property('tower_light'): g.get_editor_property('beam_lumens') for g in guardias() if g.get_editor_property('tower_sentry')}
+    lm_base = lambda a: base_foco.get(a) or lm(a)
+    mal = [(a.get_actor_label(), int(lm_base(a))) for a in far + tor if not a.actor_has_tag('luz_fuerte') or lm_base(a) > 1000]
     check('farolas (%d) y focos de torre (%d) pintan a un décimo, marcados «luz_fuerte»' % (len(far), len(tor)), len(far) >= 6 and len(tor) >= 2 and not mal, mal)
     ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
     f = ext['farolas'][1]
@@ -1250,6 +1253,155 @@ def prueba_cielo():
         menos = d.halo_counts().y
         comp.set_visibility(True); yield 0.3
         check('una farola apagada pierde su halo, y lo recupera', menos == hc.y - 1 and d.halo_counts().y == hc.y, '%d -> %d -> %d' % (hc.y, menos, d.halo_counts().y))
+
+
+def _focos_torre(encendidos):
+    for g in guardias():
+        if g.get_editor_property('tower_sentry') and g.get_editor_property('tower_light'):
+            g.get_editor_property('tower_light').get_component_by_class(unreal.LocalLightComponent).set_visibility(encendidos)
+
+
+def prueba_foco():
+    """Tanda 26: el foco de cada torre sigue un recorrido fijo por el suelo (se puede aprender), apunta de verdad al
+    punto que pisa, para el sigilo cuenta siempre lo mismo aunque lo pintado cambie con la distancia, y cuando un
+    guardia de abajo da la alarma el foco de la torre que lo tiene a mano acude a ese sitio y luego vuelve."""
+    aparte()
+    cent = sorted([g for g in guardias() if g.get_editor_property('tower_sentry')], key=lambda g: g.get_actor_label())
+    aj = MISION['ajustes']['guardias']
+    con = [g for g in cent if len(g.get_editor_property('sweep_path')) >= 2]
+    check('las dos torres tienen recorrido', len(cent) >= 2 and len(con) == len(cent), '%d de %d' % (len(con), len(cent)))
+    if not con:
+        return
+    per = [g.sweep_period() for g in con]
+    check('una vuelta dura entre 15 y 30 s (da tiempo a aprenderla y a cruzar)', all(15.0 <= x <= 30.0 for x in per), ['%.1f' % x for x in per])
+    g = con[0]
+    a, b = g.sweep_point_at(3.0), g.sweep_point_at(3.0 + per[0])
+    check('la vuelta se repite igual', dist2d(a, b) < 1.0, '%.1f cm' % dist2d(a, b))
+    fases = [aj.get(str(x.get_editor_property('guard_name')), {}).get('sweep_phase') for x in con]
+    check('cada torre arranca en su segundo fijo, y no a la vez', len(set(fases)) == len(fases) and None not in fases, fases)
+    paradas = [dist2d(g.sweep_point_at(0.1), g.sweep_point_at(1.5)) for g in con]
+    check('en el primer punto el foco se para', all(x < 1.0 for x in paradas), paradas)
+    yield 3.0
+    aim, quiere = g.get_editor_property('sweep_aim'), g.sweep_point_at(g.sweep_time())
+    check('el foco va por su recorrido', dist2d(aim, quiere) < 300.0, '%.0f cm' % dist2d(aim, quiere))
+    luz = g.get_editor_property('tower_light')
+    f, lp = luz.get_actor_forward_vector(), luz.get_actor_location()
+    t = V(aim.x - lp.x, aim.y - lp.y, aim.z - lp.z); n = math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z) or 1.0
+    cos = (f.x * t.x + f.y * t.y + f.z * t.z) / n
+    check('la luz apunta al punto del suelo que pisa (sube y baja, no solo gira)', cos > 0.995, '%.4f' % cos)
+    # se muestrea una vuelta: la mancha se mueve, lo pintado cambia con la distancia y el sigilo no
+    comp = luz.get_component_by_class(unreal.LocalLightComponent)
+    base = g.get_editor_property('beam_lumens')
+    pintado, plena, pasos, t0 = [], [], 0, 0.0
+    while t0 < per[0]:
+        aim = g.get_editor_property('sweep_aim')
+        pintado.append(comp.get_editor_property('intensity'))
+        plena.append(luz_en(V(aim.x, aim.y, 100)))
+        yield 0.5; t0 += 0.5
+        if dist2d(aim, g.get_editor_property('sweep_aim')) > 50.0:
+            pasos += 1
+    check('la mancha recorre el suelo y hace paradas', 0.4 * len(pintado) < pasos < len(pintado), '%d de %d medidas en movimiento' % (pasos, len(pintado)))
+    check('para el sigilo el foco cuenta siempre lo mismo (800 lm pintados, 8000 de sigilo)', abs(base - 800.0) < 1.0, '%.0f' % base)
+    check('lo que pinta cambia con la distancia, con tope (no quema lo que tiene cerca)', min(pintado) >= 0.35 * base - 1 and max(pintado) <= 2.5 * base + 1 and max(pintado) - min(pintado) > 40,
+          '%.0f a %.0f lm' % (min(pintado), max(pintado)))
+    check('dentro de la mancha estás a plena luz', sorted(plena)[len(plena) // 2] > 0.5, '%.2f de mediana, %.2f la peor' % (sorted(plena)[len(plena) // 2], min(plena)))
+    # el foco acude a una alarma de abajo y vuelve
+    tl = g.get_actor_location()
+    p0 = g.sweep_point_at(0.0)
+    k = 1500.0 / max(1.0, dist2d(tl, p0))
+    sitio = V(tl.x + (p0.x - tl.x) * k + 500.0, tl.y + (p0.y - tl.y) * k, 0.0)
+    check('una alarma muy lejos de la torre no mueve el foco', not g.call_beam(V(tl.x + 9000, tl.y, 0), 4.0), '')
+    ok = g.call_beam(sitio, 4.0)
+    yield ('hasta', lambda: dist2d(g.get_editor_property('sweep_aim'), sitio) < 150.0, 6.0)
+    check('alarma cerca: el foco deja su recorrido y acude', ok and dist2d(g.get_editor_property('sweep_aim'), sitio) < 150.0, '%.0f cm' % dist2d(g.get_editor_property('sweep_aim'), sitio))
+    yield ('hasta', lambda: g.get_editor_property('beam_call_t') <= 0.0, 6.0)
+    yield 4.0
+    aim, quiere = g.get_editor_property('sweep_aim'), g.sweep_point_at(g.sweep_time())
+    check('y luego vuelve a su recorrido', g.get_editor_property('beam_call_t') <= 0.0 and dist2d(aim, quiere) < 300.0, '%.0f cm' % dist2d(aim, quiere))
+    # la alarma de verdad: un guardia de suelo entra en alerta junto a la torre
+    suelo = sorted([x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) in ('PATROL', 'RETURN')], key=lambda x: dist2d(x.get_actor_location(), tl))
+    if suelo:
+        suelo[0].alarm(sitio)
+        yield 0.3
+        check('cuando uno de abajo da la alarma, el foco acude solo', g.get_editor_property('beam_call_t') > 0.0, '%.1f s' % g.get_editor_property('beam_call_t'))
+
+
+def prueba_sombra():
+    """Tanda 26: tu sombra te delata. Bajo una farola que dibuja sombra, la tuya se alarga por el suelo; un guardia que
+    no te ve a ti pero sí ve la sombra se mosquea («?» malva), sin llegar nunca a la alarma. Agachado es más corta, a
+    oscuras no hay, y una luz que no dibuja sombra no delata."""
+    d = director()
+    aparte()
+    _focos_torre(False)      # que el foco de una torre no pase por aquí a media medida
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    f = ext['farolas'][0]
+    fx, fy = f[0] * 100.0 + 25.0, f[1] * 100.0
+    far = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.Light) if a.get_actor_label().startswith('farola') and dist2d(a.get_actor_location(), V(fx, fy, 0)) < 150]
+    comp = far[0].get_component_by_class(unreal.LocalLightComponent) if far else None
+    check('la farola del camino dibuja sombra', comp is not None and comp.get_editor_property('cast_shadows'), [a.get_actor_label() for a in far])
+    if not comp:
+        _focos_torre(True)
+        return
+    for g in guardias():
+        g.hold(3600.0)
+    if agachado():
+        d.simulate_key('C'); yield 0.3
+    px, py = fx + 175.0, fy - 70.0
+    tp(px, py); yield 0.4
+    n = d.measure_shadows()
+    tips, con = list(d.get_editor_property('shadow_tips')), list(d.get_editor_property('shadow_contrasts'))
+    largo = max([dist2d(t, V(px, py, 0)) for t in tips] or [0.0])
+    lejos = all((t.x - fx) ** 2 + (t.y - fy) ** 2 > (px - fx) ** 2 + (py - fy) ** 2 for t in tips)
+    check('de pie junto a la farola echas sombra, y cae al otro lado de la luz', n >= 2 and lejos and 100.0 < largo < 450.0, '%d puntos, %.0f cm' % (n, largo))
+    check('la sombra se marca (la farola manda sobre el resto de la luz)', con and min(con) >= 0.6, ['%.2f' % c for c in con])
+    d.simulate_key('C'); yield 0.4
+    d.measure_shadows()
+    corto = max([dist2d(t, V(px, py, 0)) for t in d.get_editor_property('shadow_tips')] or [0.0])
+    check('agachado, la sombra es más corta', agachado() and corto < largo - 30.0, '%.0f frente a %.0f cm' % (corto, largo))
+    d.simulate_key('C'); yield 0.4
+    comp.set_cast_shadows(False); yield 0.1
+    check('una luz que no dibuja sombra no delata', d.measure_shadows() == 0, len(d.get_editor_property('shadow_tips')))
+    comp.set_cast_shadows(True); yield 0.1
+    tp(fx + 1250.0, 6950.0); yield 0.3
+    check('a oscuras no hay sombra', d.measure_shadows() == 0, len(d.get_editor_property('shadow_tips')))
+    # un guardia que ve la sombra y no a ti: a 3 m de la punta, de lado, con la punta dentro de su cono y tú fuera
+    tp(px, py); yield 0.3
+    d.measure_shadows()
+    tips = list(d.get_editor_property('shadow_tips'))
+    punta = max(tips, key=lambda t: dist2d(t, V(px, py, 0))) if tips else V(px + 164, py - 66, 0)
+    sx, sy = punta.x - px, punta.y - py
+    sl = math.hypot(sx, sy) or 1.0
+    gx, gy = punta.x - sy / sl * 300.0, punta.y + sx / sl * 300.0
+    a_punta = math.degrees(math.atan2(punta.y - gy, punta.x - gx))
+    a_ti = math.degrees(math.atan2(py - gy, px - gx))
+    lado = 1.0 if ((a_punta - a_ti + 180.0) % 360.0 - 180.0) > 0 else -1.0
+    obs = guardia('Carmona')
+    obs.go_to(V(gx, gy, obs.get_actor_location().z))
+    obs.set_actor_location(V(gx, gy, obs.get_actor_location().z), False, True)
+    obs.hold(0.05)
+    yield ('hasta', lambda: estado(obs) == 'PATROL', 4.0)
+    obs.set_actor_rotation(unreal.Rotator(0.0, 0.0, a_punta + lado * 35.0), True)
+    yield 0.1
+    check('el guardia tiene la sombra delante y a ti fuera de su vista', obs.visibility(jugador()) <= 0.0 and estado(obs) == 'PATROL', '%.2f, %s' % (obs.visibility(jugador()), estado(obs)))
+    quieto, n0 = d.get_editor_property('shadow_still_factor'), d.get_editor_property('shadow_noticed')
+    d.set_editor_property('shadow_still_factor', 1.0)      # el jugador de la prueba no anda: que cuente como si se moviera
+    yield ('hasta', lambda: obs.is_shadow_curious(), 8.0)
+    m = obs.get_editor_property('meter')
+    check('ve tu sombra y se mosquea, sin haberte visto', obs.is_shadow_curious() and estado(obs) == 'SUSPICIOUS' and d.get_editor_property('shadow_noticed') == n0 + 1,
+          '%s, sospecha %.2f, %s' % (estado(obs), m, d.get_editor_property('shadow_watcher')))
+    check('una sombra nunca da la alarma (la sospecha tiene tope)', m <= d.get_editor_property('shadow_cap') + 0.01, '%.2f' % m)
+    check('y se explica la primera vez', 'SOMBRA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
+    aparte()
+    yield ('hasta', lambda: estado(obs) in ('RETURN', 'PATROL'), 25.0)
+    check('sin sombra que mirar, se le pasa y vuelve', estado(obs) in ('RETURN', 'PATROL'), estado(obs))
+    # el interruptor
+    d.set_editor_property('shadow_tells', False)
+    tp(px, py); yield 0.6
+    check('con el interruptor quitado, la sombra no cuenta', len(d.get_editor_property('shadow_tips')) == 0 and not obs.is_shadow_curious(), len(d.get_editor_property('shadow_tips')))
+    d.set_editor_property('shadow_tells', True)
+    d.set_editor_property('shadow_still_factor', quieto)
+    aparte()
+    _focos_torre(True)
 
 
 def prueba_cobertura():
@@ -1435,7 +1587,15 @@ def prueba_camion():
     yield ('hasta', lambda: estado_c() == 1, 3.0)
     faros = actores('camion', unreal.Light)
     check('aparece con los faros encendidos', estado_c() == 1 and not any(a.get_editor_property('hidden') for a in piezas)
-          and len(faros) == 1 and faros[0].get_component_by_class(unreal.LocalLightComponent).is_visible(), '%s, %d faros' % (estado_c(), len(faros)))
+          and len(faros) == 2 and all(a.get_component_by_class(unreal.LocalLightComponent).is_visible() for a in faros), '%s, %d faros' % (estado_c(), len(faros)))
+    # tanda 26: dos faros de verdad (entre los dos pintan lo que la luz única), con perfil de haz, cristal y destello; uno con sombra
+    fc = d.truck_lamp_counts()
+    comps = [a.get_component_by_class(unreal.LocalLightComponent) for a in faros]
+    total = sum(c.get_editor_property('intensity') for c in comps)
+    con_sombra = sum(1 for c in comps if c.get_editor_property('cast_shadows'))
+    check('dos faros que suman los lúmenes de antes, y solo uno da sombra', fc.x == 2 and abs(total - d.get_editor_property('truck_lamp_lumens')) < 1 and con_sombra == 1,
+          '%d faros, %d lm, %d con sombra' % (fc.x, total, con_sombra))
+    check('cada faro lleva el perfil del haz de cruce, su cristal y su destello', fc.y == 2 and fc.z == 4, '%d con perfil, %d piezas de luz' % (fc.y, fc.z))
     yield ('hasta', lambda: 'CAMION' in str(director().get_editor_property('message')), 4.0)
     check('se avisa la primera vez', 'VIENE UN CAMION' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     yield ('hasta', lambda: estado_c() == 2, 25.0)
@@ -1846,7 +2006,7 @@ def prueba_puertas():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra]]
 PRUEBAS = []
 
 
@@ -1884,6 +2044,8 @@ def _limpieza(siguiente):
     # el camión (tanda 21) solo en sus pruebas: en las demás cruzaría la base a mitad de una medida de luz o de una captura
     if d:
         d.set_editor_property('truck', siguiente in (prueba_camion, prueba_viaje))
+        # tu sombra (tanda 26) solo en su prueba: las demás plantan al jugador bajo farolas para medir otra cosa
+        d.set_editor_property('shadow_tells', siguiente is prueba_sombra)
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 

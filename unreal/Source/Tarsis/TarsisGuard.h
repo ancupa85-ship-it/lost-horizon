@@ -91,6 +91,70 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
 	float TowerSweep = 54.0f;
 
+	/** Recorrido del foco por el suelo (tanda 26): puntos del mundo que el haz va pisando, siempre igual, para que se
+	 *  pueda aprender. Los pone tools/unreal/guardias.py desde mision1.json. Con menos de dos puntos, el foco barre a
+	 *  un lado y a otro como antes (TowerYaw y TowerSweep). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre", meta = (MakeEditWidget = "true"))
+	TArray<FVector> SweepPath;
+
+	/** Cerrado (del último punto vuelve al primero) o de ida y vuelta. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	bool bSweepLoop = true;
+
+	/** A qué paso recorre el suelo la mancha del foco (cm/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float SweepSpeed = 350.0f;
+
+	/** Segundos que el foco se queda quieto en cada punto del recorrido (donde falte, no se para). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	TArray<float> SweepStops;
+
+	/** En qué segundo de su vuelta arranca (fijo: cada partida empieza igual, y las dos torres van desacompasadas). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float SweepPhase = 0.0f;
+
+	/** Distancia (cm) a la que el foco pinta con los lúmenes que trae del nivel: más lejos sube y más cerca baja, para
+	 *  que la mancha se vea igual de fuerte en todo el recorrido y no queme lo que tiene cerca. Para el sigilo cuenta
+	 *  siempre lo mismo (BeamLumens). 0 = no se toca la intensidad. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float SweepRefDist = 0.0f;
+
+	/** Hasta dónde acude el foco cuando un guardia de suelo da la alarma (cm desde la torre) y cuánto se queda (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float BeamCallRadius = 4500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float BeamCallSeconds = 8.0f;
+
+	/** Punto del suelo al que apunta el foco ahora. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Torre")
+	FVector SweepAim = FVector::ZeroVector;
+
+	/** Lúmenes del foco para el sigilo (los que traía del nivel al empezar; lo pintado va aparte). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Torre")
+	float BeamLumens = 0.0f;
+
+	/** Segundos que le quedan al foco en el sitio de una alarma (0 = sigue su recorrido). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Torre")
+	float BeamCallT = 0.0f;
+
+	/** Punto del recorrido en el segundo T de la vuelta (con sus paradas). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Torre")
+	FVector SweepPointAt(float T) const;
+
+	/** Lo que dura una vuelta entera del foco (s); 0 si no hay recorrido. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Torre")
+	float SweepPeriod() const;
+
+	/** Segundo de la vuelta por el que va el foco. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Torre")
+	float SweepTime() const { return TowerT; }
+
+	/** Alarma abajo: el foco deja su recorrido y se va a Where durante Seconds; luego vuelve al punto más cercano.
+	 *  Solo si el centinela estaba tranquilo y el sitio le queda a mano (BeamCallRadius). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Torre")
+	bool CallBeam(const FVector& Where, float Seconds);
+
 	/** Un compañero (por ejemplo una torre) da la voz: viene corriendo a ese sitio. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Alarm(const FVector& Where);
@@ -292,6 +356,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis", meta = (WorldContext = "WorldContext"))
 	static float LightAt(const UObject* WorldContext, FVector Point);
 
+	/** Sombras que echa Who ahora mismo (tanda 26). Por cada luz con sombra que le da de lleno (aporta MinLight o más
+	 *  en su pecho) se tiran tres rayos (cabeza, pecho y rodillas: Heights, en cm sobre sus pies) hasta el suelo o la
+	 *  pared de detrás. Un punto cuenta si allí esa luz sigue alumbrando y manda sobre las demás (Contrast = lo que
+	 *  aporta esa luz entre toda la que llega). Solo las luces que dibujan sombra: lo que el guardia nota es lo que
+	 *  tú ves en pantalla. Devuelve cuántos puntos hay. */
+	static int32 ShadowsOf(const UObject* WorldContext, const AActor* Who, const TArray<float>& Heights, float MinLight, TArray<FVector>& Tips, TArray<float>& Contrast);
+
+	/** Ha visto una sombra de alguien a quien no ve: la sospecha sube Amount (hasta Cap, nunca hasta la alerta) y, si
+	 *  pasa de 0,3, deja la ronda y va a mirar la punta de la sombra (Tip), vuelto hacia donde venía (From). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	bool NoticeShadow(const FVector& Tip, const FVector& From, float Amount, float Cap = 0.55f);
+
+	/** Mosqueado por una sombra (el «?» sale de otro color). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	bool IsShadowCurious() const { return bShadow; }
+
 	/** Linterna en la mano (durante el apagón): el cono se ve en la niebla y cuenta como luz para verte. */
 	void SetFlashlight(bool bOn);
 	bool HasFlashlightOn() const;
@@ -377,6 +457,9 @@ private:
 	bool bNoPath = false;
 	float DownT = 0.0f;
 	bool bInvestigate = false;
+	bool bShadow = false;
+	FVector ShadowFrom = FVector::ZeroVector;
+	float ShadowHoldT = 0.0f;
 	float BlendPos = 0.0f;
 	bool bRepairing = false;
 	FVector RepairCenter = FVector::ZeroVector;
@@ -404,5 +487,12 @@ private:
 	void TowerTick(float DeltaSeconds, APawn* Player, float V);
 	float TowerT = 0.0f;
 	float LightPitch = 0.0f;
+	bool HasSweepPath() const { return SweepPath.Num() >= 2 && TowerLight != nullptr; }
+	void SweepSequence(TArray<int32>& Out) const;
+	float SweepTimeNear(const FVector& P) const;
+	void AimBeam(float DeltaSeconds, bool bSnap);
+	FVector BeamCall = FVector::ZeroVector;
+	bool bSweepAway = false;
+	float BeamPaint = 0.0f;
 	TObjectPtr<UAnimationAsset> CurrentAnim;
 };

@@ -35,7 +35,10 @@ Con el editor abierto y el nivel Tarsis cargado, en este orden (cada uno se pued
    comprobación que vale es la de después de reabrir: una prueba que lee parámetros no prueba lo que se ve.
 
 Para comprobar: `py tools/unreal/medir.py` (fps y VRAM en tres sitios; tabla en `docs/rendimiento.md`),
-`py tools/unreal/capturas.py <prefijo>` (tres cámaras fijas, en `Saved/Capturas`) y `py tools/unreal/pruebas.py`.
+`py tools/unreal/capturas.py <prefijo> [serie]` (cámaras fijas, en `Saved/Capturas`; la serie `tanda26` trae los focos,
+la sombra y un cuarto por cámara), `py tools/unreal/barracon.py` (qué cuesta cada luz en el barracón oeste y las sombras
+de las farolas, cambiando una cosa cada vez) y `py tools/unreal/pruebas.py`. `python3 tools/unreal/ies.py` (fuera de
+Unreal) escribe el perfil del haz de los faros del camión; `cielo.py` lo importa.
 `py tools/unreal/memoria.py` hace el inventario de la memoria de vídeo que piden las texturas (no cambia nada).
 Los sonidos nuevos salen de `python tools/sonido/generar_sonidos.py` (fluorescente, radio_barracon, gotera) y se importan
 con `py tools/unreal/sonidos.py`.

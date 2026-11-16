@@ -49,6 +49,7 @@
 #include "Components/DecalComponent.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Kismet/KismetMaterialLibrary.h"
+#include "Engine/TextureLightProfile.h"
 
 ATarsisDirector::ATarsisDirector()
 {
@@ -320,6 +321,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	}
 	if (DartT > 0.0f) DartT -= DeltaSeconds;
 	NoiseTick(C, DeltaSeconds);
+	ShadowTick(C, DeltaSeconds);
 	BobTick(C, DeltaSeconds);
 	ArmsTick(C, DeltaSeconds);
 	SoundTick(C, DeltaSeconds);
@@ -985,6 +987,80 @@ void ATarsisDirector::NoiseTick(ACharacter* C, float DeltaSeconds)
 }
 
 // ---------------------------------------------------------------- empezar sin armas: consejos y empujón de frente
+
+// ---------------------------------------------------------------- tu sombra te delata (tanda 26)
+// Bajo una luz que dibuja sombras, la tuya se alarga por el suelo o sube por la pared. Un guardia que no te ve a ti
+// (estás tras una esquina, o a su espalda no: tiene que caerle en el cono) pero sí ve esa sombra se mosquea: «?» malva,
+// va a mirar la punta y se vuelve hacia donde venía. Nunca da la alarma por sí sola. Agachado es más corta; quieto,
+// llama mucho menos.
+int32 ATarsisDirector::MeasureShadows()
+{
+	ShadowTips.Reset();
+	ShadowContrasts.Reset();
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!C || bDone || bCine || bCapturing || bHiding || bRiding || C->IsHidden()) return 0;
+	TArray<float> Heights;
+	if (C->bIsCrouched) Heights = { 110.0f, 70.0f, 35.0f };
+	else Heights = { 170.0f, 110.0f, 45.0f };
+	TArray<FVector> Tips;
+	TArray<float> Con;
+	ATarsisGuard::ShadowsOf(this, C, Heights, ShadowMinLight, Tips, Con);
+	for (int32 i = 0; i < Tips.Num(); ++i)
+	{
+		if (Con[i] >= ShadowMinContrast) { ShadowTips.Add(Tips[i]); ShadowContrasts.Add(Con[i]); }
+	}
+	return ShadowTips.Num();
+}
+
+void ATarsisDirector::ShadowTick(ACharacter* C, float DeltaSeconds)
+{
+	if (!bShadowTells)
+	{
+		if (ShadowTips.Num() > 0) { ShadowTips.Reset(); ShadowContrasts.Reset(); }
+		return;
+	}
+	ShadowT -= DeltaSeconds;
+	if (ShadowT > 0.0f) return;
+	const float Step = 0.2f;   // cinco veces por segundo sobra: una sombra no es un disparo
+	ShadowT = Step;
+	if (MeasureShadows() == 0) return;
+	const bool bStill = C->GetVelocity().Size2D() < 20.0f;
+	const FVector From = C->GetActorLocation();
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		ATarsisGuard* G = *It;
+		if (G->bTowerSentry || G->bAlly || G->State == ETarsisGuardState::Down || G->State == ETarsisGuardState::Alert || G->IsStunned()) continue;
+		if (G->Visibility(C) > 0.0f) continue;   // te ve a ti: eso ya lo lleva su vista
+		const FVector Eye = G->GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
+		const float CosView = FMath::Cos(FMath::DegreesToRadians(G->ViewHalfAngle));
+		float Best = 0.0f;
+		FVector BestTip = FVector::ZeroVector;
+		for (int32 i = 0; i < ShadowTips.Num(); ++i)
+		{
+			const FVector To = ShadowTips[i] - Eye;
+			const float D = To.Size();
+			if (D >= ShadowRange) continue;
+			if (FVector::DotProduct(G->GetActorForwardVector(), To.GetSafeNormal2D()) < CosView) continue;
+			const float A = ShadowRate * ShadowContrasts[i] * (1.0f - D / ShadowRange);
+			if (A <= Best) continue;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisSombraVista), true, G);
+			Q.AddIgnoredActor(C);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, ShadowTips[i], ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, ShadowTips[i]) > 40.0f) continue;
+			Best = A;
+			BestTip = ShadowTips[i];
+		}
+		if (Best <= 0.0f) continue;
+		if (bStill) Best *= ShadowStillFactor;
+		const bool bWas = G->IsShadowCurious();
+		if (G->NoticeShadow(BestTip, From, Best * Step, ShadowCap) && !bWas)
+		{
+			++ShadowNoticed;
+			ShadowWatcher = G->GuardName;
+			Teach(TEXT("ensena_sombra"), TEXT("TU SOMBRA TE DELATA\nBajo una luz, tu sombra llega antes que tu. Agachate, quedate quieto o rodea la luz."), {}, 4.5f);
+		}
+	}
+}
 
 void ATarsisDirector::HintTick()
 {
@@ -2068,22 +2144,52 @@ void ATarsisDirector::SetupTruck()
 	if (TruckParts.Num() == 0) return;
 	FActorSpawnParameters P;
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	TruckLamp = GetWorld()->SpawnActor<ASpotLight>(TruckStart, FRotator(-5.0f, 0.0f, 0.0f), P);
-	if (TruckLamp)
+	// tanda 26: dos faros con el haz de cruce de un camión de los 80 (perfil IES propio), cristal encendido y destello.
+	// Entre los dos pintan TruckLampLumens y cuentan para el sigilo lo que contaba la luz única; solo uno da sombra
+	UTextureLightProfile* Profile = TruckIESPath.IsEmpty() ? nullptr : LoadObject<UTextureLightProfile>(nullptr, *TruckIESPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	UMaterialInterface* LensMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Faro_Cristal.MI_Faro_Cristal"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UMaterialInterface* GlowMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Halo_Faro.MI_Halo_Faro"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	for (int32 i = 0; i < 2; ++i)
 	{
-		TruckLamp->Tags.Add(FName(TEXT("camion")));
-		TruckLamp->Tags.Add(FName(TEXT("luz_fuerte")));   // TruckLampLumens es lo que se pinta; para el sigilo, diez veces más
-		if (USceneComponent* Root = TruckLamp->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
-		if (USpotLightComponent* L = Cast<USpotLightComponent>(TruckLamp->GetLightComponent()))
+		ASpotLight* Lamp = GetWorld()->SpawnActor<ASpotLight>(TruckStart, FRotator(TruckLampPitch, 0.0f, TruckLampRoll), P);
+		(i == 0 ? TruckLamp : TruckLamp2) = Lamp;
+		if (!Lamp) continue;
+		Lamp->Tags.Add(FName(TEXT("camion")));
+		Lamp->Tags.Add(FName(TEXT("luz_fuerte")));   // lo que se pinta; para el sigilo, diez veces más
+		if (USceneComponent* Root = Lamp->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
+		if (USpotLightComponent* L = Cast<USpotLightComponent>(Lamp->GetLightComponent()))
 		{
 			L->SetIntensityUnits(ELightUnits::Lumens);
-			L->SetIntensity(TruckLampLumens);
+			L->SetIntensity(TruckLampLumens * 0.5f);
 			L->SetAttenuationRadius(3800.0f);
 			L->SetOuterConeAngle(30.0f);
 			L->SetInnerConeAngle(14.0f);
 			L->SetLightColor(FLinearColor(1.0f, 0.88f, 0.66f));
-			L->SetCastShadows(bTruckShadows);
-			L->SetVolumetricScatteringIntensity(10.0f);
+			L->SetCastShadows(bTruckShadows && i == 0);
+			L->SetVolumetricScatteringIntensity(5.0f);   // dos haces en la lluvia: cada uno la mitad que el único de antes
+			L->SetSourceRadius(8.0f);
+			if (Profile) { L->SetIESTexture(Profile); L->SetUseIESBrightness(false); ++TruckProfiles; }
+		}
+		// cristal (una lenteja encendida, pegada a la calandra) y destello (esfera aditiva, como los de las farolas)
+		struct FGlow { UMaterialInterface* Mat; float Size; float Flat; float Back; };
+		const FGlow Glows[2] = { { LensMat, TruckLensSize, 0.35f, -13.0f }, { GlowMat, TruckGlowSize, 1.0f, -8.0f } };
+		for (const FGlow& G : Glows)
+		{
+			if (!Sphere || !G.Mat || G.Size <= 0.0f) continue;
+			UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Lamp);
+			M->SetMobility(EComponentMobility::Movable);
+			M->SetStaticMesh(Sphere);
+			M->SetMaterial(0, G.Mat);
+			M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			M->SetCastShadow(false);
+			M->bAffectDynamicIndirectLighting = false;
+			M->bAffectDistanceFieldLighting = false;
+			M->SetupAttachment(Lamp->GetRootComponent());
+			M->SetRelativeLocation(FVector(G.Back, 0.0f, 0.0f));
+			M->SetRelativeScale3D(FVector(G.Size * G.Flat, G.Size, G.Size) / 100.0f);
+			M->RegisterComponent();
+			TruckGlows.Add(M);
 		}
 	}
 	if (USoundBase* S = Sfx(TEXT("camion_motor")))
@@ -2102,6 +2208,11 @@ void ATarsisDirector::SetupTruck()
 	TruckReset(TruckFirstDelay);
 }
 
+FIntVector ATarsisDirector::TruckLampCounts() const
+{
+	return FIntVector((TruckLamp ? 1 : 0) + (TruckLamp2 ? 1 : 0), TruckProfiles, TruckGlows.Num());
+}
+
 void ATarsisDirector::TruckShow(bool bShow)
 {
 	for (AActor* A : TruckParts)
@@ -2110,7 +2221,11 @@ void ATarsisDirector::TruckShow(bool bShow)
 		A->SetActorHiddenInGame(!bShow);
 		A->SetActorEnableCollision(bShow);
 	}
-	if (TruckLamp && TruckLamp->GetLightComponent()) TruckLamp->GetLightComponent()->SetVisibility(bShow);
+	for (ASpotLight* Lamp : { TruckLamp.Get(), TruckLamp2.Get() })
+	{
+		if (Lamp && Lamp->GetLightComponent()) Lamp->GetLightComponent()->SetVisibility(bShow);
+	}
+	for (UStaticMeshComponent* M : TruckGlows) { if (M) M->SetVisibility(bShow); }
 	if (TruckAudio)
 	{
 		if (bShow && !TruckAudio->IsPlaying()) TruckAudio->Play();
@@ -2125,8 +2240,10 @@ void ATarsisDirector::TruckPlace()
 	{
 		if (A) A->SetActorLocation(L, false, nullptr, ETeleportType::TeleportPhysics);
 	}
-	// los dos faros en una sola luz, delante de la calandra (la malla no le hace sombra) y algo hacia el suelo
-	if (TruckLamp) TruckLamp->SetActorLocationAndRotation(L + FVector(212.0f, 0.0f, 122.0f), FRotator(-5.0f, 0.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	// los dos faros, delante de la calandra (la malla no les hace sombra) y algo hacia el suelo
+	const FRotator LampRot(TruckLampPitch, 0.0f, TruckLampRoll);
+	if (TruckLamp) TruckLamp->SetActorLocationAndRotation(L + FVector(212.0f, TruckLampSpread, 122.0f), LampRot, false, nullptr, ETeleportType::TeleportPhysics);
+	if (TruckLamp2) TruckLamp2->SetActorLocationAndRotation(L + FVector(212.0f, -TruckLampSpread, 122.0f), LampRot, false, nullptr, ETeleportType::TeleportPhysics);
 	if (TruckAudio)
 	{
 		TruckAudio->SetWorldLocation(L + FVector(120.0f, 0.0f, 130.0f));

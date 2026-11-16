@@ -320,6 +320,81 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
 	bool bTruckShadows = true;
 
+	/** Tanda 26: dos faros de verdad en vez de una sola luz. Cada uno pinta la mitad de TruckLampLumens (entre los dos
+	 *  cuentan para el sigilo lo mismo que antes la luz única) y solo el primero da sombra. Separación del eje (cm),
+	 *  cabeceo (grados; el perfil ya lleva el punto fuerte 2,5 grados bajo el eje) y giro sobre el eje, para poner
+	 *  derecho el dibujo del perfil (se calibra con una captura contra el muro: 0, 90, 180 o 270). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckLampSpread = 72.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckLampPitch = -3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckLampRoll = 0.0f;
+
+	/** Perfil del haz (haz de cruce escrito en tools/unreal/ies.py e importado por tools/unreal/cielo.py). Vacío o si
+	 *  no existe: el cono liso de siempre. Solo cambia el dibujo de la luz en el suelo, no lo que cuenta para verte. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	FString TruckIESPath = TEXT("/Game/Tarsis/Luces/faro_cruce.faro_cruce");
+
+	/** Cristal encendido y destello de cada faro (materiales de tools/unreal/cielo.py); diámetros en cm. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckLensSize = 17.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckGlowSize = 60.0f;
+
+	/** Faros que tiene el camión, cuántos llevan perfil y cuántos cristales y destellos se le han puesto (pruebas). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
+	FIntVector TruckLampCounts() const;
+
+	// ---- tu sombra te delata (tanda 26) ----
+	/** Interruptor: un guardia que no te ve pero ve tu sombra (bajo una luz que dibuje sombras) se mosquea. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sombra")
+	bool bShadowTells = true;
+
+	/** Sospecha por segundo con la sombra bien marcada y a sus pies; cae con la distancia hasta ShadowRange (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sombra")
+	float ShadowRate = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sombra")
+	float ShadowRange = 1400.0f;
+
+	/** Una sombra nunca da la alarma: la sospecha que mete no pasa de aquí. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sombra")
+	float ShadowCap = 0.55f;
+
+	/** Lo que tiene que aportarte una luz para que tu sombra cuente (0-1, la escala de LightAt) y cuánto tiene que
+	 *  mandar esa luz en el sitio donde cae la sombra (1 = solo alumbra ella). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sombra")
+	float ShadowMinLight = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sombra")
+	float ShadowMinContrast = 0.6f;
+
+	/** Quieto, tu sombra llama mucho menos la atención que moviéndose. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sombra")
+	float ShadowStillFactor = 0.25f;
+
+	/** Dónde cae tu sombra ahora (puntos del mundo) y cuánto se marca cada punto (pruebas y ajuste). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sombra")
+	TArray<FVector> ShadowTips;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sombra")
+	TArray<float> ShadowContrasts;
+
+	/** Veces que un guardia se ha mosqueado por tu sombra y quién fue el último. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sombra")
+	int32 ShadowNoticed = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sombra")
+	FString ShadowWatcher;
+
+	/** Mide las sombras ahora mismo, sin esperar al siguiente paso (pruebas). Devuelve cuántos puntos cuentan. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Sombra")
+	int32 MeasureShadows();
+
 	/** Hasta dónde ve el conductor a quien esté de pie delante, dentro del haz de los faros (agachado, la mitad). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
 	float TruckSight = 2200.0f;
@@ -1030,6 +1105,13 @@ private:
 	TArray<TObjectPtr<AActor>> EntryLeaf;
 	UPROPERTY()
 	TObjectPtr<class ASpotLight> TruckLamp;
+	UPROPERTY()
+	TObjectPtr<class ASpotLight> TruckLamp2;
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> TruckGlows;
+	void ShadowTick(ACharacter* C, float DeltaSeconds);
+	float ShadowT = 0.0f;
+	int32 TruckProfiles = 0;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> TruckAudio;
 	UPROPERTY()

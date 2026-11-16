@@ -5,6 +5,7 @@ en el actor DirectorSigilo, así que la partida empaquetada no necesita el .json
 
 mision1.json:
   «ajustes»   propiedades por nombre del director («director») y de los guardias («guardias»: «*» o el nombre del guardia)
+              y «montaje», que no va al director: lo lee montar_base.py (qué farolas dan sombra)
   «textos»    clave -> texto de todo lo que sale en pantalla (ATarsisDirector::Tx; {0}, {1}... son los datos)
   «objetivos» lista ordenada {si: bandera, texto: clave}: el HUD muestra el primero cuya bandera esté puesta
   «puntos»    puntos de interacción sencillos (puerta de la jefatura, mesa de Alarcón, litera de Ramos, botiquín,
@@ -75,6 +76,9 @@ def ajustar(actor, props):
                     v = unreal.Vector(*[float(x) for x in v])
             except Exception:
                 pass
+        # lista de puntos [[x, y, z], ...] (el recorrido del foco de una torre): TArray<FVector>
+        elif isinstance(v, list) and v and all(isinstance(x, list) and len(x) == 3 for x in v):
+            v = [unreal.Vector(*[float(c) for c in x]) for x in v]
         poner(actor, k, v)
 
 def aplicar(director=None):

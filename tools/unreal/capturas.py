@@ -1,6 +1,6 @@
 """Capturas desde cámaras fijas del nivel Tarsis (para comparar antes y después de un cambio de aspecto).
 
-Uso (en el editor): py tools/unreal/capturas.py [prefijo]
+Uso (en el editor): py tools/unreal/capturas.py [prefijo] [serie]      (series: base, tanda26)
 Abre el PIE, salta la entrada, quita el HUD, para y oculta a los guardias y, desde cada cámara de CAMARAS, espera a que se
 asiente la imagen y hace un HighResShot de 1920x1080. Las imágenes quedan en Saved/Capturas/<prefijo>_<cámara>.png.
 """
@@ -14,6 +14,33 @@ CAMARAS = [
     ('puerta', V(1750, 1250, 110), V(1300, 2050, 160)),
     ('patio', V(3000, 450, 110), V(900, 2000, 60)),
 ]
+# tanda 26: la serie nueva (py tools/unreal/capturas.py <prefijo> tanda26). Los sitios salen del plano, sin haberlos
+# visto en pantalla: si una cámara cae dentro de un mueble o mira a una pared, se corrige aquí. Los guardias se paran al
+# empezar, así que cada foco de torre queda quieto donde le pille (al principio de su vuelta: torre 1 junto a la puerta
+# del barracón, torre 2 a media recta del camino).
+TANDA26 = [
+    # los dos focos de torre y su mancha en el suelo
+    ('foco_patio', V(3400, 3900, 110), V(2500, 2600, 40)),
+    ('foco_camino', V(3300, 5950, 110), V(5000, 5700, 40)),
+    # tu sombra bajo la primera farola del camino (se mira al suelo, hacia donde cae)
+    ('sombra_farola', V(1270, 5700, 110), V(1700, 5560, 0)),
+    # la luz de dentro, un cuarto por cámara (bombillas interior_1 a interior_6 de base.json)
+    ('dentro_1', V(1050, 3850, 110), V(350, 3300, 120)),
+    ('dentro_2_archivo', V(1500, 3900, 110), V(2100, 3300, 120)),
+    ('dentro_3', V(6500, 1900, 110), V(5500, 1300, 120)),
+    ('dentro_4', V(5300, 1850, 110), V(5900, 1500, 120)),
+    ('dentro_5', V(6500, 2300, 110), V(6400, 1700, 120)),
+    ('dentro_6_roja', V(6500, 2900, 110), V(6100, 2650, 120)),
+    # las de siempre, para comparar la exposición nueva con la 25f
+    ('interior', V(2080, 2620, 110), V(300, 2760, 90)),
+    ('puerta', V(1750, 1250, 110), V(1300, 2050, 160)),
+    ('patio', V(3000, 450, 110), V(900, 2000, 60)),
+]
+SERIES = {'base': CAMARAS, 'tanda26': TANDA26}
+if len(sys.argv) > 2 and sys.argv[2] in SERIES:
+    CAMARAS = SERIES[sys.argv[2]]
+# o una lista propia desde fuera: builtins._tarsis_camaras = [(nombre, posición, mira), ...]
+CAMARAS = getattr(builtins, '_tarsis_camaras', None) or CAMARAS
 PREFIJO = sys.argv[1] if len(sys.argv) > 1 else time.strftime('%H%M%S')
 OUT = os.path.join(unreal.Paths.project_saved_dir(), 'Capturas')
 SHOTS = os.path.join(unreal.Paths.project_saved_dir(), 'Screenshots')

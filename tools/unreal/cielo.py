@@ -44,8 +44,11 @@ RADIO_CUPULA = 120000.0
 # escena). Medida ahí mismo, la curva para la bóveda es pantalla = 17 x valor^1,68: cualquier diferencia entre canales se
 # dispara, así que el cielo tiene que ir casi gris aquí para salir azul noche allí. Objetivo: cenit 9, 14, 26 y horizonte
 # 15, 21, 34 (a medio camino del cubierto, que con lluvia ya salía creíble: 21, 28, 42).
+# Tanda 26: un tercio del camino de vuelta hacia el azul de la 0025b (cenit 0,0045 0,0080 0,0200). El gris de la 25c
+# quitó el añil, pero con la exposición más baja el cielo quedaba sin color; un tercio y no más, porque la curva dispara
+# cualquier diferencia entre canales. Se juzga con las capturas.
 CIELO = {
-    'Cenit': (0.0054, 0.0072, 0.0120), 'Horizonte': (0.0077, 0.0100, 0.0156),
+    'Cenit': (0.0051, 0.0075, 0.0147), 'Horizonte': (0.0085, 0.0120, 0.0204),
     'NubeLuz': (0.0125, 0.0150, 0.0205), 'NubeSombra': (0.0075, 0.0094, 0.0140),
     'Cubierto1': (0.0055, 0.0070, 0.0100), 'Cubierto2': (0.0100, 0.0125, 0.0170), 'Resplandor': (0.0140, 0.0090, 0.0040),
     'LunaColor': (0.80, 0.88, 1.00), 'EstrellaColor': (0.85, 0.92, 1.00),
@@ -287,6 +290,43 @@ def material_baston():
     return g.fin()
 
 
+# faros del camión (tanda 26): el perfil del haz (tools/unreal/ies.py lo escribe; aquí se importa), el cristal encendido
+# y el destello. El director los busca por estas rutas al crear los faros (ATarsisDirector::SetupTruck)
+IES_FARO = os.path.join(ROOT, 'assets', 'unreal', 'luces', 'faro_cruce.ies')
+DL = '/Game/Tarsis/Luces'
+FARO_COLOR = (1.0, 0.88, 0.66)
+
+
+def faros():
+    """Importa el perfil del faro y crea los dos materiales. Devuelve (perfil, cristal, destello)."""
+    perfil = None
+    ruta = DL + '/faro_cruce'
+    if os.path.exists(IES_FARO):
+        fecha = str(int(os.path.getmtime(IES_FARO)))
+        if eal.does_asset_exist(ruta) and eal.get_metadata_tag(eal.load_asset(ruta), 'lh_fecha') == fecha:
+            perfil = eal.load_asset(ruta)
+        else:
+            t = unreal.AssetImportTask()
+            t.set_editor_property('filename', IES_FARO)
+            t.set_editor_property('destination_path', DL)
+            t.set_editor_property('destination_name', 'faro_cruce')
+            t.set_editor_property('automated', True)
+            t.set_editor_property('replace_existing', True)
+            t.set_editor_property('save', False)
+            tools.import_asset_tasks([t])
+            perfil = eal.load_asset(ruta) if eal.does_asset_exist(ruta) else None
+            if perfil is not None:
+                eal.set_metadata_tag(perfil, 'lh_fecha', fecha)
+                eal.save_loaded_asset(perfil, False)
+    if perfil is None:
+        log('AVISO: cielo: sin perfil del faro (', IES_FARO, '): los faros del camión salen con el cono liso')
+    col = tuple(c ** 2.2 for c in FARO_COLOR)
+    cristal = _instancia('MI_Faro_Cristal', material_baston(), (), (('Color', (9.0 * col[0], 9.0 * col[1], 9.0 * col[2])),))
+    destello = _instancia('MI_Halo_Faro', material_halo(), (('Fuerza', 1.2), ('Caida', 9.0)), (('Color', col),))
+    log('faros del camión: perfil', 'sí' if perfil else 'no', '- cristal y destello hechos')
+    return perfil, cristal, destello
+
+
 def _instancia(nombre, base, escalares=(), vectores=()):
     ruta = DM + '/' + nombre
     mi = eal.load_asset(ruta) if eal.does_asset_exist(ruta) else tools.create_asset(
@@ -423,7 +463,7 @@ def director_luz():
 
 def todo():
     limpiar()
-    for paso in (cupula, luminarias, material_baston, director_luz):
+    for paso in (cupula, luminarias, material_baston, faros, director_luz):
         try:
             paso()
         except Exception as e:

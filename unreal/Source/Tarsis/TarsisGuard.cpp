@@ -533,8 +533,18 @@ void ATarsisGuard::BeginPlay()
 	if (bTowerSentry)
 	{
 		GetCharacterMovement()->DisableMovement();   // se queda en la plataforma, sin caer ni andar
-		TowerT = FMath::FRand() * 10.0f;
+		// tanda 26: arranque fijo. Con FRand el foco salía mirando a un sitio distinto en cada partida (y en cada
+		// captura): ni se podía aprender ni dos medidas del mismo punto valían lo mismo
+		TowerT = SweepPhase;
 		if (TowerLight) LightPitch = TowerLight->GetActorRotation().Pitch;
+		if (HasSweepPath())
+		{
+			const ALight* LA = Cast<ALight>(TowerLight);
+			const ULightComponent* LC = LA ? LA->GetLightComponent() : nullptr;
+			if (LC && SweepRefDist > 0.0f) { BeamLumens = LC->Intensity; BeamPaint = BeamLumens; }
+			SweepAim = SweepPointAt(TowerT);
+			AimBeam(0.0f, true);
+		}
 	}
 }
 
@@ -786,17 +796,117 @@ void ATarsisGuard::Stun(float Seconds)
 	Mark->SetTextRenderColor(FColor(255, 150, 60));
 }
 
+// ---- tanda 26: el foco de la torre sigue un recorrido por el suelo ----
+// La vuelta es: parada en un punto (si la tiene), tramo recto hasta el siguiente, y así. Cerrado: 0,1..N-1 y otra vez 0.
+// Ida y vuelta: 0,1..N-1,N-2..1 y otra vez 0. Todo sale del tiempo, sin estado: dos partidas hacen lo mismo.
+void ATarsisGuard::SweepSequence(TArray<int32>& Out) const
+{
+	const int32 N = SweepPath.Num();
+	for (int32 i = 0; i < N; ++i) Out.Add(i);
+	if (!bSweepLoop) for (int32 i = N - 2; i >= 1; --i) Out.Add(i);
+}
+
+float ATarsisGuard::SweepPeriod() const
+{
+	if (SweepPath.Num() < 2) return 0.0f;
+	TArray<int32> S;
+	SweepSequence(S);
+	const float Speed = FMath::Max(10.0f, SweepSpeed);
+	float T = 0.0f;
+	for (int32 k = 0; k < S.Num(); ++k)
+	{
+		const int32 A = S[k], B = S[(k + 1) % S.Num()];
+		T += (SweepStops.IsValidIndex(A) ? FMath::Max(0.0f, SweepStops[A]) : 0.0f) + FVector::Dist(SweepPath[A], SweepPath[B]) / Speed;
+	}
+	return T;
+}
+
+FVector ATarsisGuard::SweepPointAt(float T) const
+{
+	if (SweepPath.Num() == 0) return GetActorLocation();
+	if (SweepPath.Num() < 2) return SweepPath[0];
+	const float Period = SweepPeriod();
+	if (Period <= KINDA_SMALL_NUMBER) return SweepPath[0];
+	T = FMath::Fmod(T, Period);
+	if (T < 0.0f) T += Period;
+	TArray<int32> S;
+	SweepSequence(S);
+	const float Speed = FMath::Max(10.0f, SweepSpeed);
+	for (int32 k = 0; k < S.Num(); ++k)
+	{
+		const int32 A = S[k], B = S[(k + 1) % S.Num()];
+		const float Stop = SweepStops.IsValidIndex(A) ? FMath::Max(0.0f, SweepStops[A]) : 0.0f;
+		if (T < Stop) return SweepPath[A];
+		T -= Stop;
+		const float Leg = FVector::Dist(SweepPath[A], SweepPath[B]) / Speed;
+		if (T < Leg) return FMath::Lerp(SweepPath[A], SweepPath[B], T / FMath::Max(Leg, KINDA_SMALL_NUMBER));
+		T -= Leg;
+	}
+	return SweepPath[0];
+}
+
+// segundo de la vuelta en el que el recorrido pasa más cerca de P (para retomarlo donde pilla, sin dar un salto)
+float ATarsisGuard::SweepTimeNear(const FVector& P) const
+{
+	const float Period = SweepPeriod();
+	float Best = 0.0f, BestD = TNumericLimits<float>::Max();
+	for (float T = 0.0f; T < Period; T += 0.25f)
+	{
+		const float D = FVector::DistSquared2D(SweepPointAt(T), P);
+		if (D < BestD) { BestD = D; Best = T; }
+	}
+	return Best;
+}
+
+bool ATarsisGuard::CallBeam(const FVector& Where, float Seconds)
+{
+	if (!bTowerSentry || !HasSweepPath() || State != ETarsisGuardState::Patrol || HoldT > 0.0f) return false;
+	if (FVector::Dist2D(Where, GetActorLocation()) > BeamCallRadius) return false;
+	BeamCall = Where;
+	BeamCallT = FMath::Max(BeamCallT, Seconds);
+	return true;
+}
+
+// apunta el foco al punto del suelo SweepAim y ajusta lo que pinta según lo lejos que alumbra
+void ATarsisGuard::AimBeam(float DeltaSeconds, bool bSnap)
+{
+	if (!TowerLight) return;
+	const FVector LP = TowerLight->GetActorLocation();
+	const FVector Dir = (SweepAim - LP).GetSafeNormal();
+	if (Dir.IsNearlyZero()) return;
+	const FRotator Want = Dir.Rotation();
+	TowerLight->SetActorRotation(FRotator(Want.Pitch, Want.Yaw, 0.0f));
+	if (BeamLumens <= 0.0f || SweepRefDist <= 0.0f) return;
+	ALight* LA = Cast<ALight>(TowerLight);
+	ULightComponent* LC = LA ? LA->GetLightComponent() : nullptr;
+	if (!LC) return;
+	// lo que alumbra de verdad: si en medio hay un camión o un contenedor, la distancia es hasta él (para no quemarlo)
+	float D = FVector::Dist(LP, SweepAim);
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisHaz), false, this);
+	Q.AddIgnoredActor(TowerLight);
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, LP + Dir * 150.0f, SweepAim, ECC_Visibility, Q)) D = FVector::Dist(LP, Hit.ImpactPoint);
+	// la luz que llega cae con el cuadrado de la distancia: se compensa, con tope por los dos lados
+	const float Want2 = BeamLumens * FMath::Clamp(FMath::Square(D / SweepRefDist), 0.35f, 2.5f);
+	BeamPaint = bSnap ? Want2 : FMath::FInterpTo(BeamPaint, Want2, DeltaSeconds, 4.0f);
+	LC->SetIntensity(BeamPaint);
+}
+
 void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
 {
-	TowerT += DeltaSeconds;
 	if (State == ETarsisGuardState::Search || State == ETarsisGuardState::Return)
 	{
 		SetState(ETarsisGuardState::Patrol);   // tras una captura todos vuelven; el de la torre ya está en su sitio
 	}
+	const bool bPath = HasSweepPath();
+	// adónde quiere ir la mancha del foco y a qué paso (cm/s) cuando deja su recorrido
+	FVector Target = SweepAim;
+	float Chase = 0.0f;
 	if (State == ETarsisGuardState::Alert)
 	{
 		// te sigue con la vista y con el foco mientras te vea; si te pierde, vuelve a barrer
-		FaceTowards(LastSeen, DeltaSeconds * 1.5f);
+		if (bPath) { Target = LastSeen; Chase = 1400.0f; }
+		else FaceTowards(LastSeen, DeltaSeconds * 1.5f);
 		if (UnseenT > 5.0f) { Meter = 0.5f; SetState(ETarsisGuardState::Suspicious); }
 	}
 	else
@@ -804,6 +914,7 @@ void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
 		if (Meter >= 1.0f)
 		{
 			SetState(ETarsisGuardState::Alert);
+			BeamCallT = 0.0f;
 			// da la voz: los dos guardias de suelo más cercanos vienen corriendo a donde te ha visto
 			TArray<ATarsisGuard*> Ground;
 			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
@@ -818,17 +929,54 @@ void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
 		}
 		else if (State == ETarsisGuardState::Suspicious)
 		{
-			FaceTowards(LastSeen, DeltaSeconds);
+			// le ha parecido ver algo: el foco se para y va hacia allí, despacio (se le ve venir)
+			if (bPath) { Target = LastSeen; Chase = 700.0f; }
+			else FaceTowards(LastSeen, DeltaSeconds);
+			BeamCallT = 0.0f;
 			if (Meter <= 0.0f) SetState(ETarsisGuardState::Patrol);
 		}
 		else
 		{
 			if (Meter > 0.3f) { SetState(ETarsisGuardState::Suspicious); }
-			const float Yaw = TowerYaw + FMath::Sin(TowerT * 0.42f) * TowerSweep;
-			SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, Yaw, 0.0f), DeltaSeconds, 3.0f));
+			if (!bPath)
+			{
+				TowerT += DeltaSeconds;
+				const float Yaw = TowerYaw + FMath::Sin(TowerT * 0.42f) * TowerSweep;
+				SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, Yaw, 0.0f), DeltaSeconds, 3.0f));
+			}
+			else if (BeamCallT > 0.0f)
+			{
+				// alarma abajo: el foco acude al sitio y se queda un rato
+				BeamCallT -= DeltaSeconds;
+				Target = BeamCall;
+				Chase = 1000.0f;
+			}
+			else
+			{
+				if (bSweepAway)
+				{
+					// vuelve de mirar otra cosa: retoma el recorrido por el punto que le queda más cerca
+					TowerT = SweepTimeNear(SweepAim);
+					bSweepAway = false;
+				}
+				// va hacia el punto que toca; mientras no lo alcance (vuelve de lejos), el recorrido le espera
+				const FVector Next = SweepPointAt(TowerT);
+				if (FVector::DistSquared2D(SweepAim, Next) < FMath::Square(250.0f)) TowerT += DeltaSeconds;
+				SweepAim = FMath::VInterpTo(SweepAim, Next, DeltaSeconds, 5.0f);
+			}
 		}
 	}
-	if (TowerLight)
+	if (bPath)
+	{
+		if (Chase > 0.0f)
+		{
+			bSweepAway = true;
+			SweepAim = FMath::VInterpConstantTo(SweepAim, Target, DeltaSeconds, Chase);
+		}
+		FaceTowards(SweepAim, DeltaSeconds);
+		AimBeam(DeltaSeconds, false);
+	}
+	else if (TowerLight)
 	{
 		TowerLight->SetActorRotation(FRotator(LightPitch, GetActorRotation().Yaw, 0.0f));
 	}
@@ -836,13 +984,22 @@ void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
 
 void ATarsisGuard::SetState(ETarsisGuardState NewState)
 {
+	// tanda 26: cuando uno de abajo da la alarma, el foco de la torre que lo tenga a mano acude a ese sitio
+	if (NewState == ETarsisGuardState::Alert && State != ETarsisGuardState::Alert && !bTowerSentry && !bAlly && GetWorld())
+	{
+		const FVector Where = LastSeen.IsZero() ? GetActorLocation() : LastSeen;
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			if (It->bTowerSentry) It->CallBeam(Where, It->BeamCallSeconds);
+		}
+	}
 	if (NewState != ETarsisGuardState::Alert) bRadioCall = false;
 	if (NewState == ETarsisGuardState::Alert || NewState == ETarsisGuardState::Patrol || NewState == ETarsisGuardState::Down) bNoiseSearch = false;
 	State = NewState;
 	StateT = 0.0f;
 	bRepairing = false;
 	if (NewState == ETarsisGuardState::Down && Flashlight) Flashlight->SetVisibility(false);
-	if (NewState != ETarsisGuardState::Suspicious) bInvestigate = false;
+	if (NewState != ETarsisGuardState::Suspicious) { bInvestigate = false; bShadow = false; }
 	if (NewState != ETarsisGuardState::Patrol) { bErrand = false; bErrandThere = false; }   // un recado solo dura mientras nada le llame la atención
 	WaitT = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = (State == ETarsisGuardState::Alert) ? RunSpeed : WalkSpeed;
@@ -863,7 +1020,7 @@ void ATarsisGuard::UpdateMark()
 	const bool bShow = bAlert || State == ETarsisGuardState::Suspicious || State == ETarsisGuardState::Search;
 	Mark->SetHiddenInGame(!bShow);
 	Mark->SetText(FText::FromString(bAlert ? TEXT("!") : TEXT("?")));
-	Mark->SetTextRenderColor(bAlert ? FColor(255, 59, 47) : (bInvestigate ? FColor(120, 200, 255) : FColor(255, 210, 58)));
+	Mark->SetTextRenderColor(bAlert ? FColor(255, 59, 47) : (bInvestigate ? FColor(120, 200, 255) : (bShadow ? FColor(205, 170, 255) : FColor(255, 210, 58))));   // ruido azulado, sombra malva, vista amarillo
 }
 
 bool ATarsisGuard::Near2D(const FVector& Dest, float Radius) const
@@ -914,9 +1071,11 @@ static const FName NStrongLight(TEXT("luz_fuerte"));
 static const FName NDecorLight(TEXT("decorado"));
 
 // lo que aporta una luz local al punto: 0 si queda fuera de su radio o de su cono, o si algo hace sombra
-static float LightContribution(const UWorld* World, const ULocalLightComponent* L, const FVector& Point, const AActor* Owner, FCollisionQueryParams& Q, bool bStrong)
+// FixedLumens: lúmenes de sigilo de un foco de torre con recorrido (lo que pinta cambia con la distancia; lo que cuenta, no)
+static float LightContribution(const UWorld* World, const ULocalLightComponent* L, const FVector& Point, const AActor* Owner, FCollisionQueryParams& Q, bool bStrong, float FixedLumens = -1.0f, const AActor* Ignore2 = nullptr)
 {
 	if (!L || !L->IsVisible() || L->Intensity <= 0.0f) return 0.0f;
+	const float Lumens = FixedLumens > 0.0f ? FixedLumens : L->Intensity;
 	const FVector LP = L->GetComponentLocation();
 	const float D = FVector::Dist(LP, Point);
 	const float R = L->AttenuationRadius;
@@ -930,10 +1089,11 @@ static float LightContribution(const UWorld* World, const ULocalLightComponent* 
 		F *= 1.5f;   // dentro de un foco (torre, farola, linterna) se ve de lejos
 	}
 	// las luces están en lúmenes: una farola (3000 de sigilo; se pinta con 300) cuenta como 1 a su pie
-	F *= FMath::Clamp(L->Intensity * (bStrong ? StrongLightBoost : 1.0f) / 3000.0f, 0.2f, 2.0f);
+	F *= FMath::Clamp(Lumens * (bStrong ? StrongLightBoost : 1.0f) / 3000.0f, 0.2f, 2.0f);
 	if (F < 0.02f) return 0.0f;
 	Q.ClearIgnoredSourceObjects();   // ClearIgnoredActors está obsoleto en 5.8
 	if (Owner) Q.AddIgnoredActor(Owner);
+	if (Ignore2) Q.AddIgnoredActor(Ignore2);
 	FHitResult Hit;
 	if (World->LineTraceSingleByChannel(Hit, LP, Point, ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, Point) > 40.0f)
 	{
@@ -942,23 +1102,115 @@ static float LightContribution(const UWorld* World, const ULocalLightComponent* 
 	return F;
 }
 
-float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
+// focos de torre con recorrido: cuentan con sus lúmenes de sigilo, no con lo que pintan en ese momento (cambia con la
+// distancia). Se recogen una vez por medida
+typedef TArray<TPair<const AActor*, float>, TInlineAllocator<4>> FTarsisBeams;
+
+static void CollectBeams(const UWorld* World, FTarsisBeams& Out)
 {
-	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
-	if (!World) return 1.0f;
+	for (TActorIterator<ATarsisGuard> It(World); It; ++It)
+	{
+		if (It->bTowerSentry && It->BeamLumens > 0.0f && It->TowerLight) Out.Emplace(It->TowerLight.Get(), It->BeamLumens);
+	}
+}
+
+static float BeamLumensOf(const FTarsisBeams& Beams, const AActor* LightActor)
+{
+	for (const TPair<const AActor*, float>& B : Beams) if (B.Key == LightActor) return B.Value;
+	return -1.0f;
+}
+
+// toda la luz que llega a un punto, sin tope. Ignore: actor que no hace sombra (el propio jugador al medir la suya)
+static float LightSum(const UWorld* World, const FVector& Point, const AActor* Ignore)
+{
 	float Sum = 0.12f;   // luna y cielo: de noche siempre se ve una silueta de cerca
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLuz), false);
+	FTarsisBeams Beams;
+	CollectBeams(World, Beams);
 	for (TActorIterator<ALight> It(World); It; ++It)
 	{
 		if (It->ActorHasTag(NDecorLight)) continue;
-		Sum += LightContribution(World, Cast<ULocalLightComponent>(It->GetLightComponent()), Point, *It, Q, It->ActorHasTag(NStrongLight));
+		Sum += LightContribution(World, Cast<ULocalLightComponent>(It->GetLightComponent()), Point, *It, Q, It->ActorHasTag(NStrongLight), BeamLumensOf(Beams, *It), Ignore);
 	}
 	// linternas de los guardias
 	for (TActorIterator<ATarsisGuard> It(World); It; ++It)
 	{
-		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->Flashlight, Point, *It, Q, true);
+		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->Flashlight, Point, *It, Q, true, -1.0f, Ignore);
 	}
-	return FMath::Clamp(Sum, 0.0f, 1.0f);
+	return Sum;
+}
+
+float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
+	if (!World) return 1.0f;
+	return FMath::Clamp(LightSum(World, Point, nullptr), 0.0f, 1.0f);
+}
+
+int32 ATarsisGuard::ShadowsOf(const UObject* WorldContext, const AActor* Who, const TArray<float>& Heights, float MinLight, TArray<FVector>& Tips, TArray<float>& Contrast)
+{
+	Tips.Reset();
+	Contrast.Reset();
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
+	if (!World || !Who) return 0;
+	FVector Feet = Who->GetActorLocation();
+	if (const ACharacter* C = Cast<ACharacter>(Who)) Feet.Z -= C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FVector Chest = Feet + FVector(0.0f, 0.0f, Heights.Num() > 1 ? Heights[1] : 100.0f);
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisSombra), false);
+	FTarsisBeams Beams;
+	CollectBeams(World, Beams);
+	for (TActorIterator<ALight> It(World); It; ++It)
+	{
+		if (It->ActorHasTag(NDecorLight)) continue;
+		const ULocalLightComponent* L = Cast<ULocalLightComponent>(It->GetLightComponent());
+		if (!L || !L->CastShadows) continue;   // sin sombra dibujada no hay nada que ver
+		const bool bStrong = It->ActorHasTag(NStrongLight);
+		const float Fixed = BeamLumensOf(Beams, *It);
+		if (LightContribution(World, L, Chest, *It, Q, bStrong, Fixed, Who) < MinLight) continue;   // esa luz no te da de lleno
+		const FVector LP = L->GetComponentLocation();
+		for (const float H : Heights)
+		{
+			const FVector P = Feet + FVector(0.0f, 0.0f, H);
+			const FVector Dir = (P - LP).GetSafeNormal();
+			FCollisionQueryParams QR(SCENE_QUERY_STAT(TarsisSombraRayo), false, Who);
+			QR.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (!World->LineTraceSingleByChannel(Hit, P + Dir * 20.0f, P + Dir * 1500.0f, ECC_Visibility, QR)) continue;   // la sombra se pierde a lo lejos
+			const FVector S = Hit.ImpactPoint + Hit.ImpactNormal * 8.0f;
+			if (FVector::DistSquared2D(S, Feet) < FMath::Square(60.0f)) continue;   // a tus pies: la tapas tú
+			// allí tiene que seguir llegando esa luz (si no, tu sombra cae sobre otra sombra) y mandar sobre las demás
+			const float Cs = LightContribution(World, L, S, *It, Q, bStrong, Fixed, Who);
+			if (Cs < MinLight * 0.6f) continue;
+			Tips.Add(S);
+			Contrast.Add(Cs / FMath::Max(LightSum(World, S, Who), 0.01f));
+		}
+	}
+	return Tips.Num();
+}
+
+bool ATarsisGuard::NoticeShadow(const FVector& Tip, const FVector& From, float Amount, float Cap)
+{
+	if (bTowerSentry || bAlly || bRepairing || BodyTarget || HoldT > 0.0f || StunT > 0.0f) return false;
+	if (State == ETarsisGuardState::Alert || State == ETarsisGuardState::Down || State == ETarsisGuardState::Search) return false;
+	if (State == ETarsisGuardState::Suspicious && !bShadow) return false;   // ya va a mirar otra cosa (un ruido, algo que vio)
+	ShadowHoldT = 0.4f;
+	if (Meter < Cap) Meter = FMath::Min(Cap, Meter + FMath::Max(0.0f, Amount));
+	if (State == ETarsisGuardState::Suspicious)
+	{
+		LastSeen = Tip;   // la sombra se mueve: la sigue
+		ShadowFrom = From;
+		return true;
+	}
+	if (Meter > 0.3f)
+	{
+		LastSeen = Tip;
+		ShadowFrom = From;
+		SetState(ETarsisGuardState::Suspicious);
+		bShadow = true;
+		UpdateMark();
+		return true;
+	}
+	return false;
 }
 
 void ATarsisGuard::StartRepair(const FVector& Center)
@@ -1132,7 +1384,8 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	else
 	{
 		UnseenT += DeltaSeconds;
-		if (State != ETarsisGuardState::Alert)
+		if (ShadowHoldT > 0.0f) ShadowHoldT -= DeltaSeconds;   // mientras mira una sombra, la sospecha no se le pasa
+		else if (State != ETarsisGuardState::Alert)
 		{
 			Meter = FMath::Max(0.0f, Meter - SuspicionDecay * DeltaSeconds);
 		}
@@ -1222,6 +1475,8 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 			if (Near2D(LastSeen, 150.0f) || StateT > 25.0f) { bInvestigate = false; SetState(ETarsisGuardState::Search); }
 			break;
 		}
+		// una sombra: al llegar a donde la vio se queda mirando hacia donde venía
+		if (bShadow && StateT > 1.5f && Near2D(LastSeen, 150.0f)) FaceTowards(ShadowFrom, DeltaSeconds);
 		if (StateT > 1.5f && !Near2D(LastSeen, 120.0f)) Walk(LastSeen, WalkSpeed * 0.7f);
 		if (Meter <= 0.0f && StateT > 3.0f) SetState(ETarsisGuardState::Return);
 		break;

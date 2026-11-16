@@ -32,12 +32,73 @@
    "truck_self_wait": 30.0,
    "render_c_vars": [
     "r.Nanite.Streaming.StreamingPoolSize=128"
-   ]
+   ],
+   "shadow_tells": true
   },
   "guardias": {
    "*": {
     "knock_out_time": 100.0
+   },
+   "centinela de la torre 1": {
+    "sweep_path": [
+     [
+      2550,
+      2450,
+      0
+     ],
+     [
+      2500,
+      3300,
+      0
+     ],
+     [
+      2550,
+      4300,
+      0
+     ],
+     [
+      3900,
+      4300,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 300.0,
+    "sweep_stops": [
+     2.5,
+     0.0,
+     0.0,
+     2.5
+    ],
+    "sweep_phase": 0.0,
+    "sweep_ref_dist": 1500.0
+   },
+   "centinela de la torre 2": {
+    "sweep_path": [
+     [
+      4000,
+      5700,
+      0
+     ],
+     [
+      6000,
+      5700,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 250.0,
+    "sweep_stops": [
+     3.0,
+     3.0
+    ],
+    "sweep_phase": 7.0,
+    "sweep_ref_dist": 1500.0
    }
+  },
+  "montaje": {
+   "_leeme": "Lo lee tools/unreal/montar_base.py al montar el nivel. farolas_con_sombra: \"todas\", \"ninguna\" o una lista de nombres (farola_8...). Solo las farolas con sombra delatan con tu sombra.",
+   "farolas_con_sombra": "todas"
   }
  },
  "objetivos": [
@@ -293,6 +354,7 @@
   "camion_pillado": "{0} LEVANTA LA LONA\nTe saca de la caja del camion. {1}",
   "voz_papeles": "Para ahi. Los papeles del porte.",
   "voz_pase": "Todo en orden. Tira.",
-  "voz_registro": "Hay orden de mirar la carga. Abre atras."
+  "voz_registro": "Hay orden de mirar la carga. Abre atras.",
+  "ensena_sombra": "TU SOMBRA TE DELATA\nBajo una luz, tu sombra llega antes que tu. Agachate, quedate quieto o rodea la luz."
  }
 }
