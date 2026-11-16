@@ -3,7 +3,7 @@
  "ajustes": {
   "director": {
    "vault_code": "0129",
-   "truck_lamp_paint": 1.0,
+   "truck_lamp_paint": 2.5,
    "cell_time": 25.0,
    "repair_seconds": 12.0,
    "noise_radius": 900.0,
