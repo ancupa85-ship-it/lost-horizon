@@ -1295,10 +1295,11 @@ def prueba_foco():
     pintado, plena, pasos, t0 = [], [], 0, 0.0
     while t0 < per[0]:
         aim = g.get_editor_property('sweep_aim')
+        antes = V(aim.x, aim.y, aim.z)      # copia: lo que devuelve la propiedad sigue apuntando al valor vivo del guardia
         pintado.append(comp.get_editor_property('intensity'))
-        plena.append(luz_en(V(aim.x, aim.y, 100)))
+        plena.append(luz_en(V(antes.x, antes.y, 100)))
         yield 0.5; t0 += 0.5
-        if dist2d(aim, g.get_editor_property('sweep_aim')) > 50.0:
+        if dist2d(antes, g.get_editor_property('sweep_aim')) > 50.0:
             pasos += 1
     check('la mancha recorre el suelo y hace paradas', 0.4 * len(pintado) < pasos < len(pintado), '%d de %d medidas en movimiento' % (pasos, len(pintado)))
     check('para el sigilo el foco cuenta siempre lo mismo (800 lm pintados, 8000 de sigilo)', abs(base - 800.0) < 1.0, '%.0f' % base)
