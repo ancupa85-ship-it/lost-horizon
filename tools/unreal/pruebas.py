@@ -1340,6 +1340,13 @@ def prueba_sombra():
     far = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.Light) if a.get_actor_label().startswith('farola') and dist2d(a.get_actor_location(), V(fx, fy, 0)) < 150]
     comp = far[0].get_component_by_class(unreal.LocalLightComponent) if far else None
     check('la farola del camino dibuja sombra', comp is not None and comp.get_editor_property('cast_shadows'), [a.get_actor_label() for a in far])
+    # ajuste 26e: que la sombra se vea de verdad, no solo que cuente. El cuerpo del jugador la proyecta en su propia
+    # vista (oculto para él, con sombra aunque esté oculto) y la calidad de sombras deja proyectar a las personas
+    cuerpo = jugador().get_editor_property('mesh')
+    rsq = unreal.SystemLibrary.get_console_variable_int_value('r.ShadowQuality')
+    check('tu cuerpo proyecta sombra en tu propia vista y las personas dan sombra (r.ShadowQuality mayor que 0)',
+          cuerpo.get_editor_property('owner_no_see') and cuerpo.get_editor_property('cast_shadow') and cuerpo.get_editor_property('cast_hidden_shadow') and rsq > 0,
+          'owner_no_see %s, sombra %s, oculta con sombra %s, r.ShadowQuality %d' % (cuerpo.get_editor_property('owner_no_see'), cuerpo.get_editor_property('cast_shadow'), cuerpo.get_editor_property('cast_hidden_shadow'), rsq))
     if not comp:
         _focos_torre(True)
         return

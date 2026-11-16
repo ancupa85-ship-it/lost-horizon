@@ -32,7 +32,8 @@
    "truck_horn_wait": 8.0,
    "truck_self_wait": 30.0,
    "render_c_vars": [
-    "r.Nanite.Streaming.StreamingPoolSize=128"
+    "r.Nanite.Streaming.StreamingPoolSize=128",
+    "r.ShadowQuality=3"
    ],
    "shadow_tells": true
   },
