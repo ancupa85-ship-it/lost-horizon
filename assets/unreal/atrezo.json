@@ -2303,114 +2303,6 @@
    "giro": 20
   },
   {
-   "nombre": "rev_banco",
-   "modelo": "metal_office_desk",
-   "pos": [
-    6330,
-    2950,
-    60
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "rev_cubeta",
-   "modelo": "pot_enamel_01",
-   "pos": [
-    6270,
-    2945,
-    140
-   ],
-   "giro": 0,
-   "pequeno": true
-  },
-  {
-   "nombre": "rev_camara",
-   "modelo": "Camera_01",
-   "pos": [
-    6350,
-    2950,
-    140
-   ],
-   "giro": 200,
-   "pequeno": true
-  },
-  {
-   "nombre": "rev_carpeta",
-   "modelo": "binder_notebook",
-   "pos": [
-    6410,
-    2940,
-    140
-   ],
-   "giro": -10,
-   "pequeno": true
-  },
-  {
-   "nombre": "rev_bidon",
-   "modelo": "metal_jerrycan_green",
-   "pos": [
-    6540,
-    2955,
-    60
-   ],
-   "giro": 100
-  },
-  {
-   "nombre": "rev_estanteria",
-   "modelo": "steel_frame_shelves_01",
-   "pos": [
-    6025,
-    2820,
-    60
-   ],
-   "giro": 90
-  },
-  {
-   "nombre": "rev_latas",
-   "modelo": "russian_food_cans_01",
-   "pos": [
-    6025,
-    2810,
-    250
-   ],
-   "giro": 90,
-   "pequeno": true
-  },
-  {
-   "nombre": "rev_foto_1",
-   "modelo": "hanging_picture_frame_02",
-   "pos": [
-    6500,
-    2603,
-    170
-   ],
-   "giro": 180,
-   "colgar": true,
-   "pequeno": true
-  },
-  {
-   "nombre": "rev_foto_2",
-   "modelo": "hanging_picture_frame_02",
-   "pos": [
-    6100,
-    2603,
-    160
-   ],
-   "giro": 180,
-   "colgar": true,
-   "pequeno": true
-  },
-  {
-   "nombre": "rev_taburete",
-   "modelo": "metal_stool_01",
-   "pos": [
-    6330,
-    2870,
-    60
-   ],
-   "giro": 15
-  },
-  {
    "nombre": "ext_mesa",
    "modelo": "wooden_picnic_table",
    "pos": [
@@ -2799,6 +2691,72 @@
    ],
    "giro": 180,
    "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "cal_catre",
+   "modelo": "old_bed_frame",
+   "pos": [
+    6110,
+    2897,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "cal_colchon",
+   "modelo": "colchon",
+   "pos": [
+    6110,
+    2897,
+    46
+   ],
+   "giro": -1.5,
+   "colgar": true
+  },
+  {
+   "nombre": "cal_manta",
+   "modelo": "manta",
+   "pos": [
+    6105,
+    2925,
+    59
+   ],
+   "giro": -12,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "cal_cubo",
+   "modelo": "wooden_bucket_02",
+   "pos": [
+    6550,
+    2950,
+    60
+   ],
+   "giro": 30,
+   "pequeno": true
+  },
+  {
+   "nombre": "cal_taza",
+   "modelo": "pot_enamel_01",
+   "pos": [
+    6250,
+    2940,
+    60
+   ],
+   "giro": 70,
+   "pequeno": true
+  },
+  {
+   "nombre": "cal_lata",
+   "modelo": "can_rusted",
+   "pos": [
+    6290,
+    2955,
+    60
+   ],
+   "giro": 10,
    "pequeno": true
   }
  ],
