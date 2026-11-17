@@ -215,8 +215,9 @@ La primera captura te deja en el calabozo (edificio este) y la reja ya no se abr
 - **Convencer al cabo Vidal** por la reja, en tres pasos y con las teclas 1 a 3. Amenazar o sobornar falla. El segundo paso pide saber que lo de abajo está vivo (la voz sin nombre del códec o el expediente) y el tercero, haber leído el expediente o saber el salmo (mesa de Alarcón o la pista de Roig). Tres errores y deja de escuchar. Si abre él, calla (bandera `vidal_calla`).
 - **La losa suelta** del rincón (`CellSlab`) guarda la llave del hermano y su medalla, «VIDAL, J.». Siempre funciona, pero a los `CellAlertSeconds` (45 s) alguien encuentra la celda vacía y la base queda en guardia.
 - Control, por el códec (`control_celda`), da las pistas que en la versión web daba Halloran desde el camastro.
-- Cambios respecto a la web, por coherencia: nadie enseña papeles (te han registrado), Vidal no se ve (reza pegado a la pared), el viento en lugar de los perros y el hermano consta como desertor.
+- Cambios respecto a la web, por coherencia: nadie enseña papeles (te han registrado), el viento en lugar de los perros y el hermano consta como desertor.
 - **Clave del archivo:** la mesa ya no da el número del salmo, solo el «De profundis» subrayado; el número sale de Roig o de los sueños. Dos claves malas seguidas (`KeypadMaxFails`) bloquean el teclado y avisan a la central.
+- **Tanda 36:** Vidal tiene cuerpo (`SpawnVidal`: la malla y el reposo del guardia `VidalLooksLike`, sin IA; aparece al encerrarte en `CellDoor + VidalOffset`, de medio lado, y se vuelve a la pared al abrir o al dejar de escuchar) y la pregunta sale en una caja de conversación propia del HUD (`DrawCellAsk`), con letra grande.
 - Prueba: `prueba_calabozo` (familia propia). En las demás pruebas la reja se abre sola, como antes.
 
 ## Sonidos

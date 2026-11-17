@@ -846,6 +846,27 @@ public:
 	bool bCellAsk = false;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	TArray<FString> CellOptions;
+	/** Lo que dice o hace Vidal antes de las tres respuestas (la caja de conversacion del HUD, tanda 36). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	FString CellQuestion;
+	/** Para las pruebas: fotogramas en que el HUD ha dibujado la caja de conversacion. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellAskFrames = 0;
+	/** Tanda 36: Vidal con cuerpo. Aparece al encerrarte, junto a la reja por fuera; lleva el cuerpo de este guardia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	FString VidalLooksLike = TEXT("Vega");
+	/** Donde se planta, respecto a CellDoor (cm), y hacia donde mira mientras hablais y cuando se vuelve a la pared. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	FVector VidalOffset = FVector(125.0f, -80.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	float VidalYaw = 150.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	float VidalWallYaw = 90.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	TObjectPtr<class USkeletalMeshComponent> VidalBody;
+	/** Para las pruebas: hacia donde mira ahora (grados), o -1000 si no esta. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Calabozo")
+	float VidalFacing() const { return VidalBody ? VidalFace : -1000.0f; }
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	int32 CellRight = 0;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
@@ -1200,6 +1221,10 @@ private:
 	float CellOpenT = 0.0f;
 	UPROPERTY()
 	TObjectPtr<class UStaticMeshComponent> SlabProp;
+	void SpawnVidal();
+	void FaceVidal(float Yaw);
+	float VidalFace = 0.0f;
+	float VidalMeshYaw = 0.0f;
 	float LightT = 0.0f;
 	void ToggleCrouch();
 	void SetupPlayer();

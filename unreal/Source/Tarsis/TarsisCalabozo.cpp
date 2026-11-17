@@ -8,8 +8,13 @@
 // tiene precio: Vidal no lo ha visto, asi que a los CellAlertSeconds alguien encuentra la celda vacia y la base queda
 // en guardia. Si le convences, calla (bandera vidal_calla).
 #include "TarsisDirector.h"
+#include "TarsisGuard.h"
 
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
@@ -28,7 +33,8 @@ void ATarsisDirector::LockInCell(APawn* Player)
 	PlaySfx(TEXT("reja"), CellDoor + FVector(0.0f, 0.0f, 100.0f));
 	CellT = bCellPuzzle ? 0.0f : CellTime;
 	CellReset();
-	ShowMessage(Tx(TEXT("calabozo"), TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, pegado a la pared donde no le ves, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja. Vidal no es como los demas.")), 8.0f);
+	if (bCellPuzzle) { SpawnVidal(); FaceVidal(VidalYaw); }
+	ShowMessage(Tx(TEXT("calabozo"), TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, a un paso de la reja, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja. Vidal no es como los demas.")), 8.0f);
 }
 
 bool ATarsisDirector::InCell() const
@@ -65,7 +71,7 @@ bool ATarsisDirector::CellInteract()
 	if (bKeyNow) { OpenCellWith(true); return true; }
 	if (bVidalGone)
 	{
-		ShowMessage(Tx(TEXT("vidal_ido"), TEXT("CABO VIDAL\nReza mas alto y ya no contesta.\nEn el rincon, a la derecha de la reja, una losa baila bajo el pie.")), 5.0f);
+		ShowMessage(Tx(TEXT("vidal_ido"), TEXT("CABO VIDAL\nReza de cara a la pared y no se vuelve.\nEn el rincon, a la derecha de la reja, una losa baila bajo el pie.")), 5.0f);
 		return true;
 	}
 	CellAsk();
@@ -82,7 +88,7 @@ void ATarsisDirector::CellAsk()
 	FString Q;
 	if (CellStage == 0)
 	{
-		Q = Tx(TEXT("vidal_q1"), TEXT("Vidal no contesta. Al otro lado de la reja se le oye rezar."));
+		Q = Tx(TEXT("vidal_q1"), TEXT("Vidal no te mira. Mueve los labios: reza."));
 		CellOptions[0] = Tx(TEXT("vidal_1a"), TEXT("\"Abre, o cuando salga te busco a ti primero.\""));
 		CellOptions[1] = Tx(TEXT("vidal_1b"), TEXT("\"Lo oyes por las noches? Lo de abajo.\""));
 		CellOptions[2] = Tx(TEXT("vidal_1c"), TEXT("\"Alarcon te ascendera si me sueltas. Yo se lo dire.\""));
@@ -107,6 +113,7 @@ void ATarsisDirector::CellAsk()
 		bCellAlso = bFile && bPsalm;   // valen las dos
 	}
 	bCellAsk = true;
+	CellQuestion = Q;
 	ShowMessage(Tx(TEXT("vidal_pregunta"), TEXT("CABO VIDAL  {0}/3\n{1}\n1   {2}\n2   {3}\n3   {4}"),
 		{ CellStage + 1, Q, CellOptions[0], CellOptions[1], CellOptions[2] }), 60.0f);
 }
@@ -140,6 +147,7 @@ void ATarsisDirector::AnswerCell(int32 Option)
 	if (CellFails >= 3)
 	{
 		bVidalGone = true;
+		FaceVidal(VidalWallYaw);
 		ShowMessage(Tx(TEXT("vidal_se_va"), TEXT("CABO VIDAL\n{0}\nVidal no volvera a escucharte. Tiene que haber otra manera: mira el suelo."), { Reply }), 7.0f);
 		return;
 	}
@@ -153,6 +161,7 @@ void ATarsisDirector::OpenCellWith(bool bKeyUsed)
 	if (Bars.Num() == 0) return;
 	++(bKeyUsed ? CellByKey : CellByVidal);
 	OpenCell();
+	FaceVidal(VidalWallYaw);
 	if (bKeyUsed)
 	{
 		CellAlertT = CellAlertSeconds;
@@ -187,6 +196,47 @@ void ATarsisDirector::CellTick(float DeltaSeconds)
 		bCellAsk = false;
 		MessageT = FMath::Min(MessageT, 0.3f);
 	}
+}
+
+// Vidal con cuerpo (tanda 36): no es un guardia (ni ve ni oye ni patrulla), solo la malla y la postura de reposo de
+// uno de ellos, con su misma ropa. No cuesta memoria: la malla ya esta cargada. Aparece cuando te encierran.
+void ATarsisDirector::SpawnVidal()
+{
+	if (VidalBody || CellDoor.IsZero()) return;
+	ATarsisGuard* Src = nullptr;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (!It->BodyMesh) continue;
+		if (!Src) Src = *It;
+		if (It->GuardName == VidalLooksLike) { Src = *It; break; }
+	}
+	USkeletalMeshComponent* From = Src ? Src->GetMesh() : nullptr;
+	if (!From) return;
+	FVector At = CellDoor + VidalOffset;
+	FHitResult Hit;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisVidal), false, this);
+	if (GetWorld()->LineTraceSingleByObjectType(Hit, FVector(At.X, At.Y, 160.0f), FVector(At.X, At.Y, -50.0f), FCollisionObjectQueryParams(ECC_WorldStatic), Q)) At.Z = Hit.ImpactPoint.Z;
+	const float HalfH = Src->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FTransform Rel = From->GetRelativeTransform();
+	USkeletalMeshComponent* M = NewObject<USkeletalMeshComponent>(this);
+	M->SetSkeletalMesh(Src->BodyMesh);
+	M->SetMobility(EComponentMobility::Movable);
+	M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	M->SetWorldScale3D(From->GetComponentScale());
+	M->SetWorldLocation(At + FVector(0.0f, 0.0f, HalfH + Rel.GetLocation().Z));
+	M->RegisterComponent();
+	for (int32 i = 0; i < From->GetNumMaterials(); ++i) M->SetMaterial(i, From->GetMaterial(i));
+	if (Src->IdleAnim) M->PlayAnimation(Src->IdleAnim, true);
+	VidalMeshYaw = Rel.Rotator().Yaw;
+	VidalBody = M;
+}
+
+void ATarsisDirector::FaceVidal(float Yaw)
+{
+	if (!VidalBody) return;
+	VidalFace = Yaw;
+	VidalBody->SetWorldRotation(FRotator(0.0f, Yaw + VidalMeshYaw, 0.0f));
 }
 
 void ATarsisDirector::CellReset()

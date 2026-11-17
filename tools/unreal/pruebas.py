@@ -2534,6 +2534,9 @@ def prueba_calabozo():
     hablar(); yield 0.3
     check('junto a la reja, el aviso es hablar con Vidal', 'VIDAL' in str(d.cell_prompt()), str(d.cell_prompt()))
     d.interact(); yield 0.2
+    yield 0.3
+    check('tanda 36: la pregunta sale en su caja', d.get_editor_property('cell_ask_frames') > 0 and str(d.get_editor_property('cell_question')), d.get_editor_property('cell_ask_frames'))
+    check('tanda 36: Vidal tiene cuerpo y está de medio lado', abs(d.vidal_facing() - d.get_editor_property('vidal_yaw')) < 1.0 and d.get_editor_property('vidal_body') is not None, d.vidal_facing())
     check('Vidal pregunta: tres respuestas', d.get_editor_property('cell_ask') and len(d.get_editor_property('cell_options')) == 3 and '1/3' in msg(), msg()[:40])
     d.answer_cell(1); yield 0.2
     check('amenazarle no vale', d.get_editor_property('cell_fails') == 1 and d.get_editor_property('cell_stage') == 0 and not d.get_editor_property('cell_ask'), msg()[:60])
@@ -2560,12 +2563,14 @@ def prueba_calabozo():
     yield ('hasta', lambda: not director().in_cell(), 6.0)
     yield 0.2
     check('abre él: nadie da la alarma', not d.in_cell() and d.get_editor_property('cell_by_vidal') == 1 and d.has_flag('vidal_calla') and d.get_editor_property('cell_alert_t') <= 0.0 and 'no le he visto' in msg(), msg()[:60])
+    check('tanda 36: Vidal se queda de cara a la pared', abs(d.vidal_facing() - d.get_editor_property('vidal_wall_yaw')) < 1.0, d.vidal_facing())
     # otra vez dentro: tres errores y la losa
     d.lock_in_cell(jugador()); yield 0.4
     hablar(); yield 0.3
     for i in range(3):
         d.interact(); yield 0.2
         d.answer_cell(1); yield 0.2
+    check('tanda 36: al dejar de escuchar se vuelve a la pared', abs(d.vidal_facing() - d.get_editor_property('vidal_wall_yaw')) < 1.0, d.vidal_facing())
     check('tres errores: Vidal deja de escuchar', d.get_editor_property('vidal_gone') and 'NO ESCUCHA' in str(d.cell_prompt()), str(d.cell_prompt()))
     d.interact(); yield 0.2
     check('y ya no pregunta', not d.get_editor_property('cell_ask') and d.in_cell())

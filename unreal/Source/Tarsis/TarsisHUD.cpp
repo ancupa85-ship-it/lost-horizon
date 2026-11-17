@@ -69,6 +69,7 @@ void ATarsisHUD::DrawHUD()
 	DrawKeypad(D);
 	DrawExtras(D);
 	DrawRadioAsk(D);
+	DrawCellAsk(D);
 	DrawCodecRing(D);
 	DrawCodecMenu(D);
 	DrawReport(D);
@@ -275,7 +276,7 @@ void ATarsisHUD::DrawObjective(ATarsisDirector* D)
 void ATarsisHUD::DrawPrompt(ATarsisDirector* D)
 {
 	if (!D) return;
-	if (D->bRadioAsk || D->bCodecMenu || D->bCodec) return;   // esas cajas ocupan su sitio
+	if (D->bRadioAsk || D->bCellAsk || D->bCodecMenu || D->bCodec) return;   // esas cajas ocupan su sitio
 	const FString P = D->InteractPrompt();
 	if (P.IsEmpty()) return;
 	const float S = UiScale();
@@ -461,7 +462,7 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 {
 	if (!D) return;
 	const float S = UiScale();
-	if (D->MessageT > 0.0f && !D->Message.IsEmpty() && !D->bRadioAsk && !D->bCodec && !D->bCodecMenu)   // la pregunta de la central tiene su caja (DrawRadioAsk)
+	if (D->MessageT > 0.0f && !D->Message.IsEmpty() && !D->bRadioAsk && !D->bCellAsk && !D->bCodec && !D->bCodecMenu)   // la pregunta de la central tiene su caja (DrawRadioAsk)
 	{
 		// más abajo y más pequeño que antes: no tapa a los guardias del centro de la pantalla
 		const float A = FMath::Clamp(D->MessageT, 0.0f, 1.0f);
@@ -573,6 +574,41 @@ void ATarsisHUD::DrawRadioAsk(ATarsisDirector* D)
 	for (int32 i = 0; i < Lines.Num(); ++i)
 	{
 		Text(Lines[i], X + 34.0f * S, Y + 14.0f * S + i * LH, i == 0 ? FLinearColor(1.0f, 0.85f, 0.55f) : FLinearColor(0.85f, 1.0f, 0.88f), (i == 0 ? 1.05f : 1.15f) * S, false);
+	}
+}
+
+// Tanda 36: la caja de conversacion. Quien habla arriba, lo que dice o hace, y las respuestas numeradas, con letra
+// grande y partidas por palabras. De momento la usa Vidal en el calabozo (CellQuestion, CellOptions)
+void ATarsisHUD::DrawCellAsk(ATarsisDirector* D)
+{
+	if (!D || !D->bCellAsk || D->CellOptions.Num() == 0 || D->bMenu) return;
+	++D->CellAskFrames;
+	const float S = UiScale();
+	const float W = FMath::Min(980.0f * S, Canvas->ClipX - 24.0f * S), Pad = 34.0f * S, LH = 36.0f * S;
+	const float ScQ = 1.1f * S, ScO = 1.15f * S;
+	const TArray<FString> Q = Wrap(D->CellQuestion, W - 2.0f * Pad, ScQ);
+	TArray<TArray<FString>> Opts;
+	int32 Rows = Q.Num();
+	for (int32 i = 0; i < D->CellOptions.Num(); ++i)
+	{
+		Opts.Add(Wrap(D->CellOptions[i], W - 2.0f * Pad - 46.0f * S, ScO));
+		Rows += Opts.Last().Num();
+	}
+	const float H = 58.0f * S + Rows * LH + (D->CellOptions.Num() + 1) * 10.0f * S + 20.0f * S;
+	const float X = Canvas->ClipX / 2.0f - W / 2.0f, Y = FMath::Max(Canvas->ClipY * 0.94f - H, 12.0f * S);
+	const FLinearColor Amber(1.0f, 0.78f, 0.42f), Bone(0.95f, 0.92f, 0.84f);
+	Panel(X, Y, W, H, FLinearColor(0.02f, 0.015f, 0.01f, 0.88f));
+	Panel(X, Y, 4.0f * S, H, FLinearColor(Amber.R, Amber.G, Amber.B, 0.9f));
+	Text(D->Tx(TEXT("vidal_nombre"), TEXT("CABO VIDAL")), X + Pad, Y + 14.0f * S, Amber, 1.05f * S, false);
+	Text(FString::Printf(TEXT("%d / 3"), D->CellStage + 1), X + W - Pad - 60.0f * S, Y + 14.0f * S, FLinearColor(Amber.R, Amber.G, Amber.B, 0.7f), 0.9f * S, false);
+	float Yc = Y + 58.0f * S;
+	for (const FString& L : Q) { Text(L, X + Pad, Yc, FLinearColor(Bone.R, Bone.G, Bone.B, 0.8f), ScQ, false); Yc += LH; }
+	Yc += 10.0f * S;
+	for (int32 i = 0; i < Opts.Num(); ++i)
+	{
+		Text(FString::FromInt(i + 1), X + Pad, Yc, Amber, ScO, false);
+		for (const FString& L : Opts[i]) { Text(L, X + Pad + 46.0f * S, Yc, Bone, ScO, false); Yc += LH; }
+		Yc += 10.0f * S;
 	}
 }
 

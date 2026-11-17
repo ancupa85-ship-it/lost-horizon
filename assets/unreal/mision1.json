@@ -401,7 +401,7 @@
  ],
  "textos": {
   "intro": "TARSIS, DE NOCHE\nBusca la sombra. Agachado ({0}) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n{1} lanza una piedra para distraer. {2} prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo ({3}) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control.",
-  "calabozo": "CALABOZO\nDespiertas tras la reja. Al otro lado, pegado a la pared donde no le ves, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja. Vidal no es como los demas.",
+  "calabozo": "CALABOZO\nDespiertas tras la reja. Al otro lado, a un paso de la reja, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja. Vidal no es como los demas.",
   "cogido_punto": "TE HAN COGIDO\nVuelves al ultimo punto de control: {0}.",
   "cogido_entrada": "TE HAN COGIDO\nVuelves a la entrada de la base.",
   "celda_abierta": "CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia.",
@@ -602,8 +602,8 @@
   "p_vidal_ido": "VIDAL YA NO ESCUCHA",
   "p_vidal": "E   HABLAR CON EL CABO VIDAL",
   "losa": "LOSA SUELTA\nBajo la losa, en un trapo, una llave de hierro y una medalla con un nombre rayado a navaja: VIDAL, J.\nLa llave encaja en la reja. Vidal no tiene por que verlo.",
-  "vidal_ido": "CABO VIDAL\nReza mas alto y ya no contesta.\nEn el rincon, a la derecha de la reja, una losa baila bajo el pie.",
-  "vidal_q1": "Vidal no contesta. Al otro lado de la reja se le oye rezar.",
+  "vidal_ido": "CABO VIDAL\nReza de cara a la pared y no se vuelve.\nEn el rincon, a la derecha de la reja, una losa baila bajo el pie.",
+  "vidal_q1": "Vidal no te mira. Mueve los labios: reza.",
   "vidal_1a": "\"Abre, o cuando salga te busco a ti primero.\"",
   "vidal_1b": "\"Lo oyes por las noches? Lo de abajo.\"",
   "vidal_1c": "\"Alarcon te ascendera si me sueltas. Yo se lo dire.\"",
@@ -640,6 +640,7 @@
   "vidal_r3a_no": "\"Palabras.\" Vuelve la espalda.",
   "vidal_r3b_no": "\"Usted no reza.\" Vuelve la espalda.",
   "clave_alarma": "TECLADO DEL ARCHIVO\nDos claves malas seguidas: el teclado se bloquea un momento y avisa a la central.",
-  "radio_teclado": "Clave erronea en el archivo, dos veces. Todas las unidades: ojo, y parte uno por uno."
+  "radio_teclado": "Clave erronea en el archivo, dos veces. Todas las unidades: ojo, y parte uno por uno.",
+  "vidal_nombre": "CABO VIDAL"
  }
 }
