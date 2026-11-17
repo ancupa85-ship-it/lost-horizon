@@ -32,7 +32,6 @@
   "russian_food_cans_01",
   "concrete_road_barrier_02",
   "cement_bag",
-  "WoodenChair_01",
   "cardboard_box_01",
   "Camera_01",
   "wooden_picnic_table"
@@ -1802,7 +1801,7 @@
   },
   {
    "nombre": "jef_silla",
-   "modelo": "WoodenChair_01",
+   "modelo": "metal_stool_01",
    "pos": [
     440,
     3450,
@@ -1880,7 +1879,7 @@
    "nombre": "jef_archivador_2",
    "modelo": "drawer_cabinet",
    "pos": [
-    660,
+    680,
     3232,
     60
    ],
@@ -2073,7 +2072,7 @@
    "nombre": "arch_archivador_2",
    "modelo": "drawer_cabinet",
    "pos": [
-    1575,
+    1600,
     3968,
     60
    ],
@@ -2083,7 +2082,7 @@
    "nombre": "arch_archivador_3",
    "modelo": "drawer_cabinet",
    "pos": [
-    1670,
+    1720,
     3968,
     60
    ],
@@ -2124,7 +2123,7 @@
    "nombre": "arch_carpeta_2",
    "modelo": "binder_notebook",
    "pos": [
-    1575,
+    1600,
     3965,
     160
    ],
@@ -2207,7 +2206,7 @@
   },
   {
    "nombre": "tx_silla",
-   "modelo": "WoodenChair_01",
+   "modelo": "metal_stool_01",
    "pos": [
     6400,
     2000,
@@ -2415,8 +2414,8 @@
    "nombre": "ext_mesa",
    "modelo": "wooden_picnic_table",
    "pos": [
-    1150,
-    1820,
+    330,
+    1860,
     60
    ],
    "giro": 0
@@ -2425,8 +2424,8 @@
    "nombre": "ext_cafetera",
    "modelo": "pot_enamel_01",
    "pos": [
-    1130,
-    1815,
+    310,
+    1855,
     150
    ],
    "giro": 30,
@@ -2436,8 +2435,8 @@
    "nombre": "ext_lata",
    "modelo": "can_rusted",
    "pos": [
-    1185,
-    1830,
+    365,
+    1870,
     150
    ],
    "giro": 0,
@@ -2447,8 +2446,8 @@
    "nombre": "ext_tabaco",
    "modelo": "cigarette_pack",
    "pos": [
-    1105,
-    1840,
+    285,
+    1880,
     150
    ],
    "giro": 70,
@@ -2605,6 +2604,7 @@
   "_leeme": "Grados que se suman al giro de todas las piezas de un modelo. Con giro 0 lo largo de la pieza debe ir a lo largo de X (lo comprueba prueba_cobertura).",
   "concrete_road_barrier_02": 0,
   "cement_bag": 90,
-  "wooden_military_crate": 0
+  "wooden_military_crate": 0,
+  "wooden_picnic_table": 90
  }
 }

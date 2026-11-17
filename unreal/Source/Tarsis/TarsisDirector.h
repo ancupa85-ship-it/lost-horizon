@@ -225,12 +225,13 @@ public:
 	/** Farolas rotas de un dardo (sin contar el farol de la garita). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis")
 	int32 BrokenLampCount() const { return BrokenLights.Num(); }
-	/** Tapa negra que apaga la pantalla de una farola rota: dónde va respecto a su luz (la luz está 25 cm al lado y
-	 *  20 cm por debajo de la luminaria) y cuánto mide (el cubo del motor mide 100 cm). */
+	/** Tapa negra que apaga la pantalla de una farola rota: dónde va respecto a su luz y cuánto mide (el cubo del motor
+	 *  mide 100 cm). Medido en el PC en las farolas del camino: el panel va de x -33 a -17 e y -13 a 13, con la cara de
+	 *  abajo a z +0,5; la tapa lo abraza por debajo sin salirse de la carcasa. Las del patio son otro modelo, sin panel ahí. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
-	FVector LampCoverOffset = FVector(-25.0f, 0.0f, 14.0f);
+	FVector LampCoverOffset = FVector(-25.0f, 0.0f, 1.2f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
-	FVector LampCoverScale = FVector(0.7f, 0.5f, 0.1f);
+	FVector LampCoverScale = FVector(0.26f, 0.40f, 0.036f);
 	/** Repone las farolas rotas (pruebas y carga de partida). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void RepairLamps();
