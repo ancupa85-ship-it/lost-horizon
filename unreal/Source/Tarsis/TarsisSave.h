@@ -29,6 +29,7 @@ public:
 	UPROPERTY() bool bVetOpen = false;
 	UPROPERTY() bool bRamosKnown = false;
 	UPROPERTY() bool bLampBroken = false;
+	UPROPERTY() TArray<FVector> BrokenLamps;   // dónde están las farolas rotas de un dardo (tanda 27)
 	UPROPERTY() int32 Weather = 0;
 
 	// ---- parte del día siguiente (hueco "TarsisParte"): lo que la misión 2 encuentra en la base
@@ -38,6 +39,7 @@ public:
 	UPROPERTY() int32 Takedowns = 0;
 	UPROPERTY() bool bPowerCut = false;
 	UPROPERTY() bool bReserveHalf = false;
+	UPROPERTY() int32 LampsBroken = 0;
 	UPROPERTY() bool bRamosAlly = false;
 	UPROPERTY() bool bRamosDowned = false;
 	UPROPERTY() int32 Score = 0;

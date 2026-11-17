@@ -20,7 +20,7 @@ CAMARAS = [
 # del barracón, torre 2 a media recta del camino).
 TANDA26 = [
     # los dos focos de torre y su mancha en el suelo
-    ('foco_patio', V(3156, 2950, 130), V(2600, 2600, 90)),
+    ('foco_patio', V(3156, 2950, 330), V(2600, 2600, 0)),
     ('foco_camino', V(3300, 5950, 110), V(5000, 5700, 40)),
     # tu sombra bajo la primera farola del camino (se mira al suelo, hacia donde cae)
     ('sombra_farola', V(1270, 5700, 110), V(1700, 5560, 0)),

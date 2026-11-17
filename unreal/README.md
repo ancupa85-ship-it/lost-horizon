@@ -145,6 +145,15 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 
 **Pruebas.** `prueba_materia` y `prueba_cielo` (familia nueva), el bastón en `prueba_gestos` y `prueba_camion`, los halos y el relleno en `prueba_generador`, y el tamaño y el brillo de las chapas en `prueba_carteles`.
 
+### Farolas que se apagan de un dardo (tanda 27)
+
+- Cualquier farola de la base (luz con la etiqueta `luz_fuerte`) se rompe de un dardo, como ya pasaba con el farol de la garita (`ATarsisDirector::ShootLamp`, `BreakableLamp`). No valen los focos de las torres, los faros del camión ni los rellenos; la etiqueta `irrompible` excluye una a mano.
+- El dardo se gasta. La farola no vuelve con el generador, pierde su halo y su relleno, deja de alumbrarte y de darte sombra, y se guarda con el punto de control.
+- El guardia más cercano (a menos de 25 m) oye los cristales y va a mirar. El primero que pisa esa sombra, él u otro en su ronda, da parte por radio, la base se pone en guardia un minuto y él sigue la noche con la linterna encendida (`LampsTick`).
+- El parte del día siguiente cuenta las farolas rotas.
+- El cristal de las bombillas ya no da sombra (dejaba un disco negro en el techo).
+- Prueba: `prueba_farola`.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

@@ -764,6 +764,65 @@ def prueba_farol():
     check('el dardo rompe el farol', 'FAROL ROTO' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     check('el control queda a oscuras', despues < antes, '%.2f -> %.2f' % (antes, despues))
 
+def prueba_farola():
+    """Tanda 27: cualquier farola se apaga de un dardo. Gasta el dardo, se queda rota aunque vuelva el generador, pierde
+    su halo y deja de alumbrarte; el primer guardia que pisa esa sombra da parte por radio y saca la linterna. Los
+    focos de las torres no se rompen."""
+    d = director()
+    aparte()
+    _focos_torre(False)
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    f = ext['farolas'][0]
+    fx, fy = f[0] * 100.0 + 25.0, f[1] * 100.0
+    far = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.Light) if a.get_actor_label().startswith('farola') and dist2d(a.get_actor_location(), V(fx, fy, 0)) < 150]
+    check('hay farola en el camino', len(far) == 1, [a.get_actor_label() for a in far])
+    if not far:
+        return
+    a = far[0]
+    comp = a.get_component_by_class(unreal.LocalLightComponent)
+    for g in guardias():
+        g.hold(3600.0)   # nadie se mueve: lo que se mide es el disparo
+    pie = V(fx, fy, 130)
+    antes, hc = luz_en(pie), d.halo_counts()
+    d.set_darts(3)
+    tp(fx + 700, fy, 180); yield 0.2
+    mirar(a.get_actor_location()); yield 0.2
+    d.shoot_dart(); yield 0.4
+    msg = str(d.get_editor_property('message'))
+    check('el dardo rompe la farola', 'FAROLA ROTA' in msg and d.broken_lamp_count() == 1 and not comp.is_visible(), '%s, rotas %d' % (msg[:30], d.broken_lamp_count()))
+    check('gasta el dardo', d.get_editor_property('darts') == 2, d.get_editor_property('darts'))
+    despues = luz_en(pie)
+    check('a su pie ya no estás a la luz', antes > 0.5 and despues < antes * 0.5, '%.2f -> %.2f' % (antes, despues))
+    check('pierde su halo', d.halo_counts().y == hc.y - 1, '%d -> %d' % (hc.y, d.halo_counts().y))
+    # otro dardo a la misma no hace nada más (sigue contando una)
+    d.shoot_dart(); yield 0.9
+    check('una farola rota no se rompe dos veces', d.broken_lamp_count() == 1, d.broken_lamp_count())
+    # el primer guardia que pisa esa sombra da parte y saca la linterna
+    aparte(); yield 0.1
+    g = next((x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) != 'DOWN'), None)
+    voces = len(list(d.get_editor_property('voice_log')))
+    d.set_editor_property('tension_t', 0.0)
+    g.set_actor_location(V(fx + 120, fy, 100), False, True); yield 0.5
+    log_v = [str(x) for x in list(d.get_editor_property('voice_log'))[voces:]]
+    check('el guardia que la encuentra da parte por radio', any('farol' in x for x in log_v), log_v)
+    check('la base se pone en guardia y él saca la linterna', d.get_editor_property('tension_t') > 30.0 and g.has_flashlight_on(), '%.0f s, linterna %s' % (d.get_editor_property('tension_t'), g.has_flashlight_on()))
+    # los focos de las torres no se rompen
+    t = next((x for x in guardias() if x.get_editor_property('tower_sentry') and x.get_editor_property('tower_light')), None)
+    if t:
+        _focos_torre(True)
+        tl = t.get_editor_property('tower_light')
+        l = tl.get_actor_location()
+        tp(l.x + 900, l.y, 180); yield 0.2
+        mirar(l); yield 0.2
+        d.shoot_dart(); yield 0.4
+        check('el foco de una torre no se rompe', d.broken_lamp_count() == 1 and tl.get_component_by_class(unreal.LocalLightComponent).is_visible(), d.broken_lamp_count())
+        _focos_torre(False)
+    # reponerlas (carga de partida y pruebas) la deja como estaba
+    aparte()
+    d.repair_lamps(); yield 0.4
+    check('repuesta, vuelve a alumbrar con su halo', comp.is_visible() and d.broken_lamp_count() == 0 and d.halo_counts().y == hc.y, '%d halos' % d.halo_counts().y)
+
+
 def prueba_final():
     d = director()
     # sin el expediente, el portón de salida no te deja irte: aviso y la misión sigue
@@ -2014,7 +2073,7 @@ def prueba_puertas():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola]]
 PRUEBAS = []
 
 

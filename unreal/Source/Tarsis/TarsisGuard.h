@@ -378,6 +378,7 @@ public:
 
 	/** Linterna en la mano (durante el apagón): el cono se ve en la niebla y cuenta como luz para verte. */
 	void SetFlashlight(bool bOn);
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
 	bool HasFlashlightOn() const;
 	/** La linterna (para medir la luz desde fuera de la clase); nullptr si aún no la ha sacado nunca. */
 	const class USpotLightComponent* FlashlightComp() const { return Flashlight; }

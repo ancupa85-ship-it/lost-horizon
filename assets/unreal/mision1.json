@@ -289,6 +289,7 @@
   "radio_reserva": "{0}, como va eso? ... {0}? Entra la reserva. Todos al generador, ya!",
   "titulo": "LOST HORIZON: DE PROFUNDIS\nMision 1 - Tarsis\nUna base en la marisma. Esta noche, el expediente LH-07 sale de ahi contigo.\n\n(E o Espacio para saltar)",
   "farol_roto": "FAROL ROTO\nEl control queda a oscuras.{0}",
+  "farola_rota": "FAROLA ROTA\nEsta zona queda a oscuras.{0}",
   "farol_viene": "{0} ha oido los cristales y viene a mirar.",
   "partida_cargada": "PARTIDA CARGADA\nUltimo punto de control: {0}.",
   "calidad": "CALIDAD GRAFICA\nElegida segun tu PC: {0}. Se cambia en Pausa (P).",

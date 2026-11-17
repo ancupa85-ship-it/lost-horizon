@@ -422,6 +422,11 @@ for m in meshes:
                 c.set_editor_property('receives_decals', False)   # las manchas del camino no se pintan en los bajos del camión
             except Exception as e:
                 log('AVISO:', name, 'sin receives_decals:', repr(e))
+    if name.endswith('_bombilla'):
+        # tanda 27: el cristal de las bombillas no da sombra (la suya propia dejaba un disco negro en el techo)
+        c = a.get_component_by_class(unreal.StaticMeshComponent)
+        if c:
+            c.set_editor_property('cast_shadow', False)
     if name.startswith('valla_tela'):
         tela_mat(a)
     if name.startswith('hierbajos'):

@@ -346,8 +346,9 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	TruckTick(DeltaSeconds);
 	MusicTick(DeltaSeconds);
 	// el que fue a mirar el farol roto encuentra los cristales y avisa: la base se pone en guardia un rato
-	if (bLampBroken && !bLampReported && LampChecker && LampChecker->State != ETarsisGuardState::Down
-		&& GateLamp && FVector::Dist2D(LampChecker->GetActorLocation(), GateLamp->GetActorLocation()) < 350.0f)
+	LampsTick();
+	if (CheckLamp && CheckLamp.Get() == GateLamp.Get() && !bLampReported && LampChecker && LampChecker->State != ETarsisGuardState::Down
+		&& FVector::Dist2D(LampChecker->GetActorLocation(), CheckSpot) < 350.0f)
 	{
 		bLampReported = true;
 		// lo dice por radio (voz y subtítulo); que la base se pone en guardia lo dice el indicador del HUD
@@ -356,11 +357,10 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	}
 	// el camino hasta la garita es largo (rodea): a los 25 s de investigar lo deja a medio camino y vuelve a su ronda.
 	// Si no ha llegado a verlo, se le vuelve a mandar (sale ya más cerca)
-	else if (bLampBroken && !bLampReported && LampChecker && GateLamp
+	else if (CheckLamp && !bLampReported && LampChecker
 		&& (LampChecker->State == ETarsisGuardState::Return || LampChecker->State == ETarsisGuardState::Patrol))
 	{
-		const FVector P = GateLamp->GetActorLocation();
-		LampChecker->HearNoise(FVector(P.X, P.Y, ExitBarrierLoc.Z));
+		LampChecker->HearNoise(CheckSpot);
 	}
 	if (HeardT > 0.0f) HeardT -= DeltaSeconds;
 	// Ramos: la charla se corta si te alejas; con el expediente, si va contigo, se va al portillo
@@ -2837,25 +2837,64 @@ void ATarsisDirector::RideTick()
 	if (!bAny) bRideSeen = false;   // ya no te persigue nadie
 }
 
-// ---------------------------------------------------------------- farol de la garita: se rompe de un disparo
+// ---------------------------------------------------------------- farol de la garita y farolas: se rompen de un disparo
+
+// tanda 27: además del farol de la garita, cualquier farola (luz fuerte de la base) se apaga de un dardo. No vale para
+// los focos de las torres (los lleva su centinela), los faros del camión ni los rellenos; «irrompible» la excluye a mano
+bool ATarsisDirector::BreakableLamp(const ALight* A) const
+{
+	static const FName Strong(TEXT("luz_fuerte")), Truck(TEXT("camion")), Decor(TEXT("decorado")), Hard(TEXT("irrompible"));
+	if (!A || A == GateLamp.Get() || !A->ActorHasTag(Strong) || A->ActorHasTag(Truck) || A->ActorHasTag(Decor) || A->ActorHasTag(Hard)) return false;
+	for (TActorIterator<ATarsisGuard> G(GetWorld()); G; ++G) if (G->TowerLight.Get() == A) return false;
+	return true;
+}
 
 bool ATarsisDirector::ShootLamp(const FVector& From, const FVector& Fwd, float MaxT)
 {
-	if (!GateLamp || bLampBroken) return false;
-	ULightComponent* L = GateLamp->GetLightComponent();
-	if (!L) return false;
-	const FVector P = GateLamp->GetActorLocation();
-	const float T = FVector::DotProduct(P - From, Fwd);
-	if (T < 0.0f || T > MaxT || FVector::Dist(From + Fwd * T, P) > 40.0f) return false;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisFarol), true, this);
-	if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
-	Q.AddIgnoredActor(GateLamp);
-	FHitResult Hit;
-	if (GetWorld()->LineTraceSingleByChannel(Hit, From, P, ECC_Visibility, Q) && FVector::Dist(Hit.ImpactPoint, P) > 60.0f) return false;
-	bLampBroken = true;
+	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (Pl) Q.AddIgnoredActor(Pl);
+	// la luminaria más cercana que cruza la línea de tiro, sin nada en medio
+	ALight* Lamp = nullptr;
+	float BestT = MaxT;
+	for (TActorIterator<ALight> It(GetWorld()); It; ++It)
+	{
+		ALight* A = *It;
+		ULightComponent* L = A->GetLightComponent();
+		if (!L) continue;
+		const bool bGate = A == GateLamp.Get();
+		if (bGate ? bLampBroken : (BrokenLights.Contains(L) || !BreakableLamp(A))) continue;
+		const FVector P = A->GetActorLocation();
+		const float T = FVector::DotProduct(P - From, Fwd);
+		if (T < 0.0f || T > BestT || FVector::Dist(From + Fwd * T, P) > 40.0f) continue;
+		FCollisionQueryParams Q2 = Q;
+		Q2.AddIgnoredActor(A);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, From, P, ECC_Visibility, Q2) && FVector::Dist(Hit.ImpactPoint, P) > 60.0f) continue;
+		Lamp = A;
+		BestT = T;
+	}
+	if (!Lamp) return false;
+	ULightComponent* L = Lamp->GetLightComponent();
+	const bool bGate = Lamp == GateLamp.Get();
+	const FVector P = Lamp->GetActorLocation();
+	if (bGate) bLampBroken = true;
+	else BrokenLights.Add(L);
 	L->SetVisibility(false);
+	const int32 SpotIdx = bGate ? INDEX_NONE : BrokenLights.Num() - 1;
 	OffLights.Remove(L);   // si hay apagón, al volver la luz sigue roto
+	PendingOff.Remove(L);
 	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, P, 1.0f, 1.6f, 0.0f, Atten);
+	// dónde caen los cristales: el suelo bajo la luminaria (la de la garita, a la altura de la barrera)
+	FVector Ground(P.X, P.Y, ExitBarrierLoc.Z);
+	if (!bGate)
+	{
+		FCollisionQueryParams Q3 = Q;
+		Q3.AddIgnoredActor(Lamp);
+		FHitResult Floor;
+		if (GetWorld()->LineTraceSingleByChannel(Floor, P, P - FVector(0.0f, 0.0f, 1500.0f), ECC_Visibility, Q3)) Ground = Floor.ImpactPoint;
+		else Ground.Z = Pl ? Pl->GetActorLocation().Z : P.Z - 500.0f;
+	}
 	// el ruido de cristales llama al guardia más cercano, que viene a mirar
 	ATarsisGuard* Best = nullptr;
 	float BestD = 2500.0f;
@@ -2865,11 +2904,58 @@ bool ATarsisDirector::ShootLamp(const FVector& From, const FVector& Fwd, float M
 		const float D = FVector::Dist(It->GetActorLocation(), P);
 		if (D < BestD) { BestD = D; Best = *It; }
 	}
-	if (Best) Best->HearNoise(FVector(P.X, P.Y, ExitBarrierLoc.Z));
+	if (Best) Best->HearNoise(Ground);
 	LampChecker = Best;
-	ShowMessage(Tx(TEXT("farol_roto"), TEXT("FAROL ROTO\nEl control queda a oscuras.{0}"),
-		{ Best ? TEXT(" ") + Tx(TEXT("farol_viene"), TEXT("{0} ha oido los cristales y viene a mirar."), { Best->GuardName }) : FString() }), 4.0f);
+	CheckLamp = Lamp;
+	CheckSpot = Ground;
+	bLampReported = false;
+	if (SpotIdx != INDEX_NONE)
+	{
+		BrokenSpots.SetNum(BrokenLights.Num());
+		BrokenSeen.SetNum(BrokenLights.Num());
+		BrokenSpots[SpotIdx] = Ground;
+		BrokenSeen[SpotIdx] = false;
+	}
+	const FString Comes = Best ? TEXT(" ") + Tx(TEXT("farol_viene"), TEXT("{0} ha oido los cristales y viene a mirar."), { Best->GuardName }) : FString();
+	if (bGate) ShowMessage(Tx(TEXT("farol_roto"), TEXT("FAROL ROTO\nEl control queda a oscuras.{0}"), { Comes }), 4.0f);
+	else ShowMessage(Tx(TEXT("farola_rota"), TEXT("FAROLA ROTA\nEsta zona queda a oscuras.{0}"), { Comes }), 4.0f);
 	return true;
+}
+
+// Una farola rota no pasa desapercibida: el primer guardia que pisa su charco de sombra (el que oyó los cristales u
+// otro en su ronda) lo dice por radio, la base se pone en guardia un rato y él ya no guarda la linterna
+void ATarsisDirector::LampsTick()
+{
+	for (int32 i = 0; i < BrokenLights.Num(); ++i)
+	{
+		if (!BrokenSeen.IsValidIndex(i) || BrokenSeen[i]) continue;
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			if (It->State == ETarsisGuardState::Down || It->bTowerSentry || It->bAlly) continue;
+			const FVector G = It->GetActorLocation();
+			if (FVector::Dist2D(G, BrokenSpots[i]) > 350.0f || FMath::Abs(G.Z - BrokenSpots[i].Z) > 300.0f) continue;
+			BrokenSeen[i] = true;
+			if (CheckLamp && CheckLamp->GetLightComponent() == BrokenLights[i].Get()) bLampReported = true;
+			GuardSay(*It, TEXT("farol"), true);
+			TensionT = FMath::Max(TensionT, 60.0f);
+			It->SetFlashlight(true);
+			break;
+		}
+	}
+}
+
+void ATarsisDirector::RepairLamps()
+{
+	for (ULightComponent* L : BrokenLights)
+	{
+		if (!L) continue;
+		if (bPowerOff) OffLights.AddUnique(L);
+		else L->SetVisibility(true);
+	}
+	BrokenLights.Reset();
+	BrokenSpots.Reset();
+	BrokenSeen.Reset();
+	if (CheckLamp && CheckLamp.Get() != GateLamp.Get()) { CheckLamp = nullptr; LampChecker = nullptr; }
 }
 
 // ---------------------------------------------------------------- puntos de control y guardado
@@ -2902,6 +2988,8 @@ void ATarsisDirector::Checkpoint(const FString& Name)
 	S->bVetOpen = bVetOpen;
 	S->bRamosKnown = bRamosKnown;
 	S->bLampBroken = bLampBroken;
+	S->BrokenLamps.Reset();
+	for (const ULightComponent* BL : BrokenLights) if (BL && BL->GetOwner()) S->BrokenLamps.Add(BL->GetOwner()->GetActorLocation());
 	S->Weather = Weather;
 	S->Flags = FlagList();
 	bHasSave = UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisPartida"), 0) || bHasSave;
@@ -2952,6 +3040,22 @@ bool ATarsisDirector::LoadCheckpoint()
 		bLampBroken = true;
 		GateLamp->GetLightComponent()->SetVisibility(false);
 		OffLights.Remove(GateLamp->GetLightComponent());
+	}
+	// tanda 27: las farolas rotas son las del punto de control, ni más ni menos
+	RepairLamps();
+	for (const FVector& BP : S->BrokenLamps)
+	{
+		for (TActorIterator<ALight> It(GetWorld()); It; ++It)
+		{
+			ULightComponent* BL = It->GetLightComponent();
+			if (!BL || FVector::DistSquared(It->GetActorLocation(), BP) > 2500.0f || !BreakableLamp(*It) || BrokenLights.Contains(BL)) continue;
+			BrokenLights.Add(BL);
+			BrokenSpots.Add(It->GetActorLocation());
+			BrokenSeen.Add(true);   // ya se dio parte antes del punto de control (o da igual: no se repite)
+			BL->SetVisibility(false);
+			OffLights.Remove(BL);
+			PendingOff.Remove(BL);
+		}
 	}
 	if (S->Weather != Weather) SetWeather(S->Weather);
 	bWetInit = false;   // el mojado, de golpe al que toque con el clima cargado
@@ -3407,6 +3511,8 @@ void ATarsisDirector::BuildReport()
 	if (bVetOpen) L.Add(TEXT("El botiquin del veterinario esta abierto y falta la pistola de dardos."));
 	if (bKey) L.Add(TEXT("Al sargento Ibarra le falta la llave de la jefatura. Se cambiara la cerradura."));
 	if (bLampBroken) L.Add(TEXT("El farol del control aparecio roto de un disparo. Se ha pedido otro a Sevilla."));
+	if (BrokenLights.Num() == 1) L.Add(TEXT("Una farola aparecio rota de un disparo. No hay repuesto hasta el lunes."));
+	else if (BrokenLights.Num() > 1) L.Add(FString::Printf(TEXT("%d farolas aparecieron rotas a tiros. No hay repuesto hasta el lunes."), BrokenLights.Num()));
 	if (bReserveHalf) L.Add(TEXT("El generador sigue averiado: con la reserva, media base pasara la noche a oscuras."));
 	else if (bPowerCutOnce) L.Add(TEXT("Alguien corto el generador; se arranco de nuevo antes del alba."));
 	if (bRamosAlly) L.Add(bMarsh ? TEXT("El soldado Ramos no se presento a la diana. Se le da por desertor.")
@@ -3418,6 +3524,7 @@ void ATarsisDirector::BuildReport()
 	if (Detections >= 3 || Captures > 0) Cons.Add(TEXT("se doblan las rondas"));
 	if (bReserveHalf) Cons.Add(TEXT("la zona norte queda a oscuras"));
 	if (bLampBroken) Cons.Add(TEXT("el control sigue sin farol"));
+	if (BrokenLights.Num() > 0) Cons.Add(TEXT("hay farolas sin reponer"));
 	if (bRamosAlly) Cons.Add(TEXT("Ramos te espera fuera"));
 	else if (bRamosDowned) Cons.Add(TEXT("Ramos desconfia de todos"));
 	if (bKey) Cons.Add(TEXT("cerradura nueva en la jefatura"));
@@ -3438,6 +3545,7 @@ void ATarsisDirector::BuildReport()
 	S->bPowerCut = bPowerCutOnce;
 	S->bReserveHalf = bReserveHalf;
 	S->bLampBroken = bLampBroken;
+	S->LampsBroken = BrokenLights.Num();
 	S->bRamosAlly = bRamosAlly;
 	S->bRamosDowned = bRamosDowned;
 	S->bKey = bKey;

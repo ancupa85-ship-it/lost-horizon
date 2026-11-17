@@ -222,6 +222,15 @@ public:
 	 *  con su luz). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Pruebas")
 	FIntPoint HaloCounts() const { return FIntPoint(Halos.Num(), HalosLit()); }
+	/** Farolas rotas de un dardo (sin contar el farol de la garita). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	int32 BrokenLampCount() const { return BrokenLights.Num(); }
+	/** Repone las farolas rotas (pruebas y carga de partida). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void RepairLamps();
+	/** Pruebas: deja la pistola con estos dardos. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void SetDarts(int32 N) { Darts = FMath::Max(0, N); }
 
 	/** Ajuste de la tanda 25: cuánto dispersan en la niebla volumétrica los focos fuertes (torres; etiqueta «luz_fuerte»).
 	 *  Con 16 el haz de la torre era un cono blanco macizo que se comía un tercio de la imagen con lluvia. Va aquí, y no
@@ -1171,6 +1180,16 @@ private:
 	float RepairCallT = 0.0f;
 	bool bRepairerSilent = false;
 	bool ShootLamp(const FVector& From, const FVector& Fwd, float MaxT);
+	// tanda 27: farolas rotas de un dardo (no vuelven con el generador), y la que va a mirar el guardia que oyó los cristales
+	UPROPERTY()
+	TArray<TObjectPtr<class ULightComponent>> BrokenLights;
+	UPROPERTY()
+	TObjectPtr<class ALight> CheckLamp;
+	FVector CheckSpot = FVector::ZeroVector;
+	TArray<FVector> BrokenSpots;   // el suelo bajo cada farola rota, y si algún guardia la ha encontrado ya
+	TArray<bool> BrokenSeen;
+	void LampsTick();
+	bool BreakableLamp(const class ALight* A) const;
 	/** Dónde se pone el reparador: al sur del generador, despejado (encima de la malla el camino sale parcial). */
 	FVector RepairSpot() const { return GeneratorLoc + FVector(0.0f, 280.0f, 0.0f); }
 	void SetupBarrier();
