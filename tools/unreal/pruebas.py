@@ -782,6 +782,7 @@ def prueba_farola():
     comp = a.get_component_by_class(unreal.LocalLightComponent)
     for g in guardias():
         g.hold(3600.0)   # nadie se mueve: lo que se mide es el disparo
+    yield 0.5   # los halos de los focos de torre recién apagados se van un instante después: que no entren en la cuenta
     pie = V(fx, fy, 130)
     antes, hc = luz_en(pie), d.halo_counts()
     d.set_darts(3)
@@ -819,7 +820,7 @@ def prueba_farola():
         _focos_torre(False)
     # reponerlas (carga de partida y pruebas) la deja como estaba
     aparte()
-    d.repair_lamps(); yield 0.4
+    d.repair_lamps(); yield 0.8
     check('repuesta, vuelve a alumbrar con su halo', comp.is_visible() and d.broken_lamp_count() == 0 and d.halo_counts().y == hc.y, '%d halos' % d.halo_counts().y)
 
 
