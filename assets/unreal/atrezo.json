@@ -2661,39 +2661,6 @@
    "pequeno": true
   },
   {
-   "nombre": "cal_catre",
-   "modelo": "old_bed_frame",
-   "pos": [
-    6110,
-    2897,
-    60
-   ],
-   "giro": 0
-  },
-  {
-   "nombre": "cal_colchon",
-   "modelo": "colchon",
-   "pos": [
-    6110,
-    2897,
-    46
-   ],
-   "giro": -1.5,
-   "colgar": true
-  },
-  {
-   "nombre": "cal_manta",
-   "modelo": "manta",
-   "pos": [
-    6105,
-    2925,
-    59
-   ],
-   "giro": -12,
-   "colgar": true,
-   "pequeno": true
-  },
-  {
    "nombre": "cal_cubo",
    "modelo": "wooden_bucket_02",
    "pos": [
