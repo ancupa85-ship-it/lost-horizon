@@ -609,13 +609,12 @@ public:
 	/** Tu linterna está encendida. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
 	bool bTorch = false;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	/** Tanda 32: lo que alumbras a menos de esta distancia (cm) recibe menos luz, hasta TorchNearMin de cerca: como el ojo que se
 	 *  acostumbra, y el guardia deslumbrado o la pared a un palmo dejan de salir blancos. 0 lo quita. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	float TorchNearDist = 600.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
-	float TorchNearMin = 0.18f;
+	float TorchNearMin = 0.05f;   // medido en el PC: con 0,18 la pared a 50 cm seguia blanca
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
 	float TorchDimNow() const { return TorchDim; }
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
@@ -818,7 +817,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
 	float EmisoraStand = 110.0f;   // se planta a este lado de la mesa (cm hacia +X), de cara a la emisora
 	/** Segundos que lleva muda la red. */
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Radio")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
 	float RadioDeadT = 0.0f;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
 	int32 RadioRepairsSent = 0;

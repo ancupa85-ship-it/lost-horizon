@@ -78,7 +78,12 @@ void ATarsisDirector::TorchTick(float DeltaSeconds)
 		if (APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0)) NQ.AddIgnoredActor(Me);
 		FHitResult Near;
 		float Want = 1.0f;
-		if (GetWorld()->LineTraceSingleByChannel(Near, A, A + PlayerTorch->GetForwardVector() * TorchNearDist, ECC_Visibility, NQ))
+		// por tipo de objeto y no por Visibility: la capsula del guardia no bloquea Visibility y el deslumbrado salia blanco
+		FCollisionObjectQueryParams NO;
+		NO.AddObjectTypesToQuery(ECC_WorldStatic);
+		NO.AddObjectTypesToQuery(ECC_WorldDynamic);
+		NO.AddObjectTypesToQuery(ECC_Pawn);
+		if (GetWorld()->LineTraceSingleByObjectType(Near, A, A + PlayerTorch->GetForwardVector() * TorchNearDist, NO, NQ))
 		{
 			// la luz cae con el cuadrado de la distancia: se compensa casi del todo, con un suelo
 			Want = FMath::Clamp(FMath::Square(Near.Distance / TorchNearDist), TorchNearMin, 1.0f);

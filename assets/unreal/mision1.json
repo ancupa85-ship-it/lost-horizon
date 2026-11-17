@@ -33,9 +33,11 @@
    "truck_self_wait": 30.0,
    "render_c_vars": [
     "r.Nanite.Streaming.StreamingPoolSize=128",
-    "r.ShadowQuality=3"
+    "r.ShadowQuality=3",
+    "r.Streaming.PoolSize=400"
    ],
-   "shadow_tells": true
+   "shadow_tells": true,
+   "torch_near_min": 0.05
   },
   "guardias": {
    "*": {
