@@ -593,6 +593,58 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void ShootDart();
 
+	// ---- tanda 28: «Responde, Carmona». La central llama a un guardia que has dejado en el suelo; si estás junto a
+	// él, contestas tú por su radio eligiendo entre tres partes. Solo cuela el suyo, que habrás oído antes si andabas
+	// cerca cuando lo daba. «Todo tranquilo» es la frase de coacción: parece la natural y trae a dos con la base en guardia
+	/** Interruptor general de contestar por radio y de los partes que se oyen. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	bool bRadioAnswer = true;
+	/** La central espera tu respuesta (teclas 1, 2 y 3). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	bool bRadioAsk = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	TArray<FString> RadioOptions;
+	/** Cuál de las tres cuela y cuál es la de coacción (1 a 3). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	int32 RadioRight = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	int32 RadioDuress = 0;
+	/** Veces que has engañado a la central. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	int32 RadioFooled = 0;
+	/** Guardias a los que has oído dar el parte. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	TArray<FString> HeardPartes;
+	/** Segundos para contestar, cada cuánto da el parte cada guardia, a qué distancia lo oyes y a cuánto del cuerpo llegas a su radio (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float RadioAnswerSeconds = 10.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float ParteEvery = 75.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float ParteHearDist = 1600.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float RadioReach = 400.0f;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Radio")
+	void AnswerRadio(int32 Option);
+	/** El guardia da su parte ahora (lo oyes si estás a menos de ParteHearDist). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Radio")
+	void SayParte(class ATarsisGuard* G);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Radio")
+	FString ParteOf(const FString& Name) const;
+
+	// ---- tanda 28: nadie entra solo a mirar donde falta la farola (ATarsisGuard::WaitForBuddy)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
+	bool bBuddyRule = true;
+	/** Radio de la sombra de una farola rota, hasta dónde se busca compañero y cuánto se le espera. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
+	float DarkZoneRadius = 900.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
+	float BuddyCallRadius = 7000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
+	float BuddyWaitSeconds = 22.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sigilo")
+	int32 BuddyCalls = 0;
+
 	/** Respuesta a Ramos: 1 llevarlo contigo, 2 derribarlo. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Choose(int32 Option);
@@ -1081,6 +1133,13 @@ private:
 	void ApplyRenderCVars();
 	TArray<TPair<FString, FString>> RenderSaved;      // variable y valor de antes, para dejarlo como estaba
 	void RadioTick(float DeltaSeconds);
+	void RadioSend(class ATarsisGuard* Fallen, int32 HowMany);
+	void PartesTick();
+	void StartRadioAsk(class ATarsisGuard* G);
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> RadioAskGuard;
+	float RadioAskT = 0.0f;
+	TMap<TObjectPtr<class ATarsisGuard>, float> ParteNext;
 	UPROPERTY()
 	TSet<TObjectPtr<class ATarsisGuard>> Called;
 	FLinearColor BaseFogColor = FLinearColor::Black;

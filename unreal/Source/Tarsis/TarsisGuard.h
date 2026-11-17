@@ -380,6 +380,25 @@ public:
 	void SetFlashlight(bool bOn);
 	UFUNCTION(BlueprintPure, Category = "Tarsis")
 	bool HasFlashlightOn() const;
+	/** La linterna se queda encendida aunque vuelva a su ronda (el que encontró una farola rota). */
+	void KeepFlashlight() { SetFlashlight(true); bDarkTorch = false; }
+
+	// ---- tanda 28: no entra solo a mirar un ruido donde han roto la farola. Se planta, saca la linterna, pide apoyo
+	// por radio y espera al compañero; luego entran los dos. Mientras espera, la zona a oscuras es tuya y el compañero
+	// ha dejado su ronda. Lo decide ATarsisDirector::LampsTick (él sabe qué farolas faltan)
+	/** Espera plantado a que llegue un compañero antes de entrar a oscuras. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sigilo")
+	bool bWaitBuddy = false;
+	/** Va a mirar un ruido y aún nadie ha decidido si entra solo. */
+	bool WantsDarkCheck() const { return State == ETarsisGuardState::Suspicious && bInvestigate && !bDarkChecked && !bEscort && !bRepairing && HoldT <= 0.0f; }
+	/** Adónde va a mirar. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	FVector NoiseSpot() const { return LastSeen; }
+	bool IsHeld() const { return HoldT > 0.0f; }
+	bool IsBusy() const { return bRepairing || bWaitBuddy || bEscort || BodyTarget != nullptr; }
+	void DarkChecked() { bDarkChecked = true; }
+	/** Se planta y espera a B (o Seconds, lo que llegue antes); B deja lo suyo y acude. Sin B, duda ese rato y entra solo. */
+	void WaitForBuddy(ATarsisGuard* B, float Seconds);
 	/** La linterna (para medir la luz desde fuera de la clase); nullptr si aún no la ha sacado nunca. */
 	const class USpotLightComponent* FlashlightComp() const { return Flashlight; }
 	void SetFlashlightShadows(bool bOn);
@@ -494,6 +513,11 @@ private:
 	void TowerTick(float DeltaSeconds, APawn* Player, float V);
 	float TowerT = 0.0f;
 	float LightPitch = 0.0f;
+	TWeakObjectPtr<ATarsisGuard> Buddy;
+	float WaitBuddyT = 0.0f;
+	bool bDarkChecked = false;
+	bool bEscort = false;      // acude a acompañar a otro: no vuelve a pedir apoyo él
+	bool bDarkTorch = false;   // linterna sacada para entrar a oscuras: se guarda al volver a la ronda
 	bool HasSweepPath() const { return SweepPath.Num() >= 2 && TowerLight != nullptr; }
 	void SweepSequence(TArray<int32>& Out) const;
 	float SweepTimeNear(const FVector& P) const;

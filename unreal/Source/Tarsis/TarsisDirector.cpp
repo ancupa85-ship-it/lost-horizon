@@ -612,6 +612,13 @@ void ATarsisDirector::Interact()
 
 void ATarsisDirector::KeypadKey(FKey Key)
 {
+	if (bRadioAsk)
+	{
+		if (Key == EKeys::One || Key == EKeys::NumPadOne) AnswerRadio(1);
+		else if (Key == EKeys::Two || Key == EKeys::NumPadTwo) AnswerRadio(2);
+		else if (Key == EKeys::Three || Key == EKeys::NumPadThree) AnswerRadio(3);
+		return;
+	}
 	if (bChoice)
 	{
 		if (Key == EKeys::One || Key == EKeys::NumPadOne) Choose(1);
@@ -1633,7 +1640,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	// no repite frase enseguida (al cambiar de estado varias veces seguidas), salvo las que importan: el empujón,
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
-		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("perdido") || Key == TEXT("despierta")
+		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("farola") || Key == TEXT("apoyo") || Key == TEXT("voy") || Key == TEXT("perdido") || Key == TEXT("despierta")
 		|| Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
@@ -1662,6 +1669,9 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("donde")) T = TEXT("Donde se ha metido? No contesta.");
 	else if (Key == TEXT("eh")) T = TEXT("Eh! Pero que...?");
 	else if (Key == TEXT("farol")) T = TEXT("Central, el farol del control esta roto. Cristales por el suelo... esto no es el viento.");
+	else if (Key == TEXT("farola")) T = TEXT("Central, aqui hay una farola rota. Cristales por el suelo... esto no es el viento.");
+	else if (Key == TEXT("apoyo")) T = TEXT("Central, ahi no hay luz. Yo solo no entro: mandadme a alguien.");
+	else if (Key == TEXT("voy")) T = TEXT("Voy para alla. No te muevas.");
 	else if (Key == TEXT("cuerpo")) T = TEXT("Eh... ese de ahi esta en el suelo?");
 	else if (Key == TEXT("despierta")) T = TEXT("Ay, mi cabeza... Quien ha sido?");
 	else if (Key == TEXT("tengo")) T = TEXT("Te tengo!");
@@ -1833,13 +1843,167 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 			if (D < BestD) { BestD = D; Best = *O; }
 		}
 		if (!Best) continue;
-		Best->HearNoise(G->KnockLoc);
-		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Best->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
-		// la central llama al caído; nada. Al rato, el que va a mirar: «¿dónde se ha metido?»
+		// la central llama al caído. Tanda 28: si estás junto a él, su radio la tienes tú y puedes contestar
 		CentralSay(TEXT("responde"), Tx(TEXT("radio_responde"), TEXT("{0}, responde. {0}?"), { G->GuardName }));
-		TWeakObjectPtr<ATarsisGuard> W(Best);
+		APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+		if (bRadioAnswer && !bRadioAsk && Pl && !bChoice && !bKeypad && !bRiding && !bCine
+			&& FVector::Dist(Pl->GetActorLocation(), G->GetActorLocation()) < RadioReach)
+		{
+			StartRadioAsk(G);
+			continue;
+		}
+		RadioSend(G, 1);
+	}
+	// la pregunta de la central no espera: sin respuesta (o si te alejas del cuerpo), mandan a alguien como siempre
+	if (bRadioAsk)
+	{
+		RadioAskT -= DeltaSeconds;
+		ATarsisGuard* G = RadioAskGuard;
+		APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+		const bool bGone = !G || G->State != ETarsisGuardState::Down || !Pl || FVector::Dist(Pl->GetActorLocation(), G->GetActorLocation()) > RadioReach * 1.6f;
+		if (RadioAskT <= 0.0f || bGone)
+		{
+			bRadioAsk = false;
+			RadioAskGuard = nullptr;
+			MessageT = FMath::Min(MessageT, 0.3f);
+			if (G && G->State == ETarsisGuardState::Down) RadioSend(G, 1);
+		}
+	}
+	PartesTick();
+}
+
+// El guardia (o los dos) más cercano va a mirar dónde cayó el que no contesta
+void ATarsisDirector::RadioSend(ATarsisGuard* Fallen, int32 HowMany)
+{
+	if (!Fallen) return;
+	TArray<ATarsisGuard*> Sent;
+	for (int32 n = 0; n < HowMany; ++n)
+	{
+		ATarsisGuard* Best = nullptr;
+		float BestD = TNumericLimits<float>::Max();
+		for (TActorIterator<ATarsisGuard> O(GetWorld()); O; ++O)
+		{
+			if (*O == Fallen || Sent.Contains(*O) || O->State == ETarsisGuardState::Down || O->State == ETarsisGuardState::Alert || O->bTowerSentry || O->bAlly) continue;
+			const float D = FVector::Dist(O->GetActorLocation(), Fallen->KnockLoc);
+			if (D < BestD) { BestD = D; Best = *O; }
+		}
+		if (!Best) break;
+		Sent.Add(Best);
+		Best->HearNoise(Fallen->KnockLoc);
+		if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, Best->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
+	}
+	if (Sent.Num() > 0)
+	{
+		// al rato, el que va a mirar: «¿dónde se ha metido?»
+		TWeakObjectPtr<ATarsisGuard> W(Sent[0]);
 		FTimerHandle H;
 		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, W]() { if (W.IsValid()) GuardSay(W.Get(), TEXT("donde")); }), 2.2f, false);
+	}
+}
+
+// ---------------------------------------------------------------- «Responde, Carmona»: contestar por la radio de otro
+
+// Cada centinela da su parte a su manera (textos «parte_<nombre>» de mision1.json): lo que dice después de «Aquí Fulano»
+FString ATarsisDirector::ParteOf(const FString& Name) const
+{
+	const FString* F = Texts.Find(FName(*(TEXT("parte_") + Name.ToLower())));
+	return F ? *F : FString(TEXT("Sin novedad."));
+}
+
+// De vez en cuando, cada guardia en su ronda da el parte por radio. Si estás cerca lo oyes (subtítulo siempre: es
+// una pista, no ambiente) y te lo quedas; es lo que tendrás que decir si la central lo llama cuando esté en el suelo
+void ATarsisDirector::PartesTick()
+{
+	if (!bRadioAnswer || bCine || bDone || bPowerOff || TensionT > 0.0f) return;
+	const float Now = GetWorld()->GetTimeSeconds();
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->bTowerSentry || It->bAlly || It->State != ETarsisGuardState::Patrol || It->IsHeld()) continue;
+		const TObjectPtr<ATarsisGuard> K(*It);
+		float* Next = ParteNext.Find(K);
+		if (!Next) { ParteNext.Add(K, Now + 12.0f + float(GetTypeHash(It->GuardName) % 1000) * 0.001f * ParteEvery); continue; }
+		if (Now < *Next) continue;
+		*Next = Now + ParteEvery;
+		SayParte(*It);
+	}
+}
+
+void ATarsisDirector::SayParte(ATarsisGuard* G)
+{
+	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!G || !Pl || FVector::Dist(Pl->GetActorLocation(), G->GetActorLocation()) > ParteHearDist) return;
+	const FString Line = Tx(TEXT("parte_aqui"), TEXT("Aqui {0}. {1}"), { G->GuardName, ParteOf(G->GuardName) });
+	if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
+	SaySubtitle(FString::Printf(TEXT("%s (%s)"), *G->GuardName.ToUpper(), *Direction(G->GetActorLocation())), Line);
+	LastVoice = G->GuardName.ToLower() + TEXT("_parte");
+	VoiceLog.Add(LastVoice);
+	if (VoiceLog.Num() > 30) VoiceLog.RemoveAt(0);
+	if (!HeardPartes.Contains(G->GuardName))
+	{
+		HeardPartes.Add(G->GuardName);
+		Teach(TEXT("ensena_parte"), TEXT("PARTE OIDO\nCada centinela da el parte a su manera. Si la central llama a uno que has dejado en el suelo, contesta como el."), {}, 4.5f);
+	}
+}
+
+void ATarsisDirector::StartRadioAsk(ATarsisGuard* G)
+{
+	const FString Name = G->GuardName;
+	const FString Own = ParteOf(Name);
+	// la de otro: la del primer compañero que la dé distinta (empezando por uno al azar)
+	TArray<FString> Others;
+	for (TActorIterator<ATarsisGuard> O(GetWorld()); O; ++O)
+	{
+		if (*O == G || O->bTowerSentry) continue;
+		const FString P = ParteOf(O->GuardName);
+		if (P != Own) Others.AddUnique(P);
+	}
+	const FString Other = Others.Num() > 0 ? Others[FMath::RandHelper(Others.Num())] : FString(TEXT("Sin novedad en el puesto."));
+	const FString Duress = Tx(TEXT("parte_coaccion"), TEXT("Todo tranquilo."));
+	RadioRight = 1 + FMath::RandHelper(3);
+	RadioDuress = 1 + (RadioRight % 3);
+	RadioOptions.Init(FString(), 3);
+	for (int32 i = 1; i <= 3; ++i)
+	{
+		RadioOptions[i - 1] = Tx(TEXT("parte_aqui"), TEXT("Aqui {0}. {1}"), { Name, i == RadioRight ? Own : (i == RadioDuress ? Duress : Other) });
+	}
+	RadioAskGuard = G;
+	RadioAskT = RadioAnswerSeconds;
+	bRadioAsk = true;
+	ShowMessage(Tx(TEXT("radio_contesta"), TEXT("LA CENTRAL LLAMA A {0}. SU RADIO LA TIENES TU:\n1   {1}\n2   {2}\n3   {3}"),
+		{ Name.ToUpper(), RadioOptions[0], RadioOptions[1], RadioOptions[2] }), RadioAnswerSeconds);
+}
+
+void ATarsisDirector::AnswerRadio(int32 Option)
+{
+	if (!bRadioAsk || Option < 1 || Option > 3) return;
+	ATarsisGuard* G = RadioAskGuard;
+	bRadioAsk = false;
+	RadioAskGuard = nullptr;
+	MessageT = FMath::Min(MessageT, 0.2f);
+	if (!G) return;
+	SaySubtitle(Tx(TEXT("radio_tu"), TEXT("TU (RADIO)")), RadioOptions.IsValidIndex(Option - 1) ? RadioOptions[Option - 1] : FString());
+	if (Option == RadioRight)
+	{
+		// cuela: nadie va a mirar. Si lo encuentran o se despierta, ya es otra historia
+		++RadioFooled;
+		CentralSay(TEXT("recibido"), Tx(TEXT("radio_recibido"), TEXT("Recibido, {0}."), { G->GuardName }), 1.6f);
+	}
+	else if (Option == RadioDuress)
+	{
+		// la frase de coacción: la central contesta como si nada y manda a dos, con la base en guardia
+		CentralSay(TEXT("coaccion"), Tx(TEXT("radio_coaccion"), TEXT("Recibido, {0}. Aguanta ahi."), { G->GuardName }), 1.6f);
+		TensionT = FMath::Max(TensionT, 90.0f);
+		RadioSend(G, 2);
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			Teach(TEXT("ensena_coaccion"), TEXT("TODO TRANQUILO\nEs lo que dice un centinela cuando le estan apuntando. La central ha mandado gente."), {}, 5.0f);
+		}), 3.5f, false);
+	}
+	else
+	{
+		CentralSay(TEXT("repite"), Tx(TEXT("radio_repite"), TEXT("{0}? Ese parte no es el tuyo. Voy a mandar a alguien."), { G->GuardName }), 1.6f);
+		RadioSend(G, 1);
 	}
 }
 
@@ -2936,10 +3100,45 @@ void ATarsisDirector::LampsTick()
 			if (FVector::Dist2D(G, BrokenSpots[i]) > 350.0f || FMath::Abs(G.Z - BrokenSpots[i].Z) > 300.0f) continue;
 			BrokenSeen[i] = true;
 			if (CheckLamp && CheckLamp->GetLightComponent() == BrokenLights[i].Get()) bLampReported = true;
-			GuardSay(*It, TEXT("farol"), true);
+			GuardSay(*It, TEXT("farola"), true);
 			TensionT = FMath::Max(TensionT, 60.0f);
-			It->SetFlashlight(true);
+			It->KeepFlashlight();
 			break;
+		}
+	}
+	// tanda 28: nadie entra solo a mirar un ruido donde falta la farola. Se planta, pide apoyo y espera al más cercano
+	// que esté libre; si ya tiene a alguien al lado, o hay apagón (todos llevan linterna), entra sin más
+	if (BrokenLights.Num() == 0 || bPowerOff || !bBuddyRule) return;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		ATarsisGuard* G = *It;
+		if (G->bTowerSentry || G->bAlly || !G->WantsDarkCheck()) continue;
+		const FVector Spot = G->NoiseSpot();
+		bool bDark = false;
+		for (const FVector& B : BrokenSpots) if (FVector::Dist2D(B, Spot) < DarkZoneRadius) { bDark = true; break; }
+		// ya está dentro de la sombra (pasaba por allí): no se queda plantado en medio
+		for (const FVector& B : BrokenSpots) if (FVector::Dist2D(B, G->GetActorLocation()) < 400.0f) bDark = false;
+		G->DarkChecked();
+		if (!bDark) continue;
+		ATarsisGuard* Best = nullptr;
+		float BestD = BuddyCallRadius;
+		bool bCompany = false;
+		for (TActorIterator<ATarsisGuard> O(GetWorld()); O; ++O)
+		{
+			if (*O == G || O->State == ETarsisGuardState::Down || O->State == ETarsisGuardState::Alert || O->bTowerSentry || O->bAlly || O->IsHeld() || O->IsBusy()) continue;
+			const float D = FVector::Dist(O->GetActorLocation(), G->GetActorLocation());
+			if (D < 600.0f) bCompany = true;
+			if (D < BestD) { BestD = D; Best = *O; }
+		}
+		if (bCompany) continue;
+		G->WaitForBuddy(Best, Best ? BuddyWaitSeconds : BuddyWaitSeconds * 0.4f);
+		++BuddyCalls;
+		GuardSay(G, TEXT("apoyo"), true);
+		if (Best)
+		{
+			TWeakObjectPtr<ATarsisGuard> W(Best);
+			FTimerHandle H;
+			GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, W]() { if (W.IsValid()) GuardSay(W.Get(), TEXT("voy"), true); }), 2.4f, false);
 		}
 	}
 }

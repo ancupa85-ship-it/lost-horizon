@@ -823,6 +823,99 @@ def prueba_farola():
     check('repuesta, vuelve a alumbrar con su halo', comp.is_visible() and d.broken_lamp_count() == 0 and d.halo_counts().y == hc.y, '%d halos' % d.halo_counts().y)
 
 
+def prueba_radio():
+    """Tanda 28, «Responde, Carmona»: cada guardia da su parte a su manera y de cerca lo oyes. Si la central llama a uno
+    que has dejado en el suelo y estás junto a él, contestas tú: su parte cuela y no viene nadie; «todo tranquilo» es
+    la frase de coacción y trae a dos con la base en guardia."""
+    d = director()
+    c, v = guardia('Carmona'), guardia('Vega')
+    for g in guardias():
+        g.hold(3600.0)
+    check('cada uno tiene su parte', 'con frio' in str(d.parte_of('Carmona')) and str(d.parte_of('Carmona')) != str(d.parte_of('Vega')), '%s / %s' % (d.parte_of('Carmona'), d.parte_of('Vega')))
+    # de lejos no se oye; de cerca sí, y se explica la primera vez
+    aparte(); yield 0.1
+    d.say_parte(c); yield 0.2
+    check('de lejos no oyes el parte', len(list(d.get_editor_property('heard_partes'))) == 0, list(d.get_editor_property('heard_partes')))
+    detras_de(c, 600.0); yield 0.2
+    d.say_parte(c); yield 0.3
+    check('de cerca lo oyes y te lo quedas', [str(x) for x in d.get_editor_property('heard_partes')] == ['Carmona'] and str(list(d.get_editor_property('voice_log'))[-1]) == 'carmona_parte'
+          and 'ensena_parte' in [str(x) for x in d.get_editor_property('taught')], list(d.get_editor_property('voice_log'))[-2:])
+    # derribado Carmona, a los 40 s llama la central: junto a él, puedes contestar
+    derribar(c); yield 0.2
+    junto_a(c)
+    yield ('hasta', lambda: director().get_editor_property('radio_ask'), 55.0)
+    ops = [str(x) for x in d.get_editor_property('radio_options')]
+    r, k = d.get_editor_property('radio_right'), d.get_editor_property('radio_duress')
+    check('la central llama y puedes contestar con tres partes', d.get_editor_property('radio_ask') and len(ops) == 3 and 1 <= r <= 3 and 1 <= k <= 3 and r != k
+          and 'con frio' in ops[r - 1] and 'Todo tranquilo' in ops[k - 1] and all('Carmona' in o for o in ops), ops)
+    check('las tres salen en pantalla', all(o in str(d.get_editor_property('message')) for o in ops), str(d.get_editor_property('message'))[:60])
+    d.answer_radio(r); yield 3.0
+    sosp = [g.get_actor_label() for g in guardias() if estado(g) not in ('PATROL', 'DOWN')]
+    check('con su parte, la central se lo cree y no manda a nadie', d.get_editor_property('radio_fooled') == 1 and 'central_recibido' in [str(x) for x in d.get_editor_property('voice_log')] and not sosp
+          and not d.get_editor_property('radio_ask'), '%s %s' % (list(d.get_editor_property('voice_log'))[-3:], sosp))
+    # con Vega, la frase que parece natural: es la de coacción
+    d.set_editor_property('tension_t', 0.0)
+    derribar(v); yield 0.2
+    junto_a(v)
+    yield ('hasta', lambda: director().get_editor_property('radio_ask'), 55.0)
+    k = d.get_editor_property('radio_duress')
+    d.answer_radio(k); yield 2.5
+    van = [g.get_actor_label() for g in guardias() if estado(g) == 'SUSPICIOUS']
+    check('«todo tranquilo» es la frase de coacción: base en guardia y van dos', d.get_editor_property('tension_t') > 80.0 and len(van) == 2
+          and 'central_coaccion' in [str(x) for x in d.get_editor_property('voice_log')], '%.0f s, van %s' % (d.get_editor_property('tension_t'), van))
+    yield 2.5
+    check('y se te explica después', 'ensena_coaccion' in [str(x) for x in d.get_editor_property('taught')], [str(x) for x in d.get_editor_property('taught')][-3:])
+    # lejos del cuerpo no hay pregunta: mandan a alguien como siempre
+    aparte()
+    check('la central no pregunta dos veces por el mismo', not d.get_editor_property('radio_ask'))
+
+
+def prueba_apoyo():
+    """Tanda 28: nadie entra solo a mirar un ruido donde falta la farola. El que lo oye se planta con la linterna, pide
+    apoyo por radio y espera al compañero; luego entran los dos."""
+    d = director()
+    aparte()
+    _focos_torre(False)
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    f = ext['farolas'][0]
+    fx, fy = f[0] * 100.0 + 25.0, f[1] * 100.0
+    far = [x for x in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.Light) if x.get_actor_label().startswith('farola') and dist2d(x.get_actor_location(), V(fx, fy, 0)) < 150]
+    if not far:
+        check('hay farola en el camino', False)
+        return
+    # se rompe con todos quietos (que nadie vea al que dispara) y luego se sueltan dos que no se hayan enterado
+    for g in guardias():
+        g.hold(3600.0)
+    d.set_darts(2)
+    tp(fx + 700, fy, 180); yield 0.3
+    mirar(far[0].get_actor_location()); yield 0.2
+    d.shoot_dart(); yield 0.3
+    aparte(); yield 0.1
+    d.set_editor_property('tension_t', 0.0)
+    libres = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) == 'PATROL'][:2]
+    a, b = libres
+    a.set_actor_location(V(fx + 1800, fy, 100), False, True)
+    b.set_actor_location(V(fx + 4200, fy, 100), False, True)
+    a.hold(0.0); b.hold(0.0); yield 0.2
+    a.hear_noise(V(fx, fy, 20)); yield 0.3
+    check('con la farola rota, uno oye un ruido en su sombra', d.broken_lamp_count() == 1 and estado(a) == 'SUSPICIOUS', '%d, %s' % (d.broken_lamp_count(), estado(a)))
+    yield 2.5
+    pa = a.get_actor_location()
+    check('no entra solo: se planta, saca la linterna y pide apoyo', a.get_editor_property('wait_buddy') and a.has_flashlight_on() and d.get_editor_property('buddy_calls') == 1
+          and any(str(x).endswith('_apoyo') for x in d.get_editor_property('voice_log')), 'espera %s, linterna %s, %s' % (a.get_editor_property('wait_buddy'), a.has_flashlight_on(), list(d.get_editor_property('voice_log'))[-3:]))
+    yield 3.0
+    check('mientras espera no se mueve, y el compañero viene', dist2d(a.get_actor_location(), pa) < 80 and estado(b) == 'SUSPICIOUS' and any(str(x).endswith('_voy') for x in d.get_editor_property('voice_log')),
+          '%.0f cm, %s' % (dist2d(a.get_actor_location(), pa), estado(b)))
+    yield ('hasta', lambda: not a.get_editor_property('wait_buddy'), 30.0)
+    check('cuando llega el compañero, deja de esperar', not a.get_editor_property('wait_buddy') and dist2d(a.get_actor_location(), b.get_actor_location()) < 600,
+          '%.0f cm entre los dos' % dist2d(a.get_actor_location(), b.get_actor_location()))
+    yield ('hasta', lambda: dist2d(a.get_actor_location(), V(fx, fy, 0)) < 400, 25.0)
+    yield 1.0
+    check('entran los dos a la sombra', dist2d(a.get_actor_location(), V(fx, fy, 0)) < 450 and dist2d(b.get_actor_location(), V(fx, fy, 0)) < 900,
+          'a %.0f y %.0f cm' % (dist2d(a.get_actor_location(), V(fx, fy, 0)), dist2d(b.get_actor_location(), V(fx, fy, 0))))
+    d.repair_lamps()
+
+
 def prueba_final():
     d = director()
     # sin el expediente, el portón de salida no te deja irte: aviso y la misión sigue
@@ -2073,7 +2166,7 @@ def prueba_puertas():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo]]
 PRUEBAS = []
 
 
@@ -2113,6 +2206,9 @@ def _limpieza(siguiente):
         d.set_editor_property('truck', siguiente in (prueba_camion, prueba_viaje))
         # tu sombra (tanda 26) solo en su prueba: las demás plantan al jugador bajo farolas para medir otra cosa
         d.set_editor_property('shadow_tells', siguiente is prueba_sombra)
+        # tanda 28: contestar por radio y pedir apoyo, solo en sus pruebas (las demás derriban guardias y rompen farolas para medir otra cosa)
+        d.set_editor_property('radio_answer', siguiente is prueba_radio)
+        d.set_editor_property('buddy_rule', siguiente is prueba_apoyo)
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 

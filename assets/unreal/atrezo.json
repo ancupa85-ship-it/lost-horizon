@@ -31,7 +31,11 @@
   "hanging_picture_frame_02",
   "russian_food_cans_01",
   "concrete_road_barrier_02",
-  "cement_bag"
+  "cement_bag",
+  "WoodenChair_01",
+  "cardboard_box_01",
+  "Camera_01",
+  "wooden_picnic_table"
  ],
  "piezas": [
   {
@@ -1785,6 +1789,780 @@
     60
    ],
    "giro": 161.6
+  },
+  {
+   "nombre": "jef_mesa",
+   "modelo": "metal_office_desk",
+   "pos": [
+    330,
+    3450,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "jef_silla",
+   "modelo": "WoodenChair_01",
+   "pos": [
+    440,
+    3450,
+    60
+   ],
+   "giro": 270
+  },
+  {
+   "nombre": "jef_flexo",
+   "modelo": "desk_lamp_arm_01",
+   "pos": [
+    315,
+    3385,
+    140
+   ],
+   "giro": 120,
+   "sin_sombra": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_carpeta",
+   "modelo": "binder_notebook",
+   "pos": [
+    335,
+    3460,
+    140
+   ],
+   "giro": 80,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_partes",
+   "modelo": "clipboard",
+   "pos": [
+    345,
+    3410,
+    140
+   ],
+   "giro": 95,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_termo",
+   "modelo": "modified_thermos",
+   "pos": [
+    300,
+    3520,
+    140
+   ],
+   "giro": 10,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_tabaco",
+   "modelo": "cigarette_pack",
+   "pos": [
+    355,
+    3500,
+    140
+   ],
+   "giro": -35,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_archivador_1",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    560,
+    3232,
+    60
+   ],
+   "giro": 180
+  },
+  {
+   "nombre": "jef_archivador_2",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    660,
+    3232,
+    60
+   ],
+   "giro": 180
+  },
+  {
+   "nombre": "jef_reloj",
+   "modelo": "wall_clock",
+   "pos": [
+    1080,
+    3204,
+    235
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_retrato",
+   "modelo": "hanging_picture_frame_02",
+   "pos": [
+    420,
+    3203,
+    175
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_catre",
+   "modelo": "old_bed_frame",
+   "pos": [
+    300,
+    3897,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "jef_colchon",
+   "modelo": "colchon",
+   "pos": [
+    300,
+    3897,
+    46
+   ],
+   "giro": 1.5,
+   "colgar": true
+  },
+  {
+   "nombre": "jef_manta",
+   "modelo": "manta",
+   "pos": [
+    302,
+    3930,
+    59
+   ],
+   "giro": 9,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_botas",
+   "modelo": "rubber_boots",
+   "pos": [
+    420,
+    3870,
+    40
+   ],
+   "giro": 250,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_estufa",
+   "modelo": "barrel_stove",
+   "pos": [
+    1110,
+    3910,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "jef_cafetera",
+   "modelo": "pot_enamel_01",
+   "pos": [
+    1100,
+    3905,
+    150
+   ],
+   "giro": 60,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_baul",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    1110,
+    3270,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "jef_municion",
+   "modelo": "ammo_box",
+   "pos": [
+    1105,
+    3265,
+    120
+   ],
+   "giro": 15,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_estanteria_1",
+   "modelo": "steel_frame_shelves_01",
+   "pos": [
+    1540,
+    3225,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_estanteria_2",
+   "modelo": "steel_frame_shelves_01",
+   "pos": [
+    1740,
+    3225,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_estanteria_3",
+   "modelo": "steel_frame_shelves_01",
+   "pos": [
+    1940,
+    3225,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_caja_1",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    1530,
+    3225,
+    250
+   ],
+   "giro": 5,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_caja_2",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    1950,
+    3225,
+    250
+   ],
+   "giro": -8,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_carpeta_1",
+   "modelo": "binder_notebook",
+   "pos": [
+    1740,
+    3225,
+    250
+   ],
+   "giro": 20,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_archivador_1",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    1480,
+    3968,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_archivador_2",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    1575,
+    3968,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_archivador_3",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    1670,
+    3968,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_caja_3",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    2120,
+    3940,
+    60
+   ],
+   "giro": 12
+  },
+  {
+   "nombre": "arch_caja_4",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    2115,
+    3860,
+    60
+   ],
+   "giro": -20
+  },
+  {
+   "nombre": "arch_caja_5",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    2118,
+    3925,
+    110
+   ],
+   "giro": 30,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_carpeta_2",
+   "modelo": "binder_notebook",
+   "pos": [
+    1575,
+    3965,
+    160
+   ],
+   "giro": -15,
+   "pequeno": true
+  },
+  {
+   "nombre": "cg_termo",
+   "modelo": "modified_thermos",
+   "pos": [
+    5540,
+    1510,
+    140
+   ],
+   "giro": 40,
+   "pequeno": true
+  },
+  {
+   "nombre": "cg_tabaco",
+   "modelo": "cigarette_pack",
+   "pos": [
+    5690,
+    1525,
+    140
+   ],
+   "giro": 15,
+   "pequeno": true
+  },
+  {
+   "nombre": "cg_linterna",
+   "modelo": "vintage_flashlight",
+   "pos": [
+    5630,
+    1470,
+    140
+   ],
+   "giro": 110,
+   "pequeno": true
+  },
+  {
+   "nombre": "cg_caja",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5270,
+    1265,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "cg_municion",
+   "modelo": "ammo_box",
+   "pos": [
+    5268,
+    1262,
+    120
+   ],
+   "giro": -10,
+   "pequeno": true
+  },
+  {
+   "nombre": "cg_bidon",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    5370,
+    1250,
+    60
+   ],
+   "giro": 70
+  },
+  {
+   "nombre": "tx_mesa",
+   "modelo": "metal_office_desk",
+   "pos": [
+    6290,
+    2000,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "tx_silla",
+   "modelo": "WoodenChair_01",
+   "pos": [
+    6400,
+    2000,
+    60
+   ],
+   "giro": 270
+  },
+  {
+   "nombre": "tx_radio_1",
+   "modelo": "vintage_radio_transceiver",
+   "pos": [
+    6275,
+    1950,
+    140
+   ],
+   "giro": 90,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_radio_2",
+   "modelo": "vintage_radio_transceiver",
+   "pos": [
+    6275,
+    2050,
+    140
+   ],
+   "giro": 90,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_flexo",
+   "modelo": "desk_lamp_arm_01",
+   "pos": [
+    6270,
+    1890,
+    140
+   ],
+   "giro": 60,
+   "sin_sombra": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_partes",
+   "modelo": "clipboard",
+   "pos": [
+    6320,
+    2000,
+    140
+   ],
+   "giro": 85,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_termo",
+   "modelo": "modified_thermos",
+   "pos": [
+    6300,
+    2085,
+    140
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_reloj",
+   "modelo": "wall_clock",
+   "pos": [
+    6300,
+    1804,
+    235
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_caja",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    6730,
+    2140,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "tx_bidon",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    6740,
+    2040,
+    60
+   ],
+   "giro": 20
+  },
+  {
+   "nombre": "rev_banco",
+   "modelo": "metal_office_desk",
+   "pos": [
+    6330,
+    2950,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "rev_cubeta",
+   "modelo": "pot_enamel_01",
+   "pos": [
+    6270,
+    2945,
+    140
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "rev_camara",
+   "modelo": "Camera_01",
+   "pos": [
+    6350,
+    2950,
+    140
+   ],
+   "giro": 200,
+   "pequeno": true
+  },
+  {
+   "nombre": "rev_carpeta",
+   "modelo": "binder_notebook",
+   "pos": [
+    6410,
+    2940,
+    140
+   ],
+   "giro": -10,
+   "pequeno": true
+  },
+  {
+   "nombre": "rev_bidon",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    6540,
+    2955,
+    60
+   ],
+   "giro": 100
+  },
+  {
+   "nombre": "rev_estanteria",
+   "modelo": "steel_frame_shelves_01",
+   "pos": [
+    6025,
+    2820,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "rev_latas",
+   "modelo": "russian_food_cans_01",
+   "pos": [
+    6025,
+    2810,
+    250
+   ],
+   "giro": 90,
+   "pequeno": true
+  },
+  {
+   "nombre": "rev_foto_1",
+   "modelo": "hanging_picture_frame_02",
+   "pos": [
+    6500,
+    2603,
+    170
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "rev_foto_2",
+   "modelo": "hanging_picture_frame_02",
+   "pos": [
+    6100,
+    2603,
+    160
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "rev_taburete",
+   "modelo": "metal_stool_01",
+   "pos": [
+    6330,
+    2870,
+    60
+   ],
+   "giro": 15
+  },
+  {
+   "nombre": "ext_mesa",
+   "modelo": "wooden_picnic_table",
+   "pos": [
+    1150,
+    1820,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "ext_cafetera",
+   "modelo": "pot_enamel_01",
+   "pos": [
+    1130,
+    1815,
+    150
+   ],
+   "giro": 30,
+   "pequeno": true
+  },
+  {
+   "nombre": "ext_lata",
+   "modelo": "can_rusted",
+   "pos": [
+    1185,
+    1830,
+    150
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "ext_tabaco",
+   "modelo": "cigarette_pack",
+   "pos": [
+    1105,
+    1840,
+    150
+   ],
+   "giro": 70,
+   "pequeno": true
+  },
+  {
+   "nombre": "ext_bidon_gen_1",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    4430,
+    1770,
+    60
+   ],
+   "giro": 10
+  },
+  {
+   "nombre": "ext_bidon_gen_2",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    4465,
+    1745,
+    60
+   ],
+   "giro": 75
+  },
+  {
+   "nombre": "ext_barril_gen",
+   "modelo": "barrel_03",
+   "pos": [
+    4490,
+    1640,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "ext_rueda_1",
+   "modelo": "old_tyre",
+   "pos": [
+    940,
+    1650,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "ext_rueda_2",
+   "modelo": "old_tyre",
+   "pos": [
+    1490,
+    1500,
+    60
+   ],
+   "giro": 40
+  },
+  {
+   "nombre": "ext_barril_c1",
+   "modelo": "barrel_03",
+   "pos": [
+    2470,
+    3400,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "ext_barril_c2",
+   "modelo": "barrel_03",
+   "pos": [
+    2550,
+    3450,
+    60
+   ],
+   "giro": 50
+  },
+  {
+   "nombre": "ext_barril_c3",
+   "modelo": "barrel_03",
+   "pos": [
+    2475,
+    3525,
+    60
+   ],
+   "giro": 120
+  },
+  {
+   "nombre": "ext_caja_c1",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    2490,
+    3760,
+    60
+   ],
+   "giro": 5
+  },
+  {
+   "nombre": "ext_caja_c2",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    2495,
+    3755,
+    150
+   ],
+   "giro": 25
+  },
+  {
+   "nombre": "ext_bidon_c",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    2590,
+    3740,
+    60
+   ],
+   "giro": 140
   }
  ],
  "vaciar": {

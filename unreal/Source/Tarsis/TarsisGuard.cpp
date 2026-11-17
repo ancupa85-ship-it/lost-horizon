@@ -999,7 +999,13 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 	StateT = 0.0f;
 	bRepairing = false;
 	if (NewState == ETarsisGuardState::Down && Flashlight) Flashlight->SetVisibility(false);
-	if (NewState != ETarsisGuardState::Suspicious) { bInvestigate = false; bShadow = false; }
+	if (NewState != ETarsisGuardState::Suspicious) { bInvestigate = false; bShadow = false; bWaitBuddy = false; }
+	if (NewState == ETarsisGuardState::Patrol)
+	{
+		bDarkChecked = false;
+		bEscort = false;
+		if (bDarkTorch) { bDarkTorch = false; SetFlashlight(false); }
+	}
 	if (NewState != ETarsisGuardState::Patrol) { bErrand = false; bErrandThere = false; }   // un recado solo dura mientras nada le llame la atención
 	WaitT = 0.0f;
 	GetCharacterMovement()->MaxWalkSpeed = (State == ETarsisGuardState::Alert) ? RunSpeed : WalkSpeed;
@@ -1247,6 +1253,23 @@ void ATarsisGuard::StopRepair()
 	SetState(ETarsisGuardState::Return);
 }
 
+void ATarsisGuard::WaitForBuddy(ATarsisGuard* B, float Seconds)
+{
+	bDarkChecked = true;
+	bWaitBuddy = true;
+	WaitBuddyT = Seconds;
+	Buddy = B;
+	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+	if (!HasFlashlightOn()) { SetFlashlight(true); bDarkTorch = true; }
+	if (B)
+	{
+		B->bEscort = true;
+		B->bDarkChecked = true;
+		B->HearNoise(GetActorLocation());
+		if (!B->HasFlashlightOn()) { B->SetFlashlight(true); B->bDarkTorch = true; }
+	}
+}
+
 void ATarsisGuard::SetFlashlightShadows(bool bOn)
 {
 	if (Flashlight) Flashlight->SetCastShadows(bOn);   // solo la del reparador: una luz con sombra cuesta poco en la 1050
@@ -1483,6 +1506,18 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 			if (!Dir.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, Dir.Rotation().Yaw, 0.0f), DeltaSeconds, 3.5f));
 		}
 		else FaceTowards(LastSeen, DeltaSeconds);
+		if (bInvestigate && bWaitBuddy)
+		{
+			// tanda 28: plantado, con la linterna hacia lo oscuro, hasta que llegue el compañero (o se canse de esperar)
+			WaitBuddyT -= DeltaSeconds;
+			StateT = 2.0f;   // esperar no gasta los 25 s que tiene para llegar
+			ATarsisGuard* B = Buddy.Get();
+			const bool bHere = B && B->State != ETarsisGuardState::Down && FVector::Dist2D(B->GetActorLocation(), GetActorLocation()) < 450.0f;
+			if (!bHere && WaitBuddyT > 0.0f && !(B && B->State == ETarsisGuardState::Down)) break;
+			bWaitBuddy = false;
+			MoveDest = FVector(1e9f);
+			if (bHere && B->State == ETarsisGuardState::Suspicious) { B->LastSeen = LastSeen; B->bInvestigate = true; B->StateT = 2.0f; B->MoveDest = FVector(1e9f); }
+		}
 		if (bInvestigate)
 		{
 			// un ruido: va a mirar (aunque se le pase la sospecha) y allí busca; si no llega, lo deja a los 25 s

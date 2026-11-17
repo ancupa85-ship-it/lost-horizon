@@ -154,6 +154,14 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 - El cristal de las bombillas ya no da sombra (dejaba un disco negro en el techo).
 - Prueba: `prueba_farola`.
 
+### «Responde, Carmona», apoyo a oscuras y salas con vida (tanda 28)
+
+- **Contestar por la radio de otro** (`bRadioAnswer`): cada guardia da su parte a su manera (textos `parte_<nombre>` de `mision1.json`) cada `ParteEvery` segundos; si estás a menos de 16 m lo oyes, con subtítulo siempre. Cuando la central llama a uno que has dejado en el suelo y estás junto a él, eliges entre tres partes con 1, 2 y 3 (`StartRadioAsk`, `AnswerRadio`): el suyo cuela y no viene nadie; «Todo tranquilo» es la frase de coacción y trae a dos con la base en guardia; el de otro, o callar, manda a uno como siempre. Se eligió ampliar `mision1.json` en vez de un plugin de diálogo: se escribe en texto, lee nuestras banderas y se prueba desde `pruebas.py`.
+- **Nadie entra solo a oscuras** (`bBuddyRule`): el guardia que va a mirar un ruido a menos de `DarkZoneRadius` de una farola rota se planta, saca la linterna, pide apoyo por radio y espera al compañero libre más cercano (`ATarsisGuard::WaitForBuddy`, hasta `BuddyWaitSeconds`). Luego entran los dos. Mientras, esa sombra es tuya y el compañero ha dejado su ronda.
+- La voz del que encuentra una farola rota ya habla de la farola y no del farol del control.
+- **Salas**: jefatura (el despacho de Ibarra, con su catre), archivo (estanterías, archivadores y cajas), transmisiones (las radios de la central), cuarto de revelado (la luz roja) y cosas en el cuerpo de guardia. Fuera: mesa junto al barracón, material del generador, ruedas y un acopio en el patio central. 73 piezas en `atrezo.json`; cuatro modelos nuevos de Poly Haven (CC0): `WoodenChair_01`, `cardboard_box_01`, `Camera_01`, `wooden_picnic_table`.
+- Pruebas: `prueba_radio` y `prueba_apoyo`.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.
