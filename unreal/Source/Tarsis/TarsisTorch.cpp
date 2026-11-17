@@ -69,6 +69,29 @@ void ATarsisDirector::TorchTick(float DeltaSeconds)
 	if (TorchNoticeT > 0.0f) TorchNoticeT -= DeltaSeconds;
 	if (!bTorch || !PlayerTorch) return;
 	if (bCine || bDone || !bHasTorch) { SetTorch(false); return; }
+	// a bocajarro y de cara: le deslumbras. Se queda unos segundos sin ver ni andar (puedes pasar, huir o derribarle
+	// como tras un empujon) y al rehacerse va a por ti; la segunda vez seguida ya se tapa los ojos
+	if (APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0))
+	{
+		const FVector BP = PlayerTorch->GetComponentLocation();
+		const FVector BF = PlayerTorch->GetForwardVector();
+		const float CosIn = FMath::Cos(FMath::DegreesToRadians(TorchCone * 0.6f));
+		FCollisionQueryParams BQ(SCENE_QUERY_STAT(TarsisDeslumbrar), true, this);
+		BQ.AddIgnoredActor(Me);
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			if (It->bTowerSentry || It->bAlly || It->State == ETarsisGuardState::Down) continue;
+			const FVector Head = It->GetActorLocation() + FVector(0.0f, 0.0f, 65.0f);
+			const FVector D = Head - BP;
+			if (D.SizeSquared() > FMath::Square(TorchBlindDist) || FVector::DotProduct(BF, D.GetSafeNormal()) < CosIn) continue;
+			if (FVector::DotProduct(It->GetActorForwardVector(), -D.GetSafeNormal2D()) < 0.5f) continue;   // de espaldas o de lado no le da en los ojos
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, BP, Head, ECC_Visibility, BQ) && Hit.GetActor() != *It) continue;
+			if (!It->Dazzle(TorchBlindSeconds, TorchBlindAgain)) continue;
+			++TorchBlinds;
+			Teach(TEXT("ensena_deslumbrar"), TEXT("DESLUMBRADO\n{0} no ve nada unos segundos. Luego ira a por ti, y la segunda vez se tapara los ojos."), { It->GuardName.ToUpper() }, 3.5f);
+		}
+	}
 	if (TorchNoticeT > 0.0f) return;
 	// el guardia al que alumbras de cerca lo nota y viene a mirar (uno cada dos segundos y medio: tambien sirve de señuelo)
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);

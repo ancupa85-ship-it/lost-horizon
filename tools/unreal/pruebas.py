@@ -1479,6 +1479,22 @@ def prueba_linternas():
     mirar(V(oscuro.x, oscuro.y, 140)); yield 0.2
     d.set_torch(True); yield 0.6
     check('si le alumbras de cerca, viene a mirar', d.get_editor_property('torch_notices') >= 1 and estado(g) != 'PATROL', '%d, %s' % (d.get_editor_property('torch_notices'), estado(g)))
+    # a bocajarro y de cara le deslumbras; de espaldas, no; y no dos veces seguidas
+    d.set_torch(False); g.hold(30.0); yield 0.1
+    q = g.get_actor_location()
+    tp(q.x + 300, q.y, 180)
+    g.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(q, V(q.x - 300, q.y, q.z)), False); yield 0.2
+    mirar(V(q.x, q.y, q.z + 65)); yield 0.1
+    d.set_torch(True); yield 0.4
+    check('de espaldas no se deslumbra', d.get_editor_property('torch_blinds') == 0 and not g.is_dazzled(), d.get_editor_property('torch_blinds'))
+    d.set_torch(False)
+    g.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(q, V(q.x + 300, q.y, q.z)), False); yield 0.2
+    d.set_torch(True); yield 0.4
+    check('de cara y a tres metros, deslumbrado: no te ve', d.get_editor_property('torch_blinds') == 1 and g.is_dazzled() and g.visibility(jugador()) == 0.0,
+          '%d, %s, %.2f' % (d.get_editor_property('torch_blinds'), g.is_dazzled(), g.visibility(jugador())))
+    yield d.get_editor_property('torch_blind_seconds') + 0.5
+    check('se le pasa y no repite enseguida (se tapa los ojos)', not g.is_dazzled() and d.get_editor_property('torch_blinds') == 1, '%s, %d' % (g.is_dazzled(), d.get_editor_property('torch_blinds')))
+    g.hold(30.0)
     d.toggle_torch(); yield 0.1
     check('se apaga con la misma tecla', not d.get_editor_property('torch') and not d.torch_comp().is_visible(), d.get_editor_property('torch'))
     d.set_editor_property('has_torch', False); d.toggle_torch(); yield 0.1
@@ -1502,7 +1518,7 @@ def prueba_linternas():
                     lejos.append((k, q))
     check('los focos de fuera repasan el borde del muro (a 5-9 m)', not lejos, lejos)
     # el códec ya no deja el mensaje de ayuda de fondo: lo comprueba el HUD (no se puede leer desde aquí); queda el dato
-    check('textos de la linterna en mision1.json', all(k in MISION['textos'] for k in ('ensena_linterna', 'ensena_linterna_guardia')), '')
+    check('textos de la linterna en mision1.json', all(k in MISION['textos'] for k in ('ensena_linterna', 'ensena_linterna_guardia', 'ensena_deslumbrar')), '')
 
 def _de_esquina():
     """Los centinelas de las cuatro torres de esquina (tanda 30): los de dentro y los vigías de fuera."""

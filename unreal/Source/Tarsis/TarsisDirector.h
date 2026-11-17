@@ -621,6 +621,15 @@ public:
 	/** Hasta dónde nota un guardia que le alumbras (cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	float TorchNoticeDist = 1400.0f;
+	/** A bocajarro (cm) y con el guardia de cara, tu linterna le deslumbra TorchBlindSeconds; no repite hasta TorchBlindAgain s despues. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchBlindDist = 450.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchBlindSeconds = 2.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchBlindAgain = 9.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
+	int32 TorchBlinds = 0;
 	/** Veces que un guardia ha ido a mirar porque le has alumbrado. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
 	int32 TorchNotices = 0;

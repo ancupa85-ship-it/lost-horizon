@@ -562,6 +562,7 @@
   "codec_fuente_2": "F|tienes una cocina dentro. luz de tarde. yo tambien tenia. me la quitaron para dar luz a otros.",
   "codec_fuente_3": "F|cuando apagan el generador no me callo. descanso.",
   "ensena_linterna": "LINTERNA\nVes en lo oscuro, pero con ella encendida te ven como a plena luz. Si alumbras a un guardia, viene a mirar.",
-  "ensena_linterna_guardia": "LE HAS ALUMBRADO\n{0} viene a mirar de donde sale esa luz. Apagala ({1}) y muevete."
+  "ensena_linterna_guardia": "LE HAS ALUMBRADO\n{0} viene a mirar de donde sale esa luz. Apagala ({1}) y muevete.",
+  "ensena_deslumbrar": "DESLUMBRADO\n{0} no ve nada unos segundos. Luego ira a por ti, y la segunda vez se tapara los ojos."
  }
 }

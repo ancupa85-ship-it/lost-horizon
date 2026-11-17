@@ -404,6 +404,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna", meta = (WorldContext = "WorldContext"))
 	static float AmbientAt(const UObject* WorldContext, FVector Point);
 	static void SetContextTorch(bool bOn);
+	/** Deslumbrado por tu linterna a bocajarro: aturdido Seconds y luego va a por ti. No repite hasta pasados Again segundos (se tapa los ojos). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna")
+	bool Dazzle(float Seconds, float Again);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
+	bool IsDazzled() const { return bDazzled && StunT > 0.0f; }
 	/** La linterna del jugador (o nullptr): con ella encendida se le ve como si estuviera en plena luz. */
 	static void SetPlayerTorch(const class USpotLightComponent* L);
 
@@ -543,6 +548,8 @@ private:
 	bool bEscort = false;      // acude a acompañar a otro: no vuelve a pedir apoyo él
 	void AutoTorchTick(float DeltaSeconds);
 	void ShowTorch(bool bOn);
+	float DazzleCoolT = 0.0f;
+	bool bDazzled = false;
 	bool bAutoTorch = false;   // encendida por estar a oscuras: se guarda al volver a la luz
 	float TorchT = 0.0f;
 	int32 TorchLit = 0;

@@ -1182,6 +1182,15 @@ static bool GContextTorch = true;
 static TWeakObjectPtr<const USpotLightComponent> GPlayerTorch;
 
 void ATarsisGuard::SetContextTorch(bool bOn) { GContextTorch = bOn; }
+
+bool ATarsisGuard::Dazzle(float Seconds, float Again)
+{
+	if (State == ETarsisGuardState::Down || bTowerSentry || bAlly || StunT > 0.0f || DazzleCoolT > 0.0f) return false;
+	Stun(Seconds);
+	bDazzled = true;
+	DazzleCoolT = Seconds + Again;
+	return true;
+}
 void ATarsisGuard::SetPlayerTorch(const USpotLightComponent* L) { GPlayerTorch = L; }
 
 // Tanda 31: cada 0,6 s mira cuánta luz le llega (sin contar linternas). A oscuras la enciende a la primera; para
@@ -1450,6 +1459,8 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	StateT += DeltaSeconds;
+	if (DazzleCoolT > 0.0f) DazzleCoolT -= DeltaSeconds;
+	if (StunT <= 0.0f) bDazzled = false;
 	if (State == ETarsisGuardState::Down)
 	{
 		LookTick(DeltaSeconds);   // el cuerpo visible sigue copiando la caída
