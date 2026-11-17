@@ -557,10 +557,62 @@ def telas():
     _malla_tela('/Game/Tarsis/Atrezo/manta/SM_manta', 70, 45, 9, 2.5, 'MI_manta')
 
 
+def _malla_cajas(ruta, cajas, bisel, material):
+    """Una malla hecha de cajas (cx, cy, cz, dx, dy, dz en cm; el origen, en el suelo): una sola pieza y un material."""
+    GS = unreal
+    dm = unreal.DynamicMesh()
+    for c in cajas:
+        _caja(dm, *c)
+    if bisel > 0:
+        bev = unreal.GeometryScriptMeshBevelOptions()
+        bev.set_editor_property('bevel_distance', bisel)
+        GS.GeometryScript_MeshModeling.apply_mesh_polygroup_bevel(dm, bev)
+    GS.GeometryScript_Normals.compute_split_normals(dm, unreal.GeometryScriptSplitNormalsOptions(), unreal.GeometryScriptCalculateNormalsOptions())
+    if eal.does_asset_exist(ruta):
+        eal.delete_asset(ruta)
+    r = GS.GeometryScript_NewAssetUtils.create_new_static_mesh_asset_from_mesh(dm, ruta, unreal.GeometryScriptCreateNewStaticMeshAssetOptions())
+    sm = r[0] if isinstance(r, tuple) else r
+    mi = unreal.load_asset(DM + '/' + material)
+    if sm and mi:
+        sm.set_material(0, mi)
+        eal.save_loaded_asset(sm, False)
+    return sm
+
+
+def _fila_legajos(semilla, ancho=88.0):
+    """Una fila de legajos de pie a lo largo de X (centrada, de ancho cm): gruesos y finos, altos y bajos, alguno más
+    metido que otro, un hueco y un par tumbados encima. Siempre igual para la misma semilla."""
+    import random
+    r = random.Random(semilla)
+    cajas, x = [], -ancho / 2.0
+    while x < ancho / 2.0 - 3.0:
+        g = r.choice((2.5, 3.5, 3.5, 5.0, 6.5, 8.0))
+        if r.random() < 0.12:
+            x += r.uniform(3.0, 7.0)      # hueco: uno que falta
+            continue
+        if x + g > ancho / 2.0:
+            break
+        alto, fondo = r.uniform(25.0, 32.0), r.uniform(21.0, 25.0)
+        cajas.append((x + g / 2.0, r.uniform(-1.5, 1.5), alto / 2.0, g, fondo, alto))
+        x += g + r.uniform(0.2, 0.7)
+    return cajas
+
+
+def legajos():
+    """Tanda 34: lo que le faltaba al archivo y a transmisiones. «legajos» y «legajos_oscuros» (filas de carpetas de
+    pie, 88 cm de ancho, para las baldas) y «papeles» (hojas sueltas y un taco, para las mesas). Sin texturas nuevas:
+    tela basta clara (MI_colchon) y madera oscura (MI_madera), así que no suman memoria de vídeo."""
+    _malla_cajas('/Game/Tarsis/Atrezo/legajos/SM_legajos', _fila_legajos(34), 0.25, 'MI_colchon')
+    _malla_cajas('/Game/Tarsis/Atrezo/legajos_oscuros/SM_legajos_oscuros', _fila_legajos(35), 0.25, 'MI_madera')
+    hojas = [(0, 0, 0.6, 21.0, 29.7, 1.2), (17, 9, 0.15, 21.0, 29.7, 0.3), (-15, -12, 0.15, 29.7, 21.0, 0.3), (6, -24, 0.15, 21.0, 14.8, 0.3)]
+    _malla_cajas('/Game/Tarsis/Atrezo/papeles/SM_papeles', hojas, 0.0, 'MI_colchon')
+
+
 def mallas():
-    """Las mallas que hace este script (taquilla, colchón, manta): antes de colocar el atrezo."""
+    """Las mallas que hace este script (taquilla, colchón, manta, legajos, papeles): antes de colocar el atrezo."""
     taquilla()
     telas()
+    legajos()
 
 
 # ---------------------------------------------------------------- tanda 19: techo, instalación, detalles, luz de ventana

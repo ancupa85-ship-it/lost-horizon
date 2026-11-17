@@ -2627,39 +2627,6 @@
    "pequeno": true
   },
   {
-   "nombre": "arch_carpeta_4",
-   "modelo": "binder_notebook",
-   "pos": [
-    1560,
-    3232,
-    160
-   ],
-   "giro": -30,
-   "pequeno": true
-  },
-  {
-   "nombre": "arch_carpeta_5",
-   "modelo": "binder_notebook",
-   "pos": [
-    1930,
-    3225,
-    160
-   ],
-   "giro": 15,
-   "pequeno": true
-  },
-  {
-   "nombre": "arch_caja_7",
-   "modelo": "cardboard_box_01",
-   "pos": [
-    1750,
-    3225,
-    160
-   ],
-   "giro": 4,
-   "pequeno": true
-  },
-  {
    "nombre": "arch_taburete",
    "modelo": "metal_stool_01",
    "pos": [
@@ -2758,6 +2725,127 @@
    ],
    "giro": 10,
    "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_1",
+   "modelo": "legajos",
+   "pos": [
+    1493,
+    3228,
+    160
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_2",
+   "modelo": "legajos",
+   "pos": [
+    1587,
+    3228,
+    160
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_3",
+   "modelo": "legajos_oscuros",
+   "pos": [
+    1693,
+    3228,
+    160
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_4",
+   "modelo": "legajos",
+   "pos": [
+    1787,
+    3228,
+    160
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_5",
+   "modelo": "legajos",
+   "pos": [
+    1893,
+    3228,
+    160
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_6",
+   "modelo": "legajos_oscuros",
+   "pos": [
+    1987,
+    3228,
+    160
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_alto_1",
+   "modelo": "legajos",
+   "pos": [
+    1640,
+    3228,
+    250
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_alto_2",
+   "modelo": "legajos_oscuros",
+   "pos": [
+    1840,
+    3228,
+    250
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_papeles",
+   "modelo": "papeles",
+   "pos": [
+    1900,
+    3500,
+    140
+   ],
+   "giro": 25,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_papeles",
+   "modelo": "papeles",
+   "pos": [
+    6335,
+    1962,
+    140
+   ],
+   "giro": 12,
+   "pequeno": true
+  },
+  {
+   "nombre": "jef_papeles",
+   "modelo": "papeles",
+   "pos": [
+    330,
+    3395,
+    140
+   ],
+   "giro": -8,
+   "pequeno": true
   }
  ],
  "vaciar": {
@@ -2794,7 +2882,10 @@
  },
  "mallas_propias": [
   "colchon",
-  "manta"
+  "manta",
+  "legajos",
+  "legajos_oscuros",
+  "papeles"
  ],
  "giro_modelo": {
   "_leeme": "Grados que se suman al giro de todas las piezas de un modelo. Con giro 0 lo largo de la pieza debe ir a lo largo de X (lo comprueba prueba_cobertura).",

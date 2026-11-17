@@ -205,6 +205,7 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 ### Salas con más vida (tanda 33)
 
 - Transmisiones y archivo: 22 piezas más en `atrezo.json` (archivadores, cajas, carpetas, taburetes, reloj, cuadrantes), todas de modelos ya cargados: no suman memoria de vídeo.
+- Tanda 34: `ambiente.legajos()` hace tres mallas propias sin texturas nuevas (`legajos`, `legajos_oscuros`, `papeles`); las baldas del archivo llevan filas de legajos y las mesas, papeles.
 - La sala roja del edificio este vuelve a ser lo que es, el **calabozo** donde apareces si te pillan: fuera el atrezo de «cuarto de revelado» de la tanda 28; dentro, catre con colchón y manta, cubo, taza y una lata.
 
 ## Sonidos
