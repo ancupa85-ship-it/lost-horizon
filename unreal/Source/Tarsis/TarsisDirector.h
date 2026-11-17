@@ -225,6 +225,12 @@ public:
 	/** Farolas rotas de un dardo (sin contar el farol de la garita). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis")
 	int32 BrokenLampCount() const { return BrokenLights.Num(); }
+	/** Tapa negra que apaga la pantalla de una farola rota: dónde va respecto a su luz (la luz está 25 cm al lado y
+	 *  20 cm por debajo de la luminaria) y cuánto mide (el cubo del motor mide 100 cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	FVector LampCoverOffset = FVector(-25.0f, 0.0f, 14.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	FVector LampCoverScale = FVector(0.7f, 0.5f, 0.1f);
 	/** Repone las farolas rotas (pruebas y carga de partida). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void RepairLamps();
@@ -1249,6 +1255,9 @@ private:
 	TArray<bool> BrokenSeen;
 	void LampsTick();
 	bool BreakableLamp(const class ALight* A) const;
+	void CoverLamp(const class ALight* Lamp);
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> LampCovers;
 	/** Dónde se pone el reparador: al sur del generador, despejado (encima de la malla el camino sale parcial). */
 	FVector RepairSpot() const { return GeneratorLoc + FVector(0.0f, 280.0f, 0.0f); }
 	void SetupBarrier();

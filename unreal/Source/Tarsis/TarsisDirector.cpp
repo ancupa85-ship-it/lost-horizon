@@ -3046,6 +3046,7 @@ bool ATarsisDirector::ShootLamp(const FVector& From, const FVector& Fwd, float M
 	else BrokenLights.Add(L);
 	L->SetVisibility(false);
 	const int32 SpotIdx = bGate ? INDEX_NONE : BrokenLights.Num() - 1;
+	if (!bGate) CoverLamp(Lamp);
 	OffLights.Remove(L);   // si hay apagón, al volver la luz sigue roto
 	PendingOff.Remove(L);
 	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, P, 1.0f, 1.6f, 0.0f, Atten);
@@ -3143,6 +3144,16 @@ void ATarsisDirector::LampsTick()
 	}
 }
 
+// La pantalla de la luminaria es parte de una malla fundida con brillo propio: no se puede apagar una sola. Al
+// romperla se le pone delante una tapa negra sin sombra (tamaño y sitio en LampCoverScale y LampCoverOffset)
+void ATarsisDirector::CoverLamp(const ALight* Lamp)
+{
+	if (!Lamp) return;
+	UStaticMeshComponent* C = AddBlock(Lamp->GetActorLocation() + LampCoverOffset, LampCoverScale, FLinearColor(0.004f, 0.004f, 0.004f), false);
+	if (C) C->SetCastShadow(false);
+	LampCovers.Add(C);
+}
+
 void ATarsisDirector::RepairLamps()
 {
 	for (ULightComponent* L : BrokenLights)
@@ -3152,6 +3163,8 @@ void ATarsisDirector::RepairLamps()
 		else L->SetVisibility(true);
 	}
 	BrokenLights.Reset();
+	for (UStaticMeshComponent* C : LampCovers) if (C) C->DestroyComponent();
+	LampCovers.Reset();
 	BrokenSpots.Reset();
 	BrokenSeen.Reset();
 	if (CheckLamp && CheckLamp.Get() != GateLamp.Get()) { CheckLamp = nullptr; LampChecker = nullptr; }
@@ -3250,6 +3263,7 @@ bool ATarsisDirector::LoadCheckpoint()
 			if (!BL || FVector::DistSquared(It->GetActorLocation(), BP) > 2500.0f || !BreakableLamp(*It) || BrokenLights.Contains(BL)) continue;
 			BrokenLights.Add(BL);
 			BrokenSpots.Add(It->GetActorLocation());
+			CoverLamp(*It);
 			BrokenSeen.Add(true);   // ya se dio parte antes del punto de control (o da igual: no se repite)
 			BL->SetVisibility(false);
 			OffLights.Remove(BL);
