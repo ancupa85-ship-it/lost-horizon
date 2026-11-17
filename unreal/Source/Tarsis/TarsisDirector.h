@@ -834,7 +834,7 @@ public:
 	bool bCellPuzzle = true;
 	/** La losa suelta del rincon (cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
-	FVector CellSlab = FVector(6540.0f, 2680.0f, 0.0f);
+	FVector CellSlab = FVector(6545.0f, 2640.0f, 3.5f);
 	/** Segundos entre salir con la llave y que alguien encuentre la celda vacia (la base queda en guardia). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
 	float CellAlertSeconds = 45.0f;

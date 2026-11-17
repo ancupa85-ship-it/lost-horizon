@@ -38,7 +38,12 @@
    ],
    "shadow_tells": true,
    "torch_near_min": 0.008,
-   "torch_near_dist": 1000.0
+   "torch_near_dist": 1000.0,
+   "cell_slab": [
+    6545,
+    2640,
+    3.5
+   ]
   },
   "guardias": {
    "*": {
