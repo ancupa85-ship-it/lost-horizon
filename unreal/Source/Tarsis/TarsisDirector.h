@@ -857,11 +857,11 @@ public:
 	FString VidalLooksLike = TEXT("Vega");
 	/** Donde se planta, respecto a CellDoor (cm), y hacia donde mira mientras hablais y cuando se vuelve a la pared. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
-	FVector VidalOffset = FVector(125.0f, -80.0f, 0.0f);
+	FVector VidalOffset = FVector(60.0f, -120.0f, 0.0f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
-	float VidalYaw = 150.0f;
+	float VidalYaw = 120.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
-	float VidalWallYaw = 90.0f;
+	float VidalWallYaw = 0.0f;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	TObjectPtr<class USkeletalMeshComponent> VidalBody;
 	/** Para las pruebas: hacia donde mira ahora (grados), o -1000 si no esta. */

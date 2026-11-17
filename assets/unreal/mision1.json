@@ -43,7 +43,14 @@
     6545,
     2640,
     3.5
-   ]
+   ],
+   "vidal_offset": [
+    60,
+    -120,
+    0
+   ],
+   "vidal_yaw": 120.0,
+   "vidal_wall_yaw": 0.0
   },
   "guardias": {
    "*": {
