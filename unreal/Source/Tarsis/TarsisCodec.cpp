@@ -32,6 +32,16 @@ void ATarsisDirector::CodecKey()
 {
 	if (bCodec) { CodecNext(); return; }
 	if (bMenu || bCine || bDone || bCapturing || bKeypad || bChoice || bRadioAsk || bCellAsk) return;
+	// en el calabozo, hasta haber hablado con Control, la radio va directa a el (lo que hubiera pendiente se pierde)
+	if (bCellPuzzle && InCell() && !CodecTaken.Contains(TEXT("control_celda")))
+	{
+		CodecPending = NAME_None;
+		CodecRingT = 0.0f;
+		bCodecMenu = false;
+		CellCallT = 0.0f;
+		OpenCodecList({ FName(TEXT("control_celda")) });
+		return;
+	}
 	if (!CodecPending.IsNone())
 	{
 		OpenCodec(CodecPending);

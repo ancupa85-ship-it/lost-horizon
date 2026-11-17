@@ -202,6 +202,19 @@ def dardo():
     x += 0.3 * np.sin(2 * np.pi * 180 * t) * env(n, 0.001, 0.01)
     return x
 
+def disparo():
+    # tanda 37: tiro de fusil a media distancia: chasquido seco, cuerpo grave y la cola que devuelve el patio.
+    # Con su propio generador de azar, para no mover los sonidos de antes
+    r = np.random.default_rng(37)
+    n = int(1.1 * SR); t = np.arange(n) / SR
+    x = hp(r.normal(0, 1, n), 0.6) * np.exp(-t / 0.012) * 1.4
+    x += lp(r.normal(0, 1, n), 0.93) * np.exp(-t / 0.07) * 2.2
+    x += np.sin(2 * np.pi * (95 - 40 * np.minimum(t / 0.08, 1.0)) * t) * np.exp(-t / 0.05) * 1.2
+    cola = lp(r.normal(0, 1, n), 0.97) * np.exp(-t / 0.3) * 0.9
+    for d, a in ((0.11, 0.35), (0.23, 0.2)):   # dos rebotes en los muros
+        o = int(d * SR); x[o:] += a * cola[:n - o]
+    return np.tanh(x * 1.5)
+
 def bucle(x, fade=1.0):
     # se funde el final con el principio para que el bucle no tenga corte
     f = int(fade * SR); a = np.linspace(0, 1, f)
@@ -474,3 +487,5 @@ if __name__ == '__main__':
     # tanda 23: el camión por las juntas de la losa y la caja por dentro
     save('camion_junta', camion_junta(), 0.75)
     save('camion_caja', camion_caja(), 0.5)
+    # tanda 37: el tiro de los guardias
+    save('disparo', disparo(), 0.9)

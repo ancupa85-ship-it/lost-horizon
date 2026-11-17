@@ -34,6 +34,8 @@ void ATarsisDirector::LockInCell(APawn* Player)
 	CellT = bCellPuzzle ? 0.0f : CellTime;
 	CellReset();
 	if (bCellPuzzle) { SpawnVidal(); FaceVidal(VidalYaw); }
+	// lo que estuviera sonando en la radio ya no importa: llama Control, que es quien sabe con quien hablas ahi dentro
+	if (bCellPuzzle && !bCodec) { CodecPending = NAME_None; CodecRingT = 0.0f; CellCallT = 9.0f; }
 	ShowMessage(Tx(TEXT("calabozo"), TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, a un paso de la reja, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja. Vidal no es como los demas.")), 8.0f);
 }
 
@@ -86,7 +88,7 @@ bool ATarsisDirector::CellInteract()
 // hay una cuarta respuesta: callar y abrir.
 void ATarsisDirector::CellAsk()
 {
-	const bool bKey = HasFlag(FName(TEXT("llave_celda")));
+	const bool bHasKey = HasFlag(FName(TEXT("llave_celda")));
 	const bool bTold = CodecTaken.Contains(TEXT("control_celda"));
 	const bool bKnows = bCodecVoiceHeard || bFile || bTold;
 	const bool bPsalm = bNoteRead || bCellHeardPrayer || CodecTaken.Contains(TEXT("roig_salmo"));
@@ -116,15 +118,15 @@ void ATarsisDirector::CellAsk()
 	{
 		Q = Tx(TEXT("vidal_q3"), TEXT("\"Aunque le creyera. Por que iba a abrir?\""));
 		CellOptions[0] = bFile ? Tx(TEXT("vidal_3a_sabe"), TEXT("\"He leido el expediente. Alarcon firma los traslados abajo, y el proximo lleva tu apellido.\""))
-			: bKey ? Tx(TEXT("vidal_3a_medalla"), TEXT("(Le das la medalla entre los barrotes.) \"Tu hermano durmio en este catre.\""))
+			: bHasKey ? Tx(TEXT("vidal_3a_medalla"), TEXT("(Le das la medalla entre los barrotes.) \"Tu hermano durmio en este catre.\""))
 			: Tx(TEXT("vidal_3a"), TEXT("\"Hay bajas por voces. A vosotros no os lo cuentan.\""));
 		CellOptions[1] = bPsalm ? Tx(TEXT("vidal_3b_sabe"), TEXT("\"Reza conmigo. De profundis clamavi ad te, Domine.\"")) : Tx(TEXT("vidal_3b"), TEXT("\"Reza conmigo.\""));
 		CellOptions[2] = Tx(TEXT("vidal_3c"), TEXT("\"Te dare el expediente. Vendelo.\""));
-		if (bFile || bKey) CellOkMask |= 1; else CellLackMask |= 1;
+		if (bFile || bHasKey) CellOkMask |= 1; else CellLackMask |= 1;
 		if (bPsalm) CellOkMask |= 2; else CellLackMask |= 2;
-		bCellMedal = !bFile && bKey;
+		bCellMedal = !bFile && bHasKey;
 	}
-	if (bKey) CellOptions.Add(Tx(TEXT("vidal_4"), TEXT("(Callar y abrir con la llave del hermano)")));
+	if (bHasKey) CellOptions.Add(Tx(TEXT("vidal_4"), TEXT("(Callar y abrir con la llave del hermano)")));
 	CellRight = (CellOkMask & 1) ? 1 : (CellOkMask & 2) ? 2 : (CellOkMask & 4) ? 3 : 0;
 	bCellAsk = true;
 	CellQuestion = Q;
@@ -170,10 +172,10 @@ void ATarsisDirector::AnswerCell(int32 Option)
 	{
 		// no es un error: te falta saber algo, y se dice donde buscarlo
 		++CellLacks;
-		const FString Hint = CellStage == 1
+		const FString HintText = CellStage == 1
 			? Tx(TEXT("vidal_pista2"), TEXT("Te falta saber que hay abajo. Control quiza lo sepa: llama por radio ({0})."), { ActionKeys[7].GetDisplayName().ToString().ToUpper() })
 			: Tx(TEXT("vidal_pista3"), TEXT("Te falta algo que a Vidal le importe. Registra la celda."));
-		ShowMessage(Tx(TEXT("vidal_falta"), TEXT("CABO VIDAL\n{0}\n{1}"), { Reply, Hint }), 8.0f);
+		ShowMessage(Tx(TEXT("vidal_falta"), TEXT("CABO VIDAL\n{0}\n{1}"), { Reply, HintText }), 8.0f);
 		return;
 	}
 	++CellFails;
@@ -223,6 +225,11 @@ void ATarsisDirector::CellTick(float DeltaSeconds)
 			CentralSay(TEXT("fuga"), Tx(TEXT("celda_fuga"), TEXT("El calabozo esta vacio. Todas las unidades: ojo, y parte uno por uno.")));
 		}
 	}
+	if (CellCallT > 0.0f && Bars.Num() > 0)
+	{
+		CellCallT -= DeltaSeconds;
+		if (CellCallT <= 0.0f && !CodecTaken.Contains(TEXT("control_celda"))) CodecRing(TEXT("control_celda"));
+	}
 	// Vidal reza en voz alta: si te quedas unos segundos junto a la reja, oyes que salmo es (vale para rezar con el)
 	if (bCellPuzzle && !bCellHeardPrayer && !bCellAsk && !bVidalGone && Bars.Num() > 0 && InCell() && NearPlayer(CellDoor, 200.0f))
 	{
@@ -230,7 +237,7 @@ void ATarsisDirector::CellTick(float DeltaSeconds)
 		if (CellPrayT >= CellPraySeconds)
 		{
 			bCellHeardPrayer = true;
-			SaySubtitle(Tx(TEXT("vidal_nombre"), TEXT("CABO VIDAL")), Tx(TEXT("vidal_rezo"), TEXT("De profundis clamavi ad te, Domine... Domine, exaudi vocem meam...")));
+			SaySubtitle(Tx(TEXT("vidal_nombre"), TEXT("CABO VIDAL")), Tx(TEXT("vidal_rezo"), TEXT("De profundis clamavi ad te, Domine... Domine, exaudi vocem meam...")), 5.0f);
 		}
 	}
 	// si te apartas de la reja, la pregunta se queda sin contestar (no cuenta como fallo)
@@ -288,6 +295,7 @@ void ATarsisDirector::CellReset()
 	bVidalGone = false;
 	bCellMedal = false;
 	bCellHeardPrayer = false;
+	CellCallT = 0.0f;
 	CellPrayT = 0.0f;
 	CellOkMask = CellLackMask = 0;
 	CellStage = CellFails = 0;

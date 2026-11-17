@@ -236,3 +236,9 @@ Código en `TarsisCombat.cpp`. Regla `bArmedRule` del director («Alto, o dispar
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.
+
+**Arreglos tras jugarlo (37c).** Si echas a correr con el arma encima, el guardia se planta donde esté y dispara (antes
+seguía camino de una cobertura que ya no valía). Tocar a un guardia solo es captura si estás quieto o es el que viene a
+detenerte: el refuerzo que llega da el alto como los demás. Arriba de la torre la E es la escalera antes que el
+centinela, y se llega al borde de la plataforma, no pegado a él. En el calabozo la R va directa a Control y él mismo
+llama a los pocos segundos. Sonido `disparo` (sintetizado, provisional como los demás).

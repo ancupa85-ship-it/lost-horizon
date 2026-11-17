@@ -1639,12 +1639,12 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		if (Meter <= 0.0f && StateT > 3.0f) SetState(ETarsisGuardState::Return);
 		break;
 	case ETarsisGuardState::Alert:
+		if (ArmedTick(DeltaSeconds, Player, V)) break;   // tanda 37: con fusil no se corre a por nadie (y decide el cuando detenerte)
 		if (Player && V > 0.0f && FVector::Dist2D(GetActorLocation(), Player->GetActorLocation()) < CatchDistance)
 		{
 			Caught(Player);
 			break;
 		}
-		if (ArmedTick(DeltaSeconds, Player, V)) break;   // tanda 37: con fusil no se corre a por nadie
 		Walk(LastSeen, RunSpeed);
 		// mandado por radio: no te ha visto, así que no se rinde a los 4 s; va corriendo hasta el sitio
 		if ((UnseenT > 4.0f && (!bRadioCall || StateT > 20.0f)) || (Near2D(LastSeen, 80.0f) && V <= 0.0f)) SetState(ETarsisGuardState::Search);

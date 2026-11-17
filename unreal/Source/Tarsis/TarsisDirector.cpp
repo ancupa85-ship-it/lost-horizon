@@ -487,6 +487,9 @@ FString ATarsisDirector::InteractPrompt() const
 	if (bRiding) return bDone ? FString() : Tx(TEXT("p_camion_bajar"), TEXT("E   BAJAR DEL CAMION"));
 	if (Dragged) return Tx(TEXT("p_soltar"), TEXT("E   SOLTAR EL CUERPO"));
 	if (bChoice) return Tx(TEXT("p_ramos_eleccion"), TEXT("1   VENTE CONMIGO        2   DERRIBARLO"));
+	// tanda 37: la escalera manda sobre lo demas (arriba, el centinela queda a un paso)
+	if (bClimbing) return FString();
+	{ const FString L = LadderPrompt(); if (!L.IsEmpty()) return L; }
 	if (ATarsisGuard* T = TakedownTarget())
 	{
 		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? Tx(TEXT("p_ramos_agarrar"), TEXT("E   AGARRAR A RAMOS")) : Tx(TEXT("p_derribar"), TEXT("E   DERRIBAR"));
@@ -502,8 +505,6 @@ FString ATarsisDirector::InteractPrompt() const
 	}
 	if (CanBoardTruck()) return Tx(TEXT("p_camion_subir"), TEXT("E   SUBIR A LA CAJA DEL CAMION"));
 	if (bCellPuzzle && InCell()) return CellPrompt();
-	if (bClimbing) return FString();
-	{ const FString L = LadderPrompt(); if (!L.IsEmpty()) return L; }
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear())
 	{
@@ -536,6 +537,8 @@ void ATarsisDirector::Interact()
 	if (bRiding) { LeaveTruck(false); return; }
 	if (Dragged) { StopDrag(); Teach(TEXT("ensena_cuerpo"), TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), {}, 3.0f); return; }
 	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
+	if (bClimbing) return;
+	if (LadderInteract()) return;
 	if (ATarsisGuard* T = TakedownTarget())
 	{
 		if (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked)
@@ -593,8 +596,6 @@ void ATarsisDirector::Interact()
 	}
 	if (CanBoardTruck()) { BoardTruck(); return; }
 	if (CellInteract()) return;
-	if (bClimbing) return;
-	if (LadderInteract()) return;
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear()) { UsePoint(*Pt); return; }
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))

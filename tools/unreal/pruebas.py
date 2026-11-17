@@ -2230,6 +2230,10 @@ def prueba_controles():
 
 def prueba_opciones():
     d = director()
+    # la dificultad guardada de quien juega puede no ser NORMAL: se pone NORMAL por el menú y al final se le devuelve
+    dif0 = d.get_editor_property('difficulty')
+    if dif0 != 1:
+        yield from teclas(d, 'P', *(['Down'] * 10), 'Right' if dif0 == 0 else 'Left', 'P')
     yield from teclas(d, 'P', *(['Down'] * 10), 'Right')
     check('DIFICULTAD pasa a DIFICIL', 'DIFICULTAD   < DIFICIL >' in ' '.join(lineas(d)), [x for x in lineas(d) if 'DIFICULTAD' in x])
     check('la dificultad se guarda en el director', d.get_editor_property('difficulty') == 2, d.get_editor_property('difficulty'))
@@ -2248,6 +2252,9 @@ def prueba_opciones():
     # dejarlo todo como estaba
     yield from teclas(d, 'P', *(['Down'] * 11), 'Left', 'Down', 'Enter', 'Down', 'Enter', 'P')
     check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < 100 %' in ' '.join(lineas(d)))
+    if dif0 != 1:
+        yield from teclas(d, 'P', *(['Down'] * 10), 'Left' if dif0 == 0 else 'Right', 'P')
+        check('la dificultad de quien juega, como estaba', d.get_editor_property('difficulty') == dif0, d.get_editor_property('difficulty'))
 
 
 # ---------------------------------------------------------------- puertas (arreglo de la 0024)
@@ -2551,8 +2558,8 @@ def prueba_calabozo():
     check('sin saber nada, el segundo paso no tiene respuesta buena', P('cell_right') == 0, P('cell_right'))
     d.answer_cell(2); yield 0.2
     check('«que grita» no basta, pero no cuenta como error y da la pista', P('cell_fails') == 1 and P('cell_lacks') == 1 and P('cell_stage') == 1 and 'radio' in msg(), msg()[-70:])
-    d.codec_key(); yield 0.1
-    d.codec_call(1); yield 0.2
+    d.codec_key(); yield 0.2
+    check('en la celda, la R va directa a Control', P('codec') and not P('codec_menu'), '%s %s' % (P('codec'), P('codec_menu')))
     for i in range(40):
         if not P('codec'):
             break
@@ -2631,6 +2638,7 @@ def prueba_armados():
     d.set_editor_property('armed_aim', 0.0)
     d.set_editor_property('player_speed_override', 0.0)
     a_la_vista_de(g, 900)
+    d.set_torch(True)   # de noche y a 9 m: con la linterna encendida te ve seguro
     g.alarm(jugador().get_actor_location())
     yield ('hasta', lambda: director().get_editor_property('halt'), 8.0)
     dist = lambda: dist2d(g.get_actor_location(), jugador().get_actor_location())
@@ -2648,6 +2656,7 @@ def prueba_armados():
     yield ('hasta', lambda: director().get_editor_property('shots') > 0, 14.0)
     check('si te mueves, dispara', P('shots') > 0 and P('fleeing') and P('arrest_guard') is None and P('hits') == 0 and P('wounds') == 0, '%s tiros, %s' % (P('shots'), estado(g)))
     check('sigue sin echarse encima', dist() > 350 and P('captures') == c0, '%d cm' % dist())
+    check('rendirse contó una sola vez', P('surrenders') == 1, P('surrenders'))
     check('el tiro pone la base en guardia', P('tension_t') > 60.0, P('tension_t'))
     # los refuerzos: había pedido apoyo al dar el alto, pero estaban todos quietos (hold); ahora uno libre
     check('pidió refuerzos por radio', 'central_refuerzos' in vl(), vl()[-4:])
@@ -2663,6 +2672,7 @@ def prueba_armados():
     # las escaleras de las torres
     for x in guardias():
         x.hold(3600.0)
+    d.set_torch(False)
     pies, altos = list(P('ladders')), list(P('ladder_tops'))
     check('cuatro torres con escalera', len(pies) == 4 and len(altos) == 4, len(pies))
     if pies:
@@ -2679,6 +2689,7 @@ def prueba_armados():
         l = p.get_actor_location()
         check('y la plataforma te sostiene', l.z > t.z + 50, '%d' % l.z)
         check('arriba, el aviso de bajar', 'BAJAR' in str(d.ladder_prompt()), str(d.ladder_prompt()))
+        check('arriba, la E es la escalera y no el centinela', 'BAJAR' in str(d.interact_prompt()), str(d.interact_prompt()))
         d.interact(); yield P('climb_seconds') + 1.0
         l = p.get_actor_location()
         check('de vuelta al pie', l.z < 300 and dist2d(l, b) < 200, '%d,%d,%d' % (l.x, l.y, l.z))

@@ -1315,6 +1315,7 @@ private:
 	void CellReset();
 	bool bCellMedal = false;
 	float CellPrayT = 0.0f;
+	float CellCallT = 0.0f;
 	int32 CellOkMask = 0;
 	int32 CellLackMask = 0;
 	float CellOpenT = 0.0f;

@@ -566,6 +566,8 @@ private:
 	// tanda 37 (TarsisCombat.cpp): armado y con cabeza
 	bool ArmedTick(float DeltaSeconds, APawn* Player, float V);
 	bool FindCover(const FVector& Threat, FVector& Out) const;
+	void FireAt(APawn* Player, float Dist, float V, class ATarsisDirector* D);
+	FVector CoverThreat = FVector::ZeroVector;
 	float AimT = 0.0f;
 	float ShotT = 0.0f;
 	float CoverT = 0.0f;

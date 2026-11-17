@@ -10,6 +10,7 @@
 #include "TarsisGuard.h"
 
 #include "AIController.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -35,7 +36,7 @@ bool ATarsisGuard::FindCover(const FVector& Threat, FVector& Out) const
 	const float HalfH = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	const FVector Chest = Threat + FVector(0.0f, 0.0f, 30.0f);
 	float Best = TNumericLimits<float>::Max();
-	bool bFound = false;
+	bool bGotCover = false;
 	for (int32 i = 0; i < 18; ++i)
 	{
 		FNavLocation P;
@@ -60,9 +61,9 @@ bool ATarsisGuard::FindCover(const FVector& Threat, FVector& Out) const
 		{
 			if (*It != this && It->bHasCover && FVector::Dist2D(It->CoverLoc, L) < 250.0f) Score += 800.0f;
 		}
-		if (Score < Best) { Best = Score; Out = L + FVector(0.0f, 0.0f, HalfH); bFound = true; }
+		if (Score < Best) { Best = Score; Out = L + FVector(0.0f, 0.0f, HalfH); bGotCover = true; }
 	}
-	return bFound;
+	return bGotCover;
 }
 
 // En alerta y con la regla puesta. Devuelve si se ha ocupado el (si no, sigue el comportamiento de antes)
@@ -76,12 +77,16 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	AAIController* AI = Cast<AAIController>(GetController());
 	const FVector PL = Player->GetActorLocation();
 	const float Dist = FVector::Dist2D(GetActorLocation(), PL);
+	// tocarte es detenerte, pero solo si no vas huyendo: al que corre se le dispara, no se le atrapa al vuelo
+	// (ni al que se cruza andando con uno que llega de refuerzo: ese da el alto primero, como los demas)
+	const float PlSpeed = D->PlayerSpeedOverride >= 0.0f ? D->PlayerSpeedOverride : Player->GetVelocity().Size2D();
+	if (V > 0.0f && Dist < CatchDistance && !D->bFleeing && (D->ArrestGuard == this || PlSpeed < 40.0f)) { Caught(Player); return true; }
 	if (V <= 0.0f)
 	{
 		// no te ve: aguanta en su sitio mirando a donde te perdio y luego avanza andando. Si le mandaron por radio,
 		// corre hasta estar cerca y el ultimo tramo lo hace con cuidado
 		AimT = 0.0f;
-		if (D->ArrestGuard == this) D->ArrestGuard = nullptr;
+		if (D->ArrestGuard == this && UnseenT > 1.0f) D->ArrestGuard = nullptr;   // un parpadeo de la vista no le hace desistir
 		if (UnseenT < ArmedHoldSeconds && !bRadioCall)
 		{
 			if (AI && AI->GetMoveStatus() != EPathFollowingStatus::Idle) AI->StopMovement();
@@ -101,9 +106,22 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 		D->ReportAim(this, Dist);
 		return true;
 	}
+	// huyes y te tiene a tiro: se planta donde este y dispara, haya llegado o no a cubrirse
+	if (D->bFleeing && Dist < ArmedRange)
+	{
+		if (AI && AI->GetMoveStatus() != EPathFollowingStatus::Idle) AI->StopMovement();
+		FaceTowards(PL, DeltaSeconds);
+		AimT += DeltaSeconds;
+		D->ReportAim(this, Dist);
+		if (AimT > 0.5f && ShotT <= 0.0f) FireAt(Player, Dist, V, D);
+		return true;
+	}
+	// la cobertura se eligio para donde estabas: si te has movido mucho, ya no vale
+	if (bHasCover && FVector::Dist2D(CoverThreat, PL) > 400.0f) { bHasCover = false; CoverT = FMath::Min(CoverT, 0.5f); }
 	if (!bHasCover && CoverT <= 0.0f)
 	{
 		bHasCover = FindCover(PL, CoverLoc);
+		CoverThreat = PL;
 		CoverT = 3.0f;
 		if (bHasCover) ++D->ArmedCovers;
 	}
@@ -126,16 +144,18 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	FaceTowards(PL, DeltaSeconds);
 	AimT += DeltaSeconds;
 	D->ReportAim(this, Dist);
-	if (D->bFleeing && AimT > 0.5f && ShotT <= 0.0f)
-	{
-		ShotT = D->ShotInterval * FMath::FRandRange(0.8f, 1.3f);
-		const ACharacter* C = Cast<ACharacter>(Player);
-		float Chance = FMath::Clamp(1.05f - Dist / 2200.0f, 0.15f, 0.9f) * FMath::Lerp(0.5f, 1.0f, FMath::Clamp(V, 0.0f, 1.0f));
-		if (C && C->bIsCrouched) Chance *= 0.7f;
-		if (Player->GetVelocity().Size2D() > 400.0f) Chance *= 0.7f;
-		D->ShotFired(this, FMath::FRand() < Chance * D->ArmedAim);
-	}
+	if (D->bFleeing && AimT > 0.5f && ShotT <= 0.0f) FireAt(Player, Dist, V, D);
 	return true;
+}
+
+void ATarsisGuard::FireAt(APawn* Player, float Dist, float V, ATarsisDirector* D)
+{
+	ShotT = D->ShotInterval * FMath::FRandRange(0.8f, 1.3f);
+	const ACharacter* C = Cast<ACharacter>(Player);
+	float Chance = FMath::Clamp(1.05f - Dist / 2200.0f, 0.15f, 0.9f) * FMath::Lerp(0.5f, 1.0f, FMath::Clamp(V, 0.0f, 1.0f));
+	if (C && C->bIsCrouched) Chance *= 0.7f;
+	if (Player->GetVelocity().Size2D() > 400.0f) Chance *= 0.7f;
+	D->ShotFired(this, FMath::FRand() < Chance * D->ArmedAim);
 }
 
 // ---------------------------------------------------------------- el director: el alto, las heridas y los refuerzos
@@ -268,7 +288,7 @@ int32 ATarsisDirector::LadderNear(bool& bTop) const
 	for (int32 i = 0; i < Ladders.Num() && i < LadderTops.Num(); ++i)
 	{
 		if (FVector::Dist2D(P, Ladders[i]) < 150.0f && P.Z < Ladders[i].Z + 250.0f) return i;
-		if (FVector::Dist2D(P, LadderTops[i]) < 220.0f && FMath::Abs(P.Z - LadderTops[i].Z) < 200.0f) { bTop = true; return i; }
+		if (FVector::Dist2D(P, LadderTops[i]) < 90.0f && FMath::Abs(P.Z - LadderTops[i].Z) < 200.0f) { bTop = true; return i; }
 	}
 	return INDEX_NONE;
 }
@@ -311,7 +331,7 @@ void ATarsisDirector::ClimbTick(float DeltaSeconds)
 	const FVector Rail(ClimbBase.X, ClimbBase.Y, ClimbTop.Z);
 	const FVector P = U < 0.8f ? FMath::Lerp(ClimbBase, Rail, U / 0.8f) : FMath::Lerp(Rail, ClimbTop, (U - 0.8f) / 0.2f);
 	C->SetActorLocation(P, false, nullptr, ETeleportType::TeleportPhysics);
-	if (FMath::Fmod(ClimbT, 0.55f) < DeltaSeconds) PlaySfx(TEXT("paso_metal"), P - FVector(0.0f, 0.0f, 80.0f), 0.5f);
+	if (FMath::Fmod(ClimbT, 0.55f) < DeltaSeconds) PlaySfx(FString::Printf(TEXT("paso_metal_%d"), FMath::RandRange(1, 3)), P - FVector(0.0f, 0.0f, 80.0f), 0.5f);
 	if (A >= 1.0f)
 	{
 		bClimbing = false;

@@ -3,7 +3,7 @@
 Se ejecuta en el editor con el nivel abierto (montar_base.py lo llama al final si la clase está compilada).
 Rondas por casillas del plano (como en tools/blender/escena_base.py y escenario/visor.js); cada casilla mide T m.
 """
-import os, sys, json, importlib
+import os, sys, json, math, importlib
 import unreal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -209,7 +209,12 @@ def colocar():
         # tanda 37: escaleras de las torres (pie de la escalera y centro de la plataforma, en cm)
         tt = [t for t in DATA.get('torres', []) if t.get('escala')]
         d.set_editor_property('ladders', [unreal.Vector(t['escala'][0] * 100.0, -t['escala'][1] * 100.0, 0.0) for t in tt])
-        d.set_editor_property('ladder_tops', [unreal.Vector(t['pos'][0] * 100.0, -t['pos'][1] * 100.0, t.get('altura', 7.5) * 100.0) for t in tt])
+        def _arriba(t):
+            # en el borde de la plataforma del lado de la escalera (en el centro apareces pegado al centinela)
+            cx, cy, ex, ey = t['pos'][0] * 100.0, -t['pos'][1] * 100.0, t['escala'][0] * 100.0, -t['escala'][1] * 100.0
+            n = max(math.hypot(ex - cx, ey - cy), 1.0)
+            return unreal.Vector(cx + (ex - cx) / n * 130.0, cy + (ey - cy) / n * 130.0, t.get('altura', 7.5) * 100.0)
+        d.set_editor_property('ladder_tops', [_arriba(t) for t in tt])
         # textos, objetivos, puntos de interacción y ajustes de la misión 1 (assets/unreal/mision1.json)
         if HERE not in sys.path:
             sys.path.insert(0, HERE)
