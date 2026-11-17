@@ -1193,8 +1193,26 @@ bool ATarsisGuard::Dazzle(float Seconds, float Again)
 }
 void ATarsisGuard::SetPlayerTorch(const USpotLightComponent* L) { GPlayerTorch = L; }
 
-// Tanda 31: cada 0,6 s mira cuánta luz le llega (sin contar linternas). A oscuras la enciende a la primera; para
-// guardarla tiene que llevar tres medidas seguidas en la luz (no parpadea al cruzar el borde de una farola)
+// bajo techo: el suelo que pisa es el de interior (lo mismo que mira el director para el jugador)
+bool ATarsisGuard::IsIndoors() const
+{
+	FHitResult Hit;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisTecho), true, this);
+	const FVector P = GetActorLocation();
+	if (GetWorld()->LineTraceSingleByChannel(Hit, P, P - FVector(0.0f, 0.0f, 250.0f), ECC_Visibility, Q))
+	{
+		if (const UStaticMeshComponent* SM = Cast<UStaticMeshComponent>(Hit.GetComponent()))
+		{
+			return SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().Contains(TEXT("suelo_int"));
+		}
+	}
+	return false;
+}
+
+// Tanda 31: cada 0,6 s mira cuánta luz le llega (sin contar linternas) y dónde está. La saca si está a oscuras y
+// además bajo techo o yendo a mirar algo (ajuste 31c: medido en el PC, de noche el 85 % de las rondas está a la misma
+// luz de luna, 0,12, y solo por luz la llevaban encendida 7,8 de 8). Para guardarla tiene que llevar tres medidas
+// seguidas sin motivo y al menos TorchMinOn segundos encendida
 void ATarsisGuard::AutoTorchTick(float DeltaSeconds)
 {
 	if (bTowerSentry || bAlly || State == ETarsisGuardState::Down) return;
@@ -1209,12 +1227,14 @@ void ATarsisGuard::AutoTorchTick(float DeltaSeconds)
 	const bool bOn = HasFlashlightOn();
 	if (bOn && !bAutoTorch) return;   // la lleva por otra cosa (apagón, farola rota, apoyo): no es asunto nuestro
 	const float L = FMath::Clamp(LightSum(GetWorld(), GetActorLocation() + FVector(0.0f, 0.0f, 40.0f), this, false), 0.0f, 1.0f);
+	const bool bReason = bTorchOutdoors || State == ETarsisGuardState::Suspicious || State == ETarsisGuardState::Search || IsIndoors();
 	if (!bOn)
 	{
-		if (L < TorchOnBelow) { SetFlashlight(true); bAutoTorch = HasFlashlightOn(); TorchLit = 0; }
+		if (bReason && L < TorchOnBelow) { SetFlashlight(true); bAutoTorch = HasFlashlightOn(); TorchLit = 0; TorchOnFor = 0.0f; }
 		return;
 	}
-	if (L > TorchOffAbove) { if (++TorchLit >= 3) { bAutoTorch = false; SetFlashlight(false); } }
+	TorchOnFor += 0.6f;
+	if (L > TorchOffAbove || !bReason) { if (++TorchLit >= 3 && TorchOnFor >= TorchMinOn) { bAutoTorch = false; SetFlashlight(false); } }
 	else TorchLit = 0;
 }
 
@@ -1355,7 +1375,7 @@ void ATarsisGuard::SetFlashlight(bool bOn)
 		UMaterialInterface* Mats[2] = {
 			LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Faro_Cristal.MI_Faro_Cristal"), nullptr, LOAD_NoWarn | LOAD_Quiet),
 			LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Halo_Faro.MI_Halo_Faro"), nullptr, LOAD_NoWarn | LOAD_Quiet) };
-		const float Sizes[2] = { 5.0f, 26.0f };
+		const float Sizes[2] = { 5.0f, 13.0f };   // ajuste 31c: a 26 cm el destello se veia flotar junto a la mano
 		for (int32 i = 0; i < 2; ++i)
 		{
 			if (!Sphere || !Mats[i]) continue;

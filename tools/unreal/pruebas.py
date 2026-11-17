@@ -1431,6 +1431,18 @@ def prueba_linternas():
         return
     g.set_actor_location(oscuro, False, True); yield 0.2
     g.auto_torch_now(); yield 0.2
+    # ajuste 31c: de ronda y al aire libre no la saca aunque esté a oscuras (casi toda la base lo está): solo bajo techo
+    # o yendo a mirar algo. El resto de la prueba mide la luz con «torch_outdoors» puesto
+    check('de ronda al aire libre no la saca', not g.has_flashlight_on() and not g.is_indoors(), '%s, dentro %s' % (g.has_flashlight_on(), g.is_indoors()))
+    dentro = V(700, 3600, g.get_actor_location().z)
+    g.set_actor_location(dentro, False, True); yield 0.2
+    g.auto_torch_now(); yield 0.2
+    check('bajo techo y a oscuras sí (jefatura)', g.is_indoors() and g.has_auto_torch(), 'dentro %s, linterna %s, luz %.2f' % (g.is_indoors(), g.has_flashlight_on(), unreal.TarsisGuard.ambient_at(mundo(), V(700, 3600, 140))))
+    g.set_actor_location(oscuro, False, True); yield 0.2
+    g.auto_torch_now(); yield 0.2
+    check('al salir la guarda', not g.has_flashlight_on(), g.has_flashlight_on())
+    g.set_editor_property('torch_outdoors', True)
+    g.auto_torch_now(); yield 0.2
     check('a oscuras saca la linterna', g.has_auto_torch(), '%s, luz %.2f' % (g.has_flashlight_on(), unreal.TarsisGuard.ambient_at(mundo(), V(oscuro.x, oscuro.y, 140))))
     luces = [c for c in g.get_components_by_class(unreal.SpotLightComponent) if c.is_visible()]
     check('pinta lo que dice su ajuste y no da sombra', len(luces) == 1 and abs(luces[0].get_editor_property('intensity') - g.get_editor_property('torch_paint_lumens')) < 1.0
@@ -1471,6 +1483,7 @@ def prueba_linternas():
     check('el indicador de luz lo dice', d.get_editor_property('player_light') > 0.6, '%.2f' % d.get_editor_property('player_light'))
     check('de espaldas a él no cuenta como alumbrarle', d.get_editor_property('torch_notices') == 0, d.get_editor_property('torch_notices'))
     # le alumbras: viene a mirar
+    g.set_editor_property('torch_outdoors', False)
     d.set_editor_property('context_torch', True)
     g.hold(0.0)
     d.set_torch(False); yield 0.1

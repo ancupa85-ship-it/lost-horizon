@@ -610,7 +610,7 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
 	bool bTorch = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
-	float TorchLumens = 450.0f;
+	float TorchLumens = 300.0f;   // ajuste 31c: con 450 quemaba el suelo y a los guardias a 2-3 m
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	float TorchRange = 2200.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")

@@ -399,7 +399,17 @@ public:
 	bool HasAutoTorch() const { return bAutoTorch && HasFlashlightOn(); }
 	/** Decide ya (sin esperar al siguiente medio segundo) si le toca linterna. Para las pruebas. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna")
-	void AutoTorchNow() { TorchT = 0.0f; TorchLit = 99; AutoTorchTick(0.0f); }
+	void AutoTorchNow() { TorchT = 0.0f; TorchLit = 99; TorchOnFor = 999.0f; AutoTorchTick(0.0f); }
+	/** Tambien la saca de ronda al aire libre si esta a oscuras (por defecto solo bajo techo o yendo a mirar algo: de
+	 *  noche casi toda la base esta a la misma luz de luna y la llevarian siempre encendida). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	bool bTorchOutdoors = false;
+	/** Una vez encendida, aguanta al menos estos segundos (no parpadea al cruzar manchas de luz). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchMinOn = 5.0f;
+	/** Pisa suelo de interior (bajo techo). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
+	bool IsIndoors() const;
 	/** Luz ambiente en un punto, 0 a 1, sin contar las linternas de los guardias. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna", meta = (WorldContext = "WorldContext"))
 	static float AmbientAt(const UObject* WorldContext, FVector Point);
@@ -553,6 +563,7 @@ private:
 	bool bAutoTorch = false;   // encendida por estar a oscuras: se guarda al volver a la luz
 	float TorchT = 0.0f;
 	int32 TorchLit = 0;
+	float TorchOnFor = 0.0f;
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> TorchLens;
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> TorchGlow;
 	bool bDarkTorch = false;   // linterna sacada para entrar a oscuras: se guarda al volver a la ronda
