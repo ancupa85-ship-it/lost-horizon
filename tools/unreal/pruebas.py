@@ -1442,9 +1442,10 @@ def prueba_esquinas():
     for g in cs:
         g.hold(0.0)
     g = dentro[0]
-    a0 = g.get_editor_property('sweep_aim')
+    # copia: get_editor_property devuelve el struct vivo y a0 seguiría al foco (salía 0 cm)
+    a = g.get_editor_property('sweep_aim'); a0 = V(a.x, a.y, a.z)
     yield 4.0
-    a1 = g.get_editor_property('sweep_aim')
+    a = g.get_editor_property('sweep_aim'); a1 = V(a.x, a.y, a.z)
     check('el foco de dentro se mueve por su recorrido', dist2d(a0, a1) > 100.0, '%.0f cm' % dist2d(a0, a1))
     tl = g.get_editor_property('tower_light')
     c = tl.get_component_by_class(unreal.SpotLightComponent)
@@ -1457,8 +1458,10 @@ def prueba_esquinas():
           '%s / %.0f' % (c.get_editor_property('cast_shadows'), c.get_editor_property('attenuation_radius')))
     # el foco delata: plantado en su mancha hay mucha más luz que diez metros más allá
     yield ('hasta', lambda: dist2d(g.get_editor_property('sweep_aim'), g.sweep_point_at(g.sweep_time())) < 150.0, 6.0)
-    aim = g.get_editor_property('sweep_aim')
-    en, fuera_de = luz_en(V(aim.x, aim.y, 90)), luz_en(V(aim.x + 1500, aim.y + 300, 90))
+    a = g.get_editor_property('sweep_aim'); aim = V(a.x, a.y, a.z)
+    # fuera de la mancha: el más oscuro de cuatro puntos a 12 m (uno solo podía caer bajo una farola del patio)
+    en = luz_en(V(aim.x, aim.y, 90))
+    fuera_de = min(luz_en(V(aim.x + dx, aim.y + dy, 90)) for dx, dy in ((1200, 0), (-1200, 0), (0, 1200), (0, -1200)))
     check('en la mancha del foco hay luz y fuera no', en > 0.3 and en > fuera_de * 2.0, '%.2f / %.2f' % (en, fuera_de))
     for x in cs:
         x.hold(3600.0)
