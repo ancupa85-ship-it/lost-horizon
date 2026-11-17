@@ -381,7 +381,31 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis")
 	bool HasFlashlightOn() const;
 	/** La linterna se queda encendida aunque vuelva a su ronda (el que encontró una farola rota). */
-	void KeepFlashlight() { SetFlashlight(true); bDarkTorch = false; }
+	void KeepFlashlight() { SetFlashlight(true); bDarkTorch = false; bAutoTorch = false; }
+
+	// ---- tanda 31: la linterna según el sitio. En ronda o yendo a mirar algo, si donde pisa no llega luz la enciende;
+	// al volver a la luz la guarda. La ves venir de lejos y su cono le alarga la vista: lo oscuro ya no es terreno libre.
+	// Lo manda ATarsisDirector::bContextTorch
+	/** Lúmenes que pinta la linterna (para el sigilo cuenta siempre 2500). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchPaintLumens = 700.0f;
+	/** Por debajo de esta luz ambiente (0 a 1, sin contar linternas) la enciende; por encima de TorchOffAbove la guarda. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchOnBelow = 0.26f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchOffAbove = 0.45f;
+	/** La lleva encendida porque está a oscuras (y no por el apagón ni por una farola rota). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
+	bool HasAutoTorch() const { return bAutoTorch && HasFlashlightOn(); }
+	/** Decide ya (sin esperar al siguiente medio segundo) si le toca linterna. Para las pruebas. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna")
+	void AutoTorchNow() { TorchT = 0.0f; TorchLit = 99; AutoTorchTick(0.0f); }
+	/** Luz ambiente en un punto, 0 a 1, sin contar las linternas de los guardias. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna", meta = (WorldContext = "WorldContext"))
+	static float AmbientAt(const UObject* WorldContext, FVector Point);
+	static void SetContextTorch(bool bOn);
+	/** La linterna del jugador (o nullptr): con ella encendida se le ve como si estuviera en plena luz. */
+	static void SetPlayerTorch(const class USpotLightComponent* L);
 
 	// ---- tanda 28: no entra solo a mirar un ruido donde han roto la farola. Se planta, saca la linterna, pide apoyo
 	// por radio y espera al compañero; luego entran los dos. Mientras espera, la zona a oscuras es tuya y el compañero
@@ -517,6 +541,13 @@ private:
 	float WaitBuddyT = 0.0f;
 	bool bDarkChecked = false;
 	bool bEscort = false;      // acude a acompañar a otro: no vuelve a pedir apoyo él
+	void AutoTorchTick(float DeltaSeconds);
+	void ShowTorch(bool bOn);
+	bool bAutoTorch = false;   // encendida por estar a oscuras: se guarda al volver a la luz
+	float TorchT = 0.0f;
+	int32 TorchLit = 0;
+	UPROPERTY() TObjectPtr<class UStaticMeshComponent> TorchLens;
+	UPROPERTY() TObjectPtr<class UStaticMeshComponent> TorchGlow;
 	bool bDarkTorch = false;   // linterna sacada para entrar a oscuras: se guarda al volver a la ronda
 	bool HasSweepPath() const { return SweepPath.Num() >= 2 && TowerLight != nullptr; }
 	void SweepSequence(TArray<int32>& Out) const;

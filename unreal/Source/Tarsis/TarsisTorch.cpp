@@ -1,0 +1,136 @@
+// Lost Horizon: De Profundis — linternas (tanda 31). Parte de ATarsisDirector: ver el bloque «linternas» de
+// TarsisDirector.h. La de los guardias vive en ATarsisGuard (AutoTorchTick); aquí van la del jugador y el cristal
+// encendido de los proyectores de las torres.
+#include "TarsisDirector.h"
+#include "TarsisGuard.h"
+
+#include "Camera/CameraComponent.h"
+#include "Components/SpotLightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/Character.h"
+#include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
+
+// Textos solo en ASCII: MSVC lee los .cpp sin BOM como si no fueran UTF-8.
+
+void ATarsisDirector::ToggleTorch()
+{
+	if (bCodec || bMenu || bCine || bDone) return;
+	SetTorch(!bTorch);
+}
+
+void ATarsisDirector::SetTorch(bool bOn)
+{
+	if (bOn && !bHasTorch) bOn = false;
+	if (bOn && !PlayerTorch)
+	{
+		ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+		UCameraComponent* Cam = C ? C->FindComponentByClass<UCameraComponent>() : nullptr;
+		if (!Cam) return;
+		PlayerTorch = NewObject<USpotLightComponent>(C);
+		PlayerTorch->SetMobility(EComponentMobility::Movable);
+		PlayerTorch->SetupAttachment(Cam);
+		// en la mano izquierda, un palmo por debajo de los ojos: el haz no nace del centro de la pantalla
+		PlayerTorch->SetRelativeLocationAndRotation(FVector(20.0f, -16.0f, -14.0f), FRotator(-1.5f, 1.5f, 0.0f));
+		PlayerTorch->SetIntensityUnits(ELightUnits::Lumens);
+		PlayerTorch->SetLightColor(FLinearColor(0.86f, 0.93f, 1.0f));   // fria: las de los guardias son calidas, no se confunden
+		PlayerTorch->SetSourceRadius(2.0f);
+		PlayerTorch->SetVolumetricScatteringIntensity(6.0f);
+		PlayerTorch->RegisterComponent();
+	}
+	bTorch = bOn;
+	if (PlayerTorch)
+	{
+		PlayerTorch->SetIntensity(TorchLumens);
+		PlayerTorch->SetAttenuationRadius(TorchRange);
+		PlayerTorch->SetOuterConeAngle(TorchCone);
+		PlayerTorch->SetInnerConeAngle(TorchCone * 0.45f);
+		PlayerTorch->SetCastShadows(bTorchShadows);
+		PlayerTorch->SetVisibility(bOn);
+	}
+	ATarsisGuard::SetPlayerTorch(bOn ? PlayerTorch.Get() : nullptr);
+	if (bOn) Teach(TEXT("ensena_linterna"), TEXT("LINTERNA\nVes en lo oscuro, pero con ella encendida te ven como a plena luz. Si alumbras a un guardia, viene a mirar."), {}, 4.5f);
+}
+
+void ATarsisDirector::TorchTick(float DeltaSeconds)
+{
+	ATarsisGuard::SetContextTorch(bContextTorch);
+	// el cristal de cada proyector se apaga con su luz (apagon)
+	for (UStaticMeshComponent* G : BeamGlows)
+	{
+		if (!G) continue;
+		const USpotLightComponent* L = Cast<USpotLightComponent>(G->GetAttachParent());
+		const bool bOn = L && L->IsVisible();
+		if (G->IsVisible() != bOn) G->SetVisibility(bOn);
+	}
+	if (TorchNoticeT > 0.0f) TorchNoticeT -= DeltaSeconds;
+	if (!bTorch || !PlayerTorch) return;
+	if (bCine || bDone || !bHasTorch) { SetTorch(false); return; }
+	if (TorchNoticeT > 0.0f) return;
+	// el guardia al que alumbras de cerca lo nota y viene a mirar (uno cada dos segundos y medio: tambien sirve de señuelo)
+	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P) return;
+	const FVector LP = PlayerTorch->GetComponentLocation();
+	const FVector Fwd = PlayerTorch->GetForwardVector();
+	const float CosOut = FMath::Cos(FMath::DegreesToRadians(TorchCone));
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLinternaJugador), true, this);
+	Q.AddIgnoredActor(P);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->bTowerSentry || It->bAlly) continue;
+		if (It->State != ETarsisGuardState::Patrol && It->State != ETarsisGuardState::Return) continue;
+		const FVector Chest = It->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f);
+		const FVector D = Chest - LP;
+		if (D.SizeSquared() > FMath::Square(TorchNoticeDist) || FVector::DotProduct(Fwd, D.GetSafeNormal()) < CosOut) continue;
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, LP, Chest, ECC_Visibility, Q) && Hit.GetActor() != *It) continue;
+		It->HearNoise(P->GetActorLocation());
+		++TorchNotices;
+		TorchNoticeT = 2.5f;
+		Teach(TEXT("ensena_linterna_guardia"), TEXT("LE HAS ALUMBRADO\n{0} viene a mirar de donde sale esa luz. Apagala ({1}) y muevete."), { It->GuardName.ToUpper(), ActionKeys[6].GetDisplayName().ToString().ToUpper() }, 3.5f);
+		break;
+	}
+}
+
+// cristal encendido y destello en cada proyector de torre, como los faros del camion: de noche la torre era una
+// silueta y no se leia ni de donde salia el haz ni que alli arriba hubiera alguien
+void ATarsisDirector::SetupBeamLenses()
+{
+	BeamGlows.Reset();
+	BeamLenses = 0;
+	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	UMaterialInterface* LensMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Faro_Cristal.MI_Faro_Cristal"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UMaterialInterface* GlowMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Halo_Faro.MI_Halo_Faro"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!Sphere) return;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (!It->bTowerSentry || !It->TowerLight) continue;
+		USpotLightComponent* L = It->TowerLight->FindComponentByClass<USpotLightComponent>();
+		if (!L) continue;
+		struct FGlow { UMaterialInterface* Mat; float Size; float Flat; };
+		const FGlow Glows[2] = { { LensMat, BeamLensSize, 0.3f }, { GlowMat, BeamGlowSize, 1.0f } };
+		bool bAny = false;
+		for (const FGlow& G : Glows)
+		{
+			if (!G.Mat || G.Size <= 0.0f) continue;
+			UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(It->TowerLight);
+			M->SetMobility(EComponentMobility::Movable);
+			M->SetStaticMesh(Sphere);
+			M->SetMaterial(0, G.Mat);
+			M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			M->SetCastShadow(false);
+			M->bAffectDynamicIndirectLighting = false;
+			M->bAffectDistanceFieldLighting = false;
+			M->SetupAttachment(L);
+			M->SetRelativeLocation(FVector(-6.0f, 0.0f, 0.0f));
+			M->SetRelativeScale3D(FVector(G.Size * G.Flat, G.Size, G.Size) / 100.0f);
+			M->RegisterComponent();
+			BeamGlows.Add(M);
+			bAny = true;
+		}
+		if (bAny) ++BeamLenses;
+	}
+}

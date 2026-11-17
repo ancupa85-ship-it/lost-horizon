@@ -63,6 +63,7 @@ void ATarsisDirector::BeginPlay()
 	SetupBarrier();
 	SetupSound();
 	SetupTruck();
+	SetupBeamLenses();
 	SetupPlayer();
 	SetWeather(Weather);
 	SetupZones();
@@ -170,6 +171,7 @@ void ATarsisDirector::Captured(APawn* Player)
 {
 	if (!Player) return;
 	if (bRiding) LeaveTruck(true);
+	SetTorch(false);
 	ExitHide();
 	StopDrag();
 	bKeypad = false;
@@ -305,7 +307,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	{
 		LightT = 0.12f;
 		const float L = ATarsisGuard::LightAt(this, C->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f));
-		PlayerLight = FMath::Lerp(PlayerLight, L, 0.5f);
+		PlayerLight = FMath::Lerp(PlayerLight, bTorch ? FMath::Max(L, 0.85f) : L, 0.5f);   // con tu linterna encendida eres tu la luz
 	}
 
 	if (MessageT > 0.0f) MessageT -= DeltaSeconds;
@@ -324,6 +326,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (KeypadErrT > 0.0f) KeypadErrT -= DeltaSeconds;
 	if (StoneT > 0.0f) StoneT -= DeltaSeconds;
 	BinocularTick();
+	TorchTick(DeltaSeconds);
 	if (!bDone && !bCine) MissionTime += DeltaSeconds;
 	DragTick();
 	if (bKeypad && !NearPlayer(Cell(6, 17), 260.0f)) { bKeypad = false; KeypadInput.Reset(); }
@@ -3228,6 +3231,7 @@ bool ATarsisDirector::LoadCheckpoint()
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!S || !P) return false;
 	if (bRiding) LeaveTruck(true);
+	SetTorch(false);
 	ExitHide();
 	StopDrag();
 	bKeypad = false;
@@ -3554,7 +3558,7 @@ void ATarsisDirector::LoadOptions()
 
 const TCHAR* ATarsisDirector::ActionName(int32 I)
 {
-	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA") };
+	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA"), TEXT("LINTERNA") };
 	return (I >= 0 && I < NumActions) ? N[I] : TEXT("");
 }
 
@@ -3566,6 +3570,7 @@ void ATarsisDirector::DefaultKeys()
 	ActionKeys[3] = EKeys::B;
 	ActionKeys[4] = EKeys::LeftShift;
 	ActionKeys[5] = EKeys::Y;
+	ActionKeys[6] = EKeys::F;
 }
 
 void ATarsisDirector::BindAll()
@@ -3578,6 +3583,7 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[2], IE_Pressed, this, &ATarsisDirector::ThrowStone);
 	InputComponent->BindKey(ActionKeys[3], IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
 	InputComponent->BindKey(ActionKeys[5], IE_Pressed, this, &ATarsisDirector::CycleWeather);
+	InputComponent->BindKey(ActionKeys[6], IE_Pressed, this, &ATarsisDirector::ToggleTorch);
 	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);
 	InputComponent->BindKey(ActionKeys[4], IE_Released, this, &ATarsisDirector::SprintOff);
 	{
@@ -3636,6 +3642,7 @@ FString ATarsisDirector::HelpLine() const
 	auto K = [this](int32 I) { return ActionKeys[I].GetDisplayName().ToString().ToUpper(); };
 	FString S = FString::Printf(TEXT("%s agacharse   %s correr   %s piedra   %s prismaticos"), *K(0), *K(4), *K(2), *K(3));
 	if (Darts > 0) S += FString::Printf(TEXT("   CLIC dardo (%d)"), Darts);
+	if (bHasTorch) S += FString::Printf(TEXT("   %s linterna"), *K(6));
 	if (bPowerOff) S += TEXT("   sin luz: busca la sombra de las linternas");
 	S += TEXT("   R radio   P pausa");
 	return S;

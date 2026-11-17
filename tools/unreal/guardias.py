@@ -100,6 +100,8 @@ def navegacion():
         log('AVISO: no se pudo reconstruir la navegación:', repr(e))
     log('mapa de navegación', round(ancho / 100), 'x', round(largo / 100), 'm')
 
+CASETA_LM, CASETA_RADIO, CASETA_ALTO, CASETA_COLOR = 300.0, 420.0, 150.0, (1.0, 0.55, 0.25, 1.0)
+
 def centinelas(eas, cls):
     # un centinela en cada torre vieja (TOWERS del visor), en la plataforma, junto a su foco, que gira con él.
     # Tanda 30: las torres de esquina («grande») llevan dos puestos, cada uno con su centinela y su foco: el de dentro
@@ -108,8 +110,26 @@ def centinelas(eas, cls):
     focos = [a for a in eas.get_all_level_actors() if isinstance(a, unreal.SpotLight)]
     usados = set()
     n = 0
+    # tanda 31: una luz cálida y floja bajo el tejadillo de cada torre de esquina. De noche la torre era una silueta;
+    # con ella el centinela se recorta y desde el patio se lee una garita ocupada. Etiqueta «decorado»: no cuenta para
+    # el sigilo ni se rompe, y con 4,2 m de radio no llega al suelo. Valores medidos en el PC
+    for a in eas.get_all_level_actors():
+        if a.actor_has_tag('luz_caseta'):
+            eas.destroy_actor(a)
     for i, t in enumerate(DATA.get('torres', [])):
         grande = bool(t.get('grande'))
+        if grande:
+            lc = eas.spawn_actor_from_class(unreal.PointLight, unreal.Vector(t['pos'][0] * 100.0, -t['pos'][1] * 100.0, t.get('altura', 7.5) * 100.0 + CASETA_ALTO), unreal.Rotator(0, 0, 0))
+            lc.set_actor_label('caseta_' + t['name'])
+            lc.set_folder_path('Luces')
+            lc.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+            c = lc.get_component_by_class(unreal.PointLightComponent)
+            c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
+            c.set_editor_property('intensity', CASETA_LM)
+            c.set_editor_property('attenuation_radius', CASETA_RADIO)
+            c.set_editor_property('cast_shadows', False)
+            c.set_light_color(unreal.LinearColor(*CASETA_COLOR))   # unreal.Color posicional cambia el orden de los canales
+            lc.tags = [unreal.Name('decorado'), unreal.Name('luz_caseta')]
         puestos = t.get('puestos') or [{'rol': 'dentro', 'pos': [t['pos'][0] - 0.25, t['pos'][1], 0.0], 'foco': t['foco']}]
         for pu in puestos:
             fuera = pu.get('rol') == 'fuera'

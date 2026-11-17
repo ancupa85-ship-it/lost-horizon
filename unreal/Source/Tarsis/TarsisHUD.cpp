@@ -461,7 +461,7 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 {
 	if (!D) return;
 	const float S = UiScale();
-	if (D->MessageT > 0.0f && !D->Message.IsEmpty() && !D->bRadioAsk)   // la pregunta de la central tiene su caja (DrawRadioAsk)
+	if (D->MessageT > 0.0f && !D->Message.IsEmpty() && !D->bRadioAsk && !D->bCodec && !D->bCodecMenu)   // la pregunta de la central tiene su caja (DrawRadioAsk)
 	{
 		// más abajo y más pequeño que antes: no tapa a los guardias del centro de la pantalla
 		const float A = FMath::Clamp(D->MessageT, 0.0f, 1.0f);

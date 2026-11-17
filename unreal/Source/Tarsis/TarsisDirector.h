@@ -597,6 +597,54 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	bool bBinoculars = false;
 
+	// ---- tanda 31: linternas. Los guardias la sacan donde no llega la luz (ATarsisGuard::AutoTorchTick) y tú llevas
+	// la tuya (F): ves en lo oscuro, pero con ella encendida te ven como a plena luz, y el guardia al que alumbras
+	// de cerca viene a mirar. Los proyectores de las torres llevan cristal encendido y destello para que se lean de lejos.
+	/** Los guardias de suelo encienden la linterna donde no llega luz. Las pruebas viejas lo apagan. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	bool bContextTorch = true;
+	/** Llevas linterna (un objeto del equipo: una misión puede empezar sin ella). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	bool bHasTorch = true;
+	/** Tu linterna está encendida. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
+	bool bTorch = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchLumens = 450.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchRange = 2200.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchCone = 21.0f;
+	/** Tu linterna da sombra (una sola luz con sombra; quitar si la tarjeta no puede). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	bool bTorchShadows = true;
+	/** Hasta dónde nota un guardia que le alumbras (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchNoticeDist = 1400.0f;
+	/** Veces que un guardia ha ido a mirar porque le has alumbrado. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
+	int32 TorchNotices = 0;
+	/** Cristal y destello de los proyectores de torre (cm; 0 los quita). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float BeamLensSize = 34.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float BeamGlowSize = 80.0f;
+	/** Proyectores de torre con cristal encendido puesto. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
+	int32 BeamLenses = 0;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna")
+	void ToggleTorch();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna")
+	void SetTorch(bool bOn);
+	/** La luz de tu linterna (nullptr si aún no la has encendido nunca). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
+	class USpotLightComponent* TorchComp() const { return PlayerTorch; }
+	void SetupBeamLenses();
+	void TorchTick(float DeltaSeconds);
+	UPROPERTY() TObjectPtr<class USpotLightComponent> PlayerTorch;
+	UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> BeamGlows;
+	float TorchNoticeT = 0.0f;
+
 	// misión secundaria de Ramos: carta en su litera, agarrarlo por la espalda (1 te lo llevas, 2 lo derribas),
 	// llave del botiquín del veterinario con la pistola de dardos, y salida alternativa por el portillo de la marisma
 
@@ -844,11 +892,12 @@ public:
 	int32 WaitKeyFor = -1;
 
 	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
-	static constexpr int32 NumActions = 6;
+	static constexpr int32 NumActions = 7;
 	FKey ActionKeys[NumActions];
 	static const TCHAR* ActionName(int32 I);
 
 	/** Tira de ayuda de abajo a la derecha: teclas de lo que puedes hacer ahora. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
 	FString HelpLine() const;
 
 	/** Capas de música (0-1 cada una), para el HUD de pruebas. */

@@ -138,23 +138,23 @@
    "vigia de la torre 1": {
     "sweep_path": [
      [
-      -3200,
-      -900,
+      -2700,
+      800,
       0
      ],
      [
-      -3200,
-      -3200,
+      -2700,
+      -2700,
       0
      ],
      [
-      -900,
-      -3200,
+      800,
+      -2700,
       0
      ]
     ],
     "sweep_loop": false,
-    "sweep_speed": 400.0,
+    "sweep_speed": 600.0,
     "sweep_stops": [
      2.0,
      0.0,
@@ -166,23 +166,23 @@
    "vigia de la torre 2": {
     "sweep_path": [
      [
-      8100,
-      -3200,
+      6400,
+      -2700,
       0
      ],
      [
-      10400,
-      -3200,
+      9900,
+      -2700,
       0
      ],
      [
-      10400,
-      -900,
+      9900,
+      800,
       0
      ]
     ],
     "sweep_loop": false,
-    "sweep_speed": 400.0,
+    "sweep_speed": 600.0,
     "sweep_stops": [
      2.0,
      0.0,
@@ -194,23 +194,23 @@
    "vigia de la torre 3": {
     "sweep_path": [
      [
-      10400,
-      6600,
+      9900,
+      5600,
       0
      ],
      [
-      10400,
-      8800,
+      9900,
+      8300,
       0
      ],
      [
-      8100,
-      8800,
+      5700,
+      8300,
       0
      ]
     ],
     "sweep_loop": false,
-    "sweep_speed": 400.0,
+    "sweep_speed": 600.0,
     "sweep_stops": [
      2.0,
      0.0,
@@ -222,23 +222,23 @@
    "vigia de la torre 4": {
     "sweep_path": [
      [
-      -900,
-      8800,
+      400,
+      8300,
       0
      ],
      [
-      -3200,
-      8800,
+      -2700,
+      8300,
       0
      ],
      [
-      -3200,
-      6600,
+      -2700,
+      5600,
       0
      ]
     ],
     "sweep_loop": false,
-    "sweep_speed": 400.0,
+    "sweep_speed": 600.0,
     "sweep_stops": [
      2.0,
      0.0,
@@ -560,6 +560,8 @@
   "codec_fuente_0": "F|baja.\nF|te oigo contar. uno. dos. ciento veintinueve. vuelves a empezar.",
   "codec_fuente_1": "F|el que reza arriba cuenta igual que yo.",
   "codec_fuente_2": "F|tienes una cocina dentro. luz de tarde. yo tambien tenia. me la quitaron para dar luz a otros.",
-  "codec_fuente_3": "F|cuando apagan el generador no me callo. descanso."
+  "codec_fuente_3": "F|cuando apagan el generador no me callo. descanso.",
+  "ensena_linterna": "LINTERNA\nVes en lo oscuro, pero con ella encendida te ven como a plena luz. Si alumbras a un guardia, viene a mirar.",
+  "ensena_linterna_guardia": "LE HAS ALUMBRADO\n{0} viene a mirar de donde sale esa luz. Apagala ({1}) y muevete."
  }
 }

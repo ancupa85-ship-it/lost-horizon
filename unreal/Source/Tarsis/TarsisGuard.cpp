@@ -998,7 +998,7 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 	State = NewState;
 	StateT = 0.0f;
 	bRepairing = false;
-	if (NewState == ETarsisGuardState::Down && Flashlight) Flashlight->SetVisibility(false);
+	if (NewState == ETarsisGuardState::Down) ShowTorch(false);
 	if (NewState != ETarsisGuardState::Suspicious) { bInvestigate = false; bShadow = false; bWaitBuddy = false; }
 	if (NewState == ETarsisGuardState::Patrol)
 	{
@@ -1142,7 +1142,9 @@ static float BeamLumensOf(const FTarsisBeams& Beams, const AActor* LightActor)
 }
 
 // toda la luz que llega a un punto, sin tope. Ignore: actor que no hace sombra (el propio jugador al medir la suya)
-static float LightSum(const UWorld* World, const FVector& Point, const AActor* Ignore)
+static const float TorchStealthLumens = 2500.0f;   // lo que cuenta una linterna para el sigilo, pinte lo que pinte
+
+static float LightSum(const UWorld* World, const FVector& Point, const AActor* Ignore, bool bTorches = true)
 {
 	float Sum = 0.12f;   // luna y cielo: de noche siempre se ve una silueta de cerca
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLuz), false);
@@ -1154,9 +1156,10 @@ static float LightSum(const UWorld* World, const FVector& Point, const AActor* I
 		Sum += LightContribution(World, Cast<ULocalLightComponent>(It->GetLightComponent()), Point, *It, Q, It->ActorHasTag(NStrongLight), BeamLumensOf(Beams, *It), Ignore);
 	}
 	// linternas de los guardias
+	if (!bTorches) return Sum;
 	for (TActorIterator<ATarsisGuard> It(World); It; ++It)
 	{
-		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->FlashlightComp(), Point, *It, Q, true, -1.0f, Ignore);
+		if (It->HasFlashlightOn()) Sum += LightContribution(World, It->FlashlightComp(), Point, *It, Q, false, TorchStealthLumens, Ignore);
 	}
 	return Sum;
 }
@@ -1166,6 +1169,44 @@ float ATarsisGuard::LightAt(const UObject* WorldContext, FVector Point)
 	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
 	if (!World) return 1.0f;
 	return FMath::Clamp(LightSum(World, Point, nullptr), 0.0f, 1.0f);
+}
+
+float ATarsisGuard::AmbientAt(const UObject* WorldContext, FVector Point)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
+	if (!World) return 1.0f;
+	return FMath::Clamp(LightSum(World, Point, nullptr, false), 0.0f, 1.0f);
+}
+
+static bool GContextTorch = true;
+static TWeakObjectPtr<const USpotLightComponent> GPlayerTorch;
+
+void ATarsisGuard::SetContextTorch(bool bOn) { GContextTorch = bOn; }
+void ATarsisGuard::SetPlayerTorch(const USpotLightComponent* L) { GPlayerTorch = L; }
+
+// Tanda 31: cada 0,6 s mira cuánta luz le llega (sin contar linternas). A oscuras la enciende a la primera; para
+// guardarla tiene que llevar tres medidas seguidas en la luz (no parpadea al cruzar el borde de una farola)
+void ATarsisGuard::AutoTorchTick(float DeltaSeconds)
+{
+	if (bTowerSentry || bAlly || State == ETarsisGuardState::Down) return;
+	if (!GContextTorch)
+	{
+		if (bAutoTorch) { bAutoTorch = false; SetFlashlight(false); }
+		return;
+	}
+	TorchT -= DeltaSeconds;
+	if (TorchT > 0.0f) return;
+	TorchT = 0.6f;
+	const bool bOn = HasFlashlightOn();
+	if (bOn && !bAutoTorch) return;   // la lleva por otra cosa (apagón, farola rota, apoyo): no es asunto nuestro
+	const float L = FMath::Clamp(LightSum(GetWorld(), GetActorLocation() + FVector(0.0f, 0.0f, 40.0f), this, false), 0.0f, 1.0f);
+	if (!bOn)
+	{
+		if (L < TorchOnBelow) { SetFlashlight(true); bAutoTorch = HasFlashlightOn(); TorchLit = 0; }
+		return;
+	}
+	if (L > TorchOffAbove) { if (++TorchLit >= 3) { bAutoTorch = false; SetFlashlight(false); } }
+	else TorchLit = 0;
 }
 
 int32 ATarsisGuard::ShadowsOf(const UObject* WorldContext, const AActor* Who, const TArray<float>& Heights, float MinLight, TArray<FVector>& Tips, TArray<float>& Contrast)
@@ -1283,7 +1324,7 @@ bool ATarsisGuard::HasFlashlightOn() const
 void ATarsisGuard::SetFlashlight(bool bOn)
 {
 	if (bOn && (bTowerSentry || bAlly || State == ETarsisGuardState::Down)) bOn = false;
-	if (!bOn) { if (Flashlight) Flashlight->SetVisibility(false); return; }
+	if (!bOn) { bAutoTorch = false; ShowTorch(false); return; }
 	if (!Flashlight)
 	{
 		Flashlight = NewObject<USpotLightComponent>(this);
@@ -1291,16 +1332,47 @@ void ATarsisGuard::SetFlashlight(bool bOn)
 		Flashlight->SetupAttachment(GetRootComponent());
 		Flashlight->SetRelativeLocationAndRotation(FVector(35.0f, 18.0f, 55.0f), FRotator(-12.0f, 0.0f, 0.0f));   // a la altura del pecho, algo hacia abajo
 		Flashlight->SetIntensityUnits(ELightUnits::Lumens);
-		Flashlight->SetIntensity(2500.0f / StrongLightBoost);   // para el sigilo cuenta 2500 (LightAt)
+		Flashlight->SetIntensity(TorchPaintLumens);   // lo que pinta; para el sigilo cuenta 2500 (LightSum)
 		Flashlight->SetAttenuationRadius(2600.0f);   // más que la vista normal (ViewDistance 2000): de frente te ve antes
 		Flashlight->SetInnerConeAngle(10.0f);
 		Flashlight->SetOuterConeAngle(20.0f);
 		Flashlight->SetLightColor(FLinearColor(1.0f, 0.93f, 0.8f));
 		Flashlight->SetCastShadows(false);   // sin sombras: la 1050 no da para siete linternas con sombra
 		Flashlight->SetVolumetricScatteringIntensity(12.0f);    // con la lluvia el haz se sigue viendo
+		Flashlight->SetSourceRadius(3.0f);
 		Flashlight->RegisterComponent();
+		// tanda 31: el cristal encendido y un destello pequeño, para que se vea de dónde sale el haz (como los faros del camión)
+		UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		UMaterialInterface* Mats[2] = {
+			LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Faro_Cristal.MI_Faro_Cristal"), nullptr, LOAD_NoWarn | LOAD_Quiet),
+			LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Tarsis/Materiales/MI_Halo_Faro.MI_Halo_Faro"), nullptr, LOAD_NoWarn | LOAD_Quiet) };
+		const float Sizes[2] = { 5.0f, 26.0f };
+		for (int32 i = 0; i < 2; ++i)
+		{
+			if (!Sphere || !Mats[i]) continue;
+			UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(this);
+			M->SetMobility(EComponentMobility::Movable);
+			M->SetStaticMesh(Sphere);
+			M->SetMaterial(0, Mats[i]);
+			M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			M->SetCastShadow(false);
+			M->bAffectDynamicIndirectLighting = false;
+			M->bAffectDistanceFieldLighting = false;
+			M->SetupAttachment(Flashlight);
+			M->SetRelativeLocation(FVector(i == 0 ? -2.0f : 2.0f, 0.0f, 0.0f));
+			M->SetRelativeScale3D(FVector(Sizes[i] * (i == 0 ? 0.4f : 1.0f), Sizes[i], Sizes[i]) / 100.0f);
+			M->RegisterComponent();
+			(i == 0 ? TorchLens : TorchGlow) = M;
+		}
 	}
-	Flashlight->SetVisibility(true);
+	ShowTorch(true);
+}
+
+void ATarsisGuard::ShowTorch(bool bOn)
+{
+	if (Flashlight) Flashlight->SetVisibility(bOn);
+	if (TorchLens) TorchLens->SetVisibility(bOn);
+	if (TorchGlow) TorchGlow->SetVisibility(bOn);
 }
 
 float ATarsisGuard::Visibility(const AActor* Target) const
@@ -1327,7 +1399,9 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	{
 		return 0.0f;   // pared, cajas o contenedor por medio
 	}
-	const float Light = LightAt(this, Aim);
+	float Light = LightAt(this, Aim);
+	// tanda 31: con tu linterna encendida eres tú la luz
+	if (GPlayerTorch.IsValid() && GPlayerTorch->IsVisible() && GPlayerTorch->GetOwner() == Target) Light = FMath::Max(Light, 0.85f);
 	float V = D < ViewDistance ? (1.0f - FMath::Pow(D / ViewDistance, 1.5f)) * (0.2f + 0.8f * Light) : 0.0f;
 	if (bTorch) V = FMath::Max(V, 0.9f * (1.0f - FMath::Pow(D / Flashlight->AttenuationRadius, 2.0f)));
 	if (const ACharacter* C = Cast<ACharacter>(Target))
@@ -1386,6 +1460,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		return;
 	}
 	UpdateAnim();
+	AutoTorchTick(DeltaSeconds);
 	LookTick(DeltaSeconds);
 	GestureTick(DeltaSeconds);
 	BatonTick(DeltaSeconds);

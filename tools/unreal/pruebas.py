@@ -122,7 +122,8 @@ def actores(tag, clase=None):
 def relleno_encendido():
     """Las luces de relleno (etiqueta «decorado», tanda 25) que están encendidas."""
     return [a.get_actor_label() for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.Light)
-            if a.actor_has_tag('decorado') and a.get_component_by_class(unreal.LocalLightComponent) and a.get_component_by_class(unreal.LocalLightComponent).is_visible()]
+            if a.actor_has_tag('decorado') and not a.actor_has_tag('luz_caseta')   # la luz de la caseta de cada torre (tanda 31) va con el circuito de las torres: no se apaga
+            and a.get_component_by_class(unreal.LocalLightComponent) and a.get_component_by_class(unreal.LocalLightComponent).is_visible()]
 
 def reparador_cercano():
     best = None
@@ -169,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -1408,6 +1409,101 @@ def prueba_cielo():
         check('una farola apagada pierde su halo, y lo recupera', menos == hc.y - 1 and d.halo_counts().y == hc.y, '%d -> %d -> %d' % (hc.y, menos, d.halo_counts().y))
 
 
+def prueba_linternas():
+    """Tanda 31: los guardias de suelo sacan la linterna donde no llega la luz y la guardan al volver a ella; tú llevas
+    la tuya (F): con ella encendida te ven como a plena luz y el guardia al que alumbras viene a mirar. Los proyectores
+    de las torres llevan cristal encendido y cada caseta su luz; los focos de fuera repasan el borde del muro."""
+    aparte(); yield 0.1
+    d = director()
+    check('la regla está puesta en su prueba', d.get_editor_property('context_torch'), d.get_editor_property('context_torch'))
+    g = next((x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL'), None)
+    check('hay un guardia de ronda con quien probar', g is not None, [estado(x) for x in guardias()][:8])
+    if not g:
+        return
+    g.hold(60.0)
+    # a oscuras: un punto del anillo norte lejos de toda farola y fuera del recorrido de los focos
+    oscuro = None
+    for x, y in ((4500, -1200), (3000, -1300), (5500, -1300), (1500, -1300), (7500, 3500)):
+        if unreal.TarsisGuard.ambient_at(mundo(), V(x, y, 140)) < 0.2:
+            oscuro = V(x, y, 100); break
+    check('hay un sitio a oscuras en el anillo', oscuro is not None, oscuro)
+    if not oscuro:
+        return
+    g.set_actor_location(oscuro, False, True); yield 0.2
+    g.auto_torch_now(); yield 0.2
+    check('a oscuras saca la linterna', g.has_auto_torch(), '%s, luz %.2f' % (g.has_flashlight_on(), unreal.TarsisGuard.ambient_at(mundo(), V(oscuro.x, oscuro.y, 140))))
+    luces = [c for c in g.get_components_by_class(unreal.SpotLightComponent) if c.is_visible()]
+    check('pinta lo que dice su ajuste y no da sombra', len(luces) == 1 and abs(luces[0].get_editor_property('intensity') - g.get_editor_property('torch_paint_lumens')) < 1.0
+          and not luces[0].get_editor_property('cast_shadows'), [c.get_editor_property('intensity') for c in luces])
+    # para el sigilo cuenta lo de siempre: a 6 m delante de él, en su cono, estás a la luz; a su espalda, no
+    f = g.get_actor_forward_vector()
+    p = g.get_actor_location()
+    delante, detras = luz_en(V(p.x + f.x * 600, p.y + f.y * 600, 110)), luz_en(V(p.x - f.x * 600, p.y - f.y * 600, 110))
+    check('su cono te delata por delante y no por detrás', delante > 0.4 and detras < 0.25, '%.2f / %.2f' % (delante, detras))
+    cristal = [c for c in g.get_components_by_class(unreal.StaticMeshComponent) if c.is_visible() and c.get_attach_parent() in luces]
+    check('la linterna tiene cristal encendido y destello', len(cristal) == 2, len(cristal))
+    # bajo una farola la guarda
+    far = next((a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.SpotLight) if a.get_actor_label().startswith('farola_')
+                and a.get_component_by_class(unreal.SpotLightComponent).is_visible()), None)
+    fl = far.get_actor_location()
+    g.set_actor_location(V(fl.x + 150, fl.y, 100), False, True); yield 0.2
+    g.auto_torch_now(); yield 0.2
+    check('bajo una farola la guarda', not g.has_flashlight_on(), '%s, luz %.2f' % (g.has_flashlight_on(), unreal.TarsisGuard.ambient_at(mundo(), V(fl.x + 150, fl.y, 140))))
+    # sin la regla, ni a oscuras
+    d.set_editor_property('context_torch', False)
+    g.set_actor_location(oscuro, False, True); yield 0.3
+    g.auto_torch_now(); yield 0.2
+    check('con la regla quitada no la saca', not g.has_flashlight_on(), g.has_flashlight_on())
+    # tu linterna (él sigue sin la suya: si no, su cono ya te alumbraría y no se mediría la tuya)
+    check('llevas linterna y empieza apagada', d.get_editor_property('has_torch') and not d.get_editor_property('torch'), d.get_editor_property('torch'))
+    check('la F sale en la ayuda de teclas', 'linterna' in str(d.help_line()).lower(), str(d.help_line()))
+    tp(oscuro.x + 1500, oscuro.y, 180); yield 0.2
+    g.set_actor_location(oscuro, False, True)
+    g.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(oscuro, V(oscuro.x + 1500, oscuro.y, 100)), False); yield 0.2
+    mirar(V(oscuro.x + 3000, oscuro.y, 150)); yield 0.2     # de espaldas a él: no le alumbras
+    antes = g.visibility(jugador())
+    d.toggle_torch(); yield 0.3
+    c = d.torch_comp()
+    check('se enciende: una luz en la cámara', d.get_editor_property('torch') and c and c.is_visible(), d.get_editor_property('torch'))
+    con = g.visibility(jugador())
+    check('con ella encendida te ve mucho más', con > antes + 0.15, '%.2f -> %.2f' % (antes, con))
+    yield 0.4
+    check('el indicador de luz lo dice', d.get_editor_property('player_light') > 0.6, '%.2f' % d.get_editor_property('player_light'))
+    check('de espaldas a él no cuenta como alumbrarle', d.get_editor_property('torch_notices') == 0, d.get_editor_property('torch_notices'))
+    # le alumbras: viene a mirar
+    d.set_editor_property('context_torch', True)
+    g.hold(0.0)
+    d.set_torch(False); yield 0.1
+    g.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(oscuro, V(oscuro.x - 1500, oscuro.y, 100)), False)   # él, de espaldas a ti
+    tp(oscuro.x + 1100, oscuro.y, 180); yield 0.2
+    mirar(V(oscuro.x, oscuro.y, 140)); yield 0.2
+    d.set_torch(True); yield 0.6
+    check('si le alumbras de cerca, viene a mirar', d.get_editor_property('torch_notices') >= 1 and estado(g) != 'PATROL', '%d, %s' % (d.get_editor_property('torch_notices'), estado(g)))
+    d.toggle_torch(); yield 0.1
+    check('se apaga con la misma tecla', not d.get_editor_property('torch') and not d.torch_comp().is_visible(), d.get_editor_property('torch'))
+    d.set_editor_property('has_torch', False); d.toggle_torch(); yield 0.1
+    check('sin el objeto no hay linterna', not d.get_editor_property('torch'), d.get_editor_property('torch'))
+    d.set_editor_property('has_torch', True)
+    aparte(); yield 0.1
+    # torres: cristal en los ocho proyectores y luz en las cuatro casetas
+    check('los ocho proyectores tienen cristal encendido', d.get_editor_property('beam_lenses') == 8, d.get_editor_property('beam_lenses'))
+    cas = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.PointLight) if a.actor_has_tag('luz_caseta')]
+    check('cuatro casetas con su luz, sin sombra y sin contar para el sigilo', len(cas) == 4 and all(a.actor_has_tag('decorado') and not a.get_component_by_class(unreal.PointLightComponent).get_editor_property('cast_shadows') for a in cas), len(cas))
+    BASE = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))
+    e = BASE['ext']
+    aj = MISION['ajustes']['guardias']
+    lejos = []
+    for k, v in aj.items():
+        if k.startswith('vigia'):
+            for q in v['sweep_path']:
+                dx = max(e['x0'] * 100 - q[0], q[0] - e['x1'] * 100, 0)
+                dy = max(e['y0'] * 100 - q[1], q[1] - e['y1'] * 100, 0)
+                if not (500 <= max(dx, dy) <= 900):
+                    lejos.append((k, q))
+    check('los focos de fuera repasan el borde del muro (a 5-9 m)', not lejos, lejos)
+    # el códec ya no deja el mensaje de ayuda de fondo: lo comprueba el HUD (no se puede leer desde aquí); queda el dato
+    check('textos de la linterna en mision1.json', all(k in MISION['textos'] for k in ('ensena_linterna', 'ensena_linterna_guardia')), '')
+
 def _de_esquina():
     """Los centinelas de las cuatro torres de esquina (tanda 30): los de dentro y los vigías de fuera."""
     return [g for g in guardias() if g.get_editor_property('tower_sentry') and g.get_actor_label().split('_')[-1] in ('torre1', 'torre2', 'torre3', 'torre4')]
@@ -2081,7 +2177,7 @@ def prueba_controles():
     d = director()
     yield from teclas(d, 'P', *(['Down'] * 9), 'Enter')
     ls = lineas(d)
-    check('CONTROLES abre la página de teclas', len(ls) == 8 and 'VOLVER' in ls[-1], ' / '.join(ls))
+    check('CONTROLES abre la página de teclas', len(ls) == 9 and 'VOLVER' in ls[-1], ' / '.join(ls))
     tecla0 = ls[0]
     yield from teclas(d, 'Enter')
     check('Intro no se asigna a sí misma (espera tecla)', 'PULSA UNA TECLA' in lineas(d)[0], lineas(d)[0])
@@ -2092,7 +2188,7 @@ def prueba_controles():
     yield from teclas(d, 'Enter', 'E')
     ls = lineas(d)
     check('si la tecla choca, se intercambian', '[ E ]' in ls[0] and '[ X ]' in ls[1], '%s / %s' % (ls[0], ls[1]))
-    yield from teclas(d, *(['Down'] * 6), 'Enter')
+    yield from teclas(d, *(['Down'] * 7), 'Enter')   # siete acciones desde la tanda 31 (la linterna)
     ls = lineas(d)
     check('TECLAS POR DEFECTO lo deshace', ls[0] == tecla0 and ls[1] == interact, '%s / %s' % (ls[0], ls[1]))
     yield from teclas(d, 'Escape')
@@ -2316,7 +2412,7 @@ def prueba_codec():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas]]
 PRUEBAS = []
 
 
@@ -2361,6 +2457,9 @@ def _limpieza(siguiente):
         d.set_editor_property('buddy_rule', siguiente is prueba_apoyo)
         # tanda 29: las llamadas entrantes del códec, solo en su prueba (prueba_codec las enciende ella)
         d.set_editor_property('codec_calls', False)
+        # tanda 31: la linterna según el sitio, solo en su prueba (las demás miden a qué distancia te ven a oscuras sin ella)
+        d.set_editor_property('context_torch', siguiente is prueba_linternas)
+        d.set_torch(False)
     # tanda 30: los ocho centinelas de las torres de esquina, quietos y sin ver salvo en su prueba: las demás plantan al
     # jugador por el anillo y se escribieron sin ellos (su foco se queda parado al principio de su recorrido)
     # Los de dentro siguen vivos, como lo estaban las dos torres de antes; los vigías de fuera, quietos

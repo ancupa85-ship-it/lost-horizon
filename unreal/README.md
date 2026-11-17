@@ -182,6 +182,16 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 - La tapa negra de una farola rota ya distingue el farol del patio de la farola del camino (`LampCoverPatioOffset`, `LampCoverPatioScale`, `LampCoverPatioZ`).
 - Prueba: `prueba_esquinas`. En las demás, los vigías de fuera están quietos (`_limpieza`).
 
+### Linternas y retoques de las torres (tanda 31)
+
+- **Linterna según el sitio** (`bContextTorch` en el director, `ATarsisGuard::AutoTorchTick`): cada 0,6 s el guardia de suelo mide la luz que le llega sin contar linternas (`AmbientAt`). Por debajo de `TorchOnBelow` la enciende; para guardarla necesita tres medidas seguidas por encima de `TorchOffAbove`. La del apagón, la de la farola rota y la del apoyo siguen mandando sobre esta. Lo oscuro deja de ser terreno libre: la ves venir de lejos, pero su cono le alarga la vista.
+- La linterna pinta `TorchPaintLumens` (700; antes 250, casi no se veía) y para el sigilo cuenta 2500 como siempre. Lleva cristal encendido y un destello pequeño (los materiales de los faros del camión).
+- **Tu linterna** (`TarsisTorch.cpp`, tecla F, reasignable; `bHasTorch` para una misión que empiece sin ella): luz fría en la cámara, con sombra (`bTorchShadows`). Con ella encendida los guardias te ven como a plena luz (`ATarsisGuard::SetPlayerTorch`) y el indicador de luz lo marca; al guardia que alumbras a menos de `TorchNoticeDist` le llama la atención y viene a mirar, así que también sirve de señuelo.
+- **Torres**: cristal encendido y destello en cada proyector (`SetupBeamLenses`, `BeamLensSize`, `BeamGlowSize`) y una luz cálida de 300 lm bajo el tejadillo (`guardias.py`, etiquetas `decorado` y `luz_caseta`): el centinela se recorta y la garita se lee ocupada. No cuenta para el sigilo y sigue encendida en el apagón, como los focos.
+- Los focos de fuera ya no barren la marisma a 12 m: repasan el borde del muro a 7 m (más cerca el propio muro les hace sombra) y llegan a los dos portones y al portillo.
+- Mientras hablas por el códec ya no se ve de fondo el mensaje de ayuda.
+- Prueba: `prueba_linternas`. En las demás la regla está apagada (`_limpieza`), como el apoyo o la radio.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.
