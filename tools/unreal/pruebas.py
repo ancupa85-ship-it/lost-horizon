@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -2614,11 +2614,81 @@ def prueba_calabozo():
     check('con la llave se sale igual', not d.in_cell() and P('cell_by_key') == 2)
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_armados():
+    """Tanda 37. Con fusil no se corre a por nadie: el guardia que te ve se queda a distancia, te apunta y da el alto.
+    Quieto, uno se acerca a detenerte; si te mueves, disparan, y a la tercera herida caes. Al dar el alto piden
+    refuerzos por radio. Y las escaleras de las torres: se sube y se baja con la E."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.get_actor_label().endswith('Ramos')]
+    yield ('hasta', lambda: len(ronda()) > 1, 30.0)
+    g = ronda()[0]
+    for x in guardias():
+        if x != g:
+            x.hold(3600.0)
+    c0 = P('captures')
+    d.set_editor_property('armed_aim', 0.0)
+    d.set_editor_property('player_speed_override', 0.0)
+    a_la_vista_de(g, 900)
+    g.alarm(jugador().get_actor_location())
+    yield ('hasta', lambda: director().get_editor_property('halt'), 8.0)
+    dist = lambda: dist2d(g.get_actor_location(), jugador().get_actor_location())
+    check('te ve y da el alto sin echarse encima', P('halt') and P('halts') == 1 and dist() > 400 and not P('capturing'), '%d cm, %s' % (dist(), estado(g)))
+    check('dice «¡alto!»', any(x.endswith('_alto') for x in vl()), vl()[-3:])
+    # quieto: uno se acerca andando a detenerte
+    yield ('hasta', lambda: director().get_editor_property('arrest_guard') is not None, P('surrender_seconds') + 6.0)
+    check('quieto, viene a detenerte', P('surrenders') == 1 and P('arrest_guard') == g and P('shots') == 0, P('surrenders'))
+    d0 = dist()
+    yield 1.5
+    check('se acerca andando', dist() < d0 - 60 or P('capturing'), '%d -> %d' % (d0, dist()))
+    # echas a correr: ya no viene, dispara (con la puntería a cero para la prueba, falla)
+    d.set_editor_property('player_speed_override', 350.0)
+    a_la_vista_de(g, 900)
+    yield ('hasta', lambda: director().get_editor_property('shots') > 0, 14.0)
+    check('si te mueves, dispara', P('shots') > 0 and P('fleeing') and P('arrest_guard') is None and P('hits') == 0 and P('wounds') == 0, '%s tiros, %s' % (P('shots'), estado(g)))
+    check('sigue sin echarse encima', dist() > 350 and P('captures') == c0, '%d cm' % dist())
+    check('el tiro pone la base en guardia', P('tension_t') > 60.0, P('tension_t'))
+    # los refuerzos: había pedido apoyo al dar el alto, pero estaban todos quietos (hold); ahora uno libre
+    check('pidió refuerzos por radio', 'central_refuerzos' in vl(), vl()[-4:])
+    # con puntería: heridas, y a la tercera caes
+    d.set_editor_property('armed_aim', 100.0)
+    yield ('hasta', lambda: director().get_editor_property('wounds') > 0 or director().get_editor_property('capturing'), 10.0)
+    check('un impacto es una herida', P('hits') >= 1 and (P('wounds') >= 1 or P('capturing')) , '%s impactos, %s heridas' % (P('hits'), P('wounds')))
+    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 30.0)
+    check('a la tercera herida caes y te llevan', P('captures') == c0 + 1 and P('hits') >= P('max_wounds'), '%s impactos' % P('hits'))
+    yield ('hasta', lambda: not director().get_editor_property('capturing'), 6.0)
+    d.set_editor_property('player_speed_override', -1.0)
+    check('tras la captura no queda alto ni heridas', P('wounds') == 0 and not P('fleeing'))
+    # las escaleras de las torres
+    for x in guardias():
+        x.hold(3600.0)
+    pies, altos = list(P('ladders')), list(P('ladder_tops'))
+    check('cuatro torres con escalera', len(pies) == 4 and len(altos) == 4, len(pies))
+    if pies:
+        b, t = pies[0], altos[0]
+        p = jugador()
+        p.set_actor_location(V(b.x + 60, b.y, 110), False, True); yield 0.5
+        check('al pie de la torre, el aviso de subir', 'SUBIR' in str(d.ladder_prompt()), '%s (z %d)' % (d.ladder_prompt(), p.get_actor_location().z))
+        d.interact(); yield 0.3
+        check('subiendo no hay control ni otro aviso', P('climbing') and not str(d.ladder_prompt()))
+        yield P('climb_seconds') + 1.0
+        l = p.get_actor_location()
+        check('arriba, en la plataforma', not P('climbing') and l.z > t.z + 50 and dist2d(l, t) < 150, '%d,%d,%d' % (l.x, l.y, l.z))
+        yield 1.0
+        l = p.get_actor_location()
+        check('y la plataforma te sostiene', l.z > t.z + 50, '%d' % l.z)
+        check('arriba, el aviso de bajar', 'BAJAR' in str(d.ladder_prompt()), str(d.ladder_prompt()))
+        d.interact(); yield P('climb_seconds') + 1.0
+        l = p.get_actor_location()
+        check('de vuelta al pie', l.z < 300 and dist2d(l, b) < 200, '%d,%d,%d' % (l.x, l.y, l.z))
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_armados]]
 PRUEBAS = []
 
 
@@ -2667,6 +2737,12 @@ def _limpieza(siguiente):
         d.set_editor_property('radio_chat', False)
         # tanda 35: el puzle del calabozo, solo en su prueba (en las demás la reja se abre sola, como antes, y siguen)
         d.set_editor_property('cell_puzzle', siguiente is prueba_calabozo)
+        # tanda 37: guardias armados (alto, cobertura, disparos), solo en su prueba: las demás se escribieron con
+        # guardias que corren a cogerte y miden otra cosa
+        d.set_editor_property('armed_rule', siguiente is prueba_armados)
+        d.set_editor_property('player_speed_override', -1.0)
+        d.set_editor_property('armed_aim', 1.0)
+        d.set_editor_property('wounds', 0)
         # tanda 31: la linterna según el sitio, solo en su prueba (las demás miden a qué distancia te ven a oscuras sin ella)
         d.set_editor_property('context_torch', siguiente is prueba_linternas)
         d.set_torch(False)

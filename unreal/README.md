@@ -220,6 +220,19 @@ La primera captura te deja en el calabozo (edificio este) y la reja ya no se abr
 - **Tanda 36:** Vidal tiene cuerpo (`SpawnVidal`: la malla y el reposo del guardia `VidalLooksLike`, sin IA; aparece al encerrarte en `CellDoor + VidalOffset`, de medio lado, y se vuelve a la pared al abrir o al dejar de escuchar) y la pregunta sale en una caja de conversación propia del HUD (`DrawCellAsk`), con letra grande.
 - Prueba: `prueba_calabozo` (familia propia). En las demás pruebas la reja se abre sola, como antes.
 
+### Guardias armados y torres (tanda 37)
+
+Código en `TarsisCombat.cpp`. Regla `bArmedRule` del director («Alto, o disparo», elegida por Andres).
+
+- En alerta el guardia ya no corre hasta tocarte: busca cobertura (`FindCover`: puntos del mapa de navegación que tapan de cintura para abajo y dejan ver, o esquinas), se queda a tiro (`ArmedRange`), apunta y da el alto.
+- Quieto `SurrenderSeconds`, uno se acerca andando y te detiene (la captura de siempre). Si te mueves pasado `HaltGrace`, disparan cada `ShotInterval`; el acierto depende de la distancia, de la luz, de ir agachado y de correr. Cada impacto es una herida (`Wounds`, se curan solas cada `WoundHealSeconds`) y a la tercera (`MaxWounds`) caes y te llevan.
+- Al dar el alto piden refuerzos por radio (`BackupDelay`, `BackupCount`); con la emisora muda no llegan. El disparo lo oyen los que estén a `ShotHeard`.
+- Si te pierden de vista aguantan `ArmedHoldSeconds` y avanzan andando hasta donde te vieron.
+- HUD: aviso arriba mientras te apuntan, heridas y borde rojo al recibir un tiro.
+- Torres: `Ladders` y `LadderTops` (los pone `guardias.py` desde `base.json`); «E SUBIR» al pie y «E BAJAR» arriba, `ClimbSeconds` a la vista. Arriba se puede derribar al centinela por la espalda.
+- Prueba: `prueba_armados` (familia propia). Ojo: las demás pruebas siguen con la regla apagada (guardias que corren a cogerte), porque se escribieron así; conviene pasarlas a la regla nueva poco a poco.
+- Pendiente: sonido `disparo`, fogonazo en la boca del arma, flanqueo coordinado y animación de trepar.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

@@ -34,6 +34,7 @@ private:
 	void DrawHiding(class ATarsisDirector* D);
 	void DrawRadioAsk(class ATarsisDirector* D);
 	void DrawCellAsk(class ATarsisDirector* D);
+	void DrawArmed(class ATarsisDirector* D);
 	void DrawCodecRing(class ATarsisDirector* D);
 	void DrawCodecMenu(class ATarsisDirector* D);
 	void DrawCodec(class ATarsisDirector* D);

@@ -655,6 +655,17 @@
   "vidal_pista3": "Te falta algo que a Vidal le importe. Registra la celda.",
   "vidal_falta": "CABO VIDAL\n{0}\n{1}",
   "vidal_rezo": "De profundis clamavi ad te, Domine... Domine, exaudi vocem meam...",
-  "vidal_r3a_medalla": "Coge la medalla por entre los barrotes y la aprieta en el puno. No dice nada. Abre."
+  "vidal_r3a_medalla": "Coge la medalla por entre los barrotes y la aprieta en el puno. No dice nada. Abre.",
+  "ensena_alto": "TE APUNTAN\nQuieto, se acercan y te detienen. Si te mueves, disparan: rompe la linea de vision o cubrete.",
+  "alto_quieto": "NO TE MUEVES\nUno de ellos se acerca a detenerte. Aun puedes echar a correr.",
+  "radio_refuerzos": "Intruso a la vista. Las unidades mas cercanas, a apoyar. El resto, cada uno en su puesto.",
+  "herido_cae": "CAES\nEl tercer tiro te tumba. Vienen a por ti.",
+  "herido": "HERIDO {0}/{1}\nCubrete o quedate quieto.",
+  "p_bajar_torre": "E   BAJAR POR LA ESCALERA",
+  "p_subir_torre": "E   SUBIR A LA TORRE",
+  "hud_disparan": "TE DISPARAN  -  CUBRETE",
+  "hud_detienen": "QUIETO  -  VIENEN A DETENERTE",
+  "hud_alto": "ALTO!  TE APUNTAN  -  QUIETO O DISPARAN",
+  "hud_herido": "HERIDO {0}/{1}"
  }
 }

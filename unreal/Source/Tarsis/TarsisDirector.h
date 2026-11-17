@@ -906,6 +906,94 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
 	int32 KeypadAlerts = 0;
 
+	// ---- tanda 37 (TarsisCombat.cpp): guardias armados. Te apuntan y dan el alto; quieto te detienen, si huyes disparan
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	bool bArmedRule = true;
+	/** Segundos de margen tras el alto antes de que moverse cuente como huir. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float HaltGrace = 1.5f;
+	/** Segundos quieto para que uno se acerque a detenerte. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float SurrenderSeconds = 2.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ShotInterval = 1.6f;
+	/** Multiplica la punteria (1 normal; las pruebas la suben para no depender del azar, o la ponen a 0). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ArmedAim = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	int32 MaxWounds = 3;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float WoundHealSeconds = 45.0f;
+	/** Segundos desde el alto hasta que llegan los refuerzos pedidos por radio, y cuantos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float BackupDelay = 5.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	int32 BackupCount = 2;
+	/** A que distancia se oye un disparo (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ShotHeard = 4000.0f;
+	/** Para las pruebas: velocidad del jugador que se da por buena (menor que 0: la real). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float PlayerSpeedOverride = -1.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	bool bHalt = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	bool bFleeing = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	int32 Wounds = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 Halts = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 Surrenders = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 Shots = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 Hits = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 ArmedBackups = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 ArmedCovers = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	TObjectPtr<class ATarsisGuard> ArrestGuard;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	TObjectPtr<class ATarsisGuard> Aimer;
+	void ReportAim(class ATarsisGuard* G, float Dist);
+	void ShotFired(class ATarsisGuard* G, bool bHit);
+	void ArmedTick(float DeltaSeconds);
+	float HitFlashT = 0.0f;
+	float ShotFlashT = 0.0f;
+	FVector ShotFlashAt = FVector::ZeroVector;
+	float AimHoldT = 0.0f;
+	float AimerDist = 0.0f;
+	float HaltT = 0.0f;
+	float StillT = 0.0f;
+	float UnaimedT = 0.0f;
+	float BackupT = 0.0f;
+	bool bBackupSent = false;
+	float WoundT = 0.0f;
+
+	// ---- tanda 37: escaleras de las torres. Pie y plataforma de cada una (cm; los pone tools/unreal/guardias.py)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torres")
+	TArray<FVector> Ladders;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torres")
+	TArray<FVector> LadderTops;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torres")
+	float ClimbSeconds = 4.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Torres")
+	bool bClimbing = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Torres")
+	int32 Climbs = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Torres")
+	FString LadderPrompt() const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Torres")
+	bool LadderInteract();
+	int32 LadderNear(bool& bTop) const;
+	void ClimbTick(float DeltaSeconds);
+	bool bClimbUp = true;
+	float ClimbT = 0.0f;
+	FVector ClimbBase = FVector::ZeroVector;
+	FVector ClimbTop = FVector::ZeroVector;
+
 	// ---- tanda 28: nadie entra solo a mirar donde falta la farola (ATarsisGuard::WaitForBuddy)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
 	bool bBuddyRule = true;

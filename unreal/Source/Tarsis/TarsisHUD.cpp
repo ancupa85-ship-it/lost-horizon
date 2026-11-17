@@ -70,6 +70,7 @@ void ATarsisHUD::DrawHUD()
 	DrawExtras(D);
 	DrawRadioAsk(D);
 	DrawCellAsk(D);
+	DrawArmed(D);
 	DrawCodecRing(D);
 	DrawCodecMenu(D);
 	DrawReport(D);
@@ -609,6 +610,39 @@ void ATarsisHUD::DrawCellAsk(ATarsisDirector* D)
 		Text(FString::FromInt(i + 1), X + Pad, Yc, Amber, ScO, false);
 		for (const FString& L : Opts[i]) { Text(L, X + Pad + 46.0f * S, Yc, Bone, ScO, false); Yc += LH; }
 		Yc += 10.0f * S;
+	}
+}
+
+// Tanda 37: te apuntan. Un aviso corto arriba en el centro mientras dura el alto (quieto / te mueves), las heridas, y
+// un fogonazo rojo en los bordes al recibir un tiro
+void ATarsisHUD::DrawArmed(ATarsisDirector* D)
+{
+	if (!D || !D->bArmedRule || D->bMenu || D->bCine || D->bDone) return;
+	const float S = UiScale();
+	if (D->HitFlashT > 0.0f)
+	{
+		const float A = FMath::Clamp(D->HitFlashT / 0.6f, 0.0f, 1.0f) * 0.55f;
+		const float B = 70.0f * S;
+		const FLinearColor Red(0.6f, 0.02f, 0.02f, A);
+		Panel(0.0f, 0.0f, Canvas->ClipX, B, Red);
+		Panel(0.0f, Canvas->ClipY - B, Canvas->ClipX, B, Red);
+		Panel(0.0f, B, B, Canvas->ClipY - 2.0f * B, Red);
+		Panel(Canvas->ClipX - B, B, B, Canvas->ClipY - 2.0f * B, Red);
+	}
+	if (D->bHalt && !D->bCapturing)
+	{
+		const FString T = D->bFleeing ? D->Tx(TEXT("hud_disparan"), TEXT("TE DISPARAN  -  CUBRETE"))
+			: D->ArrestGuard ? D->Tx(TEXT("hud_detienen"), TEXT("QUIETO  -  VIENEN A DETENERTE"))
+			: D->Tx(TEXT("hud_alto"), TEXT("ALTO!  TE APUNTAN  -  QUIETO O DISPARAN"));
+		const float W = 620.0f * S, H = 44.0f * S, X = Canvas->ClipX / 2.0f - W / 2.0f, Y = 96.0f * S;
+		Panel(X, Y, W, H, D->bFleeing ? FLinearColor(0.35f, 0.02f, 0.02f, 0.85f) : FLinearColor(0.0f, 0.0f, 0.0f, 0.7f));
+		Text(T, Canvas->ClipX / 2.0f, Y + 10.0f * S, D->bFleeing ? FLinearColor(1.0f, 0.9f, 0.85f) : FLinearColor(1.0f, 0.8f, 0.4f), 1.0f * S, true);
+	}
+	if (D->Wounds > 0)
+	{
+		const float W = 190.0f * S, H = 36.0f * S, X = Canvas->ClipX - W - 32.0f * S, Y = 96.0f * S;
+		Panel(X, Y, W, H, FLinearColor(0.3f, 0.02f, 0.02f, 0.8f));
+		Text(D->Tx(TEXT("hud_herido"), TEXT("HERIDO {0}/{1}"), { D->Wounds, D->MaxWounds }), X + W / 2.0f, Y + 8.0f * S, FLinearColor(1.0f, 0.85f, 0.8f), 0.9f * S, true);
 	}
 }
 

@@ -635,7 +635,7 @@ void ATarsisGuard::HearNoise(const FVector& Where)
 
 bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
 {
-	if (!Who || bTowerSentry || bAlly || State == ETarsisGuardState::Down) return false;   // a un aliado (Ramos) no se le derriba por error
+	if (!Who || bAlly || State == ETarsisGuardState::Down) return false;   // tanda 37: al centinela de la torre tambien, si has subido (la altura lo decide)   // a un aliado (Ramos) no se le derriba por error
 	const FVector D = Who->GetActorLocation() - GetActorLocation();
 	// aturdido por un empujón: se le derriba por cualquier lado
 	if (StunT > 0.0f) return D.Size2D() <= 170.0f && FMath::Abs(D.Z) <= 120.0f;
@@ -993,7 +993,7 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 			if (It->bTowerSentry) It->CallBeam(Where, It->BeamCallSeconds);
 		}
 	}
-	if (NewState != ETarsisGuardState::Alert) bRadioCall = false;
+	if (NewState != ETarsisGuardState::Alert) { bRadioCall = false; bHasCover = false; AimT = 0.0f; }
 	if (NewState == ETarsisGuardState::Alert || NewState == ETarsisGuardState::Patrol || NewState == ETarsisGuardState::Down) bNoiseSearch = false;
 	State = NewState;
 	StateT = 0.0f;
@@ -1644,6 +1644,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 			Caught(Player);
 			break;
 		}
+		if (ArmedTick(DeltaSeconds, Player, V)) break;   // tanda 37: con fusil no se corre a por nadie
 		Walk(LastSeen, RunSpeed);
 		// mandado por radio: no te ha visto, así que no se rinde a los 4 s; va corriendo hasta el sitio
 		if ((UnseenT > 4.0f && (!bRadioCall || StateT > 20.0f)) || (Near2D(LastSeen, 80.0f) && V <= 0.0f)) SetState(ETarsisGuardState::Search);

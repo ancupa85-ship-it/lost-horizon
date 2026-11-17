@@ -171,6 +171,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Estado")
 	bool bAlly = false;
 
+	/** Tanda 37: a que distancia te tiene a tiro y en que radio busca donde cubrirse (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ArmedRange = 1800.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float CoverRadius = 900.0f;
+	/** Segundos que aguanta en su sitio cuando te pierde de vista, antes de avanzar andando. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ArmedHoldSeconds = 3.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	bool bHasCover = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	FVector CoverLoc = FVector::ZeroVector;
+
 	/** Deja su ronda y se va a Where, donde se queda (Ramos al portillo de la marisma). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void GoTo(const FVector& Where);
@@ -550,6 +563,12 @@ private:
 	void SetupBody();
 	void UpdateAnim();
 	void TowerTick(float DeltaSeconds, APawn* Player, float V);
+	// tanda 37 (TarsisCombat.cpp): armado y con cabeza
+	bool ArmedTick(float DeltaSeconds, APawn* Player, float V);
+	bool FindCover(const FVector& Threat, FVector& Out) const;
+	float AimT = 0.0f;
+	float ShotT = 0.0f;
+	float CoverT = 0.0f;
 	float TowerT = 0.0f;
 	float LightPitch = 0.0f;
 	TWeakObjectPtr<ATarsisGuard> Buddy;

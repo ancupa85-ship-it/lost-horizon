@@ -206,6 +206,10 @@ def colocar():
         d.set_editor_property('cell_spot', unreal.Vector(31 * T * 100 + T * 50, 12 * T * 100 + T * 50 + 340.0, 110.0))
         d.set_editor_property('cell_yaw', -90.0)
         d.set_editor_property('cell_door', unreal.Vector(31 * T * 100 + T * 50, 13 * T * 100, 0.0))
+        # tanda 37: escaleras de las torres (pie de la escalera y centro de la plataforma, en cm)
+        tt = [t for t in DATA.get('torres', []) if t.get('escala')]
+        d.set_editor_property('ladders', [unreal.Vector(t['escala'][0] * 100.0, -t['escala'][1] * 100.0, 0.0) for t in tt])
+        d.set_editor_property('ladder_tops', [unreal.Vector(t['pos'][0] * 100.0, -t['pos'][1] * 100.0, t.get('altura', 7.5) * 100.0) for t in tt])
         # textos, objetivos, puntos de interacción y ajustes de la misión 1 (assets/unreal/mision1.json)
         if HERE not in sys.path:
             sys.path.insert(0, HERE)

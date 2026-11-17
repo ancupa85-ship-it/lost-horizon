@@ -384,6 +384,8 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		if (CellT <= 0.0f) OpenCell();
 	}
 	CellTick(DeltaSeconds);
+	ArmedTick(DeltaSeconds);
+	ClimbTick(DeltaSeconds);
 }
 
 // ---------------------------------------------------------------- misión 1
@@ -500,6 +502,8 @@ FString ATarsisDirector::InteractPrompt() const
 	}
 	if (CanBoardTruck()) return Tx(TEXT("p_camion_subir"), TEXT("E   SUBIR A LA CAJA DEL CAMION"));
 	if (bCellPuzzle && InCell()) return CellPrompt();
+	if (bClimbing) return FString();
+	{ const FString L = LadderPrompt(); if (!L.IsEmpty()) return L; }
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear())
 	{
@@ -589,6 +593,8 @@ void ATarsisDirector::Interact()
 	}
 	if (CanBoardTruck()) { BoardTruck(); return; }
 	if (CellInteract()) return;
+	if (bClimbing) return;
+	if (LadderInteract()) return;
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear()) { UsePoint(*Pt); return; }
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))
