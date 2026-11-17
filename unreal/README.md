@@ -242,3 +242,11 @@ seguía camino de una cobertura que ya no valía). Tocar a un guardia solo es ca
 detenerte: el refuerzo que llega da el alto como los demás. Arriba de la torre la E es la escalera antes que el
 centinela, y se llega al borde de la plataforma, no pegado a él. En el calabozo la R va directa a Control y él mismo
 llama a los pocos segundos. Sonido `disparo` (sintetizado, provisional como los demás).
+
+**Calabozo, otra vez (38a).** Andres, jugándolo: «por más que pruebo respuestas ninguna avanza». Probando respuestas
+se llegaba a tres errores y Vidal callaba para siempre, y el segundo paso pedía haber hablado antes con Control. Ahora
+ninguna respuesta cierra la conversación, la pregunta vuelve sola a los `CellAutoAsk` segundos y cada paso tiene una
+respuesta buena que no pide nada (escucharle, decir lo que se oye, rezar con él); lo averiguado solo cambia el texto.
+La buena cambia de sitio en cada paso (2, 3, 1). La medalla y la llave siguen valiendo. Vidal, 35 cm a la izquierda
+del eje de la puerta (`vidal_offset`): estaba metido en la pared del vestíbulo.
+

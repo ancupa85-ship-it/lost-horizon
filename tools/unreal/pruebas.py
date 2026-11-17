@@ -2549,15 +2549,42 @@ def prueba_calabozo():
     check('tanda 36: la pregunta sale en su caja', P('cell_ask_frames') > 0 and str(P('cell_question')), P('cell_ask_frames'))
     check('tanda 36: Vidal tiene cuerpo y está de medio lado', abs(d.vidal_facing() - P('vidal_yaw')) < 1.0 and P('vidal_body') is not None, d.vidal_facing())
     check('Vidal pregunta: tres respuestas', P('cell_ask') and len(P('cell_options')) == 3 and '1/3' in msg(), msg()[:40])
+    # tanda 38: ninguna respuesta cierra la conversación, y tras contestar Vidal la pregunta vuelve sola
     d.answer_cell(1); yield 0.2
-    check('amenazarle no vale', P('cell_fails') == 1 and P('cell_stage') == 0 and not P('cell_ask'), msg()[:60])
+    check('amenazarle no vale, pero no cierra nada', P('cell_fails') == 1 and P('cell_stage') == 0 and not P('cell_ask') and not P('vidal_gone'), msg()[:60])
+    yield ('hasta', lambda: director().get_editor_property('cell_ask'), P('cell_auto_ask') + 2.0)
+    check('la pregunta vuelve sola', P('cell_ask') and P('cell_stage') == 0)
+    d.set_editor_property('cell_auto_ask', 0.0)   # en adelante se pregunta con la E, para medir paso a paso
+    d.answer_cell(3); yield 0.2
+    for i in range(3):
+        yield from decir(1)
+    check('cinco malas respuestas y Vidal sigue escuchando', P('cell_fails') == 5 and not P('vidal_gone') and 'VIDAL' in str(d.cell_prompt()), P('cell_fails'))
     yield from decir(2)
-    check('hablarle de lo que se oye, sí', P('cell_stage') == 1 and P('cell_fails') == 1, msg()[:60])
-    # tanda 37: contestar sin saber no es un error, y el juego dice dónde averiguarlo
+    check('hablarle de lo que se oye, sí', P('cell_stage') == 1, msg()[:60])
     d.interact(); yield 0.2
-    check('sin saber nada, el segundo paso no tiene respuesta buena', P('cell_right') == 0, P('cell_right'))
-    d.answer_cell(2); yield 0.2
-    check('«que grita» no basta, pero no cuenta como error y da la pista', P('cell_fails') == 1 and P('cell_lacks') == 1 and P('cell_stage') == 1 and 'radio' in msg(), msg()[-70:])
+    check('el segundo paso tiene respuesta buena sin saber nada, y no está en el mismo sitio', P('cell_right') == 3 and 'grita' in str(P('cell_options')[2]), [str(x)[:20] for x in P('cell_options')])
+    d.answer_cell(1); yield 0.2
+    check('«es el viento» no vale', P('cell_stage') == 1 and 'viento' in msg(), msg()[:70])
+    yield from decir(3)
+    check('segundo paso', P('cell_stage') == 2, msg()[:60])
+    d.interact(); yield 0.2
+    check('el tercero: rezar con él vale siempre; hablar de bajas, sin pruebas, no', P('cell_right') == 1 and 'Reza' in str(P('cell_options')[0]) and P('cell_lacks') == 0, [str(x)[:20] for x in P('cell_options')])
+    # si te apartas de la reja, la pregunta se va sin contar como fallo
+    f0 = P('cell_fails')
+    tp(losa.x - 150, losa.y + 250, -90.0); yield 0.4
+    check('apartarse deja la pregunta sin contestar, sin fallo', not P('cell_ask') and P('cell_fails') == f0)
+    hablar(); yield 0.3
+    yield from decir(3)
+    check('hablar de bajas sin pruebas no basta, y dice que registres la celda', P('cell_stage') == 2 and P('cell_lacks') == 1 and 'celda' in msg(), msg()[-60:])
+    yield from decir(1)
+    check('tercer paso: Vidal cede', P('cell_stage') == 3 and d.in_cell(), msg()[:60])
+    yield ('hasta', lambda: not director().in_cell(), 6.0)
+    yield 0.2
+    check('abre él: nadie da la alarma', not d.in_cell() and P('cell_by_vidal') == 1 and d.has_flag('vidal_calla') and P('cell_alert_t') <= 0.0 and 'no le he visto' in msg(), msg()[:60])
+    check('tanda 36: Vidal se queda de cara a la pared', abs(d.vidal_facing() - P('vidal_wall_yaw')) < 1.0, d.vidal_facing())
+    # Control, por la radio, desde la celda (ya no hace falta para salir, pero llama y la R va directa a él)
+    d.lock_in_cell(jugador()); yield 0.4
+    d.set_editor_property('cell_auto_ask', 0.0)
     d.codec_key(); yield 0.2
     check('en la celda, la R va directa a Control', P('codec') and not P('codec_menu'), '%s %s' % (P('codec'), P('codec_menu')))
     for i in range(40):
@@ -2565,30 +2592,7 @@ def prueba_calabozo():
             break
         d.codec_next(); yield 0.05
     check('Control lo cuenta por la radio', 'control_celda' in [str(x) for x in P('codec_taken')] and not P('codec'), [str(x) for x in P('codec_taken')][-3:])
-    hablar(); yield 0.2
-    d.interact(); yield 0.2
-    check('con lo que dijo Control, la respuesta cambia y vale', P('cell_right') == 2 and 'doctora' in str(P('cell_options')[1]), str(P('cell_options')[1]))
-    d.answer_cell(2); yield 0.2
-    check('segundo paso', P('cell_stage') == 2 and P('cell_fails') == 1, msg()[:60])
-    # el tercero: junto a la reja se acaba oyendo qué reza
-    yield ('hasta', lambda: director().get_editor_property('cell_heard_prayer'), P('cell_pray_seconds') + 4.0)
-    check('junto a la reja se oye el De profundis', P('cell_heard_prayer'))
-    d.interact(); yield 0.2
-    check('sin expediente ni medalla, lo que vale es rezar con él', P('cell_right') == 2 and 'De profundis' in str(P('cell_options')[1]), str(P('cell_options')[1]))
-    # si te apartas de la reja, la pregunta se va sin contar como fallo
-    tp(losa.x - 150, losa.y + 250, -90.0); yield 0.4
-    check('apartarse deja la pregunta sin contestar, sin fallo', not P('cell_ask') and P('cell_fails') == 1)
-    hablar(); yield 0.3
-    yield from decir(1)
-    check('hablar de bajas sin pruebas no basta (y no es error)', P('cell_stage') == 2 and P('cell_fails') == 1 and P('cell_lacks') == 2 and 'celda' in msg(), msg()[-60:])
-    yield from decir(2)
-    check('tercer paso: Vidal cede', P('cell_stage') == 3 and d.in_cell(), msg()[:60])
-    yield ('hasta', lambda: not director().in_cell(), 6.0)
-    yield 0.2
-    check('abre él: nadie da la alarma', not d.in_cell() and P('cell_by_vidal') == 1 and d.has_flag('vidal_calla') and P('cell_alert_t') <= 0.0 and 'no le he visto' in msg(), msg()[:60])
-    check('tanda 36: Vidal se queda de cara a la pared', abs(d.vidal_facing() - P('vidal_wall_yaw')) < 1.0, d.vidal_facing())
-    # otra vez dentro: la losa. Con la medalla se le convence; con la llave se puede callar y abrir
-    d.lock_in_cell(jugador()); yield 0.4
+    # la losa. Con la medalla se le convence; con la llave se puede callar y abrir
     tp(losa.x - 40, losa.y + 40, 0.0); yield 0.3
     check('en el rincón, la losa suelta', 'LOSA' in str(d.cell_prompt()), str(d.cell_prompt()))
     d.interact(); yield 0.2
@@ -2596,10 +2600,12 @@ def prueba_calabozo():
     hablar(); yield 0.3
     check('con la llave se puede seguir hablando con Vidal', 'VIDAL' in str(d.cell_prompt()) and d.in_cell(), str(d.cell_prompt()))
     yield from decir(2)
-    yield from decir(2)
     d.interact(); yield 0.2
-    check('con la llave hay una cuarta respuesta, y la medalla vale en el tercer paso', P('cell_stage') == 2 and len(P('cell_options')) == 4 and P('cell_right') == 1 and 'medalla' in str(P('cell_options')[0]), [str(x)[:30] for x in P('cell_options')])
-    d.answer_cell(1); yield 0.2
+    check('con lo que dijo Control, la respuesta buena lo dice', 'doctora' in str(P('cell_options')[2]), str(P('cell_options')[2]))
+    d.answer_cell(3); yield 0.2
+    d.interact(); yield 0.2
+    check('con la llave hay una cuarta respuesta, y la medalla también vale en el tercer paso', P('cell_stage') == 2 and len(P('cell_options')) == 4 and 'medalla' in str(P('cell_options')[2]), [str(x)[:30] for x in P('cell_options')])
+    d.answer_cell(3); yield 0.2
     yield ('hasta', lambda: not director().in_cell(), 6.0)
     yield 0.2
     check('la medalla le convence: abre él y calla', P('cell_by_vidal') == 2 and P('cell_by_key') == 0 and P('cell_alert_t') <= 0.0, msg()[:60])
@@ -2611,14 +2617,7 @@ def prueba_calabozo():
     check('todavía nadie lo sabe', P('tension_t') <= 0.0 and 'central_fuga' not in vl())
     d.set_editor_property('cell_alert_t', 0.3); yield 1.0
     check('al rato encuentran la celda vacía: base en guardia', P('cell_alerts') == 1 and P('tension_t') > 60.0 and 'central_fuga' in vl(), '%.0f %s' % (P('tension_t'), vl()[-2:]))
-    # tres errores de verdad: deja de escuchar, y con la llave aún se sale
-    d.lock_in_cell(jugador()); yield 0.4
-    hablar(); yield 0.3
-    for i in range(3):
-        yield from decir(1)
-    check('tres amenazas: Vidal deja de escuchar y se vuelve a la pared', P('vidal_gone') and 'LLAVE' in str(d.cell_prompt()) and abs(d.vidal_facing() - P('vidal_wall_yaw')) < 1.0, str(d.cell_prompt()))
-    d.interact(); yield 0.3
-    check('con la llave se sale igual', not d.in_cell() and P('cell_by_key') == 2)
+    d.set_editor_property('cell_auto_ask', 4.0)
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
 def prueba_armados():

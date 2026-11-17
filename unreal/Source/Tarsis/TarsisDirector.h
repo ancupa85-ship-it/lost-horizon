@@ -878,6 +878,9 @@ public:
 	float CellPraySeconds = 4.0f;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	bool bCellHeardPrayer = false;
+	/** Segundos que se lee lo que contesta Vidal antes de que vuelva la pregunta sola (0 = hay que pulsar E otra vez). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	float CellAutoAsk = 4.0f;
 	/** Veces que has contestado sin saber bastante (no cuenta como error; el juego dice que te falta). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	int32 CellLacks = 0;
@@ -1316,6 +1319,7 @@ private:
 	bool bCellMedal = false;
 	float CellPrayT = 0.0f;
 	float CellCallT = 0.0f;
+	float CellNextT = 0.0f;
 	int32 CellOkMask = 0;
 	int32 CellLackMask = 0;
 	float CellOpenT = 0.0f;
