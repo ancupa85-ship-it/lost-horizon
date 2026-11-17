@@ -45,11 +45,11 @@
     3.5
    ],
    "vidal_offset": [
-    -35,
+    0,
     -140,
     0
    ],
-   "vidal_yaw": 120.0,
+   "vidal_yaw": 90.0,
    "vidal_wall_yaw": 0.0
   },
   "guardias": {
@@ -632,16 +632,16 @@
   "celda_llave": "CELDA ABIERTA\nLa llave del hermano gira sin ruido. Vidal reza de espaldas y no lo ve.\nNo tardaran en encontrar la celda vacia. Tus cosas las tiene Peris en la sala de guardia.",
   "celda_vidal": "CELDA ABIERTA\nVidal abre y se queda rezando de cara a la pared. \"Yo no le he visto.\"\nNadie dara la alarma. Tus cosas las tiene Peris en la sala de guardia.",
   "celda_fuga": "El calabozo esta vacio. Todas las unidades: ojo, y parte uno por uno.",
-  "vidal_r1a": "\"Amenace. Aqui dentro no cuesta nada.\" Se aleja un paso.",
+  "vidal_r1a": "\"Amenace. Aqui dentro no cuesta nada.\" No levanta la vista.",
   "vidal_r1b": "Deja de rezar. \"Todos lo oimos. Nadie lo dice.\"",
   "vidal_r1c": "\"Alarcon no asciende. Alarcon baja gente.\" Vuelve al rezo.",
-  "vidal_r2a": "\"Ibarra dice lo que le mandan.\" Pierde interes.",
+  "vidal_r2a": "\"Ibarra dice lo que le mandan.\" Vuelve al rezo.",
   "vidal_r2b": "\"Mi hermano bajo en octubre. Volvio sordo. Luego dijeron que habia desertado.\"",
   "vidal_r2c": "Casi se rie. \"El viento no llama a nadie por su nombre.\"",
   "vidal_r3a": "Se queda callado. \"Vidal, J. Octubre. Y ahora yo.\" La llave le tiembla en la cerradura.",
   "vidal_r3b": "Se le quiebra la voz en el segundo verso. \"Desde lo profundo...\" Abre sin mirarte. \"Ella tambien clama, verdad?\"",
-  "vidal_r3c": "\"Y que hago yo con eso?\" Se va.",
-  "vidal_r3a_no": "\"Palabras.\" Vuelve la espalda.",
+  "vidal_r3c": "\"Y que hago yo con eso?\" Vuelve al rezo.",
+  "vidal_r3a_no": "\"Palabras.\" Vuelve al rezo.",
   "clave_alarma": "TECLADO DEL ARCHIVO\nDos claves malas seguidas: el teclado se bloquea un momento y avisa a la central.",
   "radio_teclado": "Clave erronea en el archivo, dos veces. Todas las unidades: ojo, y parte uno por uno.",
   "vidal_nombre": "CABO VIDAL",
