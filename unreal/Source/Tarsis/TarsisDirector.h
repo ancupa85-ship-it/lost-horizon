@@ -614,7 +614,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	float TorchNearDist = 600.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
-	float TorchNearMin = 0.05f;   // medido en el PC: con 0,18 la pared a 50 cm seguia blanca
+	float TorchNearMin = 0.008f;   // tanda 33: con 0,05 la pared a 50 cm seguia siendo un disco blanco (compensa hasta unos 55 cm)
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
 	float TorchDimNow() const { return TorchDim; }
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")

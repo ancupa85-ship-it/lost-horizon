@@ -2562,6 +2562,244 @@
     60
    ],
    "giro": 140
+  },
+  {
+   "nombre": "tx_archivador_1",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    6640,
+    2368,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "tx_archivador_2",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    6760,
+    2368,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "tx_mascara",
+   "modelo": "old_gas_mask",
+   "pos": [
+    6640,
+    2365,
+    160
+   ],
+   "giro": -20,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_carpeta_1",
+   "modelo": "binder_notebook",
+   "pos": [
+    6760,
+    2365,
+    160
+   ],
+   "giro": 25,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_cuadrante",
+   "modelo": "hanging_picture_frame_02",
+   "pos": [
+    6690,
+    1803,
+    175
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_tabaco",
+   "modelo": "cigarette_pack",
+   "pos": [
+    6325,
+    1915,
+    140
+   ],
+   "giro": 35,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_latas",
+   "modelo": "russian_food_cans_01",
+   "pos": [
+    6735,
+    2125,
+    130
+   ],
+   "giro": 15,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_linterna",
+   "modelo": "vintage_flashlight",
+   "pos": [
+    6715,
+    2170,
+    130
+   ],
+   "giro": 100,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_taburete_2",
+   "modelo": "metal_stool_01",
+   "pos": [
+    6640,
+    2130,
+    60
+   ],
+   "giro": 40
+  },
+  {
+   "nombre": "tx_caja_carton_1",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    6240,
+    2345,
+    60
+   ],
+   "giro": 8
+  },
+  {
+   "nombre": "tx_caja_carton_2",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    6243,
+    2342,
+    110
+   ],
+   "giro": -25,
+   "pequeno": true
+  },
+  {
+   "nombre": "tx_municion",
+   "modelo": "ammo_box",
+   "pos": [
+    6330,
+    2355,
+    60
+   ],
+   "giro": 80,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_archivador_4",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    1840,
+    3968,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_archivador_5",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    1960,
+    3968,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "arch_carpeta_3",
+   "modelo": "binder_notebook",
+   "pos": [
+    1845,
+    3965,
+    160
+   ],
+   "giro": 10,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_caja_6",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    1960,
+    3962,
+    160
+   ],
+   "giro": -12,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_carpeta_4",
+   "modelo": "binder_notebook",
+   "pos": [
+    1560,
+    3225,
+    160
+   ],
+   "giro": -30,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_carpeta_5",
+   "modelo": "binder_notebook",
+   "pos": [
+    1930,
+    3225,
+    160
+   ],
+   "giro": 15,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_caja_7",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    1750,
+    3225,
+    160
+   ],
+   "giro": 4,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_taburete",
+   "modelo": "metal_stool_01",
+   "pos": [
+    2030,
+    3560,
+    60
+   ],
+   "giro": 20
+  },
+  {
+   "nombre": "arch_reloj",
+   "modelo": "wall_clock",
+   "pos": [
+    2060,
+    3996,
+    235
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_cuadrante",
+   "modelo": "hanging_picture_frame_02",
+   "pos": [
+    2100,
+    3203,
+    175
+   ],
+   "giro": 180,
+   "colgar": true,
+   "pequeno": true
   }
  ],
  "vaciar": {

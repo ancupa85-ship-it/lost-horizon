@@ -37,7 +37,7 @@
     "r.Streaming.PoolSize=400"
    ],
    "shadow_tells": true,
-   "torch_near_min": 0.05
+   "torch_near_min": 0.008
   },
   "guardias": {
    "*": {
