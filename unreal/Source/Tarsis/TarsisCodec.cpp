@@ -31,7 +31,7 @@ void ATarsisDirector::CodecRing(FName Conv)
 void ATarsisDirector::CodecKey()
 {
 	if (bCodec) { CodecNext(); return; }
-	if (bMenu || bCine || bDone || bCapturing || bKeypad || bChoice || bRadioAsk) return;
+	if (bMenu || bCine || bDone || bCapturing || bKeypad || bChoice || bRadioAsk || bCellAsk) return;
 	if (!CodecPending.IsNone())
 	{
 		OpenCodec(CodecPending);
@@ -146,7 +146,7 @@ void ATarsisDirector::CloseCodec()
 
 FName ATarsisDirector::CodecControlConv() const
 {
-	if (CellT > 0.0f) return TEXT("control_celda");
+	if (CellT > 0.0f || (bCellPuzzle && InCell())) return TEXT("control_celda");
 	if (BaseState() == 2) return TEXT("control_alerta");
 	// el primer objetivo cuya bandera esté puesta: «obj_llave» -> «control_llave»
 	for (const FTarsisObjective& O : Objectives)

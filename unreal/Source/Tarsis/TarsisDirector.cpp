@@ -183,13 +183,7 @@ void ATarsisDirector::Captured(APawn* Player)
 	bChoice = false;
 	if (Captures == 1 && !CellSpot.IsZero())
 	{
-		const FRotator R(0.0f, CellYaw, 0.0f);
-		Player->TeleportTo(CellSpot, R);
-		if (Ctl) Ctl->SetControlRotation(R);
-		CloseCell();
-		PlaySfx(TEXT("reja"), CellDoor + FVector(0.0f, 0.0f, 100.0f));
-		CellT = CellTime;
-		ShowMessage(Tx(TEXT("calabozo"), TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nEspera. Vidal no es como los demas.")), 8.0f);
+		LockInCell(Player);
 		return;
 	}
 	if (bHasCheck && Difficulty < 2)
@@ -389,6 +383,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		CellT -= DeltaSeconds;
 		if (CellT <= 0.0f) OpenCell();
 	}
+	CellTick(DeltaSeconds);
 }
 
 // ---------------------------------------------------------------- misión 1
@@ -440,6 +435,9 @@ void ATarsisDirector::SetupMission()
 		}
 		return P;
 	};
+	// tanda 35: la losa suelta del calabozo, un dedo levantada y algo torcida
+	SlabProp = AddBlock(CellSlab + FVector(0.0f, 0.0f, 1.5f), FVector(0.42f, 0.42f, 0.03f), FLinearColor(0.11f, 0.105f, 0.095f), false);
+	if (SlabProp) SlabProp->SetRelativeRotation(FRotator(0.0f, 7.0f, 2.0f));
 	NoteProp = AddBlock(Rest(Cell(3, 17)) + FVector(0.0f, 0.0f, 1.0f), FVector(0.21f, 0.30f, 0.01f), FLinearColor(0.9f, 0.88f, 0.8f), false);
 	// carta en la litera de Ramos (barracón oeste) y botiquín del veterinario en el muro norte del patio este
 	LetterProp = AddBlock(Rest(FVector(1130.0f, 2850.0f, 0.0f)) + FVector(0.0f, 0.0f, 1.0f), FVector(0.21f, 0.15f, 0.01f), FLinearColor(0.85f, 0.82f, 0.72f), false);
@@ -501,6 +499,7 @@ FString ATarsisDirector::InteractPrompt() const
 		return Tx(TEXT("p_arrastrar"), TEXT("E   ARRASTRAR (escondelo en la sombra)"));
 	}
 	if (CanBoardTruck()) return Tx(TEXT("p_camion_subir"), TEXT("E   SUBIR A LA CAJA DEL CAMION"));
+	if (bCellPuzzle && InCell()) return CellPrompt();
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear())
 	{
@@ -589,6 +588,7 @@ void ATarsisDirector::Interact()
 		return;
 	}
 	if (CanBoardTruck()) { BoardTruck(); return; }
+	if (CellInteract()) return;
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear()) { UsePoint(*Pt); return; }
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))
@@ -622,6 +622,13 @@ void ATarsisDirector::Interact()
 
 void ATarsisDirector::KeypadKey(FKey Key)
 {
+	if (bCellAsk)
+	{
+		if (Key == EKeys::One || Key == EKeys::NumPadOne) AnswerCell(1);
+		else if (Key == EKeys::Two || Key == EKeys::NumPadTwo) AnswerCell(2);
+		else if (Key == EKeys::Three || Key == EKeys::NumPadThree) AnswerCell(3);
+		return;
+	}
 	if (bRadioAsk)
 	{
 		if (Key == EKeys::One || Key == EKeys::NumPadOne) AnswerRadio(1);
@@ -675,6 +682,16 @@ void ATarsisDirector::KeypadDigit(int32 Digit)
 		KeypadErrT = 1.2f;
 		PlaySfx(TEXT("clave_mal"), Cell(6, 17, 120.0f), 0.8f);
 		KeypadInput.Reset();   // el teclado se pone en rojo (KeypadErrT): no hace falta cartel
+		// tanda 35: como en la web, a ciegas no se prueba. Cada dos errores el teclado avisa a la central
+		++KeypadFails;
+		if (KeypadMaxFails > 0 && KeypadFails % KeypadMaxFails == 0)
+		{
+			++KeypadAlerts;
+			bKeypad = false;
+			TensionT = FMath::Max(TensionT, 90.0f);
+			ShowMessage(Tx(TEXT("clave_alarma"), TEXT("TECLADO DEL ARCHIVO\nDos claves malas seguidas: el teclado se bloquea un momento y avisa a la central.")), 5.0f);
+			CentralSay(TEXT("teclado"), Tx(TEXT("radio_teclado"), TEXT("Clave erronea en el archivo, dos veces. Todas las unidades: ojo, y parte uno por uno.")), 1.5f);
+		}
 	}
 }
 
@@ -3760,7 +3777,7 @@ void ATarsisDirector::BuildReport()
 	TArray<FString>& L = ReportLines;
 	L.Reset();
 	L.Add(TEXT("PARTE DEL DIA SIGUIENTE"));
-	L.Add(TEXT("Base de Tarsis - Del capitan Alarcon al Mando de la Zona Sur"));
+	L.Add(TEXT("Base de Tarsis - Del teniente coronel Alarcon al Mando de la Zona Sur"));
 	L.Add(TEXT(""));
 	L.Add(bMarsh ? TEXT("Anoche un intruso huyo por la marisma con el expediente LH-07. Se le perdio el rastro en los canales.")
 		: bLeftByTruck ? TEXT("Anoche un intruso salio de la base en la caja del camion de suministros, con el expediente LH-07. En el control miraron los papeles del conductor y nada mas.")

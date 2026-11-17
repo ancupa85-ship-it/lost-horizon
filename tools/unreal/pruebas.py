@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -2497,11 +2497,96 @@ def prueba_emisora():
     check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
 
 
+def prueba_calabozo():
+    """Tanda 35. La primera captura te deja en el calabozo y la reja ya no se abre sola: se sale convenciendo al cabo
+    Vidal en tres pasos (amenazar o sobornar falla; el segundo y el tercero piden haber averiguado algo) o con la llave
+    que hay bajo la losa suelta. Con la llave, a los CellAlertSeconds encuentran la celda vacía y la base queda en
+    guardia; si Vidal abre, calla. De paso: dos claves malas en el teclado del archivo avisan a la central."""
+    d = director()
+    msg = lambda: str(director().get_editor_property('message'))
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.1
+    # el teclado del archivo
+    t0 = d.get_editor_property('tension_t')
+    tp(1150, 3480); yield 0.2
+    d.interact(); yield 0.2
+    mala = '0130' if str(d.get_editor_property('vault_code')) != '0130' else '0131'
+    for c in mala:
+        d.keypad_digit(int(c))
+    yield 0.2
+    check('una clave mala: rojo y nada más', d.get_editor_property('keypad_fails') == 1 and d.get_editor_property('keypad_alerts') == 0 and d.get_editor_property('tension_t') <= t0, d.get_editor_property('keypad_fails'))
+    for c in mala:
+        d.keypad_digit(int(c))
+    yield 2.2
+    check('dos claves malas: aviso a la central y base en guardia', d.get_editor_property('keypad_alerts') == 1 and d.get_editor_property('tension_t') > 60.0 and 'central_teclado' in vl() and not d.get_editor_property('vault_open'),
+          '%s %.0f %s' % (d.get_editor_property('keypad_alerts'), d.get_editor_property('tension_t'), vl()[-2:]))
+    d.set_editor_property('tension_t', 0.0)
+    # al calabozo
+    puerta, losa = d.get_editor_property('cell_door'), d.get_editor_property('cell_slab')
+    hablar = lambda: tp(puerta.x, puerta.y + 110, -90.0)
+    d.captured(jugador()); yield 0.5
+    check('la primera captura te deja en el calabozo', d.in_cell() and 'CALABOZO' in msg(), msg()[:30])
+    yield 4.0
+    check('la reja ya no se abre sola', d.in_cell() and d.get_editor_property('cell_by_vidal') == 0)
+    check('Control, por el códec, habla de Vidal', str(d.codec_control_conv()) == 'control_celda', str(d.codec_control_conv()))
+    hablar(); yield 0.3
+    check('junto a la reja, el aviso es hablar con Vidal', 'VIDAL' in str(d.cell_prompt()), str(d.cell_prompt()))
+    d.interact(); yield 0.2
+    check('Vidal pregunta: tres respuestas', d.get_editor_property('cell_ask') and len(d.get_editor_property('cell_options')) == 3 and '1/3' in msg(), msg()[:40])
+    d.answer_cell(1); yield 0.2
+    check('amenazarle no vale', d.get_editor_property('cell_fails') == 1 and d.get_editor_property('cell_stage') == 0 and not d.get_editor_property('cell_ask'), msg()[:60])
+    d.interact(); yield 0.2
+    d.answer_cell(2); yield 0.2
+    check('hablarle de lo que se oye, sí', d.get_editor_property('cell_stage') == 1 and d.get_editor_property('cell_fails') == 1, msg()[:60])
+    d.interact(); yield 0.2
+    check('sin saber nada, ninguna respuesta del segundo paso vale', d.get_editor_property('cell_right') == 0, d.get_editor_property('cell_right'))
+    d.answer_cell(2); yield 0.2
+    check('«que grita» no basta', d.get_editor_property('cell_fails') == 2 and d.get_editor_property('cell_stage') == 1, msg()[:60])
+    d.set_flag('expediente')
+    d.interact(); yield 0.2
+    check('con el expediente leído cambia la respuesta', d.get_editor_property('cell_right') == 2 and 'Halloran' in str(d.get_editor_property('cell_options')[1]), str(d.get_editor_property('cell_options')[1]))
+    d.answer_cell(2); yield 0.2
+    check('segundo paso', d.get_editor_property('cell_stage') == 2, msg()[:60])
+    # si te apartas de la reja, la pregunta se va sin contar como fallo
+    d.interact(); yield 0.2
+    tp(losa.x - 150, losa.y + 250, -90.0); yield 0.4
+    check('apartarse deja la pregunta sin contestar, sin fallo', not d.get_editor_property('cell_ask') and d.get_editor_property('cell_fails') == 2)
+    hablar(); yield 0.3
+    d.interact(); yield 0.2
+    d.answer_cell(1); yield 0.2
+    check('tercer paso: Vidal cede', d.get_editor_property('cell_stage') == 3 and d.in_cell(), msg()[:60])
+    yield ('hasta', lambda: not director().in_cell(), 6.0)
+    yield 0.2
+    check('abre él: nadie da la alarma', not d.in_cell() and d.get_editor_property('cell_by_vidal') == 1 and d.has_flag('vidal_calla') and d.get_editor_property('cell_alert_t') <= 0.0 and 'no le he visto' in msg(), msg()[:60])
+    # otra vez dentro: tres errores y la losa
+    d.lock_in_cell(jugador()); yield 0.4
+    hablar(); yield 0.3
+    for i in range(3):
+        d.interact(); yield 0.2
+        d.answer_cell(1); yield 0.2
+    check('tres errores: Vidal deja de escuchar', d.get_editor_property('vidal_gone') and 'NO ESCUCHA' in str(d.cell_prompt()), str(d.cell_prompt()))
+    d.interact(); yield 0.2
+    check('y ya no pregunta', not d.get_editor_property('cell_ask') and d.in_cell())
+    tp(losa.x - 40, losa.y + 40, 0.0); yield 0.3
+    check('en el rincón, la losa suelta', 'LOSA' in str(d.cell_prompt()), str(d.cell_prompt()))
+    d.interact(); yield 0.2
+    check('debajo, la llave', d.has_flag('llave_celda') and 'VIDAL, J.' in msg(), msg()[:40])
+    hablar(); yield 0.3
+    check('con la llave, el aviso de la reja cambia', 'LLAVE' in str(d.cell_prompt()), str(d.cell_prompt()))
+    d.interact(); yield 0.3
+    check('la llave abre', not d.in_cell() and d.get_editor_property('cell_by_key') == 1 and d.get_editor_property('cell_alert_t') > 0.0, msg()[:40])
+    check('todavía nadie lo sabe', d.get_editor_property('tension_t') <= 0.0 and 'central_fuga' not in vl())
+    d.set_editor_property('cell_alert_t', 0.3); yield 1.0
+    check('al rato encuentran la celda vacía: base en guardia', d.get_editor_property('cell_alerts') == 1 and d.get_editor_property('tension_t') > 60.0 and 'central_fuga' in vl(), '%.0f %s' % (d.get_editor_property('tension_t'), vl()[-2:]))
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo]]
 PRUEBAS = []
 
 
@@ -2548,6 +2633,8 @@ def _limpieza(siguiente):
         d.set_editor_property('codec_calls', False)
         # tanda 32: la charla de Lobato y Carmona, solo en su prueba (mete voces en el registro que otras cuentan)
         d.set_editor_property('radio_chat', False)
+        # tanda 35: el puzle del calabozo, solo en su prueba (en las demás la reja se abre sola, como antes, y siguen)
+        d.set_editor_property('cell_puzzle', siguiente is prueba_calabozo)
         # tanda 31: la linterna según el sitio, solo en su prueba (las demás miden a qué distancia te ven a oscuras sin ella)
         d.set_editor_property('context_torch', siguiente is prueba_linternas)
         d.set_torch(False)

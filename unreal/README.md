@@ -208,6 +208,17 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 - Tanda 34: `ambiente.legajos()` hace tres mallas propias sin texturas nuevas (`legajos`, `legajos_oscuros`, `papeles`); las baldas del archivo llevan filas de legajos y las mesas, papeles.
 - La sala roja del edificio este vuelve a ser lo que es, el **calabozo** donde apareces si te pillan: fuera el atrezo de «cuarto de revelado» de la tanda 28; dentro, catre con colchón y manta, cubo, taza y una lata.
 
+### El calabozo: ¿por quién reza Vidal? (tanda 35)
+
+La primera captura te deja en el calabozo (edificio este) y la reja ya no se abre sola (`bCellPuzzle`). Código en `TarsisCalabozo.cpp`.
+
+- **Convencer al cabo Vidal** por la reja, en tres pasos y con las teclas 1 a 3. Amenazar o sobornar falla. El segundo paso pide saber que lo de abajo está vivo (la voz sin nombre del códec o el expediente) y el tercero, haber leído el expediente o saber el salmo (mesa de Alarcón o la pista de Roig). Tres errores y deja de escuchar. Si abre él, calla (bandera `vidal_calla`).
+- **La losa suelta** del rincón (`CellSlab`) guarda la llave del hermano y su medalla, «VIDAL, J.». Siempre funciona, pero a los `CellAlertSeconds` (45 s) alguien encuentra la celda vacía y la base queda en guardia.
+- Control, por el códec (`control_celda`), da las pistas que en la versión web daba Halloran desde el camastro.
+- Cambios respecto a la web, por coherencia: nadie enseña papeles (te han registrado), Vidal no se ve (reza pegado a la pared), el viento en lugar de los perros y el hermano consta como desertor.
+- **Clave del archivo:** la mesa ya no da el número del salmo, solo el «De profundis» subrayado; el número sale de Roig o de los sueños. Dos claves malas seguidas (`KeypadMaxFails`) bloquean el teclado y avisan a la central.
+- Prueba: `prueba_calabozo` (familia propia). En las demás pruebas la reja se abre sola, como antes.
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

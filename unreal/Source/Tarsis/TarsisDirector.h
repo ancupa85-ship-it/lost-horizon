@@ -828,6 +828,55 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Radio")
 	class ATarsisGuard* EmisoraFixerNow() const { return EmisoraFixer.Get(); }
 
+	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
+	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	bool bCellPuzzle = true;
+	/** La losa suelta del rincon (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	FVector CellSlab = FVector(6540.0f, 2680.0f, 0.0f);
+	/** Segundos entre salir con la llave y que alguien encuentre la celda vacia (la base queda en guardia). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	float CellAlertSeconds = 45.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	float CellAlertT = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellAlerts = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	bool bCellAsk = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	TArray<FString> CellOptions;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellRight = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellStage = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellFails = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	bool bVidalGone = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellByVidal = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellByKey = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Calabozo")
+	bool InCell() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Calabozo")
+	FString CellPrompt() const;
+	/** La E dentro del calabozo: la losa, hablar con Vidal o abrir con la llave. Devuelve si ha hecho algo. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Calabozo")
+	bool CellInteract();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Calabozo")
+	void AnswerCell(int32 Option);
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Calabozo")
+	void LockInCell(APawn* Player);
+	/** Errores seguidos en el teclado del archivo que avisan a la central (0: nunca). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Mision")
+	int32 KeypadMaxFails = 2;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 KeypadFails = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Mision")
+	int32 KeypadAlerts = 0;
+
 	// ---- tanda 28: nadie entra solo a mirar donde falta la farola (ATarsisGuard::WaitForBuddy)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
 	bool bBuddyRule = true;
@@ -1143,6 +1192,14 @@ private:
 	float CellT = 0.0f;
 	void CloseCell();
 	void OpenCell();
+	void CellAsk();
+	void OpenCellWith(bool bKeyUsed);
+	void CellTick(float DeltaSeconds);
+	void CellReset();
+	bool bCellAlso = false;
+	float CellOpenT = 0.0f;
+	UPROPERTY()
+	TObjectPtr<class UStaticMeshComponent> SlabProp;
 	float LightT = 0.0f;
 	void ToggleCrouch();
 	void SetupPlayer();
