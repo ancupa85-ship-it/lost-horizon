@@ -1658,7 +1658,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
 		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("farola") || Key == TEXT("apoyo") || Key == TEXT("voy") || Key == TEXT("perdido") || Key == TEXT("despierta")
-		|| Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
+		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -1696,6 +1696,8 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("yacasi")) T = TEXT("Ya casi esta.");
 	else if (Key == TEXT("papeles")) T = TEXT("Para ahi. Los papeles del porte.");
 	else if (Key == TEXT("pase")) T = TEXT("Todo en orden. Tira.");
+	else if (Key == TEXT("sinradio")) T = TEXT("Central? ... Central? Esto no da senal.");
+	else if (Key == TEXT("emisora")) T = TEXT("Quien ha tocado esto? Una valvula floja... Ya casi.");
 	else if (Key == TEXT("registro")) T = TEXT("Hay orden de mirar la carga. Abre atras.");
 	else T = Key;
 	T = Tx(FName(*(TEXT("voz_") + Key)), *T);
@@ -1850,6 +1852,7 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 		const TObjectPtr<ATarsisGuard> K(G);
 		if (G->State != ETarsisGuardState::Down) { Called.Remove(K); continue; }
 		if (G->bFound || G->bAlly || Called.Contains(K) || G->DownTime() < 40.0f) continue;
+		if (RadioDead()) continue;   // tanda 32: sin red nadie le echa de menos; cuando vuelva, llamaran
 		Called.Add(K);
 		ATarsisGuard* Best = nullptr;
 		float BestD = TNumericLimits<float>::Max();
@@ -1886,6 +1889,7 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 			if (G && G->State == ETarsisGuardState::Down) RadioSend(G, 1);
 		}
 	}
+	EmisoraTick(DeltaSeconds);
 	PartesTick();
 }
 
@@ -1931,7 +1935,8 @@ FString ATarsisDirector::ParteOf(const FString& Name) const
 // una pista, no ambiente) y te lo quedas; es lo que tendrás que decir si la central lo llama cuando esté en el suelo
 void ATarsisDirector::PartesTick()
 {
-	if (!bRadioAnswer || bCine || bDone || bPowerOff || TensionT > 0.0f) return;
+	if (!bRadioAnswer || bCine || bDone || bPowerOff || TensionT > 0.0f || RadioDead()) return;
+	RadioChatTick();
 	const float Now = GetWorld()->GetTimeSeconds();
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
@@ -3976,7 +3981,7 @@ void ATarsisDirector::CentralSay(const FString& Key, const FString& Text, float 
 		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, Key, Text]() { CentralSay(Key, Text, 0.0f); }), Delay, false);
 		return;
 	}
-	if (bCine || bDone) return;
+	if (bCine || bDone || RadioDead()) return;   // tanda 32: con la emisora muda la central no se oye
 	if (USoundBase* S = Sfx(TEXT("voz_central_") + Key)) UGameplayStatics::PlaySound2D(this, S, 0.8f);
 	else if (RadioSnd) UGameplayStatics::PlaySound2D(this, RadioSnd, 0.35f);
 	LastVoice = TEXT("central_") + Key;

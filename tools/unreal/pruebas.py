@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -2450,11 +2450,58 @@ def prueba_codec():
     d.close_codec(); yield 0.1
     check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
 
+def prueba_emisora():
+    """Tanda 32, dos puzles de radio. La charla: Lobato pregunta por la red qué decir si le apuntan y Carmona le dice la
+    frase de coacción (bandera sabe_coaccion). La emisora: en transmisiones se deja muda la red; sin red la central no
+    llama al caído ni da voces, a los RadioDeadSeconds sale uno a arreglarla y, arreglada, la base queda en guardia y
+    entonces sí llaman al que no contesta."""
+    d = director()
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.1
+    check('la charla no suena sola en las pruebas', d.get_editor_property('radio_chats') == 0, d.get_editor_property('radio_chats'))
+    ok = d.start_radio_chat(True); yield 5.5
+    check('Lobato pregunta y Carmona dice la frase', ok and d.has_flag('sabe_coaccion') and 'lobato_charla_1' in vl() and 'carmona_charla_2' in vl(), vl()[-3:])
+    check('no se pisa a sí misma', not d.start_radio_chat(True) and d.get_editor_property('radio_chats') == 1)
+    yield 13.5
+    check('la central los manda callar', 'central_charla' in vl(), vl()[-3:])
+    # la emisora
+    pt = [x for x in MISION['puntos'] if x['id'] == 'emisora'][0]
+    e = d.get_editor_property('emisora_loc')
+    check('el punto está en la emisora', abs(e.x - pt['pos'][0]) < 60 and abs(e.y - pt['pos'][1]) < 60, '%d,%d' % (e.x, e.y))
+    check('la red funciona al empezar', not d.radio_dead())
+    tp(pt['pos'][0] + 120, pt['pos'][1], 180.0); yield 0.4
+    d.interact(); yield 0.4
+    check('aflojar la válvula deja muda la red', d.radio_dead() and d.has_flag('emisora_muda'), str(d.get_editor_property('message'))[:50])
+    c, v = guardia('Carmona'), guardia('Vega')
+    derribar(c); yield 0.2
+    aparte()
+    n0 = len(vl())
+    yield 46.0
+    check('sin red, la central no llama al caído', 'central_responde' not in vl()[n0:] and all(estado(g) in ('PATROL', 'DOWN') for g in guardias() if not g.get_editor_property('tower_sentry')), vl()[n0:])
+    check('y alguien prueba la radio en vano', any(x.endswith('_sinradio') for x in vl()), vl()[-3:])
+    # mandan a uno: solo Vega está libre
+    v.hold(0.0)
+    d.set_editor_property('radio_dead_t', d.get_editor_property('radio_dead_seconds') - 0.5)
+    yield ('hasta', lambda: director().emisora_fixer_now() is not None, 8.0)
+    check('a los 90 s sale uno a arreglarla', d.emisora_fixer_now() == v and v.is_on_errand(), d.emisora_fixer_now())
+    l = v.get_actor_location()
+    v.set_actor_location(V(e.x + d.get_editor_property('emisora_stand'), e.y, l.z), False, True)
+    yield ('hasta', lambda: not director().radio_dead(), d.get_editor_property('radio_fix_seconds') + 25.0)
+    check('la arregla: vuelve la red', not d.radio_dead() and d.has_flag('emisora_reparada') and d.get_editor_property('radio_repairs') == 1, d.get_editor_property('radio_repairs'))
+    yield 1.5
+    check('la central lo dice y la base queda en guardia', 'central_red' in vl() and d.get_editor_property('tension_t') > 60.0, '%s %.0f' % (vl()[-2:], d.get_editor_property('tension_t')))
+    yield ('hasta', lambda: 'central_responde' in [str(x) for x in director().get_editor_property('voice_log')], 8.0)
+    check('y ahora sí llaman al que no contesta', 'central_responde' in vl(), vl()[-3:])
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
+
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora]]
 PRUEBAS = []
 
 
@@ -2499,6 +2546,8 @@ def _limpieza(siguiente):
         d.set_editor_property('buddy_rule', siguiente is prueba_apoyo)
         # tanda 29: las llamadas entrantes del códec, solo en su prueba (prueba_codec las enciende ella)
         d.set_editor_property('codec_calls', False)
+        # tanda 32: la charla de Lobato y Carmona, solo en su prueba (mete voces en el registro que otras cuentan)
+        d.set_editor_property('radio_chat', False)
         # tanda 31: la linterna según el sitio, solo en su prueba (las demás miden a qué distancia te ven a oscuras sin ella)
         d.set_editor_property('context_torch', siguiente is prueba_linternas)
         d.set_torch(False)

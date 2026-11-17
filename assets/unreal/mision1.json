@@ -374,6 +374,21 @@
    "segundos": 5.0,
    "punto_de_control": "cp_expediente",
    "quita": "expediente"
+  },
+  {
+   "id": "emisora",
+   "nota": "emisora de la red de la base, en transmisiones (edificio este): dejarla muda",
+   "pos": [
+    6275,
+    2000,
+    0
+   ],
+   "radio": 190,
+   "aviso": "p_emisora",
+   "pone": "emisora_muda",
+   "sonido": "candado",
+   "texto": "emisora_muda",
+   "segundos": 7.0
   }
  ],
  "textos": {
@@ -563,6 +578,16 @@
   "codec_fuente_3": "F|cuando apagan el generador no me callo. descanso.",
   "ensena_linterna": "LINTERNA\nVes en lo oscuro, pero con ella encendida te ven como a plena luz. Si alumbras a un guardia, viene a mirar.",
   "ensena_linterna_guardia": "LE HAS ALUMBRADO\n{0} viene a mirar de donde sale esa luz. Apagala ({1}) y muevete.",
-  "ensena_deslumbrar": "DESLUMBRADO\n{0} no ve nada unos segundos. Luego ira a por ti, y la segunda vez se tapara los ojos."
+  "ensena_deslumbrar": "DESLUMBRADO\n{0} no ve nada unos segundos. Luego ira a por ti, y la segunda vez se tapara los ojos.",
+  "p_emisora": "E   AFLOJAR UNA VALVULA DE LA EMISORA",
+  "emisora_muda": "RED MUDA\nSin emisora, la central no echa de menos a nadie ni da voces.\nEn minuto y medio mandaran a uno a mirarla.",
+  "voz_sinradio": "Central? ... Central? Esto no da senal.",
+  "voz_emisora": "Quien ha tocado esto? Una valvula floja... Ya casi.",
+  "radio_red": "Vuelve la red. Alguien ha tocado la emisora. Todas las unidades: ojo, y parte uno por uno.",
+  "charla_1": "Carmona, una cosa. Si me apuntan y no puedo hablar claro, que digo?",
+  "charla_2": "Todo tranquilo. Asi, tal cual. Aqui eso no lo dice nadie de verdad.",
+  "charla_3": "Y entonces?",
+  "charla_4": "Entonces la central manda a los dos que tenga mas cerca. Y corta, que nos oye el sargento.",
+  "charla_central": "Lobato, Carmona: esta red no es para charlar."
  }
 }

@@ -795,6 +795,40 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Radio")
 	FString ParteOf(const FString& Name) const;
 
+	// ---- tanda 32: dos puzles de radio (TarsisEmisora.cpp)
+	/** La charla por la red entre Lobato y Carmona sobre la frase de coaccion: suena pasados RadioChatAfter s de mision, con
+	 *  los dos de ronda y tu a menos de ParteHearDist de uno. Oirla pone la bandera «sabe_coaccion». */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	bool bRadioChat = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float RadioChatAfter = 120.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	int32 RadioChats = 0;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Radio")
+	bool StartRadioChat(bool bForce);
+	/** La emisora de transmisiones (punto «emisora» de mision1.json, bandera «emisora_muda»). Muda, la central no llama a
+	 *  los caidos, no hay partes ni voces de la central. A los RadioDeadSeconds sale el guardia mas cercano a arreglarla
+	 *  (RadioFixSeconds plantado ante ella); arreglada (bandera «emisora_reparada»), la base queda en guardia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	FVector EmisoraLoc = FVector(6275.0f, 2000.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float RadioDeadSeconds = 90.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float RadioFixSeconds = 14.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float EmisoraStand = 110.0f;   // se planta a este lado de la mesa (cm hacia +X), de cara a la emisora
+	/** Segundos que lleva muda la red. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Radio")
+	float RadioDeadT = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	int32 RadioRepairsSent = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Radio")
+	int32 RadioRepairs = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Radio")
+	bool RadioDead() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Radio")
+	class ATarsisGuard* EmisoraFixerNow() const { return EmisoraFixer.Get(); }
+
 	// ---- tanda 28: nadie entra solo a mirar donde falta la farola (ATarsisGuard::WaitForBuddy)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sigilo")
 	bool bBuddyRule = true;
@@ -1299,6 +1333,13 @@ private:
 	void RadioTick(float DeltaSeconds);
 	void RadioSend(class ATarsisGuard* Fallen, int32 HowMany);
 	void PartesTick();
+	void RadioChatTick();
+	void EmisoraTick(float DeltaSeconds);
+	bool bRadioChatOn = false;
+	bool bEmisoraNoticed = false;
+	float EmisoraFixT = 0.0f;
+	float EmisoraSendT = 0.0f;
+	TWeakObjectPtr<class ATarsisGuard> EmisoraFixer;
 	void StartRadioAsk(class ATarsisGuard* G);
 	UPROPERTY()
 	TObjectPtr<class ATarsisGuard> RadioAskGuard;

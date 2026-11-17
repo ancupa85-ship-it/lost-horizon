@@ -193,6 +193,15 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 - Mientras hablas por el códec ya no se ve de fondo el mensaje de ayuda.
 - Prueba: `prueba_linternas`. En las demás la regla está apagada (`_limpieza`), como el apoyo o la radio.
 
+### Radio: tecla, charla y emisora (tanda 32)
+
+- **La radio es una acción más** (la octava, `RADIO`, R por defecto): se reasigna en CONTROLES y el códec, la ayuda y los avisos de llamada muestran la tecla puesta.
+- **El códec viaja con el punto de control**: `UTarsisSave::CodecTaken`. Al cargar, lo ya oído vuelve y no queda llamada pendiente.
+- **Linternas**: `TorchMinOn` 9 s y bajo techo solo se guarda con luz por encima de 0,6 (Ramos la sacaba y guardaba cada poco). La tuya baja de intensidad según la distancia a lo que alumbra el centro del haz (`TorchNearDist`, `TorchNearMin`): el guardia deslumbrado y la pared a un palmo ya no salen blancos.
+- **La charla** (`TarsisEmisora.cpp`, `bRadioChat`, `RadioChatAfter`): pasados dos minutos, con Lobato y Carmona de ronda y tú a menos de `ParteHearDist` de uno, Lobato pregunta por la red qué decir si le apuntan y Carmona le explica «Todo tranquilo» y que trae a los dos más cercanos. Pone la bandera `sabe_coaccion`. Es la pista de «Responde, Carmona» dentro del mundo, y también la de que la frase sirve para mover a dos hombres a propósito.
+- **La emisora** (punto `emisora` de `mision1.json`, en transmisiones; banderas `emisora_muda` y `emisora_reparada`; `RadioDead()`): con la red muda la central no llama a los caídos, no hay partes y la central no se oye. A los 20 s el guardia más cercano prueba la radio en vano; a los `RadioDeadSeconds` (90) sale el más cercano de recado a arreglarla (`RadioFixSeconds`, 14 s ante la mesa). Si lo tumbas, tardan en mandar a otro. Arreglada, la base queda en guardia 90 s y la central llama entonces a quien no conteste.
+- Prueba: `prueba_emisora`. La charla va apagada en las demás (`_limpieza`).
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.
