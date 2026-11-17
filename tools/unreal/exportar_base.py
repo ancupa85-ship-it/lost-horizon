@@ -221,12 +221,14 @@ def torre(i, t):
                      'dir': [math.sin(t['yaw']) * math.cos(ph), -math.cos(t['yaw']) * math.cos(ph), -math.sin(ph)]}}
 
 import math
-TORRES = [torre(i, t) for i, t in enumerate(TOWERS)]
+# tanda 30: Andres quita las dos torres de dentro (las TOWERS del visor); quedan solo las cuatro de esquina. Con LH_EXT=0
+# (sin anillo) se levantan las de antes.
+TORRES = [torre(i, t) for i, t in enumerate(TOWERS)] if os.environ.get('LH_EXT', '10') == '0' else []
 
 # 4b bis) tanda 30: cuatro torres grandes, una en cada esquina del muro perimetral (por dentro), más altas que el muro.
 # Plataforma de 4,4 m para dos centinelas, cada uno con su foco: uno mira hacia dentro de la base y otro hacia fuera.
 # Los focos van en las dos esquinas de la plataforma que caen sobre la diagonal (la de dentro y la de fuera).
-TG = 6.0   # altura de la plataforma (el muro mide 4,6)
+TG = 7.5   # altura de la plataforma (el muro mide 4,6): alta para que el haz baje con ángulo sobre el camino y los patios
 
 def torre_grande(i, cx, cz):
     L = {'madera': [], 'hierro': []}
@@ -238,7 +240,7 @@ def torre_grande(i, cx, cz):
             B('madera', 0.12, 2.45, 0.12, a, TG + 1.22, b)                  # pies derechos del tejadillo
             B('hierro', 0.5, 0.25, 0.5, a, 0.12, b)                         # zapatas
     B('madera', 4.4, 0.14, 4.4, 0, TG, 0)                                   # plataforma
-    for h in (1.8, 3.6, 5.3):                                               # travesaños
+    for h in (1.8, 3.6, 5.4, 7.0):                                               # travesaños
         for q in (-1.9, 1.9):
             B('madera', 3.8, 0.1, 0.1, 0, h, q); B('madera', 0.1, 0.1, 3.8, q, h, 0)
     for h0, h1 in ((0.2, 3.6), (3.6, TG)):                                  # cruces de San Andrés en los cuatro lados, dos pisos

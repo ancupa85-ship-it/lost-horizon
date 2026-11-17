@@ -175,12 +175,12 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 
 ### Cuatro torres de esquina (tanda 30)
 
-- Pedidas por Andres: una torre grande en cada esquina del muro perimetral, por dentro (`torre3` NO, `torre4` NE, `torre5` SE, `torre6` SO; `torre_grande` en `tools/unreal/exportar_base.py`). Plataforma de 4,4 m a 6 m de alto (el muro mide 4,6), tejadillo, escala y dos proyectores en la diagonal: uno hacia dentro de la base y otro hacia fuera.
+- Pedidas por Andres: una torre grande en cada esquina del muro perimetral, por dentro (`torre_grande` en `tools/unreal/exportar_base.py`). Plataforma de 4,4 m a 7,5 m de alto (el muro mide 4,6), tejadillo, escala y dos proyectores en la diagonal: uno hacia dentro de la base y otro hacia fuera.
 - Dos centinelas por torre (`guardias.py`, «puestos» de `base.json`): «centinela de la torre N» lleva el foco de dentro y barre su tramo del anillo; «vigia de la torre N» lleva el de fuera y barre la marisma. Los recorridos y el segundo de arranque de cada uno, en `mision1.json` (`ajustes.guardias`).
-- Los ocho focos nuevos van sin sombras y con 65 m de alcance (lejos y de noche: lo que gasta memoria se deja para luego). Siguen delatando: `LightAt` traza por su cuenta.
-- Las dos torres de dentro (`torre1`, `torre2`) siguen en su sitio a la espera de lo que decida Andres.
+- Los focos de fuera van sin sombras; todos con 65 m de alcance.
+- Andres quitó las dos torres de dentro: las de esquina son ahora `torre1` (NO), `torre2` (NE), `torre3` (SE) y `torre4` (SO), a 7,5 m. Los focos de dentro barren el patio norte, el patio este y las dos mitades del camino, con sombra y haz prieto (5 grados); el patio central se queda sin foco, porque desde las esquinas lo tapan los edificios.
 - La tapa negra de una farola rota ya distingue el farol del patio de la farola del camino (`LampCoverPatioOffset`, `LampCoverPatioScale`, `LampCoverPatioZ`).
-- Prueba: `prueba_esquinas`. En las demás, los ocho centinelas nuevos están quietos y sin ver (`_limpieza`).
+- Prueba: `prueba_esquinas`. En las demás, los vigías de fuera están quietos (`_limpieza`).
 
 ## Sonidos
 

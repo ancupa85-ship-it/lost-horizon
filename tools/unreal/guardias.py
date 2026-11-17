@@ -134,10 +134,13 @@ def centinelas(eas, cls):
                     usados.add(f)
                     f.get_editor_property('root_component').set_editor_property('mobility', unreal.ComponentMobility.MOVABLE)
                     if grande:
-                        # lejos y de noche: sin sombras (lo que gasta memoria se deja para luego) y con alcance para su recorrido
+                        # alumbra desde lejos y casi de lado: haz más prieto para que la mancha no sea una franja de 60 m,
+                        # y alcance para llegar. El de dentro da sombra (delata y no atraviesa cajas); el de fuera no
                         c = f.get_component_by_class(unreal.SpotLightComponent)
-                        c.set_editor_property('cast_shadows', False)
+                        c.set_editor_property('cast_shadows', not fuera)
                         c.set_editor_property('attenuation_radius', 6500.0)
+                        c.set_editor_property('outer_cone_angle', 6.0 if fuera else 5.0)
+                        c.set_editor_property('inner_cone_angle', 4.0 if fuera else 3.5)
                     g.set_editor_property('tower_light', f)
                 else:
                     log('AVISO: no encuentro el foco de', t['name'], pu.get('rol'))

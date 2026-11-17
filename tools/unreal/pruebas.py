@@ -1410,7 +1410,7 @@ def prueba_cielo():
 
 def _de_esquina():
     """Los centinelas de las cuatro torres de esquina (tanda 30): los de dentro y los vigías de fuera."""
-    return [g for g in guardias() if g.get_editor_property('tower_sentry') and g.get_actor_label().split('_')[-1] in ('torre3', 'torre4', 'torre5', 'torre6')]
+    return [g for g in guardias() if g.get_editor_property('tower_sentry') and g.get_actor_label().split('_')[-1] in ('torre1', 'torre2', 'torre3', 'torre4')]
 
 def prueba_esquinas():
     """Tanda 30: cuatro torres grandes en las esquinas del muro, cada una con dos centinelas y dos focos: uno barre
@@ -1424,6 +1424,7 @@ def prueba_esquinas():
     check('cada una en su esquina, por dentro del muro', sorted((t['pos'][0] < 36, -t['pos'][1] < 28) for t in gr) == [(False, False), (False, True), (True, False), (True, True)]
           and all(e['x0'] + 2 < t['pos'][0] < e['x1'] - 2 and e['y0'] + 2 < -t['pos'][1] < e['y1'] - 2 for t in gr), [t['pos'] for t in gr])
     check('más altas que el muro', all(t['altura'] > 4.6 + 1.0 for t in gr), [t['altura'] for t in gr])
+    check('las dos torres de dentro ya no están', len(torres) == 4, [t['name'] for t in torres])
     cs = _de_esquina()
     dentro = [g for g in cs if g.get_actor_label().startswith('Centinela_')]
     fuera = [g for g in cs if g.get_actor_label().startswith('Vigia_')]
@@ -1451,7 +1452,8 @@ def prueba_esquinas():
     k = (0.0 - lp.z) / fw.z if fw.z < -0.01 else 0.0
     suelo = V(lp.x + fw.x * k, lp.y + fw.y * k, 0)
     check('y apunta de verdad a donde dice', fw.z < -0.01 and dist2d(suelo, a1) < 300.0, '%.0f cm' % dist2d(suelo, a1))
-    check('sin sombras y con alcance para llegar', not c.get_editor_property('cast_shadows') and c.get_editor_property('attenuation_radius') >= 6000.0,
+    c2 = fuera[0].get_editor_property('tower_light').get_component_by_class(unreal.SpotLightComponent)
+    check('el de dentro da sombra, el de fuera no, y los dos llegan', c.get_editor_property('cast_shadows') and not c2.get_editor_property('cast_shadows') and c.get_editor_property('attenuation_radius') >= 6000.0,
           '%s / %.0f' % (c.get_editor_property('cast_shadows'), c.get_editor_property('attenuation_radius')))
     # el foco delata: plantado en su mancha hay mucha más luz que diez metros más allá
     yield ('hasta', lambda: dist2d(g.get_editor_property('sweep_aim'), g.sweep_point_at(g.sweep_time())) < 150.0, 6.0)
@@ -2358,9 +2360,11 @@ def _limpieza(siguiente):
         d.set_editor_property('codec_calls', False)
     # tanda 30: los ocho centinelas de las torres de esquina, quietos y sin ver salvo en su prueba: las demás plantan al
     # jugador por el anillo y se escribieron sin ellos (su foco se queda parado al principio de su recorrido)
+    # Los de dentro siguen vivos, como lo estaban las dos torres de antes; los vigías de fuera, quietos
     if siguiente is not prueba_esquinas:
         for g in _de_esquina():
-            g.hold(3600.0)
+            if g.get_actor_label().startswith('Vigia_'):
+                g.hold(3600.0)
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 
