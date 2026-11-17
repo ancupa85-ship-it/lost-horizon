@@ -2526,66 +2526,93 @@ def prueba_calabozo():
     # al calabozo
     puerta, losa = d.get_editor_property('cell_door'), d.get_editor_property('cell_slab')
     hablar = lambda: tp(puerta.x, puerta.y + 110, -90.0)
+    P = lambda k: d.get_editor_property(k)
+    def decir(n):
+        d.interact(); yield 0.2
+        d.answer_cell(n); yield 0.2
     d.captured(jugador()); yield 0.5
     check('la primera captura te deja en el calabozo', d.in_cell() and 'CALABOZO' in msg(), msg()[:30])
     yield 4.0
-    check('la reja ya no se abre sola', d.in_cell() and d.get_editor_property('cell_by_vidal') == 0)
+    check('la reja ya no se abre sola', d.in_cell() and P('cell_by_vidal') == 0)
     check('Control, por el códec, habla de Vidal', str(d.codec_control_conv()) == 'control_celda', str(d.codec_control_conv()))
+    check('lejos de la reja no se oye qué reza', not P('cell_heard_prayer'))
     hablar(); yield 0.3
     check('junto a la reja, el aviso es hablar con Vidal', 'VIDAL' in str(d.cell_prompt()), str(d.cell_prompt()))
-    d.interact(); yield 0.2
-    yield 0.3
-    check('tanda 36: la pregunta sale en su caja', d.get_editor_property('cell_ask_frames') > 0 and str(d.get_editor_property('cell_question')), d.get_editor_property('cell_ask_frames'))
-    check('tanda 36: Vidal tiene cuerpo y está de medio lado', abs(d.vidal_facing() - d.get_editor_property('vidal_yaw')) < 1.0 and d.get_editor_property('vidal_body') is not None, d.vidal_facing())
-    check('Vidal pregunta: tres respuestas', d.get_editor_property('cell_ask') and len(d.get_editor_property('cell_options')) == 3 and '1/3' in msg(), msg()[:40])
+    d.interact(); yield 0.5
+    check('tanda 36: la pregunta sale en su caja', P('cell_ask_frames') > 0 and str(P('cell_question')), P('cell_ask_frames'))
+    check('tanda 36: Vidal tiene cuerpo y está de medio lado', abs(d.vidal_facing() - P('vidal_yaw')) < 1.0 and P('vidal_body') is not None, d.vidal_facing())
+    check('Vidal pregunta: tres respuestas', P('cell_ask') and len(P('cell_options')) == 3 and '1/3' in msg(), msg()[:40])
     d.answer_cell(1); yield 0.2
-    check('amenazarle no vale', d.get_editor_property('cell_fails') == 1 and d.get_editor_property('cell_stage') == 0 and not d.get_editor_property('cell_ask'), msg()[:60])
+    check('amenazarle no vale', P('cell_fails') == 1 and P('cell_stage') == 0 and not P('cell_ask'), msg()[:60])
+    yield from decir(2)
+    check('hablarle de lo que se oye, sí', P('cell_stage') == 1 and P('cell_fails') == 1, msg()[:60])
+    # tanda 37: contestar sin saber no es un error, y el juego dice dónde averiguarlo
     d.interact(); yield 0.2
+    check('sin saber nada, el segundo paso no tiene respuesta buena', P('cell_right') == 0, P('cell_right'))
     d.answer_cell(2); yield 0.2
-    check('hablarle de lo que se oye, sí', d.get_editor_property('cell_stage') == 1 and d.get_editor_property('cell_fails') == 1, msg()[:60])
+    check('«que grita» no basta, pero no cuenta como error y da la pista', P('cell_fails') == 1 and P('cell_lacks') == 1 and P('cell_stage') == 1 and 'radio' in msg(), msg()[-70:])
+    d.codec_key(); yield 0.1
+    d.codec_call(1); yield 0.2
+    for i in range(40):
+        if not P('codec'):
+            break
+        d.codec_next(); yield 0.05
+    check('Control lo cuenta por la radio', 'control_celda' in [str(x) for x in P('codec_taken')] and not P('codec'), [str(x) for x in P('codec_taken')][-3:])
+    hablar(); yield 0.2
     d.interact(); yield 0.2
-    check('sin saber nada, ninguna respuesta del segundo paso vale', d.get_editor_property('cell_right') == 0, d.get_editor_property('cell_right'))
+    check('con lo que dijo Control, la respuesta cambia y vale', P('cell_right') == 2 and 'doctora' in str(P('cell_options')[1]), str(P('cell_options')[1]))
     d.answer_cell(2); yield 0.2
-    check('«que grita» no basta', d.get_editor_property('cell_fails') == 2 and d.get_editor_property('cell_stage') == 1, msg()[:60])
-    d.set_flag('expediente')
+    check('segundo paso', P('cell_stage') == 2 and P('cell_fails') == 1, msg()[:60])
+    # el tercero: junto a la reja se acaba oyendo qué reza
+    yield ('hasta', lambda: director().get_editor_property('cell_heard_prayer'), P('cell_pray_seconds') + 4.0)
+    check('junto a la reja se oye el De profundis', P('cell_heard_prayer'))
     d.interact(); yield 0.2
-    check('con el expediente leído cambia la respuesta', d.get_editor_property('cell_right') == 2 and 'Halloran' in str(d.get_editor_property('cell_options')[1]), str(d.get_editor_property('cell_options')[1]))
-    d.answer_cell(2); yield 0.2
-    check('segundo paso', d.get_editor_property('cell_stage') == 2, msg()[:60])
+    check('sin expediente ni medalla, lo que vale es rezar con él', P('cell_right') == 2 and 'De profundis' in str(P('cell_options')[1]), str(P('cell_options')[1]))
     # si te apartas de la reja, la pregunta se va sin contar como fallo
-    d.interact(); yield 0.2
     tp(losa.x - 150, losa.y + 250, -90.0); yield 0.4
-    check('apartarse deja la pregunta sin contestar, sin fallo', not d.get_editor_property('cell_ask') and d.get_editor_property('cell_fails') == 2)
+    check('apartarse deja la pregunta sin contestar, sin fallo', not P('cell_ask') and P('cell_fails') == 1)
     hablar(); yield 0.3
-    d.interact(); yield 0.2
-    d.answer_cell(1); yield 0.2
-    check('tercer paso: Vidal cede', d.get_editor_property('cell_stage') == 3 and d.in_cell(), msg()[:60])
+    yield from decir(1)
+    check('hablar de bajas sin pruebas no basta (y no es error)', P('cell_stage') == 2 and P('cell_fails') == 1 and P('cell_lacks') == 2 and 'celda' in msg(), msg()[-60:])
+    yield from decir(2)
+    check('tercer paso: Vidal cede', P('cell_stage') == 3 and d.in_cell(), msg()[:60])
     yield ('hasta', lambda: not director().in_cell(), 6.0)
     yield 0.2
-    check('abre él: nadie da la alarma', not d.in_cell() and d.get_editor_property('cell_by_vidal') == 1 and d.has_flag('vidal_calla') and d.get_editor_property('cell_alert_t') <= 0.0 and 'no le he visto' in msg(), msg()[:60])
-    check('tanda 36: Vidal se queda de cara a la pared', abs(d.vidal_facing() - d.get_editor_property('vidal_wall_yaw')) < 1.0, d.vidal_facing())
-    # otra vez dentro: tres errores y la losa
+    check('abre él: nadie da la alarma', not d.in_cell() and P('cell_by_vidal') == 1 and d.has_flag('vidal_calla') and P('cell_alert_t') <= 0.0 and 'no le he visto' in msg(), msg()[:60])
+    check('tanda 36: Vidal se queda de cara a la pared', abs(d.vidal_facing() - P('vidal_wall_yaw')) < 1.0, d.vidal_facing())
+    # otra vez dentro: la losa. Con la medalla se le convence; con la llave se puede callar y abrir
     d.lock_in_cell(jugador()); yield 0.4
-    hablar(); yield 0.3
-    for i in range(3):
-        d.interact(); yield 0.2
-        d.answer_cell(1); yield 0.2
-    check('tanda 36: al dejar de escuchar se vuelve a la pared', abs(d.vidal_facing() - d.get_editor_property('vidal_wall_yaw')) < 1.0, d.vidal_facing())
-    check('tres errores: Vidal deja de escuchar', d.get_editor_property('vidal_gone') and 'NO ESCUCHA' in str(d.cell_prompt()), str(d.cell_prompt()))
-    d.interact(); yield 0.2
-    check('y ya no pregunta', not d.get_editor_property('cell_ask') and d.in_cell())
     tp(losa.x - 40, losa.y + 40, 0.0); yield 0.3
     check('en el rincón, la losa suelta', 'LOSA' in str(d.cell_prompt()), str(d.cell_prompt()))
     d.interact(); yield 0.2
-    check('debajo, la llave', d.has_flag('llave_celda') and 'VIDAL, J.' in msg(), msg()[:40])
+    check('debajo, la llave y la medalla', d.has_flag('llave_celda') and 'VIDAL, J.' in msg(), msg()[:40])
     hablar(); yield 0.3
-    check('con la llave, el aviso de la reja cambia', 'LLAVE' in str(d.cell_prompt()), str(d.cell_prompt()))
-    d.interact(); yield 0.3
-    check('la llave abre', not d.in_cell() and d.get_editor_property('cell_by_key') == 1 and d.get_editor_property('cell_alert_t') > 0.0, msg()[:40])
-    check('todavía nadie lo sabe', d.get_editor_property('tension_t') <= 0.0 and 'central_fuga' not in vl())
+    check('con la llave se puede seguir hablando con Vidal', 'VIDAL' in str(d.cell_prompt()) and d.in_cell(), str(d.cell_prompt()))
+    yield from decir(2)
+    yield from decir(2)
+    d.interact(); yield 0.2
+    check('con la llave hay una cuarta respuesta, y la medalla vale en el tercer paso', P('cell_stage') == 2 and len(P('cell_options')) == 4 and P('cell_right') == 1 and 'medalla' in str(P('cell_options')[0]), [str(x)[:30] for x in P('cell_options')])
+    d.answer_cell(1); yield 0.2
+    yield ('hasta', lambda: not director().in_cell(), 6.0)
+    yield 0.2
+    check('la medalla le convence: abre él y calla', P('cell_by_vidal') == 2 and P('cell_by_key') == 0 and P('cell_alert_t') <= 0.0, msg()[:60])
+    # callar y abrir con la llave
+    d.lock_in_cell(jugador()); yield 0.4
+    hablar(); yield 0.3
+    yield from decir(4)
+    check('la llave abre', not d.in_cell() and P('cell_by_key') == 1 and P('cell_alert_t') > 0.0, msg()[:40])
+    check('todavía nadie lo sabe', P('tension_t') <= 0.0 and 'central_fuga' not in vl())
     d.set_editor_property('cell_alert_t', 0.3); yield 1.0
-    check('al rato encuentran la celda vacía: base en guardia', d.get_editor_property('cell_alerts') == 1 and d.get_editor_property('tension_t') > 60.0 and 'central_fuga' in vl(), '%.0f %s' % (d.get_editor_property('tension_t'), vl()[-2:]))
-    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+    check('al rato encuentran la celda vacía: base en guardia', P('cell_alerts') == 1 and P('tension_t') > 60.0 and 'central_fuga' in vl(), '%.0f %s' % (P('tension_t'), vl()[-2:]))
+    # tres errores de verdad: deja de escuchar, y con la llave aún se sale
+    d.lock_in_cell(jugador()); yield 0.4
+    hablar(); yield 0.3
+    for i in range(3):
+        yield from decir(1)
+    check('tres amenazas: Vidal deja de escuchar y se vuelve a la pared', P('vidal_gone') and 'LLAVE' in str(d.cell_prompt()) and abs(d.vidal_facing() - P('vidal_wall_yaw')) < 1.0, str(d.cell_prompt()))
+    d.interact(); yield 0.3
+    check('con la llave se sale igual', not d.in_cell() and P('cell_by_key') == 2)
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],

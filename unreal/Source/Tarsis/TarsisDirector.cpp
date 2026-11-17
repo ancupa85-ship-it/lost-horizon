@@ -627,6 +627,7 @@ void ATarsisDirector::KeypadKey(FKey Key)
 		if (Key == EKeys::One || Key == EKeys::NumPadOne) AnswerCell(1);
 		else if (Key == EKeys::Two || Key == EKeys::NumPadTwo) AnswerCell(2);
 		else if (Key == EKeys::Three || Key == EKeys::NumPadThree) AnswerCell(3);
+		else if (Key == EKeys::Four || Key == EKeys::NumPadFour) AnswerCell(4);
 		return;
 	}
 	if (bRadioAsk)

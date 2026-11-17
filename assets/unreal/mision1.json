@@ -576,7 +576,7 @@
   "codec_control_expediente": "C|Dentro del archivo, el archivador. Coge LH-07 y no lo leas.",
   "codec_control_salir": "C|Porton de salida, muro este, por el camino. Hay un control: cruzalo por la sombra o espera al camion.\nC|Sin muertos. Asi se sale de los sitios sin haber estado.",
   "codec_control_alerta": "C|Te buscan. No corras en linea recta y no te quedes en la luz. Cuando dejen de verte, cuenta hasta treinta antes de moverte.",
-  "codec_control_celda": "C|No podemos sacarte. Oficialmente no estas ahi; oficialmente no estamos hablando.\nC|El de la reja es el cabo Vidal. Su hermano bajo en octubre y no volvio. No le amenaces: hablale de lo que se oye por las noches. Y si sabes rezar, reza.\nC|Si no cede, el ultimo que durmio en ese catre no se fiaba de nadie. Mira el suelo.",
+  "codec_control_celda": "C|No podemos sacarte. Oficialmente no estas ahi; oficialmente no estamos hablando.\nC|El de la reja es el cabo Vidal. Su hermano bajo en octubre y no volvio. No le amenaces: hablale de lo que se oye por las noches.\nC|Lo de abajo esta vivo y sufre. Una doctora, Halloran, lo puso por escrito y ya no firma nada. Diselo.\nC|Y registra la celda: el ultimo que durmio en ese catre no se fiaba de nadie.",
   "codec_control_extra_0": "T|Quien eres?\nC|La voz que te dice adonde ir. Antes habia otra. Tu la apagaste, o te la apagaron.\nC|Corto.",
   "codec_control_extra_1": "C|Guardo lo que haces cuando pasa algo importante. Si caes, vuelves al ultimo punto. No preguntes como; yo tampoco lo se.\nC|Corto.",
   "codec_control_extra_2": "C|Los centinelas dan el parte cada uno a su manera. Escuchalos de cerca: alguna vez tendras que contestar por ellos.\nC|Corto.",
@@ -608,7 +608,7 @@
   "p_reja_llave": "E   ABRIR LA REJA CON LA LLAVE",
   "p_vidal_ido": "VIDAL YA NO ESCUCHA",
   "p_vidal": "E   HABLAR CON EL CABO VIDAL",
-  "losa": "LOSA SUELTA\nBajo la losa, en un trapo, una llave de hierro y una medalla con un nombre rayado a navaja: VIDAL, J.\nLa llave encaja en la reja. Vidal no tiene por que verlo.",
+  "losa": "LOSA SUELTA\nBajo la losa, en un trapo, una llave de hierro y una medalla con un nombre rayado a navaja: VIDAL, J.\nLa llave encaja en la reja. La medalla, a Vidal, le dira mas que tu.",
   "vidal_ido": "CABO VIDAL\nReza de cara a la pared y no se vuelve.\nEn el rincon, a la derecha de la reja, una losa baila bajo el pie.",
   "vidal_q1": "Vidal no te mira. Mueve los labios: reza.",
   "vidal_1a": "\"Abre, o cuando salga te busco a ti primero.\"",
@@ -626,7 +626,6 @@
   "vidal_3b_sabe": "\"Reza conmigo. De profundis clamavi ad te, Domine.\"",
   "vidal_3b": "\"Reza conmigo.\"",
   "vidal_3c": "\"Te dare el expediente. Vendelo.\"",
-  "vidal_pregunta": "CABO VIDAL  {0}/3\n{1}\n1   {2}\n2   {3}\n3   {4}",
   "vidal_cede": "CABO VIDAL\n{0}",
   "vidal_sigue": "CABO VIDAL\n{0}\nSigue ahi. Habla otra vez con el.",
   "vidal_se_va": "CABO VIDAL\n{0}\nVidal no volvera a escucharte. Tiene que haber otra manera: mira el suelo.",
@@ -648,6 +647,14 @@
   "vidal_r3b_no": "\"Usted no reza.\" Vuelve la espalda.",
   "clave_alarma": "TECLADO DEL ARCHIVO\nDos claves malas seguidas: el teclado se bloquea un momento y avisa a la central.",
   "radio_teclado": "Clave erronea en el archivo, dos veces. Todas las unidades: ojo, y parte uno por uno.",
-  "vidal_nombre": "CABO VIDAL"
+  "vidal_nombre": "CABO VIDAL",
+  "vidal_2b_control": "\"Que esta vivo y sufre. Una doctora lo escribio y ya no firma nada.\"",
+  "vidal_3a_medalla": "(Le das la medalla entre los barrotes.) \"Tu hermano durmio en este catre.\"",
+  "vidal_4": "(Callar y abrir con la llave del hermano)",
+  "vidal_pista2": "Te falta saber que hay abajo. Control quiza lo sepa: llama por radio ({0}).",
+  "vidal_pista3": "Te falta algo que a Vidal le importe. Registra la celda.",
+  "vidal_falta": "CABO VIDAL\n{0}\n{1}",
+  "vidal_rezo": "De profundis clamavi ad te, Domine... Domine, exaudi vocem meam...",
+  "vidal_r3a_medalla": "Coge la medalla por entre los barrotes y la aprieta en el puno. No dice nada. Abre."
  }
 }

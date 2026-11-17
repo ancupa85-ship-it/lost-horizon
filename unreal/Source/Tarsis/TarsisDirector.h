@@ -873,6 +873,14 @@ public:
 	int32 CellStage = 0;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	int32 CellFails = 0;
+	/** Segundos junto a la reja hasta oir que reza Vidal (el De profundis: vale para rezar con el). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	float CellPraySeconds = 4.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	bool bCellHeardPrayer = false;
+	/** Veces que has contestado sin saber bastante (no cuenta como error; el juego dice que te falta). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
+	int32 CellLacks = 0;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	bool bVidalGone = false;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
@@ -1217,7 +1225,10 @@ private:
 	void OpenCellWith(bool bKeyUsed);
 	void CellTick(float DeltaSeconds);
 	void CellReset();
-	bool bCellAlso = false;
+	bool bCellMedal = false;
+	float CellPrayT = 0.0f;
+	int32 CellOkMask = 0;
+	int32 CellLackMask = 0;
 	float CellOpenT = 0.0f;
 	UPROPERTY()
 	TObjectPtr<class UStaticMeshComponent> SlabProp;
