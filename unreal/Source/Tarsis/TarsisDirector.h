@@ -232,6 +232,14 @@ public:
 	FVector LampCoverOffset = FVector(-25.0f, 0.0f, 1.2f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
 	FVector LampCoverScale = FVector(0.26f, 0.40f, 0.036f);
+	/** Tanda 30: las farolas del patio son otro modelo (un farol con la bombilla dentro, 26 a 38 cm por encima de la luz).
+	 *  Se distinguen por la altura de la luz: por debajo de LampCoverPatioZ (285 en el patio, 380 en el camino). Medido en el PC. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	FVector LampCoverPatioOffset = FVector(-25.0f, 0.0f, 32.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	FVector LampCoverPatioScale = FVector(0.16f, 0.17f, 0.14f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis")
+	float LampCoverPatioZ = 330.0f;
 	/** Repone las farolas rotas (pruebas y carga de partida). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void RepairLamps();

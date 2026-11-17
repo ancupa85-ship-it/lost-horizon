@@ -101,34 +101,48 @@ def navegacion():
     log('mapa de navegación', round(ancho / 100), 'x', round(largo / 100), 'm')
 
 def centinelas(eas, cls):
-    # un centinela en cada torre (TOWERS del visor), en la plataforma, junto a su foco, que gira con él
+    # un centinela en cada torre vieja (TOWERS del visor), en la plataforma, junto a su foco, que gira con él.
+    # Tanda 30: las torres de esquina («grande») llevan dos puestos, cada uno con su centinela y su foco: el de dentro
+    # se llama «centinela de la torre N» y el de fuera «vigia de la torre N» (sus recorridos, en mision1.json)
     import math
     focos = [a for a in eas.get_all_level_actors() if isinstance(a, unreal.SpotLight)]
+    usados = set()
     n = 0
     for i, t in enumerate(DATA.get('torres', [])):
-        bx, by = t['pos'][0], t['pos'][1]
-        loc = unreal.Vector((bx - 0.25) * 100.0, -by * 100.0, t.get('altura', 4.2) * 100.0 + 95.0)
-        d = t['foco']['dir']
-        yaw = math.degrees(math.atan2(-d[1], d[0]))   # Blender -> Unreal: Y cambia de signo
-        g = eas.spawn_actor_from_class(cls, loc, unreal.Rotator(roll=0, pitch=0, yaw=yaw))
-        g.set_actor_label('Centinela_' + t['name'])
-        g.set_editor_property('guard_name', 'centinela de la torre %d' % (i + 1))
-        g.set_folder_path('Guardias')
-        g.set_editor_property('tower_sentry', True)
-        g.set_editor_property('tower_yaw', yaw)
-        g.set_editor_property('view_distance', 2500.0)
-        g.set_editor_property('view_half_angle', 32.0)
-        fp = t['foco']['pos']
-        fl = unreal.Vector(fp[0] * 100.0, -fp[1] * 100.0, fp[2] * 100.0)
-        if focos:
-            f = min(focos, key=lambda a: (a.get_actor_location() - fl).length())
-            if (f.get_actor_location() - fl).length() < 400:
-                f.get_editor_property('root_component').set_editor_property('mobility', unreal.ComponentMobility.MOVABLE)
-                g.set_editor_property('tower_light', f)
-            else:
-                log('AVISO: no encuentro el foco de', t['name'])
-        cuerpo(g, 'centinela')
-        n += 1
+        grande = bool(t.get('grande'))
+        puestos = t.get('puestos') or [{'rol': 'dentro', 'pos': [t['pos'][0] - 0.25, t['pos'][1], 0.0], 'foco': t['foco']}]
+        for pu in puestos:
+            fuera = pu.get('rol') == 'fuera'
+            loc = unreal.Vector(pu['pos'][0] * 100.0, -pu['pos'][1] * 100.0, t.get('altura', 4.2) * 100.0 + 95.0)
+            d = pu['foco']['dir']
+            yaw = math.degrees(math.atan2(-d[1], d[0]))   # Blender -> Unreal: Y cambia de signo
+            g = eas.spawn_actor_from_class(cls, loc, unreal.Rotator(roll=0, pitch=0, yaw=yaw))
+            g.set_actor_label(('Vigia_' if fuera else 'Centinela_') + t['name'])
+            g.set_editor_property('guard_name', '%s de la torre %d' % ('vigia' if fuera else 'centinela', i + 1))
+            g.set_folder_path('Guardias')
+            g.set_editor_property('tower_sentry', True)
+            g.set_editor_property('tower_yaw', yaw)
+            # los de esquina de dentro ven más corto: su torre queda lejos y el portillo de la marisma tiene que seguir siendo posible
+            g.set_editor_property('view_distance', 1800.0 if grande and not fuera else 2500.0)
+            g.set_editor_property('view_half_angle', 32.0)
+            fp = pu['foco']['pos']
+            fl = unreal.Vector(fp[0] * 100.0, -fp[1] * 100.0, fp[2] * 100.0)
+            libres = [a for a in focos if a not in usados]
+            if libres:
+                f = min(libres, key=lambda a: (a.get_actor_location() - fl).length())
+                if (f.get_actor_location() - fl).length() < 400:
+                    usados.add(f)
+                    f.get_editor_property('root_component').set_editor_property('mobility', unreal.ComponentMobility.MOVABLE)
+                    if grande:
+                        # lejos y de noche: sin sombras (lo que gasta memoria se deja para luego) y con alcance para su recorrido
+                        c = f.get_component_by_class(unreal.SpotLightComponent)
+                        c.set_editor_property('cast_shadows', False)
+                        c.set_editor_property('attenuation_radius', 6500.0)
+                    g.set_editor_property('tower_light', f)
+                else:
+                    log('AVISO: no encuentro el foco de', t['name'], pu.get('rol'))
+            cuerpo(g, 'centinela')
+            n += 1
     return n
 
 def colocar():

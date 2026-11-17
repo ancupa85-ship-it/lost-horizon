@@ -3163,7 +3163,8 @@ void ATarsisDirector::LampsTick()
 void ATarsisDirector::CoverLamp(const ALight* Lamp)
 {
 	if (!Lamp) return;
-	UStaticMeshComponent* C = AddBlock(Lamp->GetActorLocation() + LampCoverOffset, LampCoverScale, FLinearColor(0.004f, 0.004f, 0.004f), false);
+	const bool bPatio = Lamp->GetActorLocation().Z < LampCoverPatioZ;   // el farol del patio cuelga más bajo que la farola del camino
+	UStaticMeshComponent* C = AddBlock(Lamp->GetActorLocation() + (bPatio ? LampCoverPatioOffset : LampCoverOffset), bPatio ? LampCoverPatioScale : LampCoverScale, FLinearColor(0.004f, 0.004f, 0.004f), false);
 	if (C) C->SetCastShadow(false);
 	LampCovers.Add(C);
 }

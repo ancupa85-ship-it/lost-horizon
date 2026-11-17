@@ -223,6 +223,60 @@ def torre(i, t):
 import math
 TORRES = [torre(i, t) for i, t in enumerate(TOWERS)]
 
+# 4b bis) tanda 30: cuatro torres grandes, una en cada esquina del muro perimetral (por dentro), más altas que el muro.
+# Plataforma de 4,4 m para dos centinelas, cada uno con su foco: uno mira hacia dentro de la base y otro hacia fuera.
+# Los focos van en las dos esquinas de la plataforma que caen sobre la diagonal (la de dentro y la de fuera).
+TG = 6.0   # altura de la plataforma (el muro mide 4,6)
+
+def torre_grande(i, cx, cz):
+    L = {'madera': [], 'hierro': []}
+    def B(key, sx, sy, sz, px, py, pz, rx=0.0, ry=0.0, rz=0.0):
+        L[key].append((sx, sy, sz, cx + px, py, cz + pz, rx, ry, rz))
+    for a in (-1.9, 1.9):
+        for b in (-1.9, 1.9):
+            B('madera', 0.24, TG, 0.24, a, TG / 2, b)                       # patas
+            B('madera', 0.12, 2.45, 0.12, a, TG + 1.22, b)                  # pies derechos del tejadillo
+            B('hierro', 0.5, 0.25, 0.5, a, 0.12, b)                         # zapatas
+    B('madera', 4.4, 0.14, 4.4, 0, TG, 0)                                   # plataforma
+    for h in (1.8, 3.6, 5.3):                                               # travesaños
+        for q in (-1.9, 1.9):
+            B('madera', 3.8, 0.1, 0.1, 0, h, q); B('madera', 0.1, 0.1, 3.8, q, h, 0)
+    for h0, h1 in ((0.2, 3.6), (3.6, TG)):                                  # cruces de San Andrés en los cuatro lados, dos pisos
+        lar = math.hypot(3.8, h1 - h0); ang = math.atan2(h1 - h0, 3.8); hm = (h0 + h1) / 2
+        for q in (-1.9, 1.9):
+            for sg in (-1, 1):
+                B('madera', lar, 0.08, 0.08, 0, hm, q, rz=sg * ang)
+                B('madera', 0.08, 0.08, lar, q, hm, 0, rx=sg * ang)
+    for q in (-2.1, 2.1):                                                   # peto de tablas y pasamanos; el lado +x se abre para la escala
+        B('madera', 4.2, 0.55, 0.04, 0, TG + 0.36, q); B('madera', 4.2, 0.07, 0.07, 0, TG + 1.1, q)
+    B('madera', 0.04, 0.55, 4.2, -2.1, TG + 0.36, 0); B('madera', 0.07, 0.07, 4.2, -2.1, TG + 1.1, 0)
+    for b in (-1.35, 1.35):
+        B('madera', 0.04, 0.55, 1.5, 2.1, TG + 0.36, b); B('madera', 0.07, 0.07, 1.5, 2.1, TG + 1.1, b)
+    B('hierro', 5.2, 0.06, 5.2, 0, TG + 2.48, 0, rz=0.04)                   # tejadillo de chapa
+    for b in (-0.26, 0.26):                                                 # escala
+        B('madera', 0.06, TG + 1.1, 0.06, 2.3, (TG + 1.1) / 2, b)
+    h = 0.3
+    while h < TG + 0.9:
+        B('madera', 0.04, 0.04, 0.55, 2.3, h, 0); h += 0.3
+    # hacia dentro: la diagonal que apunta al centro de la base
+    ux, uz = (1.0 if cx < 36 else -1.0) / math.sqrt(2), (1.0 if cz < 28 else -1.0) / math.sqrt(2)
+    puestos = []
+    for rol, sg, baja in (('dentro', 1.0, 0.38), ('fuera', -1.0, 0.30)):
+        fx, fz = sg * ux * 2.75, sg * uz * 2.75                             # el proyector, en su esquina
+        B('hierro', 0.5, 0.5, 0.42, fx, TG + 1.55, fz, ry=math.pi / 4)
+        B('hierro', 0.09, 1.3, 0.09, fx, TG + 0.65, fz)
+        lx, lz = cx + sg * ux * 3.25, cz + sg * uz * 3.25                   # la luz, medio metro por delante de la carcasa
+        puestos.append({'rol': rol, 'pos': [cx + sg * ux * 1.5, -(cz + sg * uz * 1.5), 0.0],
+                        'foco': {'pos': [lx, -lz, TG + 1.5], 'dir': [sg * ux * math.cos(baja), -sg * uz * math.cos(baja), -math.sin(baja)]}})
+    for key in ('madera', 'hierro'):
+        malla('torre%d_%s' % (i + 1, key), L[key], key)
+    return {'name': 'torre%d' % (i + 1), 'pos': [cx, -cz, 0.0], 'yaw': math.atan2(ux, -uz), 'altura': TG, 'grande': True,
+            'escala': [cx + 2.9, -cz, 0.0], 'foco': puestos[0]['foco'], 'puestos': puestos}
+
+ESQUINAS = [(-15.0, -15.0), (87.0, -15.0), (87.0, 71.0), (-15.0, 71.0)] if os.environ.get('LH_EXT', '10') != '0' else []   # NO, NE, SE, SO
+N_TORRES_VIEJAS = len(TORRES)
+TORRES += [torre_grande(N_TORRES_VIEJAS + k, cx, cz) for k, (cx, cz) in enumerate(ESQUINAS)]
+
 # 4c) recintos del visor (v51): vallas de tela metálica (f), huecos para pasar agachado (h) y contenedores (m).
 #     El plano se parchea como en visor.js y se levanta la misma geometría.
 MAP = list(json.load(open(os.path.splitext(glb0)[0] + '.json'))['map'])
@@ -484,7 +538,7 @@ for w in FAROLA_POS:
 if JEXT:   # báculo del portón de entrada (el farol de la salida lo crea el director junto a la barrera)
     q = JEXT['entrada']['farol']
     lights.append(dict(f0, pos=[q[0], -q[1], q[2] + 0.2]))
-for tw in TORRES:
+for tw in TORRES[:N_TORRES_VIEJAS]:
     lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': tw['foco']['pos'], 'dir': tw['foco']['dir'],
                    'color': [0.8, 0.9, 1.0], 'power': 90000})
 if JEXT:   # tanda 21: farolas del camino y aplique del portillo. Al final de la lista: las luces de antes conservan su número
@@ -493,6 +547,11 @@ if JEXT:   # tanda 21: farolas del camino y aplique del portillo. Al final de la
     if JEXT.get('portillo_luz'):
         q = JEXT['portillo_luz']
         lights.append({'kind': 'POINT', 'name': 'aplique', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.7, 0.4], 'power': 260})
+# tanda 30: los ocho focos de las torres de esquina, al final (las luces de antes conservan su número)
+for tw in TORRES[N_TORRES_VIEJAS:]:
+    for pu in tw['puestos']:
+        lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': pu['foco']['pos'], 'dir': pu['foco']['dir'],
+                       'color': [0.8, 0.9, 1.0], 'power': 90000})
 json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'marcas': MARCAS, 'torres': TORRES,
            **({'ext': JEXT} if JEXT else {}), 'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
           open(os.path.join(OUT, 'base.json'), 'w'), indent=1)

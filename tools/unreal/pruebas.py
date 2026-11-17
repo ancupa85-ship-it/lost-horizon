@@ -1408,6 +1408,59 @@ def prueba_cielo():
         check('una farola apagada pierde su halo, y lo recupera', menos == hc.y - 1 and d.halo_counts().y == hc.y, '%d -> %d -> %d' % (hc.y, menos, d.halo_counts().y))
 
 
+def _de_esquina():
+    """Los centinelas de las cuatro torres de esquina (tanda 30): los de dentro y los vigías de fuera."""
+    return [g for g in guardias() if g.get_editor_property('tower_sentry') and g.get_actor_label().split('_')[-1] in ('torre3', 'torre4', 'torre5', 'torre6')]
+
+def prueba_esquinas():
+    """Tanda 30: cuatro torres grandes en las esquinas del muro, cada una con dos centinelas y dos focos: uno barre
+    el anillo por dentro y otro la marisma por fuera. Cada foco tiene su recorrido y su segundo de arranque."""
+    aparte(); yield 0.1
+    BASE = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))
+    torres = BASE.get('torres', [])
+    gr = [t for t in torres if t.get('grande')]
+    check('cuatro torres de esquina en base.json, con dos puestos cada una', len(gr) == 4 and all(len(t['puestos']) == 2 for t in gr), len(gr))
+    e = BASE['ext']
+    check('cada una en su esquina, por dentro del muro', sorted((t['pos'][0] < 36, -t['pos'][1] < 28) for t in gr) == [(False, False), (False, True), (True, False), (True, True)]
+          and all(e['x0'] + 2 < t['pos'][0] < e['x1'] - 2 and e['y0'] + 2 < -t['pos'][1] < e['y1'] - 2 for t in gr), [t['pos'] for t in gr])
+    check('más altas que el muro', all(t['altura'] > 4.6 + 1.0 for t in gr), [t['altura'] for t in gr])
+    cs = _de_esquina()
+    dentro = [g for g in cs if g.get_actor_label().startswith('Centinela_')]
+    fuera = [g for g in cs if g.get_actor_label().startswith('Vigia_')]
+    check('ocho centinelas: cuatro miran dentro y cuatro fuera', len(dentro) == 4 and len(fuera) == 4, '%d / %d' % (len(dentro), len(fuera)))
+    luces = [g.get_editor_property('tower_light') for g in cs]
+    check('cada uno con su foco, ninguno compartido', all(luces) and len({l.get_actor_label() for l in luces if l}) == len(cs), [l.get_actor_label() if l else None for l in luces])
+    check('subidos a la plataforma', all(g.get_actor_location().z > 600.0 for g in cs), [round(g.get_actor_location().z) for g in cs])
+    aj = MISION['ajustes']['guardias']
+    check('todos tienen recorrido en mision1.json', all(str(g.get_editor_property('guard_name')) in aj and len(g.get_editor_property('sweep_path')) >= 2 for g in cs),
+          [str(g.get_editor_property('guard_name')) for g in cs if len(g.get_editor_property('sweep_path')) < 2])
+    x0, x1, y0, y1 = e['x0'] * 100, e['x1'] * 100, e['y0'] * 100, e['y1'] * 100
+    den = lambda p: x0 < p.x < x1 and y0 < p.y < y1
+    check('los de dentro barren dentro del muro', all(den(p) for g in dentro for p in g.get_editor_property('sweep_path')))
+    check('los vigías barren fuera del muro', all(not den(p) for g in fuera for p in g.get_editor_property('sweep_path')))
+    for g in cs:
+        g.hold(0.0)
+    g = dentro[0]
+    a0 = g.get_editor_property('sweep_aim')
+    yield 4.0
+    a1 = g.get_editor_property('sweep_aim')
+    check('el foco de dentro se mueve por su recorrido', dist2d(a0, a1) > 100.0, '%.0f cm' % dist2d(a0, a1))
+    tl = g.get_editor_property('tower_light')
+    c = tl.get_component_by_class(unreal.SpotLightComponent)
+    fw = tl.get_actor_forward_vector(); lp = tl.get_actor_location()
+    k = (0.0 - lp.z) / fw.z if fw.z < -0.01 else 0.0
+    suelo = V(lp.x + fw.x * k, lp.y + fw.y * k, 0)
+    check('y apunta de verdad a donde dice', fw.z < -0.01 and dist2d(suelo, a1) < 300.0, '%.0f cm' % dist2d(suelo, a1))
+    check('sin sombras y con alcance para llegar', not c.get_editor_property('cast_shadows') and c.get_editor_property('attenuation_radius') >= 6000.0,
+          '%s / %.0f' % (c.get_editor_property('cast_shadows'), c.get_editor_property('attenuation_radius')))
+    # el foco delata: plantado en su mancha hay mucha más luz que diez metros más allá
+    yield ('hasta', lambda: dist2d(g.get_editor_property('sweep_aim'), g.sweep_point_at(g.sweep_time())) < 150.0, 6.0)
+    aim = g.get_editor_property('sweep_aim')
+    en, fuera_de = luz_en(V(aim.x, aim.y, 90)), luz_en(V(aim.x + 1500, aim.y + 300, 90))
+    check('en la mancha del foco hay luz y fuera no', en > 0.3 and en > fuera_de * 2.0, '%.2f / %.2f' % (en, fuera_de))
+    for x in cs:
+        x.hold(3600.0)
+
 def _focos_torre(encendidos):
     for g in guardias():
         if g.get_editor_property('tower_sentry') and g.get_editor_property('tower_light'):
@@ -2258,7 +2311,7 @@ def prueba_codec():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas]]
 PRUEBAS = []
 
 
@@ -2303,6 +2356,11 @@ def _limpieza(siguiente):
         d.set_editor_property('buddy_rule', siguiente is prueba_apoyo)
         # tanda 29: las llamadas entrantes del códec, solo en su prueba (prueba_codec las enciende ella)
         d.set_editor_property('codec_calls', False)
+    # tanda 30: los ocho centinelas de las torres de esquina, quietos y sin ver salvo en su prueba: las demás plantan al
+    # jugador por el anillo y se escribieron sin ellos (su foco se queda parado al principio de su recorrido)
+    if siguiente is not prueba_esquinas:
+        for g in _de_esquina():
+            g.hold(3600.0)
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 

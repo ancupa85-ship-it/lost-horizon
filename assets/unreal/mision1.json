@@ -96,6 +96,206 @@
     ],
     "sweep_phase": 7.0,
     "sweep_ref_dist": 1850.0
+   },
+   "centinela de la torre 3": {
+    "sweep_path": [
+     [
+      -800,
+      -800,
+      0
+     ],
+     [
+      2800,
+      -900,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 300.0,
+    "sweep_stops": [
+     2.5,
+     2.5
+    ],
+    "sweep_phase": 3.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "centinela de la torre 4": {
+    "sweep_path": [
+     [
+      8100,
+      -900,
+      0
+     ],
+     [
+      4600,
+      -900,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 300.0,
+    "sweep_stops": [
+     2.5,
+     2.5
+    ],
+    "sweep_phase": 11.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "centinela de la torre 5": {
+    "sweep_path": [
+     [
+      8100,
+      6800,
+      0
+     ],
+     [
+      4600,
+      6800,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 300.0,
+    "sweep_stops": [
+     2.5,
+     2.5
+    ],
+    "sweep_phase": 17.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "centinela de la torre 6": {
+    "sweep_path": [
+     [
+      -900,
+      6000,
+      0
+     ],
+     [
+      -900,
+      2600,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 300.0,
+    "sweep_stops": [
+     2.5,
+     2.5
+    ],
+    "sweep_phase": 23.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 3": {
+    "sweep_path": [
+     [
+      -3200,
+      -900,
+      0
+     ],
+     [
+      -3200,
+      -3200,
+      0
+     ],
+     [
+      -900,
+      -3200,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 400.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 5.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 4": {
+    "sweep_path": [
+     [
+      8100,
+      -3200,
+      0
+     ],
+     [
+      10400,
+      -3200,
+      0
+     ],
+     [
+      10400,
+      -900,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 400.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 13.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 5": {
+    "sweep_path": [
+     [
+      10400,
+      6600,
+      0
+     ],
+     [
+      10400,
+      8800,
+      0
+     ],
+     [
+      8100,
+      8800,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 400.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 19.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 6": {
+    "sweep_path": [
+     [
+      -900,
+      8800,
+      0
+     ],
+     [
+      -3200,
+      8800,
+      0
+     ],
+     [
+      -3200,
+      6600,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 400.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 29.0,
+    "sweep_ref_dist": 3000.0
    }
   },
   "montaje": {

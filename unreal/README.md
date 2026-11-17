@@ -173,6 +173,15 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 - Prueba: `prueba_codec`.
 - Pendiente: la R no se puede reasignar todavía; el códec no se guarda en el punto de control (lo ya hablado se olvida al cargar).
 
+### Cuatro torres de esquina (tanda 30)
+
+- Pedidas por Andres: una torre grande en cada esquina del muro perimetral, por dentro (`torre3` NO, `torre4` NE, `torre5` SE, `torre6` SO; `torre_grande` en `tools/unreal/exportar_base.py`). Plataforma de 4,4 m a 6 m de alto (el muro mide 4,6), tejadillo, escala y dos proyectores en la diagonal: uno hacia dentro de la base y otro hacia fuera.
+- Dos centinelas por torre (`guardias.py`, «puestos» de `base.json`): «centinela de la torre N» lleva el foco de dentro y barre su tramo del anillo; «vigia de la torre N» lleva el de fuera y barre la marisma. Los recorridos y el segundo de arranque de cada uno, en `mision1.json` (`ajustes.guardias`).
+- Los ocho focos nuevos van sin sombras y con 65 m de alcance (lejos y de noche: lo que gasta memoria se deja para luego). Siguen delatando: `LightAt` traza por su cuenta.
+- Las dos torres de dentro (`torre1`, `torre2`) siguen en su sitio a la espera de lo que decida Andres.
+- La tapa negra de una farola rota ya distingue el farol del patio de la farola del camino (`LampCoverPatioOffset`, `LampCoverPatioScale`, `LampCoverPatioZ`).
+- Prueba: `prueba_esquinas`. En las demás, los ocho centinelas nuevos están quietos y sin ver (`_limpieza`).
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.
