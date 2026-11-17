@@ -1505,6 +1505,8 @@ def prueba_linternas():
     d.set_torch(True); yield 0.4
     check('de cara y a tres metros, deslumbrado: no te ve', d.get_editor_property('torch_blinds') == 1 and g.is_dazzled() and g.visibility(jugador()) == 0.0,
           '%d, %s, %.2f' % (d.get_editor_property('torch_blinds'), g.is_dazzled(), g.visibility(jugador())))
+    check('lo que alumbras de cerca no se quema: la luz baja', d.torch_dim_now() < 0.5 and d.torch_comp().get_editor_property('intensity') < d.get_editor_property('torch_lumens') * 0.5,
+          '%.2f, %.0f lm' % (d.torch_dim_now(), d.torch_comp().get_editor_property('intensity')))
     yield d.get_editor_property('torch_blind_seconds') + 0.5
     check('se le pasa y no repite enseguida (se tapa los ojos)', not g.is_dazzled() and d.get_editor_property('torch_blinds') == 1, '%s, %d' % (g.is_dazzled(), d.get_editor_property('torch_blinds')))
     g.hold(30.0)
@@ -2206,7 +2208,7 @@ def prueba_controles():
     d = director()
     yield from teclas(d, 'P', *(['Down'] * 9), 'Enter')
     ls = lineas(d)
-    check('CONTROLES abre la página de teclas', len(ls) == 9 and 'VOLVER' in ls[-1], ' / '.join(ls))
+    check('CONTROLES abre la página de teclas', len(ls) == 10 and 'VOLVER' in ls[-1], ' / '.join(ls))
     tecla0 = ls[0]
     yield from teclas(d, 'Enter')
     check('Intro no se asigna a sí misma (espera tecla)', 'PULSA UNA TECLA' in lineas(d)[0], lineas(d)[0])
@@ -2217,7 +2219,7 @@ def prueba_controles():
     yield from teclas(d, 'Enter', 'E')
     ls = lineas(d)
     check('si la tecla choca, se intercambian', '[ E ]' in ls[0] and '[ X ]' in ls[1], '%s / %s' % (ls[0], ls[1]))
-    yield from teclas(d, *(['Down'] * 7), 'Enter')   # siete acciones desde la tanda 31 (la linterna)
+    yield from teclas(d, *(['Down'] * 8), 'Enter')   # ocho acciones desde la tanda 32 (la radio)
     ls = lineas(d)
     check('TECLAS POR DEFECTO lo deshace', ls[0] == tecla0 and ls[1] == interact, '%s / %s' % (ls[0], ls[1]))
     yield from teclas(d, 'Escape')
@@ -2388,6 +2390,17 @@ def prueba_codec():
         d.codec_next(); yield 0.05
     check('tras la última frase cuelga y el juego sigue', not d.get_editor_property('codec') and not pausa())
     check('queda apuntada', 'inicio' in [str(x) for x in d.get_editor_property('codec_taken')])
+    # tanda 32: la tecla de la radio es una acción más (se reasigna) y lo ya oído viaja con el punto de control
+    check('la tecla de la radio sale en la ayuda', 'R radio' in str(d.help_line()), str(d.help_line()))
+    d.checkpoint('prueba del codec'); yield 0.2
+    d.codec_reset()
+    check('codec_reset lo olvida', 'inicio' not in [str(x) for x in d.get_editor_property('codec_taken')])
+    d.codec_ring('alarma'); yield 0.1
+    ok = d.load_checkpoint(); yield 0.6
+    check('al cargar el punto de control, lo oído vuelve', ok and 'inicio' in [str(x) for x in d.get_editor_property('codec_taken')], [str(x) for x in d.get_editor_property('codec_taken')])
+    check('y no queda una llamada de antes sonando', str(d.get_editor_property('codec_pending')) == 'None', str(d.get_editor_property('codec_pending')))
+    for g in guardias():
+        g.hold(3600.0)
     # menú de frecuencias
     d.codec_key(); yield 0.1
     m = [str(x) for x in d.codec_menu_lines()]

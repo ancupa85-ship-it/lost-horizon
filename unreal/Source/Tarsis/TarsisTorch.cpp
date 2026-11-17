@@ -44,7 +44,8 @@ void ATarsisDirector::SetTorch(bool bOn)
 	bTorch = bOn;
 	if (PlayerTorch)
 	{
-		PlayerTorch->SetIntensity(TorchLumens);
+		if (!bOn) TorchDim = 1.0f;
+		PlayerTorch->SetIntensity(TorchLumens * TorchDim);
 		PlayerTorch->SetAttenuationRadius(TorchRange);
 		PlayerTorch->SetOuterConeAngle(TorchCone);
 		PlayerTorch->SetInnerConeAngle(TorchCone * 0.45f);
@@ -69,6 +70,22 @@ void ATarsisDirector::TorchTick(float DeltaSeconds)
 	if (TorchNoticeT > 0.0f) TorchNoticeT -= DeltaSeconds;
 	if (!bTorch || !PlayerTorch) return;
 	if (bCine || bDone || !bHasTorch) { SetTorch(false); return; }
+	// lo que tienes a un palmo no se quema: la luz baja con la distancia a lo que alumbra el centro del haz
+	if (TorchNearDist > 1.0f)
+	{
+		const FVector A = PlayerTorch->GetComponentLocation();
+		FCollisionQueryParams NQ(SCENE_QUERY_STAT(TarsisLinternaCerca), true, this);
+		if (APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0)) NQ.AddIgnoredActor(Me);
+		FHitResult Near;
+		float Want = 1.0f;
+		if (GetWorld()->LineTraceSingleByChannel(Near, A, A + PlayerTorch->GetForwardVector() * TorchNearDist, ECC_Visibility, NQ))
+		{
+			// la luz cae con el cuadrado de la distancia: se compensa casi del todo, con un suelo
+			Want = FMath::Clamp(FMath::Square(Near.Distance / TorchNearDist), TorchNearMin, 1.0f);
+		}
+		TorchDim = FMath::FInterpTo(TorchDim, Want, DeltaSeconds, Want < TorchDim ? 9.0f : 3.0f);
+		PlayerTorch->SetIntensity(TorchLumens * TorchDim);
+	}
 	// a bocajarro y de cara: le deslumbras. Se queda unos segundos sin ver ni andar (puedes pasar, huir o derribarle
 	// como tras un empujon) y al rehacerse va a por ti; la segunda vez seguida ya se tapa los ojos
 	if (APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0))

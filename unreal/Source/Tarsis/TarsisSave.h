@@ -30,6 +30,7 @@ public:
 	UPROPERTY() bool bRamosKnown = false;
 	UPROPERTY() bool bLampBroken = false;
 	UPROPERTY() TArray<FVector> BrokenLamps;   // dónde están las farolas rotas de un dardo (tanda 27)
+	UPROPERTY() TArray<FString> CodecTaken;   // conversaciones del codec ya oidas (tanda 32)
 	UPROPERTY() int32 Weather = 0;
 
 	// ---- parte del día siguiente (hueco "TarsisParte"): lo que la misión 2 encuentra en la base

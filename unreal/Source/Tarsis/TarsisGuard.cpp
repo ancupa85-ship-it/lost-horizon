@@ -1234,7 +1234,9 @@ void ATarsisGuard::AutoTorchTick(float DeltaSeconds)
 		return;
 	}
 	TorchOnFor += 0.6f;
-	if (L > TorchOffAbove || !bReason) { if (++TorchLit >= 3 && TorchOnFor >= TorchMinOn) { bAutoTorch = false; SetFlashlight(false); } }
+	// tanda 32: bajo techo solo la guarda con luz de sobra (0,6), que una bombilla al pasar no basta
+	const float Off = IsIndoors() ? FMath::Max(TorchOffAbove, 0.6f) : TorchOffAbove;
+	if (L > Off || !bReason) { if (++TorchLit >= 3 && TorchOnFor >= TorchMinOn) { bAutoTorch = false; SetFlashlight(false); } }
 	else TorchLit = 0;
 }
 

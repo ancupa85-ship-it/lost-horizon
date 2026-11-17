@@ -3220,6 +3220,7 @@ void ATarsisDirector::Checkpoint(const FString& Name)
 	S->bLampBroken = bLampBroken;
 	S->BrokenLamps.Reset();
 	for (const ULightComponent* BL : BrokenLights) if (BL && BL->GetOwner()) S->BrokenLamps.Add(BL->GetOwner()->GetActorLocation());
+	S->CodecTaken = CodecTaken;
 	S->Weather = Weather;
 	S->Flags = FlagList();
 	bHasSave = UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisPartida"), 0) || bHasSave;
@@ -3289,6 +3290,12 @@ bool ATarsisDirector::LoadCheckpoint()
 			PendingOff.Remove(BL);
 		}
 	}
+	// tanda 32: las llamadas ya cogidas son las del punto de control (antes, al cargar, Control repetia las suyas)
+	CloseCodec();
+	CodecPending = NAME_None;
+	CodecRingT = 0.0f;
+	bCodecMenu = false;
+	CodecTaken = S->CodecTaken;
 	if (S->Weather != Weather) SetWeather(S->Weather);
 	bWetInit = false;   // el mojado, de golpe al que toque con el clima cargado
 	bCloudInit = false; // y el cielo
@@ -3558,7 +3565,7 @@ void ATarsisDirector::LoadOptions()
 
 const TCHAR* ATarsisDirector::ActionName(int32 I)
 {
-	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA"), TEXT("LINTERNA") };
+	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA"), TEXT("LINTERNA"), TEXT("RADIO") };
 	return (I >= 0 && I < NumActions) ? N[I] : TEXT("");
 }
 
@@ -3571,6 +3578,7 @@ void ATarsisDirector::DefaultKeys()
 	ActionKeys[4] = EKeys::LeftShift;
 	ActionKeys[5] = EKeys::Y;
 	ActionKeys[6] = EKeys::F;
+	ActionKeys[7] = EKeys::R;
 }
 
 void ATarsisDirector::BindAll()
@@ -3605,8 +3613,8 @@ void ATarsisDirector::BindAll()
 		B.bConsumeInput = false;
 	}
 	BindMenuKeys();
-	// códec: la R (llamar o coger la llamada) y, con la conversación abierta y el juego en pausa, la E y el clic para seguir
-	for (const FKey& K : { EKeys::R, ActionKeys[1], EKeys::LeftMouseButton })
+	// códec: la tecla de la radio (R; llamar o coger la llamada) y, con la conversación abierta y el juego en pausa, la E y el clic para seguir
+	for (const FKey& K : { ActionKeys[7], ActionKeys[1], EKeys::LeftMouseButton })
 	{
 		FInputKeyBinding& B = InputComponent->BindKey(K, IE_Pressed, this, &ATarsisDirector::CodecInput);
 		B.bConsumeInput = false;
@@ -3644,7 +3652,7 @@ FString ATarsisDirector::HelpLine() const
 	if (Darts > 0) S += FString::Printf(TEXT("   CLIC dardo (%d)"), Darts);
 	if (bHasTorch) S += FString::Printf(TEXT("   %s linterna"), *K(6));
 	if (bPowerOff) S += TEXT("   sin luz: busca la sombra de las linternas");
-	S += TEXT("   R radio   P pausa");
+	S += FString::Printf(TEXT("   %s radio   P pausa"), *K(7));
 	return S;
 }
 

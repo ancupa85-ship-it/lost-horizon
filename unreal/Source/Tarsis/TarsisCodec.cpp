@@ -44,7 +44,7 @@ void ATarsisDirector::CodecKey()
 
 void ATarsisDirector::CodecInput(FKey Key)
 {
-	if (Key == EKeys::R) { CodecKey(); return; }
+	if (Key == ActionKeys[7]) { CodecKey(); return; }
 	if (bCodec) CodecNext();   // la E y el clic pasan de frase
 }
 
@@ -195,7 +195,7 @@ TArray<FString> ATarsisDirector::CodecMenuLines() const
 	L.Add(TEXT("1    141.12    CONTROL"));
 	L.Add(TEXT("2    140.85    ROIG"));
 	if (CodecVoiceOpen()) L.Add(TEXT("3    000.00    - - -"));
-	L.Add(Tx(TEXT("codec_colgar"), TEXT("R    colgar")));
+	L.Add(Tx(TEXT("codec_colgar"), TEXT("{0}    colgar"), { ActionKeys[7].GetDisplayName().ToString().ToUpper() }));
 	return L;
 }
 
@@ -210,8 +210,9 @@ FString ATarsisDirector::CodecPendingText() const
 {
 	if (CodecPending.IsNone() || bCodec || bCine || bDone) return FString();
 	const TCHAR* Freq = CodecPending.ToString().StartsWith(TEXT("fuente")) ? TEXT("000.00") : (CodecPending.ToString().StartsWith(TEXT("roig")) ? TEXT("140.85") : TEXT("141.12"));
-	return CodecRingT > 0.0f ? Tx(TEXT("codec_llamada"), TEXT("LLAMADA  {0}  -  pulsa R"), { Freq })
-		: Tx(TEXT("codec_espera"), TEXT("R: llamada en espera ({0})"), { Freq });
+	const FString RK = ActionKeys[7].GetDisplayName().ToString().ToUpper();
+	return CodecRingT > 0.0f ? Tx(TEXT("codec_llamada"), TEXT("LLAMADA  {0}  -  pulsa {1}"), { Freq, RK })
+		: Tx(TEXT("codec_espera"), TEXT("{1}: llamada en espera ({0})"), { Freq, RK });
 }
 
 FString ATarsisDirector::CodecHelp() const

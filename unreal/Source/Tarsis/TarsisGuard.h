@@ -406,7 +406,7 @@ public:
 	bool bTorchOutdoors = false;
 	/** Una vez encendida, aguanta al menos estos segundos (no parpadea al cruzar manchas de luz). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
-	float TorchMinOn = 5.0f;
+	float TorchMinOn = 9.0f;   // tanda 32: con 5 s Ramos la sacaba y guardaba unas 4 veces por minuto en el barracon
 	/** Pisa suelo de interior (bajo techo). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
 	bool IsIndoors() const;

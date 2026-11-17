@@ -610,6 +610,15 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
 	bool bTorch = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	/** Tanda 32: lo que alumbras a menos de esta distancia (cm) recibe menos luz, hasta TorchNearMin de cerca: como el ojo que se
+	 *  acostumbra, y el guardia deslumbrado o la pared a un palmo dejan de salir blancos. 0 lo quita. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchNearDist = 600.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchNearMin = 0.18f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
+	float TorchDimNow() const { return TorchDim; }
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	float TorchLumens = 300.0f;   // ajuste 31c: con 450 quemaba el suelo y a los guardias a 2-3 m
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	float TorchRange = 2200.0f;
@@ -653,6 +662,7 @@ public:
 	UPROPERTY() TObjectPtr<class USpotLightComponent> PlayerTorch;
 	UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> BeamGlows;
 	float TorchNoticeT = 0.0f;
+	float TorchDim = 1.0f;   // tanda 32: 1 = toda la luz; baja cuando alumbras algo a un palmo
 
 	// misión secundaria de Ramos: carta en su litera, agarrarlo por la espalda (1 te lo llevas, 2 lo derribas),
 	// llave del botiquín del veterinario con la pistola de dardos, y salida alternativa por el portillo de la marisma
@@ -901,7 +911,7 @@ public:
 	int32 WaitKeyFor = -1;
 
 	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
-	static constexpr int32 NumActions = 7;
+	static constexpr int32 NumActions = 8;
 	FKey ActionKeys[NumActions];
 	static const TCHAR* ActionName(int32 I);
 
