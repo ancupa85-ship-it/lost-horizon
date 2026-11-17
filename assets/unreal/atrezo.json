@@ -2730,9 +2730,9 @@
    "nombre": "arch_legajos_1",
    "modelo": "legajos",
    "pos": [
-    1493,
+    1540,
     3228,
-    160
+    125
    ],
    "giro": 0,
    "pequeno": true
@@ -2741,9 +2741,9 @@
    "nombre": "arch_legajos_2",
    "modelo": "legajos",
    "pos": [
-    1587,
+    1540,
     3228,
-    160
+    175
    ],
    "giro": 180,
    "pequeno": true
@@ -2752,9 +2752,9 @@
    "nombre": "arch_legajos_3",
    "modelo": "legajos_oscuros",
    "pos": [
-    1693,
+    1740,
     3228,
-    160
+    125
    ],
    "giro": 0,
    "pequeno": true
@@ -2763,9 +2763,9 @@
    "nombre": "arch_legajos_4",
    "modelo": "legajos",
    "pos": [
-    1787,
+    1740,
     3228,
-    160
+    175
    ],
    "giro": 180,
    "pequeno": true
@@ -2774,9 +2774,9 @@
    "nombre": "arch_legajos_5",
    "modelo": "legajos",
    "pos": [
-    1893,
+    1940,
     3228,
-    160
+    125
    ],
    "giro": 0,
    "pequeno": true
@@ -2785,9 +2785,9 @@
    "nombre": "arch_legajos_6",
    "modelo": "legajos_oscuros",
    "pos": [
-    1987,
+    1940,
     3228,
-    160
+    175
    ],
    "giro": 180,
    "pequeno": true
@@ -2796,9 +2796,9 @@
    "nombre": "arch_legajos_alto_1",
    "modelo": "legajos",
    "pos": [
-    1640,
+    1540,
     3228,
-    250
+    75
    ],
    "giro": 0,
    "pequeno": true
@@ -2807,9 +2807,9 @@
    "nombre": "arch_legajos_alto_2",
    "modelo": "legajos_oscuros",
    "pos": [
-    1840,
+    1940,
     3228,
-    250
+    75
    ],
    "giro": 180,
    "pequeno": true
@@ -2818,18 +2818,19 @@
    "nombre": "arch_papeles",
    "modelo": "papeles",
    "pos": [
-    1900,
-    3500,
-    140
+    1875,
+    3522,
+    78
    ],
    "giro": 25,
-   "pequeno": true
+   "pequeno": true,
+   "colgar": true
   },
   {
    "nombre": "tx_papeles",
    "modelo": "papeles",
    "pos": [
-    6335,
+    6290,
     1962,
     140
    ],
