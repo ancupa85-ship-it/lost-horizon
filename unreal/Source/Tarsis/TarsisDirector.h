@@ -612,7 +612,7 @@ public:
 	/** Tanda 32: lo que alumbras a menos de esta distancia (cm) recibe menos luz, hasta TorchNearMin de cerca: como el ojo que se
 	 *  acostumbra, y el guardia deslumbrado o la pared a un palmo dejan de salir blancos. 0 lo quita. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
-	float TorchNearDist = 600.0f;
+	float TorchNearDist = 1000.0f;   // tanda 33: con 600 todo lo cercano quedaba como a 6 m, casi blanco de noche
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
 	float TorchNearMin = 0.008f;   // tanda 33: con 0,05 la pared a 50 cm seguia siendo un disco blanco (compensa hasta unos 55 cm)
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")

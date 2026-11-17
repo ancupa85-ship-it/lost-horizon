@@ -2125,7 +2125,7 @@
    "pos": [
     1600,
     3965,
-    160
+    210
    ],
    "giro": -15,
    "pequeno": true
@@ -2208,8 +2208,8 @@
    "nombre": "tx_silla",
    "modelo": "metal_stool_01",
    "pos": [
-    6400,
-    2000,
+    6380,
+    2140,
     60
    ],
    "giro": 270
@@ -2567,7 +2567,7 @@
    "nombre": "tx_archivador_1",
    "modelo": "drawer_cabinet",
    "pos": [
-    6640,
+    6620,
     2368,
     60
    ],
@@ -2577,7 +2577,7 @@
    "nombre": "tx_archivador_2",
    "modelo": "drawer_cabinet",
    "pos": [
-    6760,
+    6735,
     2368,
     60
    ],
@@ -2587,9 +2587,9 @@
    "nombre": "tx_mascara",
    "modelo": "old_gas_mask",
    "pos": [
-    6640,
+    6620,
     2365,
-    160
+    210
    ],
    "giro": -20,
    "pequeno": true
@@ -2598,9 +2598,9 @@
    "nombre": "tx_carpeta_1",
    "modelo": "binder_notebook",
    "pos": [
-    6760,
+    6735,
     2365,
-    160
+    210
    ],
    "giro": 25,
    "pequeno": true
@@ -2718,7 +2718,7 @@
    "pos": [
     1845,
     3965,
-    160
+    210
    ],
    "giro": 10,
    "pequeno": true
@@ -2729,7 +2729,7 @@
    "pos": [
     1960,
     3962,
-    160
+    210
    ],
    "giro": -12,
    "pequeno": true
@@ -2739,7 +2739,7 @@
    "modelo": "binder_notebook",
    "pos": [
     1560,
-    3225,
+    3232,
     160
    ],
    "giro": -30,
