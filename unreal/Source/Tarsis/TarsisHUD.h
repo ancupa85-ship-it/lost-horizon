@@ -32,6 +32,12 @@ private:
 	void DrawReport(class ATarsisDirector* D);
 	void DrawHint(class ATarsisDirector* D);
 	void DrawHiding(class ATarsisDirector* D);
+	void DrawRadioAsk(class ATarsisDirector* D);
+	void DrawCodecRing(class ATarsisDirector* D);
+	void DrawCodecMenu(class ATarsisDirector* D);
+	void DrawCodec(class ATarsisDirector* D);
+	void DrawPortrait(class ATarsisDirector* D, FName Key, float X, float Y, float Size, bool bTalking);
+	TArray<FString> Wrap(const FString& S, float MaxW, float Scale) const;
 	float FpsSmooth = 0.0f;
 	float UiScale() const;
 	void Panel(float X, float Y, float W, float H, const FLinearColor& C);

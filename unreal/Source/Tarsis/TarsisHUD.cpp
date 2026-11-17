@@ -5,6 +5,8 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Engine/Texture.h"
+#include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
@@ -66,7 +68,11 @@ void ATarsisHUD::DrawHUD()
 	DrawPrompt(D);
 	DrawKeypad(D);
 	DrawExtras(D);
+	DrawRadioAsk(D);
+	DrawCodecRing(D);
+	DrawCodecMenu(D);
 	DrawReport(D);
+	DrawCodec(D);
 	DrawMenu(D);
 }
 
@@ -269,6 +275,7 @@ void ATarsisHUD::DrawObjective(ATarsisDirector* D)
 void ATarsisHUD::DrawPrompt(ATarsisDirector* D)
 {
 	if (!D) return;
+	if (D->bRadioAsk || D->bCodecMenu || D->bCodec) return;   // esas cajas ocupan su sitio
 	const FString P = D->InteractPrompt();
 	if (P.IsEmpty()) return;
 	const float S = UiScale();
@@ -454,7 +461,7 @@ void ATarsisHUD::DrawMessage(ATarsisDirector* D)
 {
 	if (!D) return;
 	const float S = UiScale();
-	if (D->MessageT > 0.0f && !D->Message.IsEmpty())
+	if (D->MessageT > 0.0f && !D->Message.IsEmpty() && !D->bRadioAsk)   // la pregunta de la central tiene su caja (DrawRadioAsk)
 	{
 		// más abajo y más pequeño que antes: no tapa a los guardias del centro de la pantalla
 		const float A = FMath::Clamp(D->MessageT, 0.0f, 1.0f);
@@ -540,4 +547,199 @@ void ATarsisHUD::DrawHiding(ATarsisDirector* D)
 		Yc += Gap;
 	}
 	Panel(0.0f, Yc, X, Y - Yc, Dark);
+}
+// ---------------------------------------------------------------- tanda 29: la pregunta de la central, en grande
+
+void ATarsisHUD::DrawRadioAsk(ATarsisDirector* D)
+{
+	if (!D || !D->bRadioAsk || D->Message.IsEmpty()) return;
+	const float S = UiScale();
+	TArray<FString> Lines;
+	D->Message.ParseIntoArray(Lines, TEXT("\n"));
+	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+	float TW = 300.0f * S;
+	for (int32 i = 0; i < Lines.Num(); ++i)
+	{
+		float LW = 0.0f, LH = 0.0f;
+		if (F) GetTextSize(Lines[i], LW, LH, F, (i == 0 ? 1.05f : 1.15f) * S);
+		TW = FMath::Max(TW, LW);
+	}
+	const float LH = 36.0f * S;
+	const float W = FMath::Min(TW + 70.0f * S, Canvas->ClipX - 24.0f * S), H = Lines.Num() * LH + 26.0f * S;
+	const float X = Canvas->ClipX / 2.0f - W / 2.0f, Y = Canvas->ClipY * 0.55f;
+	Panel(X, Y, W, H, FLinearColor(0.0f, 0.03f, 0.01f, 0.86f));
+	Panel(X, Y, W, 3.0f * S, FLinearColor(0.35f, 1.0f, 0.45f, 0.9f));
+	Panel(X, Y + H - 3.0f * S, W, 3.0f * S, FLinearColor(0.35f, 1.0f, 0.45f, 0.9f));
+	for (int32 i = 0; i < Lines.Num(); ++i)
+	{
+		Text(Lines[i], X + 34.0f * S, Y + 14.0f * S + i * LH, i == 0 ? FLinearColor(1.0f, 0.85f, 0.55f) : FLinearColor(0.85f, 1.0f, 0.88f), (i == 0 ? 1.05f : 1.15f) * S, false);
+	}
+}
+
+// ---------------------------------------------------------------- tanda 29: el códec
+
+TArray<FString> ATarsisHUD::Wrap(const FString& Str, float MaxW, float Scale) const
+{
+	TArray<FString> Out;
+	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+	TArray<FString> Words;
+	Str.ParseIntoArray(Words, TEXT(" "));
+	FString Line;
+	for (const FString& Wd : Words)
+	{
+		const FString Try = Line.IsEmpty() ? Wd : Line + TEXT(" ") + Wd;
+		float W = 0.0f, H = 0.0f;
+		if (F) const_cast<ATarsisHUD*>(this)->GetTextSize(Try, W, H, F, Scale);
+		if (W > MaxW && !Line.IsEmpty()) { Out.Add(Line); Line = Wd; }
+		else Line = Try;
+	}
+	if (!Line.IsEmpty()) Out.Add(Line);
+	return Out;
+}
+
+void ATarsisHUD::DrawCodecRing(ATarsisDirector* D)
+{
+	if (!D) return;
+	const FString T = D->CodecPendingText();
+	if (T.IsEmpty()) return;
+	const float S = UiScale();
+	const bool bRing = D->CodecRingT > 0.0f;
+	const float Now = GetWorld() ? (float)GetWorld()->GetRealTimeSeconds() : 0.0f;
+	const bool bOn = !bRing || FMath::Fmod(Now, 0.7f) > 0.25f;
+	const float Sc = (bRing ? 1.0f : 0.72f) * S;
+	UFont* F = GEngine ? GEngine->GetMediumFont() : nullptr;
+	float W = 260.0f * S, H = 0.0f;
+	if (F) GetTextSize(T, W, H, F, Sc);
+	W += 44.0f * S;
+	const float PH = (bRing ? 42.0f : 30.0f) * S;
+	const float X = Canvas->ClipX / 2.0f - W / 2.0f, Y = Canvas->ClipY * 0.085f;
+	Panel(X, Y, W, PH, FLinearColor(0.0f, 0.06f, 0.02f, bRing ? 0.8f : 0.5f));
+	Panel(X, Y, 4.0f * S, PH, FLinearColor(0.35f, 1.0f, 0.45f, bOn ? 0.95f : 0.25f));
+	Text(T, Canvas->ClipX / 2.0f + 2.0f * S, Y + (bRing ? 8.0f : 5.0f) * S, FLinearColor(0.6f, 1.0f, 0.7f, bOn ? 1.0f : 0.45f), Sc, true);
+}
+
+void ATarsisHUD::DrawCodecMenu(ATarsisDirector* D)
+{
+	if (!D || !D->bCodecMenu || D->bCodec) return;
+	const float S = UiScale();
+	const TArray<FString> L = D->CodecMenuLines();
+	const float LH = 36.0f * S;
+	const float W = 470.0f * S, H = L.Num() * LH + 26.0f * S;
+	const float X = Canvas->ClipX / 2.0f - W / 2.0f, Y = Canvas->ClipY * 0.55f;
+	Panel(X, Y, W, H, FLinearColor(0.0f, 0.05f, 0.02f, 0.86f));
+	Panel(X, Y, W, 3.0f * S, FLinearColor(0.35f, 1.0f, 0.45f, 0.9f));
+	Panel(X, Y + H - 3.0f * S, W, 3.0f * S, FLinearColor(0.35f, 1.0f, 0.45f, 0.9f));
+	for (int32 i = 0; i < L.Num(); ++i)
+	{
+		const bool bHead = i == 0, bFoot = i == L.Num() - 1;
+		Text(L[i], X + 30.0f * S, Y + 14.0f * S + i * LH, bHead ? FLinearColor(1.0f, 0.85f, 0.55f) : (bFoot ? FLinearColor(0.6f, 0.75f, 0.65f) : FLinearColor(0.8f, 1.0f, 0.85f)),
+			(bHead ? 0.95f : (bFoot ? 0.85f : 1.15f)) * S, false);
+	}
+}
+
+// retratos de puntos de la versión web (16 x 16), para quien no tiene retrato ilustrado
+static const TCHAR* const GCodecPix[4][16] = {
+	{ TEXT("................"), TEXT("....xxxxxxxx...."), TEXT("...xxxxxxxxxx..."), TEXT("...xxhhhhhhxx..."), TEXT("...xhhhhhhhhx..."), TEXT("...xhhkhhkhhx..."), TEXT("...xhhhhhhhhx..."), TEXT("....hhhnnhhh...."),
+	  TEXT("....hhhhhhhh...."), TEXT("....hhsssshh...."), TEXT(".....hhhhhh....."), TEXT("......uuuu......"), TEXT("....uuuuuuuu...."), TEXT("...uuuuuuuuuu..."), TEXT("..uuuuuuuuuuuu.."), TEXT(".uuuuuuuuuuuuuu.") },
+	{ TEXT("................"), TEXT("....xxxxxxxx...."), TEXT("...xxxxxxxxxx..."), TEXT("..xxxhhhhhhxxx.."), TEXT("..xxhhhhhhhhxx.."), TEXT("..xxhhkhhkhhxx.."), TEXT("..xxhhhhhhhhxx.."), TEXT("..xxhhhnnhhhxx.."),
+	  TEXT("..xxhhhhhhhhxx.."), TEXT("..xxhhsshhhhxx.."), TEXT("..xx.hhhhhh.xx.."), TEXT("..x...uuuu...x.."), TEXT("....uuuuuuuu...."), TEXT("...uuuuuuuuuu..."), TEXT("..uuuuuuuuuuuu.."), TEXT(".uuuuuuuuuuuuuu.") },
+	{ TEXT("................"), TEXT("................"), TEXT("......####......"), TEXT(".....######....."), TEXT("....########...."), TEXT("....########...."), TEXT("....########...."), TEXT(".....######....."),
+	  TEXT("......####......"), TEXT("....########...."), TEXT("..############.."), TEXT(".##############."), TEXT("################"), TEXT("################"), TEXT("################"), TEXT("################") },
+	{ TEXT("................"), TEXT("................"), TEXT("................"), TEXT(".......ff......."), TEXT("......ffff......"), TEXT(".....ffffff....."), TEXT("....ffffffff...."), TEXT("...ffffffffff..."),
+	  TEXT("..ffffffffffff.."), TEXT("...ffffffffff..."), TEXT("....ffffffff...."), TEXT(".....ffffff....."), TEXT("......ffff......"), TEXT(".......ff......."), TEXT("................"), TEXT("................") } };
+
+void ATarsisHUD::DrawPortrait(ATarsisDirector* D, FName Key, float X, float Y, float Size, bool bTalking)
+{
+	const float S = UiScale();
+	const float Now = GetWorld() ? (float)GetWorld()->GetRealTimeSeconds() : 0.0f;
+	Panel(X - 3.0f * S, Y - 3.0f * S, Size + 6.0f * S, Size + 6.0f * S, bTalking ? FLinearColor(0.45f, 1.0f, 0.55f, 0.95f) : FLinearColor(0.1f, 0.3f, 0.18f, 0.9f));
+	Panel(X, Y, Size, Size, FLinearColor(0.012f, 0.1f, 0.06f, 1.0f));
+	if (UTexture* T = D ? D->Portrait(Key) : nullptr)
+	{
+		DrawTexture(T, X, Y, Size, Size, 0.0f, 0.0f, 1.0f, 1.0f, FLinearColor(0.9f, 1.0f, 0.93f, 1.0f));
+		Panel(X, Y, Size, Size, FLinearColor(0.08f, 0.35f, 0.2f, 0.16f));
+	}
+	else
+	{
+		const int32 Who = Key == TEXT("roig") ? 1 : (Key == TEXT("control") ? 2 : (Key == TEXT("fuente") ? 3 : 0));
+		const float Px = Size / 16.0f;
+		const int32 Phase = FMath::FloorToInt32(Now * 6.0f);
+		for (int32 j = 0; j < 16; ++j)
+		{
+			const TCHAR* Row = GCodecPix[Who][j];
+			for (int32 i = 0; i < 16; ++i)
+			{
+				const TCHAR Ch = Row[i];
+				if (Ch == TEXT('.')) continue;
+				FLinearColor C(1.0f, 1.0f, 1.0f);
+				switch (Ch)
+				{
+				case TEXT('x'): C = FLinearColor(0.023f, 0.010f, 0.005f); break;   // pelo
+				case TEXT('h'): C = FLinearColor(0.807f, 0.479f, 0.279f); break;   // piel
+				case TEXT('k'): C = FLinearColor(0.006f, 0.006f, 0.006f); break;   // ojos
+				case TEXT('n'): C = FLinearColor(0.527f, 0.246f, 0.138f); break;   // nariz
+				case TEXT('s'): C = FLinearColor(0.352f, 0.188f, 0.098f); break;   // boca
+				case TEXT('u'): C = FLinearColor(0.042f, 0.054f, 0.039f); break;   // uniforme
+				case TEXT('#'): C = FMath::FRand() < 0.25f ? FLinearColor(0.005f, 0.023f, 0.012f) : FLinearColor(0.007f, 0.042f, 0.021f); break;   // Control: una silueta con nieve
+				case TEXT('f'): C = (i + j + Phase) % 3 ? FLinearColor(0.042f, 0.254f, 0.117f) : FLinearColor(0.347f, 0.871f, 0.527f); break;       // la voz: un rombo que late
+				default: break;
+				}
+				Panel(X + i * Px, Y + j * Px, Px + 0.5f, Px + 0.5f, C);
+			}
+		}
+	}
+	// líneas de barrido y, si no habla, a media luz
+	for (float L = 0.0f; L < Size; L += 4.0f * S) Panel(X, Y + L, Size, 1.5f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.3f));
+	if (!bTalking) Panel(X, Y, Size, Size, FLinearColor(0.0f, 0.0f, 0.0f, 0.45f));
+}
+
+void ATarsisHUD::DrawCodec(ATarsisDirector* D)
+{
+	if (!D || !D->bCodec || !D->CodecLines.IsValidIndex(D->CodecIdx)) return;
+	D->CodecFrame();
+	const float S = UiScale();
+	const float Now = GetWorld() ? (float)GetWorld()->GetRealTimeSeconds() : 0.0f;
+	const ATarsisDirector::FCodecLine& L = D->CodecLines[D->CodecIdx];
+	// el otro lado de la línea: el último que no eres tú (hasta esta frase), o el primero que venga
+	FName Other = TEXT("control");
+	bool bFound = false;
+	for (int32 i = D->CodecIdx; i >= 0 && !bFound; --i) { if (!D->CodecLines[i].bMe) { Other = D->CodecLines[i].Port; bFound = true; } }
+	for (int32 i = D->CodecIdx + 1; i < D->CodecLines.Num() && !bFound; ++i) { if (!D->CodecLines[i].bMe) { Other = D->CodecLines[i].Port; bFound = true; } }
+
+	Panel(0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY, FLinearColor(0.0f, 0.0f, 0.0f, 0.62f));
+	const float W = FMath::Min(1120.0f * S, Canvas->ClipX - 24.0f * S), H = 470.0f * S;
+	const float X = Canvas->ClipX / 2.0f - W / 2.0f, Y = Canvas->ClipY * 0.5f - H / 2.0f;
+	const FLinearColor Green(0.35f, 1.0f, 0.45f, 0.9f);
+	Panel(X, Y, W, H, FLinearColor(0.0f, 0.045f, 0.02f, 0.94f));
+	Panel(X, Y, W, 3.0f * S, Green);
+	Panel(X, Y + H - 3.0f * S, W, 3.0f * S, Green);
+	const float PS = 210.0f * S;
+	DrawPortrait(D, TEXT("cuttlas"), X + 34.0f * S, Y + 34.0f * S, PS, L.bMe);
+	DrawPortrait(D, Other, X + W - 34.0f * S - PS, Y + 34.0f * S, PS, !L.bMe);
+	// centro: frecuencia, barras de señal que bailan y quién habla
+	const float CX = Canvas->ClipX / 2.0f;
+	Text(TEXT("PTT"), CX, Y + 36.0f * S, FLinearColor(0.35f, 0.75f, 0.45f), 0.7f * S, true);
+	Text(L.Freq, CX, Y + 62.0f * S, FLinearColor(0.55f, 1.0f, 0.65f), 2.6f * S, true);
+	const int32 Typed = D->CodecTyped();
+	const bool bTyping = Typed < L.Text.Len();
+	for (int32 i = 0; i < 12; ++i)
+	{
+		const float Lvl = bTyping ? 0.25f + 0.75f * FMath::Abs(FMath::Sin(Now * (7.0f + i * 1.3f) + i * 1.7f)) : 0.12f;
+		const float BH = 46.0f * S * Lvl;
+		Panel(CX - 6.0f * 16.0f * S + i * 16.0f * S + 3.0f * S, Y + 190.0f * S - BH, 10.0f * S, BH, FLinearColor(0.35f, 1.0f, 0.45f, 0.35f + 0.5f * Lvl));
+	}
+	Text(L.Who, CX, Y + 204.0f * S, FLinearColor(1.0f, 0.85f, 0.55f), 1.0f * S, true);
+	// la frase, partida en renglones con el texto entero (para que las palabras no salten) y escrita letra a letra
+	const float TS = 1.12f * S;
+	const TArray<FString> Rows = Wrap(L.Text, W - 90.0f * S, TS);
+	int32 Left = Typed;
+	for (int32 i = 0; i < Rows.Num() && Left > 0; ++i)
+	{
+		const FString Part = Rows[i].Left(Left);
+		Text(Part, X + 45.0f * S, Y + 272.0f * S + i * 36.0f * S, FLinearColor(0.82f, 1.0f, 0.86f), TS, false);
+		Left -= Rows[i].Len() + 1;   // el espacio que se comió el corte
+	}
+	const bool bBlink = FMath::Fmod(Now, 0.9f) > 0.4f;
+	Text(D->CodecHelp(), CX, Y + H - 40.0f * S, FLinearColor(0.5f, 0.7f, 0.55f, bTyping || bBlink ? 0.9f : 0.5f), 0.72f * S, true);
+	Text(FString::Printf(TEXT("%d / %d"), D->CodecIdx + 1, D->CodecLines.Num()), X + W - 50.0f * S, Y + H - 40.0f * S, FLinearColor(0.4f, 0.6f, 0.45f), 0.7f * S, true);
 }

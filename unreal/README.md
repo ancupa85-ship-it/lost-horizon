@@ -162,6 +162,17 @@ En el juego: la salida es el portón este (`ExitLoc` 9050, 5700, radio 420; sin 
 - **Salas**: jefatura (el despacho de Ibarra, con su catre), archivo (estanterías, archivadores y cajas), transmisiones (las radios de la central), cuarto de revelado (la luz roja) y cosas en el cuerpo de guardia. Fuera: mesa junto al barracón, material del generador, ruedas y un acopio en el patio central. 73 piezas en `atrezo.json`; cuatro modelos nuevos de Poly Haven (CC0): `WoodenChair_01`, `cardboard_box_01`, `Camera_01`, `wooden_picnic_table`.
 - Pruebas: `prueba_radio` y `prueba_apoyo`.
 
+### Códec y música nueva (tanda 29)
+
+- **Códec** (`TarsisCodec.cpp`, parte de `ATarsisDirector`): la frecuencia de Control (141.12) y la de Roig (140.85), que no son la radio de la base, y una tercera voz (000.00) que solo aparece sin luz o con el expediente. Las llamadas entrantes (`CodecRing`: al empezar, con la alarma, al abrir el archivo, al coger el expediente y en el apagón; `bCodecCalls`) **no paran el juego**: suenan, se anuncian arriba y se cogen con la **R** cuando puedes. Con la R sin llamada sale el menú de frecuencias (1, 2, 3). Durante la conversación el juego está en pausa; E, Espacio, Intro o clic pasan de frase y Esc cuelga.
+- Control contesta según la base y el objetivo (`CodecControlConv`: `control_llave`, `control_jefatura`... y `control_alerta`, `control_celda`) y añade una frase de las suyas; Roig da la pista del salmo una vez, cuando ya has leído la mesa de Alarcón y el archivo sigue cerrado.
+- Los diálogos son textos `codec_<nombre>` de `mision1.json`, una frase por línea: `C|` Control, `T|` tú, `R|` Roig, `F|` la voz sin nombre. Vienen de la versión web (`src/07-codec.js`), adaptados a esta base.
+- Retratos: `tools/unreal/retratos.py` importa `assets/retratos/*.jpg` en `/Game/Tarsis/Retratos` (el nombre del archivo es la clave: `cuttlas`, `roig`, `control`, `fuente`). A quien no tiene retrato ilustrado, el HUD le dibuja el de puntos de la web.
+- **La pregunta de la central** («Responde, Carmona») tiene ahora su propia caja, con letra grande, y no se pisa con el aviso de la E.
+- **Música**: `tools/sonido/generar_musica.py` escribe las tres capas juntas, sobre la misma armonía (16 compases a 75 ppm en re menor, 51,2 s, estéreo): colchón de cuerdas, bajo y un piano lejano con el tema; latido y ostinato de cuerda para la tensión; percusión, bajo y metales para la alerta. Con el códec abierto la música se aparta. También genera los sonidos del códec (`codec_llamada`, `codec_abrir`, `codec_cerrar`, `codec_tecla`).
+- Prueba: `prueba_codec`.
+- Pendiente: la R no se puede reasignar todavía; el códec no se guarda en el punto de control (lo ya hablado se olvida al cargar).
+
 ## Sonidos
 
 `tools/sonido/generar_sonidos.py` sintetiza los .wav (pasos de gravilla y cemento, piedra, dardo, viento y lluvia) en `assets/unreal/sonidos`, y `tools/unreal/sonidos.py` (Python del editor) los importa en `/Game/Tarsis/Sonidos`. El director los carga por su ruta: si faltan, el juego va igual pero mudo.

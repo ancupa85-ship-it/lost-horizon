@@ -448,9 +448,9 @@ if __name__ == '__main__':
     save('lluvia', lluvia(), 0.5)
     save('radio', radio(), 0.6)
     save('generador', generador(), 0.5)
-    save('musica_base', musica_base(), 0.5)
-    save('musica_tension', musica_tension(), 0.5)
-    save('musica_alerta', musica_alerta(), 0.55)
+    # la música es ahora la de tools/sonido/generar_musica.py (tanda 29). Las tres de antes se siguen calculando, sin
+    # guardarlas, para no mover el generador de azar: así los sonidos de después salen idénticos
+    musica_base(); musica_tension(); musica_alerta()
     # lo añadido después va al final: el generador de azar es el mismo y así los sonidos de antes no cambian
     for k in range(3):
         save('paso_metal_%d' % (k + 1), metal(k), 0.65)

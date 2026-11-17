@@ -600,6 +600,87 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void ShootDart();
 
+	// ---- tanda 29: códec (TarsisCodec.cpp). Control (141.12) y Roig (140.85) hablan contigo por una frecuencia que no
+	// es la de la base; la tercera voz (000.00) solo aparece sin luz o con el expediente. Las llamadas entrantes no
+	// paran el juego: suenan y se cogen con la R cuando puedes. Con la R sin llamada, eliges a quién llamar (1, 2, 3).
+	// Durante la conversación el juego está en pausa. Los diálogos son textos «codec_<nombre>» de mision1.json: una
+	// línea por frase, «C|...» Control, «T|...» tú, «R|...» Roig, «F|...» la voz sin nombre.
+	/** Llamadas entrantes automáticas (inicio, alarma, archivo, expediente, apagón). Las pruebas las apagan. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Codec")
+	bool bCodecCalls = true;
+	/** Conversación abierta (juego en pausa). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Codec")
+	bool bCodec = false;
+	/** Menú de frecuencias abierto (el juego sigue). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Codec")
+	bool bCodecMenu = false;
+	/** Llamada entrante sin coger. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Codec")
+	FName CodecPending;
+	/** Conversaciones que ya has tenido, en orden. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Codec")
+	TArray<FString> CodecTaken;
+	/** Frase por la que va la conversación. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Codec")
+	int32 CodecIdx = 0;
+	/** Segundos que suena una llamada entrante y que aguanta abierto el menú de frecuencias, y letras por segundo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Codec")
+	float CodecRingSeconds = 14.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Codec")
+	float CodecMenuSeconds = 9.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Codec")
+	float CodecCharsPerSecond = 46.0f;
+	float CodecRingT = 0.0f;
+	float CodecMenuT = 0.0f;
+
+	/** Entra una llamada: suena, se anuncia en pantalla y espera a la R. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Codec")
+	void CodecRing(FName Conv);
+	/** La tecla R: coge la llamada pendiente o abre y cierra el menú de frecuencias. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Codec")
+	void CodecKey();
+	/** Abre una conversación por su nombre (texto «codec_<nombre>»). Devuelve si se ha abierto. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Codec")
+	bool OpenCodec(FName Conv);
+	/** Completa la frase que se está escribiendo o pasa a la siguiente; tras la última, cuelga. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Codec")
+	void CodecNext();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Codec")
+	void CloseCodec();
+	/** Llamas tú desde el menú: 1 Control, 2 Roig, 3 la voz sin nombre (si está). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Codec")
+	void CodecCall(int32 Option);
+	/** Qué conversación de Control toca ahora, según la base y el objetivo. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Codec")
+	FName CodecControlConv() const;
+	/** La tercera frecuencia ya se puede marcar. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Codec")
+	bool CodecVoiceOpen() const { return bPowerOff || bCodecVoiceHeard; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Codec")
+	TArray<FString> CodecMenuLines() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Codec")
+	int32 CodecLineCount() const { return CodecLines.Num(); }
+	/** La frase actual como «QUIEN|FRECUENCIA|texto». */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Codec")
+	FString CodecLine() const;
+	/** Aviso de la llamada entrante para el HUD (vacío si no hay). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Codec")
+	FString CodecPendingText() const;
+	/** Pruebas: olvida la llamada pendiente, lo ya hablado y la cuenta de llamadas. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pruebas")
+	void CodecReset();
+
+	struct FCodecLine { FString Who; FString Freq; FName Port; FString Text; bool bMe = false; };
+	TArray<FCodecLine> CodecLines;
+	/** Letras ya escritas de la frase actual (va con el reloj real: el juego está en pausa). */
+	int32 CodecTyped() const;
+	/** Lo llama el HUD en cada fotograma con el códec abierto: los pitidos de la escritura. */
+	void CodecFrame();
+	/** Retrato ilustrado de /Game/Tarsis/Retratos (tools/unreal/retratos.py); si falta, el HUD dibuja el de puntos. */
+	class UTexture* Portrait(FName Key);
+	FString CodecHelp() const;
+	bool bCodecVoiceHeard = false;
+
 	// ---- tanda 28: «Responde, Carmona». La central llama a un guardia que has dejado en el suelo; si estás junto a
 	// él, contestas tú por su radio eligiendo entre tres partes. Solo cuela el suyo, que habrás oído antes si andabas
 	// cerca cuando lo daba. «Todo tranquilo» es la frase de coacción: parece la natural y trae a dos con la base en guardia
@@ -1293,6 +1374,23 @@ private:
 	TObjectPtr<class UAudioComponent> MusicAlr;
 	void SetupMusic();
 	void MusicTick(float DeltaSeconds);
+
+	// códec (tanda 29)
+	UPROPERTY()
+	TMap<FName, TObjectPtr<class UTexture>> PortraitCache;
+	bool OpenCodecList(const TArray<FName>& Convs);
+	void CodecTick(float DeltaSeconds);
+	void CodecInput(FKey Key);
+	double CodecLineStart = 0.0;
+	int32 CodecBlips = 0;
+	int32 CodecControlCalls = 0;
+	int32 CodecRoigCalls = 0;
+	int32 CodecVoiceCalls = 0;
+	bool bCodecInit = false;
+	bool bCodecPrevAlert = false;
+	bool bCodecPrevVault = false;
+	bool bCodecPrevFile = false;
+	bool bCodecPrevPower = false;
 	UPROPERTY()
 	TMap<TObjectPtr<class ATarsisGuard>, uint8> PrevState;
 	void DetectTick();

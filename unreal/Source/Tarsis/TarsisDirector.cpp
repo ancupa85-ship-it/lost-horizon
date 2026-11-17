@@ -146,6 +146,12 @@ void ATarsisDirector::IntroText()
 	auto K = [this](int32 I) { return ActionKeys[I].GetDisplayName().ToString(); };
 	ShowMessage(Tx(TEXT("intro"), TEXT("TARSIS, DE NOCHE\nBusca la sombra. Agachado ({0}) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n{1} lanza una piedra para distraer. {2} prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo ({3}) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control."),
 		{ K(0), K(2), K(3), K(4) }), 11.0f);
+	// Control llama al empezar (no al cargar un punto de control). No para el juego: se coge con la R
+	if (bCodecCalls && MissionTime < 5.0f && !CodecTaken.Contains(TEXT("inicio")))
+	{
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]() { if (bCodecCalls && !CodecTaken.Contains(TEXT("inicio"))) CodecRing(TEXT("inicio")); }), 6.0f, false);
+	}
 }
 
 void ATarsisDirector::ShowMessage(const FString& Text, float Seconds)
@@ -345,6 +351,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	BarrierTick(DeltaSeconds);
 	TruckTick(DeltaSeconds);
 	MusicTick(DeltaSeconds);
+	CodecTick(DeltaSeconds);
 	// el que fue a mirar el farol roto encuentra los cristales y avisa: la base se pone en guardia un rato
 	LampsTick();
 	if (CheckLamp && CheckLamp.Get() == GateLamp.Get() && !bLampReported && LampChecker && LampChecker->State != ETarsisGuardState::Down
@@ -617,6 +624,13 @@ void ATarsisDirector::KeypadKey(FKey Key)
 		if (Key == EKeys::One || Key == EKeys::NumPadOne) AnswerRadio(1);
 		else if (Key == EKeys::Two || Key == EKeys::NumPadTwo) AnswerRadio(2);
 		else if (Key == EKeys::Three || Key == EKeys::NumPadThree) AnswerRadio(3);
+		return;
+	}
+	if (bCodecMenu && !bChoice && !bKeypad)
+	{
+		if (Key == EKeys::One || Key == EKeys::NumPadOne) CodecCall(1);
+		else if (Key == EKeys::Two || Key == EKeys::NumPadTwo) CodecCall(2);
+		else if (Key == EKeys::Three || Key == EKeys::NumPadThree) CodecCall(3);
 		return;
 	}
 	if (bChoice)
@@ -3362,6 +3376,13 @@ void ATarsisDirector::MenuKey(FKey Key)
 {
 	if (KeyFrame == GFrameCounter) return;   // esta pulsación ya se ha usado para asignar una tecla
 	if (WaitKeyFor >= 0) return;               // esperando la tecla nueva: la recoge AnyKey
+	if (bCodec)
+	{
+		// códec abierto (juego en pausa, sin menú): Intro o Espacio pasan de frase y Esc cuelga
+		if (Key == EKeys::Escape) CloseCodec();
+		else if (Key == EKeys::Enter || Key == EKeys::SpaceBar) CodecNext();
+		return;
+	}
 	if (bMenu && MenuPage == 1 && Key == EKeys::Escape) { MenuPage = 0; MenuSel = 0; return; }
 	if (Key == EKeys::P || Key == EKeys::Escape)
 	{
@@ -3577,6 +3598,13 @@ void ATarsisDirector::BindAll()
 		B.bConsumeInput = false;
 	}
 	BindMenuKeys();
+	// códec: la R (llamar o coger la llamada) y, con la conversación abierta y el juego en pausa, la E y el clic para seguir
+	for (const FKey& K : { EKeys::R, ActionKeys[1], EKeys::LeftMouseButton })
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(K, IE_Pressed, this, &ATarsisDirector::CodecInput);
+		B.bConsumeInput = false;
+		B.bExecuteWhenPaused = true;
+	}
 	{
 		FInputKeyBinding& B = InputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this, &ATarsisDirector::AnyKey);
 		B.bConsumeInput = false;
@@ -3608,7 +3636,7 @@ FString ATarsisDirector::HelpLine() const
 	FString S = FString::Printf(TEXT("%s agacharse   %s correr   %s piedra   %s prismaticos"), *K(0), *K(4), *K(2), *K(3));
 	if (Darts > 0) S += FString::Printf(TEXT("   CLIC dardo (%d)"), Darts);
 	if (bPowerOff) S += TEXT("   sin luz: busca la sombra de las linternas");
-	S += TEXT("   P pausa");
+	S += TEXT("   R radio   P pausa");
 	return S;
 }
 
@@ -3651,9 +3679,10 @@ void ATarsisDirector::MusicTick(float DeltaSeconds)
 	MusicTension = FMath::FInterpTo(MusicTension, bQuiet ? 0.0f : TenT, DeltaSeconds, TenT > MusicTension ? 2.0f : 0.4f);
 	MusicAlert = FMath::FInterpTo(MusicAlert, bQuiet ? 0.0f : AlrT, DeltaSeconds, AlrT > MusicAlert ? 4.0f : 0.3f);
 	const float Base = 0.35f * (1.0f - 0.4f * MusicAlert);
-	if (MusicBase) MusicBase->SetVolumeMultiplier(FMath::Max(0.001f, Base * OptMusic));
-	if (MusicTen) MusicTen->SetVolumeMultiplier(FMath::Max(0.001f, 0.5f * MusicTension * (1.0f - 0.5f * MusicAlert) * OptMusic));
-	if (MusicAlr) MusicAlr->SetVolumeMultiplier(FMath::Max(0.001f, 0.55f * MusicAlert * OptMusic));
+	const float Duck = bCodec ? 0.3f : 1.0f;   // con el códec abierto la música se aparta
+	if (MusicBase) MusicBase->SetVolumeMultiplier(FMath::Max(0.001f, Base * OptMusic * Duck));
+	if (MusicTen) MusicTen->SetVolumeMultiplier(FMath::Max(0.001f, 0.5f * MusicTension * (1.0f - 0.5f * MusicAlert) * OptMusic * Duck));
+	if (MusicAlr) MusicAlr->SetVolumeMultiplier(FMath::Max(0.001f, 0.55f * MusicAlert * OptMusic * Duck));
 }
 
 // ---------------------------------------------------------------- detecciones (para la puntuación) y dirección de un sonido

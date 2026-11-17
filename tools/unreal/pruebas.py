@@ -169,7 +169,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -2163,11 +2163,102 @@ def prueba_puertas():
     aparte()
 
 
+def prueba_codec():
+    """Tanda 29, el códec: las llamadas entrantes suenan sin parar el juego y se cogen con la R; con la conversación
+    abierta el juego está en pausa y se pasa de frase; sin llamada, la R abre el menú de frecuencias (Control, Roig y,
+    sin luz o con el expediente, la voz sin nombre). Control contesta según el objetivo y Roig da la pista del salmo."""
+    d = director()
+    pausa = lambda: unreal.GameplayStatics.is_game_paused(mundo())
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.1
+    t = MISION['textos']
+    convs = [k[6:] for k in t if k.startswith('codec_') and '|' in t[k]]
+    check('hay conversaciones en mision1.json', len(convs) >= 25, len(convs))
+    check('toda frase empieza por C|, T|, R| o F|', all(l[:2] in ('C|', 'T|', 'R|', 'F|') for c in convs for l in t['codec_' + c].split('\n')),
+          [c for c in convs if not all(l[:2] in ('C|', 'T|', 'R|', 'F|') for l in t['codec_' + c].split('\n'))])
+    # llamada entrante: no para el juego
+    d.codec_ring('inicio'); yield 0.3
+    check('la llamada entra sin parar el juego', str(d.get_editor_property('codec_pending')) == 'inicio' and not pausa() and not d.get_editor_property('codec'))
+    check('se anuncia con su frecuencia', '141.12' in str(d.codec_pending_text()), str(d.codec_pending_text()))
+    d.codec_key(); yield 0.3
+    check('la R la coge: códec abierto y juego en pausa', d.get_editor_property('codec') and pausa())
+    check('la llamada deja de estar pendiente', str(d.get_editor_property('codec_pending')) == 'None', str(d.get_editor_property('codec_pending')))
+    n = len(t['codec_inicio'].split('\n'))
+    check('tantas frases como en el .json', d.codec_line_count() == n, '%d / %d' % (d.codec_line_count(), n))
+    check('habla Control por 141.12', str(d.codec_line()).startswith('CONTROL|141.12|Cuttlas'), str(d.codec_line())[:40])
+    tm = d.get_editor_property('mission_time')
+    yield 0.6
+    check('el tiempo de misión no corre', d.get_editor_property('mission_time') == tm)
+    d.press_key('P'); yield 0.1
+    check('la P no abre el menú encima', not d.get_editor_property('menu'))
+    # la primera pulsación completa la frase y la segunda pasa a la siguiente
+    d.codec_ring('alarma'); yield 0.1
+    check('hablando no entra otra llamada', str(d.get_editor_property('codec_pending')) == 'None')
+    i0 = d.get_editor_property('codec_idx')
+    d.press_key('Enter'); yield 0.1
+    d.press_key('Enter'); yield 0.1
+    check('Intro pasa de frase', d.get_editor_property('codec_idx') == i0 + 1, d.get_editor_property('codec_idx'))
+    for _ in range(2 * n + 2):
+        if not d.get_editor_property('codec'):
+            break
+        d.codec_next(); yield 0.05
+    check('tras la última frase cuelga y el juego sigue', not d.get_editor_property('codec') and not pausa())
+    check('queda apuntada', 'inicio' in [str(x) for x in d.get_editor_property('codec_taken')])
+    # menú de frecuencias
+    d.codec_key(); yield 0.1
+    m = [str(x) for x in d.codec_menu_lines()]
+    check('sin llamada, la R abre el menú sin pausa', d.get_editor_property('codec_menu') and not pausa(), m)
+    check('Control y Roig; la tercera voz aún no', len(m) == 4 and 'CONTROL' in m[1] and 'ROIG' in m[2], m)
+    d.codec_call(3); yield 0.1
+    check('la tercera frecuencia no contesta todavía', not d.get_editor_property('codec'))
+    check('Control habla del objetivo', str(d.codec_control_conv()) == 'control_llave', str(d.codec_control_conv()))
+    d.codec_call(1); yield 0.2
+    check('llamas a Control: se abre y pausa', d.get_editor_property('codec') and pausa() and 'Ibarra' in str(d.codec_line()), str(d.codec_line())[:60])
+    d.press_key('Escape'); yield 0.2
+    check('Esc cuelga', not d.get_editor_property('codec') and not pausa() and not d.get_editor_property('menu'))
+    # Roig: la pista del salmo solo con la mesa leída y el archivo cerrado
+    d.codec_key(); d.codec_call(2); yield 0.1
+    check('Roig contesta por 140.85', str(d.codec_line()).startswith('ROIG|140.85|') and 'De profundis' not in str(d.codec_line()), str(d.codec_line())[:40])
+    d.close_codec()
+    d.set_flag('nota_leida')
+    check('con la nota leída, Control habla del archivo', str(d.codec_control_conv()) == 'control_archivo', str(d.codec_control_conv()))
+    d.codec_key(); d.codec_call(2); yield 0.1
+    check('con la mesa leída, Roig da la pista del salmo', 'De profundis' in str(d.codec_line()), str(d.codec_line())[:60])
+    d.close_codec()
+    d.codec_key(); d.codec_call(2); yield 0.1
+    check('la pista, una sola vez', d.get_editor_property('codec') and 'De profundis' not in str(d.codec_line()), str(d.codec_line())[:60])
+    d.close_codec(); yield 0.1
+    # llamada automática: al saltar la alarma
+    d.set_editor_property('codec_calls', True); yield 0.3
+    g = guardias()[0]
+    l = g.get_actor_location()
+    g.alarm(V(l.x + 250, l.y, l.z)); yield 0.6
+    check('con la alarma, Control llama', str(d.get_editor_property('codec_pending')) == 'alarma', '%s / base %s' % (d.get_editor_property('codec_pending'), d.base_state()))
+    d.set_editor_property('codec_calls', False)
+    d.codec_reset(); yield 0.1
+    check('codec_reset quita la llamada pendiente', str(d.get_editor_property('codec_pending')) == 'None')
+    # todas las conversaciones existen y se abren (ninguna clave pedida falta en el .json)
+    mal = []
+    for c in convs:
+        if not d.open_codec(c):
+            mal.append(c)
+        d.close_codec()
+    yield 0.1
+    check('todas las conversaciones se abren', not mal, mal)
+    check('no queda en pausa', not pausa() and not d.get_editor_property('codec'))
+    d.codec_key(); yield 0.1
+    check('la voz sin nombre ya se ha oído: tercera frecuencia', d.codec_voice_open() and len(d.codec_menu_lines()) == 5, [str(x) for x in d.codec_menu_lines()])
+    d.codec_call(3); yield 0.1
+    check('y contesta por 000.00', '|000.00|' in str(d.codec_line()), str(d.codec_line())[:40])
+    d.close_codec(); yield 0.1
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec]]
 PRUEBAS = []
 
 
@@ -2210,6 +2301,8 @@ def _limpieza(siguiente):
         # tanda 28: contestar por radio y pedir apoyo, solo en sus pruebas (las demás derriban guardias y rompen farolas para medir otra cosa)
         d.set_editor_property('radio_answer', siguiente is prueba_radio)
         d.set_editor_property('buddy_rule', siguiente is prueba_apoyo)
+        # tanda 29: las llamadas entrantes del códec, solo en su prueba (prueba_codec las enciende ella)
+        d.set_editor_property('codec_calls', False)
     R['prueba'] = siguiente.__name__.replace('prueba_', '')
     yield from siguiente()
 
