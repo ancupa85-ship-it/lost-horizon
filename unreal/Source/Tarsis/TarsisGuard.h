@@ -79,6 +79,9 @@ public:
 	/** Centinela de torre: no anda; barre con la vista (y con su foco) a un lado y a otro y, si te ve, avisa a los de abajo. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
 	bool bTowerSentry = false;
+	/** Lo que tarda el de la torre en estar seguro de lo que ve en su foco, frente a un guardia de abajo (0,45: unos 3-4 s en facil). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")
+	float TowerGain = 0.45f;
 
 	/** Foco de la torre, que gira con el centinela (lo pone tools/unreal/guardias.py). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Torre")

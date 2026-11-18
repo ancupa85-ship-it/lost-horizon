@@ -1572,7 +1572,8 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	{
 		LastSeen = Player->GetActorLocation();
 		UnseenT = 0.0f;
-		const float Gain = (State == ETarsisGuardState::Alert || State == ETarsisGuardState::Search) ? 3.0f : 1.0f;
+		// el de la torre mira desde lejos: tarda mas en estar seguro (da tiempo a salir de la mancha del foco)
+		const float Gain = ((State == ETarsisGuardState::Alert || State == ETarsisGuardState::Search) ? 3.0f : 1.0f) * (bTowerSentry ? TowerGain : 1.0f);
 		Meter = FMath::Min(1.0f, Meter + V * SuspicionRate * Gain * AlertBoost * DeltaSeconds);
 	}
 	else

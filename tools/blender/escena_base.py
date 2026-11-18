@@ -447,7 +447,7 @@ def cocina():
     de 9,6 x 5,4 m con puerta al patio (oeste), fogón de hierro con su tubo, mesa de despiece, poyo de acero y despensa. En la
     olla del rincón queda el hueso que le gusta al perro."""
     x0, x1, y0, y1, Hh, g = 58.0, 67.6, 32.0, 37.4, 2.9, 0.25
-    W, D, cx, cy, dy, dw, dh = x1 - x0, y1 - y0, (x0 + x1) / 2, (y0 + y1) / 2, 35.6, 1.1, 2.1
+    W, D, cx, cy, dy, dw, dh = x1 - x0, y1 - y0, (x0 + x1) / 2, (y0 + y1) / 2, 35.4, 1.6, 2.1
     box('suelo_int', (W - 0.1, D - 0.1, 0.06), Mp(cx, cy, 0.03))
     box('pared', (W, 0.14, Hh), Mp(cx, y0 + 0.07, Hh / 2)); box('pared', (W, g, Hh), Mp(cx, y1 - g / 2, Hh / 2)); box('pared', (g, D, Hh), Mp(x1 - g / 2, cy, Hh / 2))
     na, nb = (dy - dw / 2) - y0, y1 - (dy + dw / 2)                                                 # pared oeste: dos paños y el dintel
@@ -455,7 +455,7 @@ def cocina():
     box('pared', (g, dw, Hh - dh), Mp(x0 + g / 2, dy, dh + (Hh - dh) / 2))
     for q in (-1, 1): box('madera', (g + 0.06, 0.08, dh), Mp(x0 + g / 2, dy + q * (dw / 2 - 0.04), dh / 2))   # marco
     box('madera', (g + 0.06, dw, 0.08), Mp(x0 + g / 2, dy, dh - 0.04))
-    box('madera', (0.05, dw - 0.2, dh - 0.12), Mp(x0 - 0.5, dy - dw / 2 - 0.02, dh / 2), rotz=math.radians(78))   # hoja abierta hacia fuera
+    box('madera', (0.05, dw - 0.2, dh - 0.12), Mp(x0 - 0.04, dy - dw / 2 - (dw - 0.2) / 2 - 0.03, dh / 2))   # hoja abierta del todo, pegada a la pared (a 78 grados estorbaba el paso)
     box('aviso', (0.03, 0.9, 0.3), Mp(x0 - 0.02, dy, dh + 0.38))
     box('techo_int', (W - 0.2, D - 0.2, 0.05), Mp(cx, cy, Hh - 0.025)); box('tejado', (W + 0.5, D + 0.3, 0.1), Mp(cx, cy + 0.1, Hh + 0.05))
     box('ventana_on', (1.3, 0.04, 0.7), Mp(x0 + 2.2, y1 + 0.01, 1.75)); box('ventana_on', (0.04, 0.9, 0.5), Mp(x1 + 0.01, cy, 2.0))   # se ve encendida desde el patio

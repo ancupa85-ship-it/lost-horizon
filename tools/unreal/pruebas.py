@@ -683,7 +683,7 @@ def prueba_perdido():
     quien = g.get_actor_label()[8:].lower()
     check('al perderte: "lo he perdido"', quien + '_perdido' in list(d.get_editor_property('voice_log')), '%s %s' % (estado(g), list(d.get_editor_property('voice_log'))[-3:]))
     # el subtítulo puede esperar en cola a que acabe el anterior
-    yield ('hasta', lambda: any('Lo he perdido' in str(x) for x in director().get_editor_property('subtitle_log')), 8.0)
+    yield ('hasta', lambda: any('Lo he perdido' in str(x) for x in director().get_editor_property('subtitle_log')), 14.0)   # con los centinelas de torre hablando, la cola puede llevar dos o tres
     check('con subtítulo aunque la opción esté apagada', 'SUBTITULOS DE SONIDOS   < NO' in ' '.join(d.menu_lines()) and any('Lo he perdido' in str(x) for x in d.get_editor_property('subtitle_log')),
           list(d.get_editor_property('subtitle_log'))[-2:])
 

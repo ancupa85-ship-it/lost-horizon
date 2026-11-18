@@ -150,7 +150,7 @@ void ATarsisDirector::FlareTick(float DeltaSeconds)
 	}
 	FlareLight->SetActorLocation(Where);
 	if (ULightComponent* L = FlareLight->GetLightComponent()) L->SetIntensity(FlareCandelas * K);
-	if (FlareGlow) FlareGlow->SetRelativeScale3D(FVector(0.6f + 1.6f * K));
+	if (FlareGlow) FlareGlow->SetRelativeScale3D(FVector(1.2f + 3.2f * K));
 }
 
 // ---------------------------------------------------------------- dia o noche

@@ -1017,7 +1017,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
 	float FlareEndHeight = 3200.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
-	float FlareCandelas = 6000.0f;
+	float FlareCandelas = 13000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
 	float FlareRadius = 14000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
@@ -1111,20 +1111,20 @@ public:
 	void SetDay(bool bNewDay);
 	/** Sol: lux (la luna da 0,8 con la exposicion fija del nivel), color, y cuanto baja (grados) sobre el horizonte. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
-	float DaySunLux = 5.0f;
+	float DaySunLux = 8.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
 	FLinearColor DaySunColor = FLinearColor(1.0f, 0.95f, 0.86f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
 	float DaySunPitch = -48.0f;
 	/** Boveda de dia (en la escala de la exposicion fija: valores pequenos). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
-	FLinearColor DayZenith = FLinearColor(0.018f, 0.028f, 0.050f);
+	FLinearColor DayZenith = FLinearColor(0.18f, 0.30f, 0.55f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
-	FLinearColor DayHorizon = FLinearColor(0.045f, 0.052f, 0.060f);
+	FLinearColor DayHorizon = FLinearColor(0.40f, 0.44f, 0.50f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
-	FLinearColor DayCloud = FLinearColor(0.070f, 0.070f, 0.070f);
+	FLinearColor DayCloud = FLinearColor(0.55f, 0.55f, 0.55f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
-	FLinearColor DayFogColor = FLinearColor(0.030f, 0.034f, 0.040f);
+	FLinearColor DayFogColor = FLinearColor(0.25f, 0.27f, 0.30f);
 	/** Luz de sigilo de dia: a cielo abierto y bajo techo (de noche el fondo es 0,12). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
 	float DayAmbientOpen = 0.9f;
