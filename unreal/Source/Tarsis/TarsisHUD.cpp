@@ -1,4 +1,5 @@
 #include "TarsisHUD.h"
+#include "MediaTexture.h"
 #include "TarsisDirector.h"
 #include "TarsisGuard.h"
 
@@ -43,6 +44,28 @@ void ATarsisHUD::DrawHUD()
 	ATarsisDirector* D = nullptr;
 	for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { D = *It; break; }
 	const ACharacter* C = Cast<ACharacter>(GetOwningPawn());
+	if (D && D->bMovie)
+	{
+		// intro de anime: el video a pantalla completa (16:9, con franjas si la pantalla no lo es) y el rotulo tecleado al pie
+		Panel(0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY, FLinearColor::Black);
+		const float VW = FMath::Min(Canvas->ClipX, Canvas->ClipY * 16.0f / 9.0f), VH = VW * 9.0f / 16.0f;
+		const float VX = (Canvas->ClipX - VW) * 0.5f, VY = (Canvas->ClipY - VH) * 0.5f;
+		if (D->IntroTexture) DrawTexture(D->IntroTexture, VX, VY, VW, VH, 0.0f, 0.0f, 1.0f, 1.0f, FLinearColor::White, BLEND_Opaque);
+		const float S = UiScale();
+		const FString Cap = D->MovieCaption();
+		if (!Cap.IsEmpty())
+		{
+			TArray<FString> Rows;
+			Cap.ParseIntoArray(Rows, TEXT("\n"), false);
+			for (int32 i = 0; i < Rows.Num(); ++i)
+			{
+				Text(Rows[i], VX + 42.0f * S + 2.0f, VY + VH - (96.0f - i * 30.0f) * S + 2.0f, FLinearColor(0.0f, 0.0f, 0.0f, 0.85f), 1.15f * S, false);
+				Text(Rows[i], VX + 42.0f * S, VY + VH - (96.0f - i * 30.0f) * S, FLinearColor(0.93f, 0.93f, 0.88f, 1.0f), 1.15f * S, false);
+			}
+		}
+		if (D->MovieT < 4.0f) Text(TEXT("E / ESPACIO"), Canvas->ClipX - 150.0f * S, Canvas->ClipY - 34.0f * S, FLinearColor(1.0f, 1.0f, 1.0f, 0.45f), 0.7f * S, false);
+		return;
+	}
 	if (D && D->bCine)
 	{
 		// cinemática: franjas de cine y solo el texto

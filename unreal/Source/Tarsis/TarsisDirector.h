@@ -614,6 +614,40 @@ public:
 	UFUNCTION()
 	void OnCineFinished();
 
+	// ---- tanda 48: intro de anime (video antes de dar el mando; TarsisIntro.cpp)
+	/** Poner el video de entrada si esta en Content/Movies. Sin el, el sobrevuelo de siempre. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Intro")
+	bool bIntroMovie = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Intro")
+	FString IntroMovie = TEXT("intro_brecha.mp4");
+	/** A los cuantos segundos empieza a teclearse el rotulo, a cuantas letras por segundo, y tope de duracion. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Intro")
+	float MovieCaptionAt = 4.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Intro")
+	float MovieCaptionRate = 16.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Intro")
+	float MovieMaxSeconds = 45.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Intro")
+	bool bMovie = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Intro")
+	float MovieT = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Intro")
+	int32 MoviesPlayed = 0;
+	UPROPERTY()
+	TObjectPtr<class UMediaPlayer> IntroPlayer;
+	UPROPERTY()
+	TObjectPtr<class UMediaTexture> IntroTexture;
+	UPROPERTY()
+	TObjectPtr<class UMediaSoundComponent> IntroSound;
+	UPROPERTY()
+	TObjectPtr<class UFileMediaSource> IntroSource;
+	bool PlayIntroMovie();
+	void CloseIntroMovie();
+	void EndIntroMovie();
+	void MovieTick(float DeltaSeconds);
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Intro")
+	FString MovieCaption() const;
+
 	/** Segundos que tarda el guardia en arrancar el generador una vez junto a él. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Luz")
 	float RepairSeconds = 12.0f;

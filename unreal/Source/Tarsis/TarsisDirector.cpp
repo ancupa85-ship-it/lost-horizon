@@ -140,6 +140,8 @@ void ATarsisDirector::SetupPlayer()
 	bPlayerReady = true;
 	bHasSave = UGameplayStatics::DoesSaveGameExist(TEXT("TarsisPartida"), 0);
 	// entrada: sobrevuelo de la base; al acabar (o al saltarla) salen las instrucciones
+	// tanda 48: si esta el video de anime, va el; si no, el sobrevuelo
+	if (bPlayIntro && PlayIntroMovie()) return;
 	if (!(bPlayIntro && PlayCine(TEXT("LS_Entrada"), true))) IntroText();
 }
 
@@ -280,6 +282,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!bPlayerReady) { SetupPlayer(); return; }
+	MovieTick(DeltaSeconds);
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (!C) return;
 
@@ -2353,6 +2356,7 @@ bool ATarsisDirector::PlayCine(const TCHAR* Name, bool bIntro)
 
 void ATarsisDirector::SkipCine()
 {
+	if (bMovie) { EndIntroMovie(); return; }
 	if (!bCine || !CinePlayer) return;
 	if (!bCineIntro) return;   // los finales no se saltan: es la pantalla final
 	CinePlayer->Stop();        // Stop no lanza OnFinished: se cierra a mano
