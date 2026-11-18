@@ -659,6 +659,8 @@ if DATA.get('spawn'):
         d = ue_dir([sx * T, -sy * T, 0])   # columnas -> +x de Blender, filas -> -y de Blender
         if d.length() > 0:
             yaw = unreal.MathLibrary.make_rot_from_x(d).yaw
+    if DATA.get('spawn_yaw') is not None:   # tanda 40: base.json lo fija (en la brecha, mirando hacia dentro)
+        yaw = float(DATA['spawn_yaw'])
     ps = eas.spawn_actor_from_class(unreal.PlayerStart, ue([p[0], p[1], 1.0]), unreal.Rotator(roll=0, pitch=0, yaw=yaw))
     ps.set_actor_label('SalidaCuttlas')
     log('salida de Cuttlas', ps.get_actor_location(), 'mirando a', round(yaw))

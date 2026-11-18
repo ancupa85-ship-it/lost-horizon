@@ -486,6 +486,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
 	float TruckStopX() const { return (bTruckStayed || TruckStaySeconds <= 0.0f) ? TruckBarrierStopX : TruckStayX; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
 	FVector TruckLocation() const { return FVector(TruckX, TruckStart.Y, TruckStart.Z); }
 
 	/** Tanda 22: vas escondido en la caja del camión. Se sube por detrás con la E cuando está parado o cruza la base al
