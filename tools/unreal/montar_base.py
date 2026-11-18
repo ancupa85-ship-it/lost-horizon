@@ -494,8 +494,8 @@ EXPO = {'ev': 0.0, 'luna': 0.8, 'cielo': 2.2}
 # cinco metros negro: 140 veces más luz que la de la luna, cuando una imagen aguanta unas 20. Ahora el suelo devuelve
 # más (materiales.py, ALBEDO) y la farola da menos: el charco de luz tiene color y alrededor queda penumbra.
 LUZ_FUERTE = 'luz_fuerte'
-FAROLA_LM, FOCO_LM, HANGAR_SOMBRA = True   # si la VRAM no da, False (y la luz se ve algo por fuera de la nave)
-APLIQUE_LM = 300.0, 800.0, 150.0
+FAROLA_LM, FOCO_LM, APLIQUE_LM = 300.0, 800.0, 150.0
+HANGAR_SOMBRA = True   # si la VRAM no da, False (y la luz se ve algo por fuera de la nave)
 # tanda 26: qué farolas dibujan sombra (assets/unreal/mision1.json, ajustes.montaje). Hasta la 25 ninguna: bajo una
 # farola no tenías sombra. Ahora la sombra del jugador delata (ATarsisDirector::ShadowTick) y solo cuentan las luces que
 # la dibujan, así que la farola que no dé sombra tampoco delata. Lo que cuesta se mide con tools/unreal/barracon.py
