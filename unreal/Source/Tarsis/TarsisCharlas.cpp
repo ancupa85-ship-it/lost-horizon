@@ -135,13 +135,13 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 	TalkT += DeltaSeconds;
 	if (TalkPhase == 0)
 	{
-		if (TalkA->AtErrand() && TalkB->AtErrand()) { TalkPhase = 1; TalkT = TalkLineSeconds - 1.0f; TalkWait = TalkLineSeconds; TalkLine = 0; }
+		if (TalkA->AtErrand() && TalkB->AtErrand()) { TalkPhase = 1; TalkT = TalkLineSeconds - 1.0f; TalkLineWait = TalkLineSeconds; TalkLine = 0; }
 		else if (TalkT > TalkGather) EndTalk(true);
 		return;
 	}
-	if (TalkT < TalkWait) return;
+	if (TalkT < TalkLineWait) return;
 	TalkT = 0.0f;
-	TalkWait = TalkLineSeconds;
+	TalkLineWait = TalkLineSeconds;
 	if (TalkLine >= T.Lines.Num())
 	{
 		++TalksEnded;
@@ -158,8 +158,8 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 		PlaySfx(TEXT("rumor"), T.Spot + FVector(0.0f, 0.0f, 150.0f), 0.5f);
 		// tanda 42: las frases largas duran lo que se tarda en leerlas (16 letras por segundo), no 4 s justos
 		const FString Said = Tx(T.Lines[TalkLine], TEXT("..."));
-		TalkWait = FMath::Max(TalkLineSeconds, Said.Len() / 16.0f);
-		SaySubtitle(Who.ToUpper(), Said, TalkWait);
+		TalkLineWait = FMath::Max(TalkLineSeconds, Said.Len() / 16.0f);
+		SaySubtitle(Who.ToUpper(), Said, TalkLineWait);
 		if (T.Facts.IsValidIndex(TalkLine)) LearnFact(T.Facts[TalkLine]);
 	}
 	else if (D < TalkSeeDist)
