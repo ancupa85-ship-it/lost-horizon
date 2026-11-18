@@ -2926,7 +2926,8 @@ def prueba_charlas():
         check('%s: oída entera, sus %d datos quedan apuntados' % (c['id'], len(todos)), all(d.fact_known(x) for x in todos), [x for x in todos if not d.fact_known(x)])
         yield 2.0
     check('los datos que ponen bandera la ponen', all(d.has_flag(q['pone']) for q in datos if q.get('pone')), [q['pone'] for q in datos if q.get('pone') and not d.has_flag(q['pone'])])
-    check('sabido todo, ninguna charla vuelve a empezar sola', d.facts_known() == len(datos), '%d de %d' % (d.facts_known(), len(datos)))
+    de_charlas = {f[2] for c in charlas for f in c['frases'] if len(f) > 2}   # tanda 43: hay datos que solo se sacan interrogando
+    check('sabido todo, ninguna charla vuelve a empezar sola', all(d.fact_known(x) for x in de_charlas), '%d de %d' % (d.facts_known(), len(de_charlas)))
     # una charla que se corta: uno de los dos oye algo y se va
     c = charlas[1]; a = guardia(c['a'])
     for g in guardias():

@@ -77,7 +77,10 @@ void ATarsisDirector::LeanTick(float DeltaSeconds)
 		float Room = LeanDist;
 		if (GetWorld()->SweepSingleByChannel(Hit, Base, Base + Right * Want * (LeanDist + 18.0f), FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(12.0f), Q))
 		{
-			Room = FMath::Max(0.0f, Hit.Distance - 6.0f);
+			// pegado a una pared el barrido sale ya tocandola (distancia 0) y no dejaba asomarse a ningun lado: solo cuenta
+			// si es hacia la pared
+			if (!Hit.bStartPenetrating) Room = FMath::Max(0.0f, Hit.Distance - 6.0f);
+			else if (FVector::DotProduct(Hit.Normal, Right * Want) < 0.0f) Room = 0.0f;
 		}
 		Want *= Room;
 	}
