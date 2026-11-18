@@ -3103,10 +3103,10 @@ def prueba_apuntar():
     aparte(); yield 0.3
     f0 = cam.get_editor_property('field_of_view')
     d0 = P('darts')
-    d.set_editor_property('darts', 0)
+    d.set_darts(0)
     d.set_editor_property('aim_held', True); yield 0.6
     check('sin dardos no se apunta', P('aim_alpha') < 0.01 and abs(cam.get_editor_property('field_of_view') - f0) < 0.5 and not d.can_aim(), '%.2f %.1f' % (P('aim_alpha'), cam.get_editor_property('field_of_view')))
-    d.set_editor_property('darts', 3); yield 0.8
+    d.set_darts(3); yield 0.8
     check('con dardos, el botón derecho cierra la vista', P('aim_alpha') > 0.95 and abs(cam.get_editor_property('field_of_view') - P('aim_fov')) < 1.0, '%.2f %.1f' % (P('aim_alpha'), cam.get_editor_property('field_of_view')))
     check('apuntando al aire la mira no marca a nadie', d.dart_aim() is None)
     d.set_editor_property('aim_held', False); yield 0.8
@@ -3115,7 +3115,7 @@ def prueba_apuntar():
     d.toggle_binoculars(); yield 0.3
     d.toggle_binoculars(); d.set_editor_property('aim_held', False); yield 0.8
     check('prismáticos mientras apuntas: al bajar todo, la vista es la de antes', abs(cam.get_editor_property('field_of_view') - f0) < 0.5, cam.get_editor_property('field_of_view'))
-    d.set_editor_property('darts', d0)
+    d.set_darts(d0)
 
 def prueba_tercera():
     """Tanda 47. La G pasa a tercera persona: la cámara se va detrás del hombro (sin atravesar paredes), se ve el cuerpo de
@@ -3123,7 +3123,10 @@ def prueba_tercera():
     d = director()
     P = lambda k: director().get_editor_property(k)
     cam = jugador().get_component_by_class(unreal.CameraComponent)
-    aparte(); yield 0.5
+    # lo que dejen las pruebas de antes: de pie y sin asomarse (si no, la camara aun se mueve y la animacion es la de agachado)
+    d.simulate_key('Z', False, True); d.simulate_key('V', False, True)
+    if jugador().get_editor_property('is_crouched'): jugador().un_crouch()
+    aparte(); yield 1.0
     check('Cuttlas tiene cuerpo (modelo importado)', d.hero_ready())
     c0 = cam.get_world_location()
     d.toggle_third(); yield 0.8
@@ -3294,7 +3297,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce, prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro]]
 PRUEBAS = []
 
 

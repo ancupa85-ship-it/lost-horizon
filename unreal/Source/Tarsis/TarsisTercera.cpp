@@ -130,6 +130,10 @@ void ATarsisDirector::ThirdTick(float DeltaSeconds)
 		bThirdShown = bOut;
 		if (Arms) Arms->SetVisibility(!bOut, true);
 		if (HeroBody) HeroBody->SetVisibility(bOut);
+		// la malla de primera persona de la plantilla (solo la ve su dueno) tambien sale en tercera: se veia el maniqui encima de Cuttlas
+		TArray<USkeletalMeshComponent*> Ms;
+		C->GetComponents<USkeletalMeshComponent>(Ms);
+		for (USkeletalMeshComponent* M : Ms) { if (M != HeroBody.Get() && M != Arms.Get() && M->bOnlyOwnerSee) M->SetVisibility(!bOut, true); }
 	}
 	if (!HeroBody || !bOut) return;
 	const float HalfH = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
