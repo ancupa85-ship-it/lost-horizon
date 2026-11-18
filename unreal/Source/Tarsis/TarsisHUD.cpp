@@ -186,6 +186,11 @@ void ATarsisHUD::DrawMenu(ATarsisDirector* D)
 	Text(D->MenuPage == 1 ? TEXT("Intro: cambiar la tecla (si ya la usa otra accion, se intercambian)    Esc: volver")
 		: TEXT("W/S o flechas: elegir    A/D: cambiar    Intro: aceptar    P: volver al juego"), CX, Y0 + L.Num() * LH + 30.0f * S,
 		FLinearColor(0.7f, 0.7f, 0.7f), 0.7f * S, true);
+	if (D->MenuPage == 1)
+	{
+		Text(TEXT("Teclas fijas:   WASD moverse    RATON mirar    CLIC dardo    P pausa    1-4 responder    ESC colgar la radio"), CX, Y0 + L.Num() * LH + 56.0f * S,
+			FLinearColor(0.85f, 0.8f, 0.6f), 0.75f * S, true);
+	}
 }
 
 void ATarsisHUD::DrawBinoculars(ATarsisDirector* D)
@@ -242,14 +247,33 @@ void ATarsisHUD::DrawLastKnown(ATarsisDirector* D)
 	if (A.X < 0.0f || A.X > Canvas->ClipX || B.Y > Canvas->ClipY || A.Y < 0.0f) return;
 	const float Tall = FMath::Clamp(A.Y - B.Y, 10.0f * S, Canvas->ClipY * 0.6f);
 	const float Fade = FMath::Clamp(D->LastKnownT / 3.0f, 0.0f, 1.0f) * (0.75f + 0.25f * FMath::Sin(GetWorld()->GetTimeSeconds() * 5.0f));
-	const FLinearColor Col(1.0f, 0.82f, 0.23f, 0.34f * Fade);
-	// cabeza, tronco y piernas: una figura, no un icono
-	Panel(A.X - Tall * 0.065f, A.Y - Tall, Tall * 0.13f, Tall * 0.13f, Col);
-	Panel(A.X - Tall * 0.15f, A.Y - Tall * 0.85f, Tall * 0.30f, Tall * 0.40f, Col);
-	Panel(A.X - Tall * 0.13f, A.Y - Tall * 0.45f, Tall * 0.11f, Tall * 0.45f, Col);
-	Panel(A.X + Tall * 0.02f, A.Y - Tall * 0.45f, Tall * 0.11f, Tall * 0.45f, Col);
+	// una figura, no un icono: cabeza, hombros, tronco que se estrecha y piernas, con borde oscuro para que se lea
+	// igual sobre un muro claro que sobre la noche
+	const FLinearColor Col(1.0f, 0.82f, 0.23f, 0.62f * Fade);
+	const FLinearColor Edge(0.0f, 0.0f, 0.0f, 0.45f * Fade);
+	const float E = FMath::Max(1.5f * S, Tall * 0.012f);
+	auto Part = [&](float X0, float Y0, float PW, float PH)
+	{
+		Panel(A.X + X0 * Tall - E, A.Y - Y0 * Tall - E, PW * Tall + 2.0f * E, PH * Tall + 2.0f * E, Edge);
+	};
+	auto Fill = [&](float X0, float Y0, float PW, float PH)
+	{
+		Panel(A.X + X0 * Tall, A.Y - Y0 * Tall, PW * Tall, PH * Tall, Col);
+	};
+	static const float Parts[][4] = {
+		{ -0.055f, 1.00f, 0.11f, 0.12f },    // cabeza
+		{ -0.025f, 0.88f, 0.05f, 0.03f },    // cuello
+		{ -0.165f, 0.85f, 0.33f, 0.07f },    // hombros
+		{ -0.135f, 0.78f, 0.27f, 0.17f },    // pecho
+		{ -0.110f, 0.61f, 0.22f, 0.14f },    // cintura
+		{ -0.215f, 0.80f, 0.045f, 0.33f },   // brazo izquierdo
+		{ 0.170f, 0.80f, 0.045f, 0.33f },    // brazo derecho
+		{ -0.115f, 0.47f, 0.095f, 0.47f },   // pierna izquierda
+		{ 0.020f, 0.47f, 0.095f, 0.47f } };  // pierna derecha
+	for (const auto& Q : Parts) Part(Q[0], Q[1], Q[2], Q[3]);
+	for (const auto& Q : Parts) Fill(Q[0], Q[1], Q[2], Q[3]);
 	const int32 M = FMath::RoundToInt(FVector::Dist2D(D->LastKnown, Pl->GetActorLocation()) / 100.0f);
-	Text(FString::Printf(TEXT("TE VIERON AQUI  %dm"), M), A.X, A.Y - Tall - 20.0f * S, FLinearColor(1.0f, 0.82f, 0.23f, 0.85f * Fade), 0.7f * S, true);
+	Text(FString::Printf(TEXT("TE VIERON AQUI  %dm"), M), A.X, A.Y - Tall - 24.0f * S, FLinearColor(1.0f, 0.82f, 0.23f, Fade), 0.85f * S, true);
 }
 
 void ATarsisHUD::DrawHeard(ATarsisDirector* D)

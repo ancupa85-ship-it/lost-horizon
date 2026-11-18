@@ -1017,7 +1017,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
 	float FlareEndHeight = 3200.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
-	float FlareCandelas = 13000.0f;
+	float FlareCandelas = 26000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
 	float FlareRadius = 14000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
@@ -1232,6 +1232,9 @@ public:
 	/** Con uniforme, de pie y andando: mas lejos de esto (cm) los guardias te toman por uno de los suyos. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
 	float UniformDist = 900.0f;
+	/** Un guardia que tiene la caja delante a menos de esto (cm) la mira dos veces: de cerca no engana. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
+	float BoxNoticeDist = 150.0f;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Caja")
 	void ToggleBox();
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Caja")
@@ -1477,6 +1480,8 @@ public:
 	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
 	static constexpr int32 NumActions = 13;   // tanda 43: caja, mapa, interrogar y asomarse tambien se ven y se cambian en CONTROLES
 	FKey ActionKeys[NumActions];
+	/** Nombre de la tecla de una accion, en mayusculas y sin tildes (ToUpper dejaba «MAYuS» con la u minuscula). */
+	FString KeyLabel(int32 I) const;
 	static const TCHAR* ActionName(int32 I);
 
 	/** Tira de ayuda de abajo a la derecha: teclas de lo que puedes hacer ahora. */

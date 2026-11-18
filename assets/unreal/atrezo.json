@@ -3294,7 +3294,7 @@
   },
   {
    "nombre": "coc_saco0",
-   "modelo": "cement_bag",
+   "modelo": "barrel_03",
    "pos": [
     6090,
     3685,
@@ -3304,23 +3304,13 @@
   },
   {
    "nombre": "coc_saco1",
-   "modelo": "cement_bag",
+   "modelo": "cardboard_box_01",
    "pos": [
     6160,
     3685,
     60
    ],
    "giro": 84
-  },
-  {
-   "nombre": "coc_saco2",
-   "modelo": "cement_bag",
-   "pos": [
-    6125,
-    3685,
-    120
-   ],
-   "giro": 95
   },
   {
    "nombre": "coc_barril",

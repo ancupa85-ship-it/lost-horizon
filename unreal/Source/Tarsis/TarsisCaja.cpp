@@ -89,5 +89,6 @@ void ATarsisDirector::BoxTick(float DeltaSeconds)
 	// el uniforme: de pie, andando y sin alarma
 	bUniformNow = C && HasFlag(FName(TEXT("uniforme"))) && !bBoxOn && !C->bIsCrouched && !bSprint && !bAlert && !bHiding && !bRiding && !InCell();
 	ATarsisGuard::GSeenMul = BoxCloaked() ? 0.0f : 1.0f;
+	ATarsisGuard::GBoxNear = BoxNoticeDist;
 	ATarsisGuard::GFarLimit = bUniformNow ? UniformDist : 0.0f;
 }

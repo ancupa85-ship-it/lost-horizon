@@ -3047,6 +3047,7 @@ def prueba_tactica():
     d.simulate_key('T'); yield 0.3
     check('la T de verdad lo interroga', P('interrogations') == i0 + 1, P('interrogations'))
     check('y suelta un dato de los que le tocan', d.facts_known() == n0 + 1 and P('interrogation_facts') == f0 + 1 and any(d.has_flag('dato_' + i) for i in le_toca(nombre(g))), '%d datos; %s' % (d.facts_known(), le_toca(nombre(g))))
+    check('levanta las manos', 'manos' in [str(x) for x in g.get_editor_property('gesture_log')], [str(x) for x in g.get_editor_property('gesture_log')][-3:])
     check('se queda quieto, a mano para derribarlo', g.is_stunned() and estado(g) != 'ALERT' and 'DERRIBAR' in str(d.interact_prompt()), '%s / %s' % (estado(g), d.interact_prompt()))
     check('ya no se ofrece interrogarlo otra vez', 'INTERROGAR' not in str(d.interact_prompt()), d.interact_prompt())
     d.interrogate(); yield 0.1
@@ -3064,6 +3065,25 @@ def prueba_tactica():
         d.interrogate(); yield 0.2
         check('el que no sabe nada lo dice y no apunta ningún dato', d.facts_known() == n1 and P('interrogations') == i0 + 2, '%s: %d' % (nombre(x), d.facts_known()))
         d.simulate_key('E'); yield 0.3
+    # ---- la caja de cartón, de cerca, ya no engaña (tanda 44)
+    otros = [x for x in ronda if estado(x) == 'PATROL' and x != g]
+    if otros:
+        o = otros[0]; o.hold(3600.0)
+        d.set_flag('caja')
+        a_la_vista_de(o, 400.0); yield 0.2
+        if not P('box_on'):
+            d.toggle_box()
+        yield 1.0
+        check('quieto en la caja a 4 m, no te ve', P('box_on') and o.visibility(jugador()) == 0.0, o.visibility(jugador()))
+        a_la_vista_de(o, 120.0)
+        v_cerca = o.visibility(jugador())   # sin esperar: si te ve de verdad, te coge
+        jugador().set_actor_hidden_in_game(True)
+        check('a un paso, la caja ya no engaña', v_cerca > 0.0, v_cerca)
+        if P('box_on'):
+            d.toggle_box()
+        tp(4300, 3500, 0); yield 0.3
+        jugador().set_actor_hidden_in_game(False)
+        yield ('hasta', lambda: all(estado(x) in ('PATROL', 'DOWN') for x in guardias() if not x.get_editor_property('tower_sentry')), 40.0)
     # ---- asomarse, en lo abierto
     tp(4300, 3500, 0); yield 0.3   # en (3000,4600) la cámara toca contenedor_2 y hacia él no se asoma (bien)
     cam = lambda: jugador().get_component_by_class(unreal.CameraComponent).get_world_location()
@@ -3173,6 +3193,8 @@ def _limpieza(siguiente):
         # tanda 43: la búsqueda en pareja, solo en su prueba (las demás dan alarmas para medir otra cosa)
         d.set_editor_property('last_seen_rule', siguiente is prueba_tactica)
         d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
+        # tanda 44: la caja que se nota de cerca, solo en su prueba (las de la caja se escribieron pegadas al guardia)
+        d.set_editor_property('box_notice_dist', 150.0 if siguiente is prueba_tactica else 0.0)
         d.set_editor_property('flares', False)
         d.set_editor_property('torch_flicker', False)
         if d.get_editor_property('day'):

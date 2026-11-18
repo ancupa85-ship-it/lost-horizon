@@ -465,7 +465,7 @@ def cocina():
     for q in (-0.75, 0.0, 0.75): cyl('oscuro', 0.2, 0.02, Mp(fx + q, y0 + 0.62, 0.88), seg=14); box('hierro', (0.5, 0.03, 0.34), Mp(fx + q, y0 + 1.04, 0.42))
     box('metal', (2.6, 1.0, 0.5), Mp(fx, y0 + 0.62, 2.05)); cyl('metal', 0.14, Hh + 1.3 - 2.3, Mp(fx, y0 + 0.5, (Hh + 1.3 + 2.3) / 2), seg=12)
     cyl('metal', 0.2, 0.06, Mp(fx, y0 + 0.5, Hh + 1.36), seg=12)
-    cyl('metal', 0.3, 0.42, Mp(fx - 0.75, y0 + 0.62, 1.1), seg=16); cyl('oscuro', 0.2, 0.26, Mp(fx + 0.75, y0 + 0.62, 1.02), seg=14)   # ollas sobre el fuego
+    cyl('hierro', 0.3, 0.42, Mp(fx - 0.75, y0 + 0.62, 1.1), seg=20); cyl('oscuro', 0.2, 0.26, Mp(fx + 0.75, y0 + 0.62, 1.02), seg=14)   # ollas sobre el fuego
     # poyo de acero con pila en la pared este, y barra de ganchos encima
     box('metal', (0.7, 3.4, 0.05), Mp(x1 - g - 0.37, cy + 0.5, 0.88)); box('oscuro', (0.62, 3.3, 0.82), Mp(x1 - g - 0.37, cy + 0.5, 0.42)); box('oscuro', (0.5, 0.7, 0.03), Mp(x1 - g - 0.37, cy + 1.4, 0.9))
     cyl('hierro', 0.015, 3.0, Mp(x1 - g - 0.12, cy + 0.5, 1.95), rot=Matrix.Rotation(math.pi / 2, 4, 'X'), seg=8)
@@ -482,7 +482,8 @@ def cocina():
     for xx in (62.8, 64.6, 66.4): box('madera', (0.05, 0.36, 1.65), Mp(xx, y1 - g - 0.19, 0.83))
     ox, oy = x0 + 0.95, y1 - 0.95
     cyl('madera', 0.32, 0.5, Mp(ox + 0.9, oy + 0.1, 0.25), seg=14)                                           # tajo
-    cyl('metal', 0.34, 0.5, Mp(ox, oy, 0.25), seg=18); cyl('oscuro', 0.31, 0.02, Mp(ox, oy, 0.47), seg=18)   # la olla grande, en el suelo
+    cyl('hierro', 0.34, 0.5, Mp(ox, oy, 0.25), seg=24); cyl('hierro', 0.365, 0.035, Mp(ox, oy, 0.5), seg=24); cyl('oscuro', 0.31, 0.02, Mp(ox, oy, 0.51), seg=24)   # la olla grande, en el suelo: hierro negro con su reborde
+    for q in (-1, 1): box('hierro', (0.05, 0.16, 0.03), Mp(ox + q * 0.37, oy, 0.4))   # asas
     EXT_OUT['cocina'] = {'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'alto': Hh, 'puerta': [x0, dy, dw, dh], 'luz': [cx - 0.6, cy + 0.3, 2.6], 'olla': [ox, oy], 'fogon': [fx, y0 + 0.6]}
 
 def build_exterior():

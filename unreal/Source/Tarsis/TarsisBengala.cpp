@@ -15,6 +15,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Engine/Light.h"
+#include "Components/LightComponent.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SpotLight.h"
 #include "Engine/StaticMesh.h"
@@ -204,6 +206,25 @@ void ATarsisDirector::SetDay(bool bNewDay)
 		{
 			if (UExponentialHeightFogComponent* F = It->GetComponent()) F->SetFogInscatteringColor(Weather == 2 ? DayFogColor * 1.5f : DayFogColor);
 			break;
+		}
+	}
+	// de dia las farolas de fuera se apagan (las de dentro y las de las casetas siguen); de noche vuelven
+	for (ALight* A : DayOffLights) { if (A && A->GetLightComponent()) A->GetLightComponent()->SetVisibility(true); }
+	DayOffLights.Reset();
+	if (bDay && bDayLampsOff)
+	{
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisDia), false, this);
+		for (TActorIterator<ALight> It(GetWorld()); It; ++It)
+		{
+			ULightComponent* L = It->GetLightComponent();
+			if (!L || !L->IsVisible() || BrokenLights.Contains(L) || (*It != GateLamp.Get() && !BreakableLamp(*It))) continue;
+			FCollisionQueryParams Q2 = Q;
+			Q2.AddIgnoredActor(*It);
+			FHitResult Hit;
+			const FVector P = It->GetActorLocation();
+			if (GetWorld()->LineTraceSingleByChannel(Hit, P + FVector(0.0f, 0.0f, 60.0f), P + FVector(0.0f, 0.0f, 2500.0f), ECC_Visibility, Q2)) continue;   // bajo techo
+			L->SetVisibility(false);
+			DayOffLights.Add(*It);
 		}
 	}
 	ATarsisGuard::SetDayAmbient(bDay ? DayAmbientOpen : 0.0f, bDay ? DayAmbientRoofed : 0.0f);

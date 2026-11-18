@@ -467,6 +467,8 @@ public:
 	/** Tanda 40 (los pone el director cada tick): la caja de carton (0 = nadie te ve) y el uniforme (mas lejos de
 	GFarLimit cm no te distinguen de un guardia; 0 = sin uniforme). */
 	static float GSeenMul;
+	/** Tanda 44: a menos de esto (cm), de frente, la caja de carton ya no engana. */
+	static float GBoxNear;
 	static float GFarLimit;
 
 	/** Dormido con un dardo: se le puede quitar (E) y vuelve a la pistola. */

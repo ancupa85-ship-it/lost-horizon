@@ -41,6 +41,9 @@ void ATarsisDirector::Interrogate()
 	for (const FTarsisFact& F : Facts) { if (F.Link.Equals(G->GuardName, ESearchCase::IgnoreCase) && !FactKnown(F.Id)) { Got = F.Id; break; } }
 	if (Got.IsNone()) { for (const FTarsisFact& F : Facts) { if (F.Card.Equals(G->GuardName, ESearchCase::IgnoreCase) && !FactKnown(F.Id)) { Got = F.Id; break; } } }
 	PlaySfx(TEXT("empujon"), G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 0.3f);
+	G->PlayGesture(FName(TEXT("manos")), InterrogateSeconds);   // manos arriba mientras habla
+	// antes del dato: el cartel de APUNTADO es el que debe quedar a la vista
+	Teach(TEXT("ensena_interrogar"), TEXT("INTERROGADO\n{0} habla y se queda quieto unos segundos. Derribalo (E) antes de que se rehaga, o ira a por ti."), { G->GuardName.ToUpper() }, 4.5f);
 	if (Got.IsNone())
 	{
 		SaySubtitle(G->GuardName.ToUpper(), Tx(TEXT("int_nada"), TEXT("No se nada mas. Se lo juro.")), 3.0f);
@@ -51,7 +54,6 @@ void ATarsisDirector::Interrogate()
 		LearnFact(Got);
 		++InterrogationFacts;
 	}
-	Teach(TEXT("ensena_interrogar"), TEXT("INTERROGADO\n{0} habla y se queda quieto unos segundos. Derribalo (E) antes de que se rehaga, o ira a por ti."), { G->GuardName.ToUpper() }, 4.5f);
 }
 
 // ---------------------------------------------------------------- asomarse

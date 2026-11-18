@@ -307,12 +307,13 @@ void ATarsisGuard::GestureTick(float DeltaSeconds)
 	// Después de LookTick: la pose visible ya es la de la animación con la cabeza girada; aquí se le ponen los brazos.
 	// Sin grafo de animación (SingleNode) no hay capas: se apunta cada hueso del brazo hacia donde debe ir. Cada brazo
 	// tiene su peso y su dirección suavizada: de un gesto a otro (tender la mano -> leer) el brazo va, no salta.
-	static const FName NAlto(TEXT("alto")), NPapeles(TEXT("papeles")), NLeer(TEXT("leer")), NPase(TEXT("pase")), NLona(TEXT("lona"));
+	static const FName NAlto(TEXT("alto")), NPapeles(TEXT("papeles")), NLeer(TEXT("leer")), NPase(TEXT("pase")), NLona(TEXT("lona")), NManos(TEXT("manos"));
 	if (!Pose) return;
 	if (GestureLeft > 0.0f) GestureLeft -= DeltaSeconds;
 	const bool bCalm = (State == ETarsisGuardState::Patrol || State == ETarsisGuardState::Return) && StunT <= 0.0f
 		&& (Gesture == NAlto || GetVelocity().Size2D() < 45.0f);
-	const bool bOn = GestureLeft > 0.0f && bCalm;
+	// manos arriba (interrogado): es justo mientras esta aturdido
+	const bool bOn = GestureLeft > 0.0f && (bCalm || (Gesture == NManos && State != ETarsisGuardState::Down));
 	if (!bOn && ArmW[0] <= 0.0f && ArmW[1] <= 0.0f && FMath::Abs(GestureHead) < 0.05f && FMath::Abs(GestureLean) < 0.05f)
 	{
 		GestureW = 0.0f;
@@ -326,7 +327,18 @@ void ATarsisGuard::GestureTick(float DeltaSeconds)
 	float HeadPitch = 0.0f, SpineLean = 0.0f;
 	if (bOn)
 	{
-		if (Gesture == NAlto)
+		if (Gesture == NManos)
+		{
+			// los dos brazos abiertos y los antebrazos arriba
+			for (int32 Side = 0; Side < 2; ++Side)
+			{
+				const float Sg = Side == 0 ? 1.0f : -1.0f;
+				bUse[Side] = true;
+				Want[Side][0] = FVector(0.1f, 0.85f * Sg, 0.5f);
+				Want[Side][1] = FVector(0.05f, 0.15f * Sg, 0.98f);
+			}
+		}
+		else if (Gesture == NAlto)
 		{
 			// la mano derecha en alto y separada del cuerpo (tanda 25: con el brazo por delante del pecho, de frente y
 			// de espaldas la silueta era la misma que sin gesto): el brazo sale hacia su derecha y el antebrazo sube recto
@@ -1422,6 +1434,7 @@ void ATarsisGuard::ShowTorch(bool bOn)
 }
 
 float ATarsisGuard::GSeenMul = 1.0f;
+float ATarsisGuard::GBoxNear = 0.0f;
 float ATarsisGuard::GFarLimit = 0.0f;
 
 float ATarsisGuard::Visibility(const AActor* Target) const
@@ -1434,7 +1447,7 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	// tanda 40: quieto dentro de la caja de carton no te ve; con uniforme, de lejos eres uno mas (si no te persigue ya)
 	if (const APawn* TP = Cast<APawn>(Target))
 	{
-		if (TP->IsPlayerControlled() && (GSeenMul <= 0.0f || (GFarLimit > 0.0f && D > GFarLimit && State != ETarsisGuardState::Alert))) return 0.0f;
+		if (TP->IsPlayerControlled() && ((GSeenMul <= 0.0f && D > GBoxNear) || (GFarLimit > 0.0f && D > GFarLimit && State != ETarsisGuardState::Alert))) return 0.0f;
 	}
 	// en el cono de su linterna te ve de más lejos que a simple vista (pero solo de frente: el cono es estrecho)
 	bool bTorch = false;
