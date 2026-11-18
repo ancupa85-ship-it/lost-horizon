@@ -1104,6 +1104,8 @@ public:
 	/** Toda la base vuelve a su ronda y nadie queda en alerta (al encerrarte en el calabozo). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tactica")
 	void CalmBase();
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	int32 Calms = 0;
 	void TacticsTick(float DeltaSeconds);
 	FVector FlareDrift = FVector::ZeroVector;
 

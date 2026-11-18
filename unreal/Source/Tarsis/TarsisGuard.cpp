@@ -701,6 +701,29 @@ void ATarsisGuard::WakeUp()
 	}
 }
 
+void ATarsisGuard::Recover()
+{
+	StunT = 0.0f;
+	BodyTarget = nullptr;
+	BodyCheckT = 0.0f;
+	bNoiseSearch = false;
+	bRadioCall = false;
+	bFound = false;
+	Meter = 0.0f;
+	UnseenT = 0.0f;
+	BeamCallT = 0.0f;
+	if (State == ETarsisGuardState::Down)
+	{
+		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		Body->SetRelativeRotation(FRotator::ZeroRotator);
+		CurrentAnim = nullptr;
+		bDarted = false;
+		DownT = 0.0f;
+	}
+	if (State != ETarsisGuardState::Patrol) SetState(bTowerSentry ? ETarsisGuardState::Patrol : ETarsisGuardState::Return);
+	UpdateMark();
+}
+
 void ATarsisGuard::LookForBodies()
 {
 	if (State == ETarsisGuardState::Alert || bAlly || BodyTarget || StunT > 0.0f) return;
@@ -1436,6 +1459,7 @@ void ATarsisGuard::ShowTorch(bool bOn)
 float ATarsisGuard::GSeenMul = 1.0f;
 float ATarsisGuard::GBoxNear = 0.0f;
 float ATarsisGuard::GFarLimit = 0.0f;
+bool ATarsisGuard::GPrisoner = false;
 
 float ATarsisGuard::Visibility(const AActor* Target) const
 {
@@ -1447,6 +1471,7 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	// tanda 40: quieto dentro de la caja de carton no te ve; con uniforme, de lejos eres uno mas (si no te persigue ya)
 	if (const APawn* TP = Cast<APawn>(Target))
 	{
+		if (GPrisoner && TP->IsPlayerControlled()) return 0.0f;
 		if (TP->IsPlayerControlled() && ((GSeenMul <= 0.0f && D > GBoxNear) || (GFarLimit > 0.0f && D > GFarLimit && State != ETarsisGuardState::Alert))) return 0.0f;
 	}
 	// en el cono de su linterna te ve de más lejos que a simple vista (pero solo de frente: el cono es estrecho)
@@ -1566,7 +1591,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		if (StunT <= 0.0f)
 		{
 			APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
-			if (Pl && !Pl->IsHidden() && GSeenMul > 0.0f) { Meter = 1.0f; UnseenT = 0.0f; LastSeen = Pl->GetActorLocation(); SetState(ETarsisGuardState::Alert); }
+			if (Pl && !Pl->IsHidden() && GSeenMul > 0.0f && !GPrisoner) { Meter = 1.0f; UnseenT = 0.0f; LastSeen = Pl->GetActorLocation(); SetState(ETarsisGuardState::Alert); }
 			else { LastSeen = GetActorLocation(); Meter = 0.6f; SetState(ETarsisGuardState::Search); }   // te has escondido: busca alrededor
 		}
 		return;

@@ -48,14 +48,23 @@ void ATarsisDirector::CalmBase()
 {
 	TensionT = 0.0f;
 	LastKnownT = 0.0f;
+	// lo que quedaba en marcha de la persecucion: el alto, los refuerzos pedidos y la pregunta de la central
+	bHalt = bFleeing = false;
+	HaltT = StillT = UnaimedT = AimHoldT = 0.0f;
+	BackupT = 0.0f;
+	bBackupSent = false;
+	Aimer = nullptr;
+	ArrestGuard = nullptr;
+	if (bRadioAsk) { bRadioAsk = false; MessageT = FMath::Min(MessageT, 0.3f); }
+	RadioAskGuard = nullptr;
+	RadioAskT = 0.0f;
+	// los tumbados y los aturdidos tambien: a los suyos los han levantado, y nadie se despierta buscandote
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
-		if (It->State == ETarsisGuardState::Down || It->bAlly) continue;
-		It->Meter = 0.0f;
-		It->UnseenT = 0.0f;
-		It->BeamCallT = 0.0f;
-		if (It->State != ETarsisGuardState::Patrol) It->SetState(It->bTowerSentry ? ETarsisGuardState::Patrol : ETarsisGuardState::Return);
+		if (It->bAlly) continue;
+		It->Recover();
 	}
+	++Calms;
 }
 
 bool ATarsisDirector::InCell() const

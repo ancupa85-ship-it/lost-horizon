@@ -670,6 +670,40 @@ def prueba_captura():
     yield ('hasta', lambda: not director().get_editor_property('capturing'), 4.0)
     check('vuelves a tener el control', not pc.is_move_input_ignored() and not pc.is_look_input_ignored())
 
+def prueba_calma():
+    """Tanda 45 (queja de Andres: «me meten al calabozo y aparecen guardias en alerta»). Al capturarte no queda nada en
+    marcha: el tumbado se levanta sin buscar, el aturdido no sale a por ti, el que venía corriendo vuelve a su ronda y
+    nadie da la voz por verte tras la reja."""
+    d = director()
+    libres = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) in ('PATROL', 'RETURN') and not x.get_actor_label().endswith('Ramos')]
+    yield ('hasta', lambda: len(libres()) >= 3, 30.0)
+    a, b, c = libres()[:3]
+    lc = c.get_actor_location()
+    a.knock_out(); b.stun(4.0); c.alarm(V(lc.x + 500, lc.y, lc.z))
+    yield 0.5
+    check('preparado: uno en el suelo, uno aturdido y uno corriendo hacia ti', estado(a) == 'DOWN' and b.is_stunned() and estado(c) in ('ALERT', 'SUSPICIOUS', 'SEARCH'), '%s %s %s' % (estado(a), b.is_stunned(), estado(c)))
+    d.lock_in_cell(jugador()); yield 0.5   # lo mismo que hace la captura (Captured llama a CalmBase y te encierra)
+    check('estás en el calabozo', d.in_cell())
+    mal = lambda: ['%s %s' % (x.get_actor_label(), estado(x)) for x in guardias() if estado(x) in ('ALERT', 'SEARCH', 'SUSPICIOUS', 'DOWN') and not x.get_actor_label().endswith('Ramos')]
+    check('nada más encerrarte, nadie en alerta ni en el suelo', not mal(), mal())
+    peor = []
+    for i in range(24):
+        yield 0.5
+        peor += mal()
+    check('a los doce segundos sigue todo en calma (ni el aturdido ni el tumbado salen a buscarte)', not peor and d.base_state() == 0, '%s base %s' % (sorted(set(peor))[:4], d.base_state()))
+    # un guardia delante de la reja te ve preso y no da la voz
+    puerta = d.get_editor_property('cell_door')
+    g = libres()[0]
+    g.set_actor_location(V(puerta.x, puerta.y - 150, g.get_actor_location().z), False, True)
+    tp(puerta.x, puerta.y + 110, -90.0)
+    g.hold(6.0)
+    g.set_actor_rotation(unreal.Rotator(0, 0, 90.0), False)
+    m = 0.0
+    for i in range(8):
+        yield 0.5
+        m = max(m, g.get_editor_property('meter'))
+    check('un guardia ante la reja no se alarma por ver al preso', m < 0.05 and estado(g) in ('PATROL', 'RETURN'), '%.2f %s' % (m, estado(g)))
+
 def prueba_perdido():
     d = director()
     aparte()
@@ -3121,7 +3155,7 @@ def prueba_tactica():
 
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
-            [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
+            [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
             [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas], [prueba_bengala], [prueba_tactica]]
 PRUEBAS = []

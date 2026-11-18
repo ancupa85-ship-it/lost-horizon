@@ -470,6 +470,8 @@ public:
 	/** Tanda 44: a menos de esto (cm), de frente, la caja de carton ya no engana. */
 	static float GBoxNear;
 	static float GFarLimit;
+	/** Tanda 45: preso tras la reja cerrada. Nadie da la voz por ver a un preso en su celda. */
+	static bool GPrisoner;
 
 	/** Dormido con un dardo: se le puede quitar (E) y vuelve a la pistola. */
 	bool bDarted = false;
@@ -563,6 +565,8 @@ private:
 	FVector ErrandFace = FVector::ZeroVector;
 	float ErrandT = 0.0f;
 	void WakeUp();
+	/** Tanda 45: lo levantan los suyos y vuelve a su puesto sin buscar a nadie (al capturarte). */
+	void Recover();
 	void LookForBodies();
 
 	void SetState(ETarsisGuardState NewState);
