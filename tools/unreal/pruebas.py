@@ -3065,7 +3065,7 @@ def prueba_tactica():
         check('el que no sabe nada lo dice y no apunta ningún dato', d.facts_known() == n1 and P('interrogations') == i0 + 2, '%s: %d' % (nombre(x), d.facts_known()))
         d.simulate_key('E'); yield 0.3
     # ---- asomarse, en lo abierto
-    tp(3000, 4600, 0); yield 0.3
+    tp(4300, 3500, 0); yield 0.3   # en (3000,4600) la cámara toca contenedor_2 y hacia él no se asoma (bien)
     cam = lambda: jugador().get_component_by_class(unreal.CameraComponent).get_world_location()
     lado = lambda a, b: (b.x - a.x) * r.x + (b.y - a.y) * r.y
     c0 = cam(); p0 = jugador().get_actor_location(); r = jugador().get_actor_right_vector()
