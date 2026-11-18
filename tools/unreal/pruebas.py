@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp', 'TarsisCaja.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp', 'TarsisCaja.cpp', 'TarsisCharlas.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -2761,6 +2761,80 @@ def prueba_hangar():
     check('y el camión te saca de la base', P('done') and P('left_by_truck'), str(P('message'))[:40].replace('\n', ' / '))
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_charlas():
+    """Tanda 41. Dos guardias se juntan a hablar; de lejos solo hay murmullo y de cerca se oye cada frase. Las frases con
+    dato lo apuntan en la ficha del soldado (bandera dato_<id>), una charla cortada se repite, y el mapa se abre con la M."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    t = MISION['textos']; datos = MISION['datos']; charlas = MISION['charlas']
+    ids = {q['id'] for q in datos}
+    claves = {q['texto'] for q in datos} | {f[1] for c in charlas for f in c['frases']}
+    check('charlas y datos solo usan textos que existen', not (claves - set(t)), sorted(claves - set(t)))
+    check('cada frase con dato nombra un dato que existe', all(f[2] in ids for c in charlas for f in c['frases'] if len(f) > 2))
+    check('todos los que hablan están en el nivel', all(guardia(c[k]) for c in charlas for k in ('a', 'b')), [c[k] for c in charlas for k in ('a', 'b') if not guardia(c[k])])
+    check('quien dice cada frase es uno de los dos', all(f[0] in (c['a'], c['b']) for c in charlas for f in c['frases']))
+    check('el director tiene las %d charlas y los %d datos' % (len(charlas), len(datos)), len(P('talks')) == len(charlas) and len(P('facts')) == len(datos), '%d, %d' % (len(P('talks')), len(P('facts'))))
+    check('al empezar no sabes nada', d.facts_known() == 0 and 'M mapa' not in str(d.help_line()), d.facts_known())
+    jugador().set_actor_hidden_in_game(True)    # la prueba mide el oído, no que te vean
+    d.set_editor_property('talk_start_dist', 0.0)   # aquí las charlas las arranca la prueba, una a una
+    for k, c in enumerate(charlas):
+        a, b = guardia(c['a']), guardia(c['b'])
+        for g in guardias():
+            g.hold(0.0 if g in (a, b) else 3600.0)
+        yield 0.3
+        sx, sy = c['sitio'][0], c['sitio'][1]
+        aparte()
+        ok = d.start_talk(k)
+        check('%s: %s y %s dejan la ronda para juntarse' % (c['id'], c['a'], c['b']), ok and P('talk_idx') == k and a.is_on_errand() and b.is_on_errand())
+        if not ok:
+            continue
+        yield ('hasta', lambda: director().get_editor_property('talk_phase') == 1 or director().get_editor_property('talk_idx') < 0, P('talk_gather') + 5.0)
+        check('%s: llegan los dos al sitio' % c['id'], P('talk_phase') == 1 and dist2d(a.get_actor_location(), V(sx, sy, 0)) < 200 and dist2d(b.get_actor_location(), V(sx, sy, 0)) < 200,
+              '%d y %d cm' % (dist2d(a.get_actor_location(), V(sx, sy, 0)), dist2d(b.get_actor_location(), V(sx, sy, 0))))
+        if P('talk_phase') != 1:
+            continue
+        if k == 0:
+            # primero de lejos: se ve que hablan, no se entiende y no se apunta nada
+            h0 = P('talk_lines_heard')
+            jugador().set_actor_location(V(sx + 800, sy, 150), False, True)
+            yield ('hasta', lambda: director().get_editor_property('talk_line') >= 2, 14.0)
+            check('de lejos solo hay murmullo', P('talk_lines_heard') == h0 and d.facts_known() == 0 and any('voz baja' in str(x) for x in P('subtitle_log')), [str(x)[:40] for x in list(P('subtitle_log'))[-2:]])
+            jugador().set_actor_location(V(sx + 300, sy, 150), False, True)
+            yield ('hasta', lambda: director().get_editor_property('talk_idx') < 0, 30.0)
+            sabe = [f[2] for f in c['frases'][2:] if len(f) > 2]
+            check('de cerca se oye y se apunta lo que llegaste a oír', P('talk_lines_heard') >= 2 and all(d.fact_known(x) for x in sabe) and not d.fact_known(c['frases'][0][2])
+                  and 'APUNTADO' in str(P('message')), '%d frases, %d datos' % (P('talk_lines_heard') - h0, d.facts_known()))
+            check('la línea de teclas ya nombra el mapa', 'M mapa' in str(d.help_line()))
+            check('le queda algo que contarte: se repetirá', P('talks_ended') >= 1 and not d.fact_known(c['frases'][0][2]))
+            yield 2.5
+            ok = d.start_talk(k); yield 0.2
+            yield ('hasta', lambda: director().get_editor_property('talk_phase') == 1 or director().get_editor_property('talk_idx') < 0, P('talk_gather') + 5.0)
+        jugador().set_actor_location(V(sx + 300, sy, 150), False, True)
+        yield ('hasta', lambda: director().get_editor_property('talk_idx') < 0, len(c['frases']) * P('talk_line_seconds') + 12.0)
+        todos = [f[2] for f in c['frases'] if len(f) > 2]
+        check('%s: oída entera, sus %d datos quedan apuntados' % (c['id'], len(todos)), all(d.fact_known(x) for x in todos), [x for x in todos if not d.fact_known(x)])
+        yield 2.0
+    check('los datos que ponen bandera la ponen', all(d.has_flag(q['pone']) for q in datos if q.get('pone')), [q['pone'] for q in datos if q.get('pone') and not d.has_flag(q['pone'])])
+    check('sabido todo, ninguna charla vuelve a empezar sola', d.facts_known() == len(datos), '%d de %d' % (d.facts_known(), len(datos)))
+    # una charla que se corta: uno de los dos oye algo y se va
+    c = charlas[1]; a = guardia(c['a'])
+    for g in guardias():
+        g.hold(0.0 if g.get_actor_label().endswith((c['a'], c['b'])) else 3600.0)
+    yield 0.3
+    n0 = P('talk_cuts')
+    if d.start_talk(1):
+        yield 1.0
+        a.alarm(V(c['sitio'][0] + 1500, c['sitio'][1], 0)); yield 1.0
+        check('si uno se va a mirar otra cosa, la charla se corta', P('talk_idx') < 0 and P('talk_cuts') == n0 + 1, '%s, %s' % (P('talk_idx'), P('talk_cuts')))
+    # el mapa
+    d.toggle_mind_map(); yield 0.3
+    check('la M abre el mapa', P('mind_map'))
+    d.toggle_mind_map(); yield 0.2
+    check('y lo cierra', not P('mind_map'))
+    jugador().set_actor_hidden_in_game(False)
+    aparte()
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
 def prueba_armados():
     """Tanda 37. Con fusil no se corre a por nadie: el guardia que te ve se queda a distancia, te apunta y da el alto.
     Quieto, uno se acerca a detenerte; si te mueves, disparan, y a la tercera herida caes. Al dar el alto piden
@@ -2840,7 +2914,7 @@ def prueba_armados():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas]]
 PRUEBAS = []
 
 
@@ -2899,6 +2973,11 @@ def _limpieza(siguiente):
         d.set_editor_property('armed_rule', siguiente is prueba_armados)
         # tanda 40: el control de entrada y la parada del camión ante el hangar, solo en su prueba (las del camión miden
         # tiempos de la pasada de antes); y la caja de cartón, quitada
+        # tanda 41: las charlas sacan a los guardias de su ronda: solo en su prueba
+        d.set_editor_property('talk_rule', siguiente is prueba_charlas)
+        d.set_editor_property('talk_start_dist', 3000.0)
+        if d.get_editor_property('mind_map'):
+            d.toggle_mind_map()
         d.set_editor_property('truck_entry_papers', 0.0)
         d.set_editor_property('truck_stay_seconds', 0.0)
         if d.get_editor_property('box_on'):

@@ -47,6 +47,36 @@ struct FTarsisPoint
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") int32 Darts = 0;
 };
 
+/** Tanda 41. Dato del mapa mental: va en la ficha de un soldado (Card). Saberlo es tener la bandera dato_<Id>. */
+USTRUCT(BlueprintType)
+struct FTarsisFact
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Id;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FString Card;
+	/** Clave del texto; clase (objeto, costumbre, debilidad, historia); ficha con la que lo une una linea; bandera que pone. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Text;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Kind;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FString Link;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Sets;
+};
+
+/** Tanda 41. Charla entre dos guardias (A y B) en Spot, a partir del segundo After de la mision. Por frase: quien la
+dice (Who), la clave del texto (Lines) y el dato que da al oirla (Facts; None si ninguno). */
+USTRUCT(BlueprintType)
+struct FTarsisTalk
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Id;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FString A;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FString B;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FVector Spot = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") float After = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") TArray<FString> Who;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") TArray<FName> Lines;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") TArray<FName> Facts;
+};
+
 /** Objetivo del HUD: el primero de la lista cuya bandera If esté puesta (If vacía: siempre). */
 USTRUCT(BlueprintType)
 struct FTarsisObjective
@@ -948,6 +978,71 @@ public:
 	int32 GearDarts = 0;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Equipo")
 	void TakeGear();
+	// ---- tanda 41: charlas que se oyen de cerca y mapa mental (TarsisCharlas.cpp)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	bool bTalkRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	TArray<FTarsisTalk> Talks;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	TArray<FTarsisFact> Facts;
+	/** A menos de esto (cm) del sitio se oye cada frase; hasta TalkSeeDist, solo un murmullo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkHearDist = 450.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkSeeDist = 1100.0f;
+	/** Una charla solo empieza contigo a menos de esto de su sitio: no se gasta mientras estas en la otra punta. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkStartDist = 3000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkLineSeconds = 4.0f;
+	/** Segundos que tienen para juntarse, y pausa hasta la charla siguiente (o hasta repetir la que se corto). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkGather = 60.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkRetry = 45.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkWait = 20.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalkIdx = -1;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalkPhase = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalkLine = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalksStarted = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalksEnded = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalkCuts = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalkLinesHeard = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 FactsLearned = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	FName LastFact;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	bool bMindMap = false;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Charlas")
+	bool StartTalk(int32 Index);
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Charlas")
+	bool FactKnown(FName Id) const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Charlas")
+	int32 FactsKnown() const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Charlas")
+	bool LearnFact(FName Id);
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Charlas")
+	void ToggleMindMap();
+	bool TalkPending(int32 Index) const;
+	void EndTalk(bool bCut);
+	void TalkTick(float DeltaSeconds);
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> TalkA;
+	UPROPERTY()
+	TObjectPtr<class ATarsisGuard> TalkB;
+	float TalkT = 0.0f;
+	int32 TalkNext = 0;
+	bool bTalkHeardAny = false;
+	bool bTalkMurmur = false;
 	// ---- tanda 40: la caja de carton (X) y el uniforme (TarsisCaja.cpp)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
 	bool bBoxOn = false;

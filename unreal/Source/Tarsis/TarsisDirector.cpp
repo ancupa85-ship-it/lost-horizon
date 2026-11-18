@@ -386,6 +386,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	CellTick(DeltaSeconds);
 	GearTick(DeltaSeconds);
 	BoxTick(DeltaSeconds);
+	TalkTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
 	ClimbTick(DeltaSeconds);
 }
@@ -3693,6 +3694,7 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[3], IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
 	InputComponent->BindKey(ActionKeys[5], IE_Pressed, this, &ATarsisDirector::CycleWeather);
 	InputComponent->BindKey(ActionKeys[6], IE_Pressed, this, &ATarsisDirector::ToggleTorch);
+	InputComponent->BindKey(EKeys::M, IE_Pressed, this, &ATarsisDirector::ToggleMindMap);   // tanda 41: el mapa mental (tecla fija)
 	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &ATarsisDirector::ToggleBox);   // tanda 40: la caja de cartón (tecla fija)
 	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);
 	InputComponent->BindKey(ActionKeys[4], IE_Released, this, &ATarsisDirector::SprintOff);
@@ -3754,6 +3756,7 @@ FString ATarsisDirector::HelpLine() const
 	if (Darts > 0) S += FString::Printf(TEXT("   CLIC dardo (%d)"), Darts);
 	if (bHasTorch) S += FString::Printf(TEXT("   %s linterna"), *K(6));
 	if (HasFlag(FName(TEXT("caja")))) S += TEXT("   X caja");
+	if (FactsLearned > 0 || FactsKnown() > 0) S += TEXT("   M mapa");
 	if (bPowerOff) S += TEXT("   sin luz: busca la sombra de las linternas");
 	S += FString::Printf(TEXT("   %s radio   P pausa"), *K(7));
 	return S;

@@ -1,5 +1,5 @@
 {
- "_leeme": "Mision 1 de Tarsis en datos. tools/unreal/mision.py lo vuelca en el director del nivel (y guardias.py al colocarlo). Textos en ASCII: la fuente del HUD no lleva tildes. {0}, {1}... son los datos que pone el juego (nombres, teclas, cifras).",
+ "_leeme": "Mision 1 de Tarsis en datos. tools/unreal/mision.py lo vuelca en el director del nivel (y guardias.py al colocarlo). Textos en ASCII: la fuente del HUD no lleva tildes. {0}, {1}... son los datos que pone el juego (nombres, teclas, cifras). Tanda 41: «datos» son las lineas del mapa mental (ficha del soldado, clave del texto, clase, enlace con otra ficha y bandera que pone); «charlas», las conversaciones entre dos guardias (sitio en cm, desde que segundo, y por frase: quien, clave del texto y dato que da al oirla de cerca).",
  "ajustes": {
   "director": {
    "vault_code": "0129",
@@ -715,6 +715,273 @@
   "caja_registro": "LEVANTA LA LONA\nCajas. Una mas no le dice nada.",
   "ensena_camion_hangar": "EL CAMION PARA EN EL HANGAR\nSe queda un rato descargando y luego sigue hasta el control de salida. Parado, se sube a la caja por detras.",
   "p_uniforme": "E   COGER EL CAPOTE Y EL CASCO",
-  "uniforme_cogido": "CAPOTE Y CASCO\nDe pie y andando, de lejos pasas por un guardia mas. De cerca no cuela.\nNo vale agachado, corriendo ni con la base en alarma."
- }
+  "uniforme_cogido": "CAPOTE Y CASCO\nDe pie y andando, de lejos pasas por un guardia mas. De cerca no cuela.\nNo vale agachado, corriendo ni con la base en alarma.",
+  "mapa_nuevo": "APUNTADO: {0}\n{1}\nM abre el mapa.",
+  "charla_cortada": "SE CALLAN\nLa charla se corta. Volveran a hablar mas tarde.",
+  "charla_murmullo": "(Hablan en voz baja. Desde aqui no se entiende: acercate.)",
+  "ch_camion_1": "El camion otra vez. Tres cuartos de minuto parado en el hangar y ni Dios mira lo que lleva.",
+  "ch_camion_2": "Sanz mira los papeles. La caja, solo si hay alarma.",
+  "ch_camion_3": "Y si hay alarma, que? Levanta la lona, ve cajas y a correr.",
+  "ch_camion_4": "Pues eso. Una caja de carton entre cajas, quien la va a abrir. Anda, a tu garita.",
+  "ch_llaves_1": "Ramos. La llave del botiquin sigue en tu bolsillo?",
+  "ch_llaves_2": "Si, mi sargento. El veterinario se dejo dentro la pistola de dardos.",
+  "ch_llaves_3": "Pues que no salga de ahi. La de jefatura tampoco sale del mio: quien la quiera, que venga a quitarmela.",
+  "ch_llaves_4": "El jueves bajo con los partes, mi sargento. Quien se queda la del botiquin?",
+  "ch_llaves_5": "El jueves ya veremos quien baja.",
+  "ch_puesto_1": "Mi sargento. La noche del puesto cuatro oi dos chapoteos en la marisma. Dos.",
+  "ch_puesto_2": "Ranas, Vega. Oiste ranas.",
+  "ch_puesto_3": "Las ranas no apagan el generador media hora.",
+  "ch_puesto_4": "Tu ronda acaba en el porton. Lo que pase mas alla no es tuyo.",
+  "ch_medalla_1": "Otra vez bajas el jueves con los partes?",
+  "ch_medalla_2": "Y no vuelvo. Le he dejado a Vidal la medalla de su hermano en la celda, bajo la losa que baila.",
+  "ch_medalla_3": "Calla. Alarcon firma los traslados de abajo y tu eres el siguiente.",
+  "ch_medalla_4": "Por eso. Guardame el sitio en tu cajon, con lo de los presos. Y sal a fumar menos, que se te ve la brasa.",
+  "dt_sanz_registro": "Solo registra la caja del camion si hay alarma.",
+  "dt_sanz_cajas": "Si levanta la lona y ve cajas, no las abre.",
+  "dt_camion_hangar": "El camion para tres cuartos de minuto en el hangar.",
+  "dt_ramos_botiquin": "Lleva la llave del botiquin. Dentro esta la pistola de dardos.",
+  "dt_ibarra_llave": "No suelta la llave de la jefatura: hay que quitarsela.",
+  "dt_ramos_jueves": "El jueves le toca bajar con los partes.",
+  "dt_vega_chapoteos": "Oyo dos chapoteos en la marisma la noche del puesto cuatro.",
+  "dt_moya_rapido": "Contesta demasiado deprisa cuando le nombran el puesto cuatro.",
+  "dt_generador": "Esa noche el generador estuvo apagado media hora.",
+  "dt_ramos_novuelve": "Peris sabe que baja el jueves; Ramos dice que no piensa volver.",
+  "dt_vidal_medalla": "La medalla de su hermano esta en la celda, bajo la losa que baila.",
+  "dt_alarcon_traslados": "Firma los traslados de abajo.",
+  "dt_peris_cajon": "Guarda en su cajon lo de los presos, y sale a fumar a la puerta.",
+  "dt_carmona_hangar": "Sabe que nadie mira lo que lleva el camion."
+ },
+ "datos": [
+  {
+   "id": "sanz_registro",
+   "ficha": "Sanz",
+   "texto": "dt_sanz_registro",
+   "clase": "costumbre"
+  },
+  {
+   "id": "sanz_cajas",
+   "ficha": "Sanz",
+   "texto": "dt_sanz_cajas",
+   "clase": "debilidad",
+   "enlace": "Carmona"
+  },
+  {
+   "id": "camion_hangar",
+   "ficha": "Lobato",
+   "texto": "dt_camion_hangar",
+   "clase": "costumbre",
+   "enlace": "Sanz"
+  },
+  {
+   "id": "ramos_botiquin",
+   "ficha": "Ramos",
+   "texto": "dt_ramos_botiquin",
+   "clase": "objeto",
+   "pone": "sabe_de_ramos"
+  },
+  {
+   "id": "ibarra_llave",
+   "ficha": "Ibarra",
+   "texto": "dt_ibarra_llave",
+   "clase": "objeto"
+  },
+  {
+   "id": "ramos_jueves",
+   "ficha": "Ramos",
+   "texto": "dt_ramos_jueves",
+   "clase": "historia",
+   "enlace": "Ibarra"
+  },
+  {
+   "id": "vega_chapoteos",
+   "ficha": "Vega",
+   "texto": "dt_vega_chapoteos",
+   "clase": "historia",
+   "enlace": "Moya"
+  },
+  {
+   "id": "moya_rapido",
+   "ficha": "Moya",
+   "texto": "dt_moya_rapido",
+   "clase": "debilidad"
+  },
+  {
+   "id": "generador",
+   "ficha": "Moya",
+   "texto": "dt_generador",
+   "clase": "historia"
+  },
+  {
+   "id": "ramos_novuelve",
+   "ficha": "Ramos",
+   "texto": "dt_ramos_novuelve",
+   "clase": "historia",
+   "enlace": "Alarcon"
+  },
+  {
+   "id": "vidal_medalla",
+   "ficha": "Vidal",
+   "texto": "dt_vidal_medalla",
+   "clase": "objeto",
+   "enlace": "Ramos"
+  },
+  {
+   "id": "alarcon_traslados",
+   "ficha": "Alarcon",
+   "texto": "dt_alarcon_traslados",
+   "clase": "historia"
+  },
+  {
+   "id": "peris_cajon",
+   "ficha": "Peris",
+   "texto": "dt_peris_cajon",
+   "clase": "costumbre"
+  },
+  {
+   "id": "carmona_hangar",
+   "ficha": "Carmona",
+   "texto": "dt_carmona_hangar",
+   "clase": "costumbre"
+  }
+ ],
+ "charlas": [
+  {
+   "id": "camion",
+   "nota": "junto a la garita de entrada, del lado norte del camino (sitio sin medir)",
+   "a": "Lobato",
+   "b": "Carmona",
+   "sitio": [
+    -900,
+    5280,
+    0
+   ],
+   "desde": 60,
+   "frases": [
+    [
+     "Lobato",
+     "ch_camion_1",
+     "camion_hangar"
+    ],
+    [
+     "Carmona",
+     "ch_camion_2",
+     "sanz_registro"
+    ],
+    [
+     "Lobato",
+     "ch_camion_3",
+     "carmona_hangar"
+    ],
+    [
+     "Carmona",
+     "ch_camion_4",
+     "sanz_cajas"
+    ]
+   ]
+  },
+  {
+   "id": "llaves",
+   "nota": "patio norte, junto a la puerta del barracon (sitio sin medir)",
+   "a": "Ibarra",
+   "b": "Ramos",
+   "sitio": [
+    1900,
+    1700,
+    0
+   ],
+   "desde": 90,
+   "frases": [
+    [
+     "Ibarra",
+     "ch_llaves_1"
+    ],
+    [
+     "Ramos",
+     "ch_llaves_2",
+     "ramos_botiquin"
+    ],
+    [
+     "Ibarra",
+     "ch_llaves_3",
+     "ibarra_llave"
+    ],
+    [
+     "Ramos",
+     "ch_llaves_4",
+     "ramos_jueves"
+    ],
+    [
+     "Ibarra",
+     "ch_llaves_5"
+    ]
+   ]
+  },
+  {
+   "id": "puesto",
+   "nota": "patio del porton, donde se cruzan las rondas de Vega y Moya (sitio sin medir)",
+   "a": "Vega",
+   "b": "Moya",
+   "sitio": [
+    3900,
+    4300,
+    0
+   ],
+   "desde": 150,
+   "frases": [
+    [
+     "Vega",
+     "ch_puesto_1",
+     "vega_chapoteos"
+    ],
+    [
+     "Moya",
+     "ch_puesto_2",
+     "moya_rapido"
+    ],
+    [
+     "Vega",
+     "ch_puesto_3",
+     "generador"
+    ],
+    [
+     "Moya",
+     "ch_puesto_4"
+    ]
+   ]
+  },
+  {
+   "id": "medalla",
+   "nota": "a la puerta de la sala de guardia, donde Peris sale a fumar",
+   "a": "Peris",
+   "b": "Ramos",
+   "sitio": [
+    4700,
+    1780,
+    0
+   ],
+   "desde": 240,
+   "frases": [
+    [
+     "Peris",
+     "ch_medalla_1",
+     "ramos_novuelve"
+    ],
+    [
+     "Ramos",
+     "ch_medalla_2",
+     "vidal_medalla"
+    ],
+    [
+     "Peris",
+     "ch_medalla_3",
+     "alarcon_traslados"
+    ],
+    [
+     "Ramos",
+     "ch_medalla_4",
+     "peris_cajon"
+    ]
+   ]
+  }
+ ]
 }

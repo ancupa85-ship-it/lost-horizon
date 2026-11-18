@@ -95,6 +95,21 @@ def aplicar(director=None):
     poner(director, 'texts', {k: v for k, v in datos['textos'].items()})
     poner(director, 'objectives', [objetivo(o) for o in datos['objetivos']])
     poner(director, 'points', [punto(p) for p in datos['puntos']])
+    # tanda 41: datos del mapa mental y charlas entre guardias
+    def dato(q):
+        s = unreal.TarsisFact()
+        poner(s, 'id', q['id']); poner(s, 'card', q['ficha']); poner(s, 'text', q['texto']); poner(s, 'kind', q.get('clase', ''))
+        poner(s, 'link', q.get('enlace', '')); poner(s, 'sets', q.get('pone', ''))
+        return s
+    def charla(q):
+        s = unreal.TarsisTalk()
+        poner(s, 'id', q['id']); poner(s, 'a', q['a']); poner(s, 'b', q['b']); poner(s, 'spot', unreal.Vector(*[float(x) for x in q['sitio']]))
+        poner(s, 'after', float(q.get('desde', 0)))
+        poner(s, 'who', [f[0] for f in q['frases']]); poner(s, 'lines', [f[1] for f in q['frases']])
+        poner(s, 'facts', [(f[2] if len(f) > 2 else 'None') for f in q['frases']])
+        return s
+    poner(director, 'facts', [dato(q) for q in datos.get('datos', [])])
+    poner(director, 'talks', [charla(q) for q in datos.get('charlas', [])])
     aj = datos.get('ajustes', {})
     ajustar(director, aj.get('director', {}))
     gcls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')

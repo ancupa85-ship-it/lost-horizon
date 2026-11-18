@@ -73,6 +73,7 @@ void ATarsisHUD::DrawHUD()
 	DrawCellAsk(D);
 	DrawArmed(D);
 	DrawCodecRing(D);
+	DrawMindMap(D);
 	DrawCodecMenu(D);
 	DrawReport(D);
 	DrawCodec(D);
@@ -532,6 +533,63 @@ void ATarsisHUD::DrawHint(ATarsisDirector* D)
 	const float X = 32.0f * S, Y = (D->SideObjective().IsEmpty() ? 98.0f : 124.0f) * S;
 	Panel(X, Y, W + 28.0f * S, 34.0f * S, FLinearColor(0.05f, 0.08f, 0.02f, 0.55f));
 	Text(D->Hint, X + 14.0f * S, Y + 7.0f * S, FLinearColor(0.85f, 1.0f, 0.6f), 0.8f * S);
+}
+
+void ATarsisHUD::DrawMindMap(ATarsisDirector* D)
+{
+	// tanda 41: una ficha por soldado, con lo que sabes de cada uno, y lineas entre los que une algun dato
+	if (!D || !D->bMindMap || D->bMenu || D->bCodec) return;
+	const float X = Canvas->ClipX, Y = Canvas->ClipY, S = UiScale();
+	Panel(0.0f, 0.0f, X, Y, FLinearColor(0.01f, 0.015f, 0.012f, 0.9f));
+	TArray<FString> Cards;
+	for (const FTarsisFact& F : D->Facts) { Cards.AddUnique(F.Card); }
+	const int32 Cols = 4, Rows = FMath::Max(1, (Cards.Num() + Cols - 1) / Cols);
+	const float Mx = 40.0f * S, Top = 90.0f * S, Gap = 22.0f * S;
+	const float Cw = (X - 2.0f * Mx - Gap * (Cols - 1)) / Cols, Ch = FMath::Min(250.0f * S, (Y - Top - 60.0f * S - Gap * (Rows - 1)) / Rows);
+	auto Cx = [&](int32 i) { return Mx + (i % Cols) * (Cw + Gap); };
+	auto Cy = [&](int32 i) { return Top + (i / Cols) * (Ch + Gap); };
+	Text(FString::Printf(TEXT("MAPA MENTAL   %d de %d datos"), D->FactsKnown(), D->Facts.Num()), Mx, 30.0f * S, FLinearColor(0.6f, 0.9f, 0.7f), 1.2f * S);
+	Text(TEXT("Lo que oyes de cerca se apunta aqui.   M cierra"), Mx, 60.0f * S, FLinearColor(0.7f, 0.7f, 0.65f), 0.8f * S);
+	// las lineas, por debajo de las fichas
+	for (const FTarsisFact& F : D->Facts)
+	{
+		if (F.Link.IsEmpty() || !D->FactKnown(F.Id)) continue;
+		const int32 a = Cards.IndexOfByKey(F.Card), b = Cards.IndexOfByKey(F.Link);
+		if (a < 0 || b < 0 || a == b) continue;
+		DrawLine(Cx(a) + Cw / 2.0f, Cy(a) + Ch / 2.0f, Cx(b) + Cw / 2.0f, Cy(b) + Ch / 2.0f, FLinearColor(0.85f, 0.7f, 0.3f, 0.9f), 2.0f * S);
+	}
+	for (int32 i = 0; i < Cards.Num(); ++i)
+	{
+		int32 Known = 0;
+		for (const FTarsisFact& F : D->Facts) { if (F.Card == Cards[i] && D->FactKnown(F.Id)) ++Known; }
+		Panel(Cx(i), Cy(i), Cw, Ch, Known > 0 ? FLinearColor(0.05f, 0.08f, 0.07f, 0.97f) : FLinearColor(0.03f, 0.035f, 0.035f, 0.97f));
+		Panel(Cx(i), Cy(i), Cw, 3.0f * S, Known > 0 ? FLinearColor(0.6f, 0.9f, 0.7f) : FLinearColor(0.25f, 0.28f, 0.27f));
+		Text(Cards[i].ToUpper(), Cx(i) + 12.0f * S, Cy(i) + 10.0f * S, Known > 0 ? FLinearColor::White : FLinearColor(0.45f, 0.45f, 0.45f), 0.95f * S);
+		float Ly = Cy(i) + 42.0f * S;
+		if (Known == 0) { Text(TEXT("Sin datos. Escuchale de cerca."), Cx(i) + 12.0f * S, Ly, FLinearColor(0.4f, 0.4f, 0.4f), 0.72f * S); continue; }
+		for (const FTarsisFact& F : D->Facts)
+		{
+			if (F.Card != Cards[i] || !D->FactKnown(F.Id)) continue;
+			const bool bNew = F.Id == D->LastFact;
+			Text(F.Kind.ToString().ToUpper(), Cx(i) + 12.0f * S, Ly, FLinearColor(0.85f, 0.7f, 0.3f), 0.62f * S);
+			Ly += 17.0f * S;
+			// el texto, partido en renglones que quepan en la ficha
+			TArray<FString> Words;
+			D->Tx(F.Text, TEXT("")).ParseIntoArray(Words, TEXT(" "));
+			FString Row;
+			const int32 MaxCh = FMath::Max(20, FMath::FloorToInt(Cw / (8.6f * S)));
+			for (int32 w = 0; w <= Words.Num(); ++w)
+			{
+				if (w == Words.Num() || Row.Len() + Words[w].Len() + 1 > MaxCh)
+				{
+					if (!Row.IsEmpty()) { Text(Row, Cx(i) + 12.0f * S, Ly, bNew ? FLinearColor(0.8f, 1.0f, 0.85f) : FLinearColor(0.85f, 0.85f, 0.8f), 0.74f * S); Ly += 19.0f * S; }
+					Row.Reset();
+				}
+				if (w < Words.Num()) Row += (Row.IsEmpty() ? TEXT("") : TEXT(" ")) + Words[w];
+			}
+			Ly += 8.0f * S;
+		}
+	}
 }
 
 void ATarsisHUD::DrawBox(ATarsisDirector* D)
