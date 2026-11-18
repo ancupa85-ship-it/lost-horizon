@@ -393,6 +393,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	TacticsTick(DeltaSeconds);
 	DogTick(DeltaSeconds);
 	AimTick(DeltaSeconds);
+	ThirdTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
 	ClimbTick(DeltaSeconds);
 }
@@ -3780,6 +3781,7 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[11], IE_Released, this, &ATarsisDirector::LeanLeftOff);
 	InputComponent->BindKey(ActionKeys[12], IE_Pressed, this, &ATarsisDirector::LeanRightOn);
 	InputComponent->BindKey(ActionKeys[12], IE_Released, this, &ATarsisDirector::LeanRightOff);
+	InputComponent->BindKey(EKeys::G, IE_Pressed, this, &ATarsisDirector::ToggleThird);   // tanda 47: tercera persona (fija)
 	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ATarsisDirector::AimOn);   // tanda 47: apuntar (fija)
 	InputComponent->BindKey(EKeys::RightMouseButton, IE_Released, this, &ATarsisDirector::AimOff);
 	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);

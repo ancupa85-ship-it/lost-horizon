@@ -3110,6 +3110,35 @@ def prueba_apuntar():
     check('prismáticos mientras apuntas: al bajar todo, la vista es la de antes', abs(cam.get_editor_property('field_of_view') - f0) < 0.5, cam.get_editor_property('field_of_view'))
     d.set_editor_property('darts', d0)
 
+def prueba_tercera():
+    """Tanda 47. La G pasa a tercera persona: la cámara se va detrás del hombro (sin atravesar paredes), se ve el cuerpo de
+    Cuttlas y se esconden los brazos; otra vez la G y todo vuelve. Con los prismáticos la vista es la de siempre."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    cam = jugador().get_component_by_class(unreal.CameraComponent)
+    aparte(); yield 0.5
+    check('Cuttlas tiene cuerpo (modelo importado)', d.hero_ready())
+    c0 = cam.get_world_location()
+    d.toggle_third(); yield 0.8
+    c1 = cam.get_world_location(); off = d.third_cam_offset()
+    lejos = math.sqrt((c1.x - c0.x) ** 2 + (c1.y - c0.y) ** 2 + (c1.z - c0.z) ** 2)
+    check('la G saca la cámara detrás del hombro', d.third_now() and P('third_alpha') > 0.95 and 150 < lejos < 300, '%.0f cm, alfa %.2f' % (lejos, P('third_alpha')))
+    check('se ve el cuerpo y no los brazos', d.hero_shown() and (not d.hero_ready() or d.hero_anim_index() == 0), '%s anim %s' % (d.hero_shown(), d.hero_anim_index()))
+    pc = unreal.GameplayStatics.get_player_controller(mundo(), 0)
+    for k in range(8):
+        pc.set_control_rotation(unreal.Rotator(0.0, 0.0, 45.0 * k)); yield 0.15
+    pc.set_control_rotation(unreal.Rotator(0.0, 0.0, 0.0)); yield 0.3
+    jugador().crouch(); yield 0.5
+    check('agachado, la animación es la de ir agachado', not d.hero_ready() or d.hero_anim_index() == 2, d.hero_anim_index())
+    jugador().un_crouch(); yield 0.4
+    d.toggle_binoculars(); yield 0.6
+    check('con los prismáticos, la vista de siempre', not d.third_now() and P('third_alpha') < 0.05, P('third_alpha'))
+    d.toggle_binoculars(); yield 0.6
+    d.toggle_third(); yield 0.8
+    c2 = cam.get_world_location()
+    vuelve = math.sqrt((c2.x - c0.x) ** 2 + (c2.y - c0.y) ** 2 + (c2.z - c0.z) ** 2)
+    check('otra vez la G: la cámara vuelve a su sitio exacto tras girar una vuelta entera', not d.third_now() and not d.hero_shown() and vuelve < 3.0, '%.1f cm' % vuelve)
+
 def prueba_perro():
     """Tanda 46. El perro del hangar ronda entre dos puntas; no ve, huele: a menos de DogSmell gruñe (aviso, sin ladrar),
     si no te apartas ladra y llama a los guardias de cerca, y si te vas se calla. Con el hueso de la olla se le puede dar
@@ -3258,7 +3287,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce, prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar], [prueba_perro]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce, prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro]]
 PRUEBAS = []
 
 
@@ -3329,6 +3358,7 @@ def _limpieza(siguiente):
         d.set_editor_property('last_seen_rule', siguiente is prueba_tactica)
         d.set_editor_property('talk_cross', siguiente is prueba_cruce)   # tanda 47: en las demás, las charlas no salen solas al cruzarse
         d.set_editor_property('aim_held', False)
+        d.set_editor_property('third', False)
         d.set_editor_property('dog', siguiente is prueba_perro)   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
         d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
         # tanda 44: la caja que se nota de cerca, solo en su prueba (las de la caja se escribieron pegadas al guardia)

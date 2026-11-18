@@ -1128,6 +1128,47 @@ public:
 	bool StartTalkAt(int32 Index, const FVector& Spot);
 	float TalkCrossT = 0.0f;
 
+	// ---- tanda 47: cuerpo de Cuttlas y tercera persona (TarsisTercera.cpp). La G alterna
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	bool bThirdRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	bool bThird = false;
+	/** Donde va la camara respecto a la vista (cm: adelante, derecha, arriba). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	FVector ThirdOffset = FVector(-230.0f, 45.0f, 25.0f);
+	/** Velocidad (cm/s) a la que las animaciones de andar y de ir agachado van a su ritmo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroWalkSpeed = 280.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroSneakSpeed = 150.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tercera")
+	float ThirdAlpha = 0.0f;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tercera")
+	void ToggleThird();
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	bool ThirdNow() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	bool HeroReady() const { return HeroBody != nullptr; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	bool HeroShown() const { return bThirdShown; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	int32 HeroAnimIndex() const { return HeroAnimNow; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	FVector ThirdCamOffset() const { return ThirdAdded; }
+	void SetupHero(class ACharacter* C);
+	void ThirdTick(float DeltaSeconds);
+	UPROPERTY()
+	TObjectPtr<class USkeletalMeshComponent> HeroBody;
+	UPROPERTY()
+	TObjectPtr<class UAnimationAsset> HeroAnims[4];
+	bool bHeroTried = false;
+	bool bThirdShown = false;
+	float HeroYaw = 0.0f;
+	float HeroFootZ = 0.0f;
+	int32 HeroAnimNow = -1;
+	FVector ThirdAdded = FVector::ZeroVector;
+	FVector ThirdRelDelta = FVector::ZeroVector;
+
 	// ---- tanda 47: apuntar (boton derecho mantenido): la vista se cierra, sale la mira y se pone roja sobre un guardia
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Apuntar")
 	bool bAimRule = true;

@@ -189,7 +189,7 @@ void ATarsisHUD::DrawMenu(ATarsisDirector* D)
 		FLinearColor(0.7f, 0.7f, 0.7f), 0.7f * S, true);
 	if (D->MenuPage == 1)
 	{
-		Text(TEXT("Teclas fijas:   WASD moverse    RATON mirar    CLIC dardo    CLIC DERECHO apuntar    P pausa    1-4 responder    ESC colgar la radio"), CX, Y0 + L.Num() * LH + 56.0f * S,
+		Text(TEXT("Teclas fijas:   WASD moverse    RATON mirar    CLIC dardo    CLIC DERECHO apuntar    G tercera persona    P pausa    1-4 responder    ESC colgar la radio"), CX, Y0 + L.Num() * LH + 56.0f * S,
 			FLinearColor(0.85f, 0.8f, 0.6f), 0.75f * S, true);
 	}
 }
