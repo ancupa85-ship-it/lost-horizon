@@ -1108,6 +1108,49 @@ public:
 	int32 Calms = 0;
 	void TacticsTick(float DeltaSeconds);
 
+	// ---- tanda 47: las charlas salen cuando los dos se cruzan en sus rondas contigo cerca (idea de Andres), no en un
+	// sitio fijo. Si en TalkCrossWait segundos contigo por la zona no se han cruzado, quedan en el sitio de siempre
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	bool bTalkCross = true;
+	/** A menos de esto (cm) uno de otro, de ronda los dos, se paran a hablar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkCrossDist = 900.0f;
+	/** Y solo si tu estas a menos de esto (cm) de ellos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkNearDist = 1600.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkCrossWait = 75.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TalksCrossed = 0;
+	/** Donde hablan ahora (el cruce, o el sitio fijo de la charla). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	FVector TalkSpotNow = FVector::ZeroVector;
+	bool StartTalkAt(int32 Index, const FVector& Spot);
+	float TalkCrossT = 0.0f;
+
+	// ---- tanda 47: apuntar (boton derecho mantenido): la vista se cierra, sale la mira y se pone roja sobre un guardia
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Apuntar")
+	bool bAimRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Apuntar")
+	float AimFov = 55.0f;
+	/** Cuanto se mueven los brazos al apuntar (cm, en los ejes de ArmsOffset): la pistola hacia el centro. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Apuntar")
+	FVector AimArmsShift = FVector::ZeroVector;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Apuntar")
+	float AimAlpha = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Apuntar")
+	bool bAimHeld = false;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Apuntar")
+	bool CanAim() const;
+	/** El guardia que cruzaria ahora la linea de tiro (nullptr si ninguno). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Apuntar")
+	class ATarsisGuard* DartAim() const;
+	class ATarsisGuard* DartLine(const FVector& Loc, const FVector& Fwd, float& OutT) const;
+	void AimOn() { bAimHeld = true; }
+	void AimOff() { bAimHeld = false; }
+	void AimTick(float DeltaSeconds);
+	float AimBaseFov = 0.0f;
+
 	// ---- tanda 46: el perro del hangar (TarsisPerro.cpp). No ve: huele. Grune de aviso, ladra y llama a los guardias;
 	// con el hueso de la cocina se hace amigo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")

@@ -58,6 +58,7 @@ void ATarsisHUD::DrawHUD()
 	DrawHiding(D);
 	DrawBox(D);
 	DrawBinoculars(D);
+	DrawAim(D);
 	DrawMarked();
 	DrawLastKnown(D);
 	DrawHeard(D);
@@ -188,9 +189,32 @@ void ATarsisHUD::DrawMenu(ATarsisDirector* D)
 		FLinearColor(0.7f, 0.7f, 0.7f), 0.7f * S, true);
 	if (D->MenuPage == 1)
 	{
-		Text(TEXT("Teclas fijas:   WASD moverse    RATON mirar    CLIC dardo    P pausa    1-4 responder    ESC colgar la radio"), CX, Y0 + L.Num() * LH + 56.0f * S,
+		Text(TEXT("Teclas fijas:   WASD moverse    RATON mirar    CLIC dardo    CLIC DERECHO apuntar    P pausa    1-4 responder    ESC colgar la radio"), CX, Y0 + L.Num() * LH + 56.0f * S,
 			FLinearColor(0.85f, 0.8f, 0.6f), 0.75f * S, true);
 	}
+}
+
+// Tanda 47: la mira. Sin apuntar, un punto tenue (se puede tirar de cadera); apuntando, una cruz abierta que se pone
+// roja cuando el dardo daria a un guardia
+void ATarsisHUD::DrawAim(ATarsisDirector* D)
+{
+	if (!D || !D->bAimRule || D->Darts <= 0 || D->bBinoculars || D->bMenu || D->bCodec || D->bDone || D->bCine || D->bHiding || D->bRiding || D->bBoxOn || D->bCapturing) return;
+	const float S = UiScale();
+	const float X = Canvas->ClipX / 2.0f, Y = Canvas->ClipY / 2.0f;
+	const float A = D->AimAlpha;
+	if (A < 0.5f)
+	{
+		Panel(X - 1.5f * S, Y - 1.5f * S, 3.0f * S, 3.0f * S, FLinearColor(1.0f, 1.0f, 1.0f, 0.3f));
+		return;
+	}
+	const bool bOn = D->DartAim() != nullptr;
+	const FLinearColor Col = bOn ? FLinearColor(1.0f, 0.25f, 0.2f, 0.95f) : FLinearColor(1.0f, 1.0f, 1.0f, 0.75f);
+	const float G = 7.0f * S, L = 9.0f * S, T = 2.0f * S;
+	Panel(X - G - L, Y - T / 2.0f, L, T, Col);
+	Panel(X + G, Y - T / 2.0f, L, T, Col);
+	Panel(X - T / 2.0f, Y - G - L, T, L, Col);
+	Panel(X - T / 2.0f, Y + G, T, L, Col);
+	Panel(X - 1.0f * S, Y - 1.0f * S, 2.0f * S, 2.0f * S, Col);
 }
 
 void ATarsisHUD::DrawBinoculars(ATarsisDirector* D)

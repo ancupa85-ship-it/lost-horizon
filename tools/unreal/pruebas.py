@@ -3056,6 +3056,60 @@ def prueba_armados():
         check('de vuelta al pie', l.z < 300 and dist2d(l, b) < 200, '%d,%d,%d' % (l.x, l.y, l.z))
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_cruce():
+    """Tanda 47 (idea de Andres). Una charla sale cuando sus dos guardias, de ronda, se cruzan (a menos de TalkCrossDist)
+    y tú estás cerca (TalkNearDist): se paran allí mismo, no en el sitio fijo. Contigo lejos, se cruzan y no hablan."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    c = MISION['charlas'][0]
+    a, b = guardia(c['a']), guardia(c['b'])
+    check('los dos de la primera charla están en el nivel', a is not None and b is not None)
+    if not a or not b:
+        return
+    jugador().set_actor_hidden_in_game(True)
+    for g in guardias():
+        g.hold(0.0 if g in (a, b) else 3600.0)
+    d.set_editor_property('mission_time', max(P('mission_time'), float(c.get('desde', 0)) + 1.0))
+    sx, sy = c['sitio'][0], c['sitio'][1]
+    juntos = lambda: (a.set_actor_location(V(sx - 900, sy - 250, a.get_actor_location().z), False, True), b.set_actor_location(V(sx - 900, sy + 250, b.get_actor_location().z), False, True))
+    n0 = P('talks_crossed')
+    aparte(); juntos(); d.set_editor_property('talk_wait', 0.0)
+    yield 4.5
+    check('contigo lejos se cruzan y no se paran a hablar', P('talk_idx') < 0 and P('talks_crossed') == n0, '%s %s' % (P('talk_idx'), P('talks_crossed')))
+    tp(sx - 900, sy + 1100); juntos(); d.set_editor_property('talk_wait', 0.0)
+    yield ('hasta', lambda: director().get_editor_property('talk_idx') >= 0, 8.0)
+    sp = P('talk_spot_now')
+    check('contigo cerca, al cruzarse se paran a hablar', P('talk_idx') == 0 and P('talks_crossed') == n0 + 1 and a.is_on_errand() and b.is_on_errand(), '%s %s' % (P('talk_idx'), P('talks_crossed')))
+    check('hablan donde se cruzan, no en el sitio fijo', math.hypot(sp.x - (sx - 900), sp.y - sy) < 500 and math.hypot(sp.x - sx, sp.y - sy) > 400, '%.0f %.0f frente a %s %s' % (sp.x, sp.y, sx, sy))
+    yield ('hasta', lambda: director().get_editor_property('talk_phase') == 1 or director().get_editor_property('talk_idx') < 0, P('talk_gather') + 5.0)
+    check('se juntan y empiezan', P('talk_phase') == 1, P('talk_phase'))
+    d.set_editor_property('talk_rule', False); yield 0.3    # se corta: la prueba de las charlas empieza de cero
+    d.set_editor_property('talk_rule', True)
+    jugador().set_actor_hidden_in_game(False)
+
+def prueba_apuntar():
+    """Tanda 47. Con dardos, mantener el botón derecho cierra la vista a AimFov y saca la mira; al soltar vuelve. Sin
+    dardos no se apunta."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    cam = jugador().get_component_by_class(unreal.CameraComponent)
+    aparte(); yield 0.3
+    f0 = cam.get_editor_property('field_of_view')
+    d0 = P('darts')
+    d.set_editor_property('darts', 0)
+    d.set_editor_property('aim_held', True); yield 0.6
+    check('sin dardos no se apunta', P('aim_alpha') < 0.01 and abs(cam.get_editor_property('field_of_view') - f0) < 0.5 and not d.can_aim(), '%.2f %.1f' % (P('aim_alpha'), cam.get_editor_property('field_of_view')))
+    d.set_editor_property('darts', 3); yield 0.8
+    check('con dardos, el botón derecho cierra la vista', P('aim_alpha') > 0.95 and abs(cam.get_editor_property('field_of_view') - P('aim_fov')) < 1.0, '%.2f %.1f' % (P('aim_alpha'), cam.get_editor_property('field_of_view')))
+    check('apuntando al aire la mira no marca a nadie', d.dart_aim() is None)
+    d.set_editor_property('aim_held', False); yield 0.8
+    check('al soltar, la vista vuelve', P('aim_alpha') < 0.01 and abs(cam.get_editor_property('field_of_view') - f0) < 0.5, '%.2f %.1f frente a %.1f' % (P('aim_alpha'), cam.get_editor_property('field_of_view'), f0))
+    d.set_editor_property('aim_held', True); yield 0.6
+    d.toggle_binoculars(); yield 0.3
+    d.toggle_binoculars(); d.set_editor_property('aim_held', False); yield 0.8
+    check('prismáticos mientras apuntas: al bajar todo, la vista es la de antes', abs(cam.get_editor_property('field_of_view') - f0) < 0.5, cam.get_editor_property('field_of_view'))
+    d.set_editor_property('darts', d0)
+
 def prueba_perro():
     """Tanda 46. El perro del hangar ronda entre dos puntas; no ve, huele: a menos de DogSmell gruñe (aviso, sin ladrar),
     si no te apartas ladra y llama a los guardias de cerca, y si te vas se calla. Con el hueso de la olla se le puede dar
@@ -3204,7 +3258,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas], [prueba_bengala], [prueba_tactica], [prueba_perro]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce, prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar], [prueba_perro]]
 PRUEBAS = []
 
 
@@ -3264,7 +3318,7 @@ def _limpieza(siguiente):
         # tanda 40: el control de entrada y la parada del camión ante el hangar, solo en su prueba (las del camión miden
         # tiempos de la pasada de antes); y la caja de cartón, quitada
         # tanda 41: las charlas sacan a los guardias de su ronda: solo en su prueba
-        d.set_editor_property('talk_rule', siguiente is prueba_charlas)
+        d.set_editor_property('talk_rule', siguiente in (prueba_charlas, prueba_cruce))
         d.set_editor_property('talk_start_dist', 3000.0)
         if d.get_editor_property('mind_map'):
             d.toggle_mind_map()
@@ -3273,6 +3327,8 @@ def _limpieza(siguiente):
         # tanda 42: ni bengalas ni parpadeo de tu linterna fuera de su prueba (cambian la luz que miden las demás), y de noche
         # tanda 43: la búsqueda en pareja, solo en su prueba (las demás dan alarmas para medir otra cosa)
         d.set_editor_property('last_seen_rule', siguiente is prueba_tactica)
+        d.set_editor_property('talk_cross', siguiente is prueba_cruce)   # tanda 47: en las demás, las charlas no salen solas al cruzarse
+        d.set_editor_property('aim_held', False)
         d.set_editor_property('dog', siguiente is prueba_perro)   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
         d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
         # tanda 44: la caja que se nota de cerca, solo en su prueba (las de la caja se escribieron pegadas al guardia)

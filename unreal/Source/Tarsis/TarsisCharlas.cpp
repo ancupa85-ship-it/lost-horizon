@@ -85,6 +85,11 @@ void ATarsisDirector::EndTalk(bool bCut)
 
 bool ATarsisDirector::StartTalk(int32 Index)
 {
+	return Talks.IsValidIndex(Index) && StartTalkAt(Index, Talks[Index].Spot);
+}
+
+bool ATarsisDirector::StartTalkAt(int32 Index, const FVector& Spot)
+{
 	if (TalkIdx >= 0 || !Talks.IsValidIndex(Index)) return false;
 	const FTarsisTalk& T = Talks[Index];
 	ATarsisGuard* GA = TalkGuard(GetWorld(), T.A);
@@ -93,9 +98,10 @@ bool ATarsisDirector::StartTalk(int32 Index)
 	// cada uno a un lado del sitio, a un paso largo, mirandose
 	const FVector Side = (GB->GetActorLocation() - GA->GetActorLocation()).GetSafeNormal2D();
 	const FVector Dir = Side.IsNearlyZero() ? FVector(1.0f, 0.0f, 0.0f) : Side;
-	const FVector PA = T.Spot - Dir * 65.0f, PB = T.Spot + Dir * 65.0f;
+	const FVector PA = Spot - Dir * 65.0f, PB = Spot + Dir * 65.0f;
 	if (!GA->Errand(PA, PB, TalkGather + T.Lines.Num() * (TalkLineSeconds + 3.0f) + 10.0f)) return false;
 	if (!GB->Errand(PB, PA, TalkGather + T.Lines.Num() * (TalkLineSeconds + 3.0f) + 10.0f)) { GA->EndErrand(); return false; }
+	TalkSpotNow = Spot;
 	TalkIdx = Index;
 	TalkPhase = 0;
 	TalkLine = 0;
@@ -124,6 +130,30 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 			const int32 k = (TalkNext + i) % Talks.Num();
 			const FTarsisTalk& T = Talks[k];
 			if (MissionTime < T.After || !TalkPending(k)) continue;
+			if (bTalkCross)
+			{
+				// tanda 47: se cruzan en sus rondas y tu andas cerca: se paran alli mismo
+				ATarsisGuard* GA = TalkGuard(GetWorld(), T.A);
+				ATarsisGuard* GB = TalkGuard(GetWorld(), T.B);
+				if (GA && GB && GA->State == ETarsisGuardState::Patrol && GB->State == ETarsisGuardState::Patrol && !GA->IsOnErrand() && !GB->IsOnErrand())
+				{
+					const FVector Mid = (GA->GetActorLocation() + GB->GetActorLocation()) * 0.5f;
+					if (FVector::Dist2D(GA->GetActorLocation(), GB->GetActorLocation()) < TalkCrossDist && FVector::Dist2D(Pl->GetActorLocation(), Mid) < TalkNearDist
+						&& FMath::Abs(GA->GetActorLocation().Z - GB->GetActorLocation().Z) < 150.0f && StartTalkAt(k, FVector(Mid.X, Mid.Y, T.Spot.Z)))
+					{
+						++TalksCrossed;
+						TalkCrossT = 0.0f;
+						TalkNext = k + 1;
+						break;
+					}
+				}
+				// no se cruzan y llevas un rato por su zona: quedan donde siempre
+				if (FVector::Dist2D(Pl->GetActorLocation(), T.Spot) > TalkNearDist) continue;
+				TalkCrossT += 2.0f;
+				if (TalkCrossT < TalkCrossWait) continue;
+				if (StartTalk(k)) { TalkCrossT = 0.0f; TalkNext = k + 1; break; }
+				continue;
+			}
 			if (FVector::Dist2D(Pl->GetActorLocation(), T.Spot) > TalkStartDist) continue;
 			if (StartTalk(k)) { TalkNext = k + 1; break; }
 		}
@@ -148,14 +178,14 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 		EndTalk(false);
 		return;
 	}
-	const float D = FVector::Dist(Pl->GetActorLocation(), T.Spot);
+	const float D = FVector::Dist2D(Pl->GetActorLocation(), TalkSpotNow);
 	const FString Who = T.Who.IsValidIndex(TalkLine) ? T.Who[TalkLine] : T.A;
 	if (ATarsisGuard* Sp = Who.Equals(T.B, ESearchCase::IgnoreCase) ? TalkB.Get() : TalkA.Get()) Sp->PlayGesture(TEXT("pase"), 1.2f, (Sp == TalkA ? TalkB : TalkA)->GetActorLocation());
 	if (D < TalkHearDist && !bHiding)
 	{
 		bTalkHeardAny = true;
 		++TalkLinesHeard;
-		PlaySfx(TEXT("rumor"), T.Spot + FVector(0.0f, 0.0f, 150.0f), 0.5f);
+		PlaySfx(TEXT("rumor"), TalkSpotNow + FVector(0.0f, 0.0f, 150.0f), 0.5f);
 		// tanda 42: las frases largas duran lo que se tarda en leerlas (16 letras por segundo), no 4 s justos
 		const FString Said = Tx(T.Lines[TalkLine], TEXT("..."));
 		TalkLineWait = FMath::Max(TalkLineSeconds, Said.Len() / 16.0f);
@@ -164,7 +194,7 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 	}
 	else if (D < TalkSeeDist)
 	{
-		PlaySfx(TEXT("rumor"), T.Spot + FVector(0.0f, 0.0f, 150.0f), 0.35f);
+		PlaySfx(TEXT("rumor"), TalkSpotNow + FVector(0.0f, 0.0f, 150.0f), 0.35f);
 		if (!bTalkMurmur)
 		{
 			bTalkMurmur = true;

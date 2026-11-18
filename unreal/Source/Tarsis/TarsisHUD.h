@@ -25,6 +25,7 @@ private:
 	void DrawPrompt(class ATarsisDirector* D);
 	void DrawKeypad(class ATarsisDirector* D);
 	void DrawBinoculars(class ATarsisDirector* D);
+	void DrawAim(class ATarsisDirector* D);
 	void DrawMarked();
 	void DrawLastKnown(class ATarsisDirector* D);
 	void DrawHeard(class ATarsisDirector* D);

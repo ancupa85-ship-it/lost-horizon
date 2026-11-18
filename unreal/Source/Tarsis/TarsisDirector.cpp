@@ -392,6 +392,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	FlareTick(DeltaSeconds);
 	TacticsTick(DeltaSeconds);
 	DogTick(DeltaSeconds);
+	AimTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
 	ClimbTick(DeltaSeconds);
 }
@@ -823,7 +824,7 @@ void ATarsisDirector::ToggleBinoculars()
 	if (!bBinoculars && bGearTaken) { GearNag(); return; }
 	if (!bBinoculars && BoxBlocks()) return;
 	bBinoculars = !bBinoculars;
-	if (bBinoculars) { SavedFov = Cam->FieldOfView; Cam->SetFieldOfView(18.0f); }
+	if (bBinoculars) { if (AimAlpha > 0.0f && AimBaseFov > 1.0f) { Cam->SetFieldOfView(AimBaseFov); AimAlpha = 0.0f; } SavedFov = Cam->FieldOfView; Cam->SetFieldOfView(18.0f); }
 	else Cam->SetFieldOfView(SavedFov > 0.0f ? SavedFov : 90.0f);
 }
 
@@ -915,10 +916,22 @@ void ATarsisDirector::ShootDart()
 	RecoilT = 1.0f;
 	PC->SetControlRotation(PC->GetControlRotation() + FRotator(0.7f, 0.0f, 0.0f));
 	// el guardia más cercano cuyo cuerpo cruza la línea de tiro (a menos de 35 m), sin nada en medio
+	float BestT = 3500.0f;
+	ATarsisGuard* Best = DartLine(Loc, Fwd, BestT);
+	if (ShootLamp(Loc, Fwd, Best ? BestT : 3500.0f)) return;
+	if (!Best) return;   // fallado: el contador de dardos del HUD ya lo dice
+	Best->KnockOut();
+	Best->bDarted = true;
+	++Takedowns;
+	Teach(TEXT("ensena_dormido"), TEXT("{0} DORMIDO\nEl dardo se recupera: acercate al cuerpo y pulsa E."), { Best->GuardName.ToUpper() }, 3.0f);
+}
+
+ATarsisGuard* ATarsisDirector::DartLine(const FVector& Loc, const FVector& Fwd, float& OutT) const
+{
 	ATarsisGuard* Best = nullptr;
 	float BestT = 3500.0f;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisDardo), true, this);
-	Q.AddIgnoredActor(Pl);
+	Q.AddIgnoredActor(UGameplayStatics::GetPlayerPawn(this, 0));
 	const float Heights[] = { -50.0f, 0.0f, 50.0f };
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
@@ -939,12 +952,35 @@ void ATarsisDirector::ShootDart()
 			break;
 		}
 	}
-	if (ShootLamp(Loc, Fwd, Best ? BestT : 3500.0f)) return;
-	if (!Best) return;   // fallado: el contador de dardos del HUD ya lo dice
-	Best->KnockOut();
-	Best->bDarted = true;
-	++Takedowns;
-	Teach(TEXT("ensena_dormido"), TEXT("{0} DORMIDO\nEl dardo se recupera: acercate al cuerpo y pulsa E."), { Best->GuardName.ToUpper() }, 3.0f);
+	OutT = BestT;
+	return Best;
+}
+
+ATarsisGuard* ATarsisDirector::DartAim() const
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC) return nullptr;
+	FVector Loc; FRotator Rot;
+	PC->GetPlayerViewPoint(Loc, Rot);
+	float T = 0.0f;
+	return DartLine(Loc, Rot.Vector(), T);
+}
+
+bool ATarsisDirector::CanAim() const
+{
+	return bAimRule && Darts > 0 && !bBinoculars && !bKeypad && !bChoice && !bDone && !bCine && !bMenu && !bCodec && !bCellAsk && !bCapturing && !bHiding && !bRiding && !bBoxOn && Dragged == nullptr;
+}
+
+void ATarsisDirector::AimTick(float DeltaSeconds)
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	UCameraComponent* Cam = C ? C->FindComponentByClass<UCameraComponent>() : nullptr;
+	if (!Cam || bBinoculars) { AimAlpha = 0.0f; return; }
+	const float Want = (bAimHeld && CanAim()) ? 1.0f : 0.0f;
+	if (AimAlpha <= 0.0f && Want <= 0.0f) return;
+	if (AimAlpha <= 0.0f) AimBaseFov = Cam->FieldOfView;   // la vista de antes de apuntar, para volver a ella
+	AimAlpha = FMath::FInterpConstantTo(AimAlpha, Want, DeltaSeconds, 7.0f);
+	if (AimBaseFov > 1.0f) Cam->SetFieldOfView(FMath::Lerp(AimBaseFov, AimFov, AimAlpha * AimAlpha * (3.0f - 2.0f * AimAlpha)));
 }
 
 void ATarsisDirector::Finish(bool bByMarsh)
@@ -1453,7 +1489,7 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 	const FQuat Rel = FRotator(7.0f * RecoilT, 0.0f, 0.0f).Quaternion() * FRotator(0.0f, -90.0f, 0.0f).Quaternion();
 	// la cabeza del maniquí, en la cámara: así la pistola queda donde la llevaría alguien de tu altura
 	const FVector Head = Arms->GetBoneLocation(TEXT("head"), EBoneSpaces::ComponentSpace);
-	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + Bob + Sway + FVector(-5.0f * RecoilT, 0.0f, -30.0f * (1.0f - ArmsShow));
+	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + AimArmsShift * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT, 0.0f, -30.0f * (1.0f - ArmsShow));
 	Arms->SetRelativeLocationAndRotation(Loc, Rel);
 }
 
@@ -3744,6 +3780,8 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[11], IE_Released, this, &ATarsisDirector::LeanLeftOff);
 	InputComponent->BindKey(ActionKeys[12], IE_Pressed, this, &ATarsisDirector::LeanRightOn);
 	InputComponent->BindKey(ActionKeys[12], IE_Released, this, &ATarsisDirector::LeanRightOff);
+	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ATarsisDirector::AimOn);   // tanda 47: apuntar (fija)
+	InputComponent->BindKey(EKeys::RightMouseButton, IE_Released, this, &ATarsisDirector::AimOff);
 	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);
 	InputComponent->BindKey(ActionKeys[4], IE_Released, this, &ATarsisDirector::SprintOff);
 	{
