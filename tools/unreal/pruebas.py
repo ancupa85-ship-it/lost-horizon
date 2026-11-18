@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -2620,6 +2620,40 @@ def prueba_calabozo():
     d.set_editor_property('cell_auto_ask', 4.0)
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_equipo():
+    """Tanda 39. Al encerrarte te quitan linterna, prismáticos y dardos: están en el cajón de Peris, en la sala de
+    guardia. Registrarlo lleva unos segundos, se corta si te apartas y devuelve lo que llevabas."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    msg = lambda: str(director().get_editor_property('message'))
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.1
+    d.set_darts(3)
+    d.lock_in_cell(jugador()); yield 0.4
+    check('en el calabozo te han registrado', P('gear_taken') and P('darts') == 0 and not P('has_torch') and P('gear_darts') == 3, '%s %s' % (P('gear_taken'), P('darts')))
+    d.set_torch(True); yield 0.2
+    check('la linterna no enciende, y dice dónde está', not P('torch') and 'PERIS' in msg().upper(), msg()[:40])
+    check('la línea secundaria lo recuerda', 'Peris' in str(d.side_objective()), str(d.side_objective()))
+    c = P('gear_spot')
+    tp(c.x + 60, c.y, 180.0); yield 0.3
+    check('junto a la mesa de Peris, el aviso del cajón', 'CAJON' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.5
+    check('registrar lleva un rato', P('gear_searching') and P('gear_taken') and 'REGISTRANDO' in str(d.interact_prompt()), str(d.interact_prompt()))
+    tp(c.x + 600, c.y, 180.0); yield 0.4
+    check('si te apartas, se queda a medias', not P('gear_searching') and P('gear_taken') and 'MEDIAS' in msg(), msg()[:30])
+    tp(c.x + 60, c.y, 180.0); yield 0.3
+    d.interact()
+    yield ('hasta', lambda: director().get_editor_property('gear_back'), P('gear_seconds') + 3.0)
+    check('recuperas lo tuyo', P('gear_back') and not P('gear_taken') and P('darts') == 3 and P('has_torch') and d.has_flag('equipo') and 'reloj' in msg(), msg()[:30])
+    d.set_torch(True); yield 0.2
+    check('y la linterna vuelve a encender', P('torch'))
+    d.set_torch(False)
+    d.lock_in_cell(jugador()); yield 0.3
+    check('una vez recuperado, no te lo vuelven a quitar', not P('gear_taken') and P('darts') == 3)
+    aparte()
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
 def prueba_armados():
     """Tanda 37. Con fusil no se corre a por nadie: el guardia que te ve se queda a distancia, te apunta y da el alto.
     Quieto, uno se acerca a detenerte; si te mueves, disparan, y a la tercera herida caes. Al dar el alto piden
@@ -2657,6 +2691,7 @@ def prueba_armados():
     check('sigue sin echarse encima', dist() > 350 and P('captures') == c0, '%d cm' % dist())
     check('rendirse contó una sola vez', P('surrenders') == 1, P('surrenders'))
     check('el tiro pone la base en guardia', P('tension_t') > 60.0, P('tension_t'))
+    check('tanda 39: cada tiro, su fogonazo', P('shot_flashes') == P('shots'), '%s de %s' % (P('shot_flashes'), P('shots')))
     # los refuerzos: había pedido apoyo al dar el alto, pero estaban todos quietos (hold); ahora uno libre
     check('pidió refuerzos por radio', 'central_refuerzos' in vl(), vl()[-4:])
     # con puntería: heridas, y a la tercera caes
@@ -2698,7 +2733,7 @@ def prueba_armados():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_armados]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados]]
 PRUEBAS = []
 
 
@@ -2751,7 +2786,7 @@ def _limpieza(siguiente):
         # tanda 32: la charla de Lobato y Carmona, solo en su prueba (mete voces en el registro que otras cuentan)
         d.set_editor_property('radio_chat', False)
         # tanda 35: el puzle del calabozo, solo en su prueba (en las demás la reja se abre sola, como antes, y siguen)
-        d.set_editor_property('cell_puzzle', siguiente is prueba_calabozo)
+        d.set_editor_property('cell_puzzle', siguiente in (prueba_calabozo, prueba_equipo))
         # tanda 37: guardias armados (alto, cobertura, disparos), solo en su prueba: las demás se escribieron con
         # guardias que corren a cogerte y miden otra cosa
         d.set_editor_property('armed_rule', siguiente is prueba_armados)

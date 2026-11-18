@@ -2705,8 +2705,30 @@
    "pequeno": true
   },
   {
+   "nombre": "arch_legajos_1_lomo",
+   "modelo": "legajos_lomo",
+   "pos": [
+    1540,
+    3228,
+    125
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
    "nombre": "arch_legajos_2",
    "modelo": "legajos",
+   "pos": [
+    1540,
+    3228,
+    175
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_2_lomo",
+   "modelo": "legajos_lomo",
    "pos": [
     1540,
     3228,
@@ -2727,8 +2749,30 @@
    "pequeno": true
   },
   {
+   "nombre": "arch_legajos_3_lomo",
+   "modelo": "legajos_oscuros_lomo",
+   "pos": [
+    1740,
+    3228,
+    125
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
    "nombre": "arch_legajos_4",
    "modelo": "legajos",
+   "pos": [
+    1740,
+    3228,
+    175
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_4_lomo",
+   "modelo": "legajos_lomo",
    "pos": [
     1740,
     3228,
@@ -2749,8 +2793,30 @@
    "pequeno": true
   },
   {
+   "nombre": "arch_legajos_5_lomo",
+   "modelo": "legajos_lomo",
+   "pos": [
+    1940,
+    3228,
+    125
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
    "nombre": "arch_legajos_6",
    "modelo": "legajos_oscuros",
+   "pos": [
+    1940,
+    3228,
+    175
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_6_lomo",
+   "modelo": "legajos_oscuros_lomo",
    "pos": [
     1940,
     3228,
@@ -2771,8 +2837,30 @@
    "pequeno": true
   },
   {
+   "nombre": "arch_legajos_alto_1_lomo",
+   "modelo": "legajos_lomo",
+   "pos": [
+    1540,
+    3228,
+    75
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
    "nombre": "arch_legajos_alto_2",
    "modelo": "legajos_oscuros",
+   "pos": [
+    1940,
+    3228,
+    75
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "arch_legajos_alto_2_lomo",
+   "modelo": "legajos_oscuros_lomo",
    "pos": [
     1940,
     3228,
@@ -2853,7 +2941,9 @@
   "manta",
   "legajos",
   "legajos_oscuros",
-  "papeles"
+  "papeles",
+  "legajos_lomo",
+  "legajos_oscuros_lomo"
  ],
  "giro_modelo": {
   "_leeme": "Grados que se suman al giro de todas las piezas de un modelo. Con giro 0 lo largo de la pieza debe ir a lo largo de X (lo comprueba prueba_cobertura).",

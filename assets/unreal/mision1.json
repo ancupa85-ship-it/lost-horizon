@@ -50,7 +50,12 @@
     0
    ],
    "vidal_yaw": 90.0,
-   "vidal_wall_yaw": 0.0
+   "vidal_wall_yaw": 0.0,
+   "gear_spot": [
+    5700,
+    1500,
+    0
+   ]
   },
   "guardias": {
    "*": {
@@ -662,6 +667,12 @@
   "hud_disparan": "TE DISPARAN  -  CUBRETE",
   "hud_detienen": "QUIETO  -  VIENEN A DETENERTE",
   "hud_alto": "ALTO!  TE APUNTAN  -  QUIETO O DISPARAN",
-  "hud_herido": "HERIDO {0}/{1}"
+  "hud_herido": "HERIDO {0}/{1}",
+  "equipo_falta": "TE LO HAN QUITADO\nLinterna, prismaticos y dardos estan en el cajon de Peris, en la sala de guardia.",
+  "p_cajon": "E   REGISTRAR EL CAJON DE PERIS",
+  "p_cajon_buscando": "REGISTRANDO EL CAJON...  {0} s",
+  "cajon_dejado": "CAJON A MEDIAS\nTe apartas y lo dejas como estaba. Hay que empezar otra vez.",
+  "equipo_vuelve": "TUS COSAS\nLinterna, prismaticos y dardos, envueltos en tu propia chaqueta.\nDebajo, un reloj de pulsera parado a las tres y dos.",
+  "sec_equipo": "Sin equipo: tus cosas estan en el cajon de Peris, en la sala de guardia"
  }
 }

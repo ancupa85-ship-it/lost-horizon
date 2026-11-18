@@ -12,6 +12,7 @@
 #include "AIController.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
@@ -59,7 +60,12 @@ bool ATarsisGuard::FindCover(const FVector& Threat, FVector& Out) const
 		// no dos en el mismo sitio
 		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 		{
-			if (*It != this && It->bHasCover && FVector::Dist2D(It->CoverLoc, L) < 250.0f) Score += 800.0f;
+			if (*It == this || !It->bHasCover || It->State != ETarsisGuardState::Alert) continue;
+			if (FVector::Dist2D(It->CoverLoc, L) < 250.0f) Score += 800.0f;
+			// tanda 39: ni por el mismo lado. Si un companero ya te apunta desde alli, este busca otro angulo (menos
+			// de unos 50 grados entre los dos, visto desde ti, penaliza): entre dos te cierran, no hacen fila
+			const FVector A = (It->CoverLoc - Threat).GetSafeNormal2D(), B = (L - Threat).GetSafeNormal2D();
+			if (FVector::DotProduct(A, B) > 0.64f) Score += 450.0f;
 		}
 		if (Score < Best) { Best = Score; Out = L + FVector(0.0f, 0.0f, HalfH); bGotCover = true; }
 	}
@@ -175,6 +181,11 @@ void ATarsisDirector::ArmedTick(float DeltaSeconds)
 	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!bArmedRule || !Pl) return;
 	if (HitFlashT > 0.0f) HitFlashT -= DeltaSeconds;
+	if (ShotFlashT > 0.0f)
+	{
+		ShotFlashT -= DeltaSeconds;
+		if (ShotFlashT <= 0.0f && ShotLight) ShotLight->SetVisibility(false);
+	}
 	if (AimHoldT > 0.0f) AimHoldT -= DeltaSeconds;
 	const bool bAimed = AimHoldT > 0.0f && !bCapturing && !bDone && !bCine;
 	const float Speed = PlayerSpeedOverride >= 0.0f ? PlayerSpeedOverride : Pl->GetVelocity().Size2D();
@@ -253,6 +264,21 @@ void ATarsisDirector::ShotFired(ATarsisGuard* G, bool bHit)
 	PlaySfx(TEXT("disparo"), Muzzle, 1.0f);
 	ShotFlashT = 0.08f;
 	ShotFlashAt = Muzzle;
+	// fogonazo: una luz de un instante en la boca del fusil (sin sombras; se apaga en ArmedTick)
+	if (!ShotLight)
+	{
+		ShotLight = NewObject<UPointLightComponent>(this);
+		ShotLight->SetMobility(EComponentMobility::Movable);
+		ShotLight->SetIntensityUnits(ELightUnits::Lumens);
+		ShotLight->SetAttenuationRadius(700.0f);
+		ShotLight->SetCastShadows(false);
+		ShotLight->SetLightColor(FLinearColor(1.0f, 0.78f, 0.45f));
+		ShotLight->RegisterComponent();
+	}
+	ShotLight->SetWorldLocation(Muzzle);
+	ShotLight->SetIntensity(ShotFlashLm);
+	ShotLight->SetVisibility(true);
+	++ShotFlashes;
 	TensionT = FMath::Max(TensionT, 120.0f);
 	// el tiro se oye: los que esten cerca y libres acuden
 	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);

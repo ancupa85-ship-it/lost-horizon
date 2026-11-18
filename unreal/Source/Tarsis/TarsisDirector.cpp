@@ -384,6 +384,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 		if (CellT <= 0.0f) OpenCell();
 	}
 	CellTick(DeltaSeconds);
+	GearTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
 	ClimbTick(DeltaSeconds);
 }
@@ -503,6 +504,7 @@ FString ATarsisDirector::InteractPrompt() const
 		if (G->bDarted) return Tx(TEXT("p_dardo"), TEXT("E   RECUPERAR EL DARDO"));
 		return Tx(TEXT("p_arrastrar"), TEXT("E   ARRASTRAR (escondelo en la sombra)"));
 	}
+	{ const FString GP = GearPrompt(); if (!GP.IsEmpty()) return GP; }
 	if (CanBoardTruck()) return Tx(TEXT("p_camion_subir"), TEXT("E   SUBIR A LA CAJA DEL CAMION"));
 	if (bCellPuzzle && InCell()) return CellPrompt();
 	// puertas, notas y objetos de la misión (mision1.json)
@@ -594,6 +596,7 @@ void ATarsisDirector::Interact()
 		StartDrag(G);
 		return;
 	}
+	if (GearInteract()) return;
 	if (CanBoardTruck()) { BoardTruck(); return; }
 	if (CellInteract()) return;
 	// puertas, notas y objetos de la misión (mision1.json)
@@ -807,6 +810,7 @@ void ATarsisDirector::ToggleBinoculars()
 	UCameraComponent* Cam = C ? C->FindComponentByClass<UCameraComponent>() : nullptr;
 	if (!Cam) return;
 	if (!bBinoculars && (bKeypad || Dragged)) return;
+	if (!bBinoculars && bGearTaken) { GearNag(); return; }
 	bBinoculars = !bBinoculars;
 	if (bBinoculars) { SavedFov = Cam->FieldOfView; Cam->SetFieldOfView(18.0f); }
 	else Cam->SetFieldOfView(SavedFov > 0.0f ? SavedFov : 90.0f);
@@ -874,6 +878,7 @@ void ATarsisDirector::Choose(int32 Option)
 
 FString ATarsisDirector::SideObjective() const
 {
+	if (bGearTaken) return Tx(TEXT("sec_equipo"), TEXT("Sin equipo: tus cosas estan en el cajon de Peris, en la sala de guardia"));
 	if (bDone || !bRamosKnown) return FString();
 	if (bRamosAlly && bFile) return Tx(TEXT("sec_portillo"), TEXT("Otra salida: Ramos te espera en el portillo de la marisma (muro oeste, patio suroeste)"));
 	if (bVetOpen) return bRamosAlly ? Tx(TEXT("sec_ramos_contigo"), TEXT("Ramos esta contigo: con el expediente, saldra por la marisma")) : FString();
@@ -883,6 +888,7 @@ FString ATarsisDirector::SideObjective() const
 
 void ATarsisDirector::ShootDart()
 {
+	if (bGearTaken && Darts <= 0 && !bKeypad && !bMenu && !bCodec && !bCellAsk) { GearNag(); return; }
 	if (Darts <= 0 || DartT > 0.0f || bKeypad || bChoice || bDone || Dragged || bRiding) return;
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);

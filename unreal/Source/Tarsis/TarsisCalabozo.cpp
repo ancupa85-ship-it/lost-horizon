@@ -35,6 +35,7 @@ void ATarsisDirector::LockInCell(APawn* Player)
 	CellT = bCellPuzzle ? 0.0f : CellTime;
 	CellReset();
 	if (bCellPuzzle) { SpawnVidal(); FaceVidal(VidalYaw); }
+	if (bCellPuzzle) TakeGear();   // te han registrado: lo que llevabas esta en la sala de guardia
 	// lo que estuviera sonando en la radio ya no importa: llama Control, que es quien sabe con quien hablas ahi dentro
 	if (bCellPuzzle && !bCodec) { CodecPending = NAME_None; CodecRingT = 0.0f; CellCallT = 9.0f; }
 	ShowMessage(Tx(TEXT("calabozo"), TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, a un paso de la reja, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja. Vidal no es como los demas.")), 8.0f);

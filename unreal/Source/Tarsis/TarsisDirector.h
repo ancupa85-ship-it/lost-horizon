@@ -900,6 +900,44 @@ public:
 	/** La E dentro del calabozo: la losa, hablar con Vidal o abrir con la llave. Devuelve si ha hecho algo. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Calabozo")
 	bool CellInteract();
+
+	// ---- tanda 39: tus cosas las tiene Peris (TarsisEquipo.cpp)
+	/** Al encerrarte te quitan linterna, prismaticos y dardos; estan en el cajon de Peris (GearSpot). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Equipo")
+	bool bGearRule = true;
+	/** El cajon de la mesa de Peris, en la sala de guardia (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Equipo")
+	FVector GearSpot = FVector(5700.0f, 1500.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Equipo")
+	float GearRadius = 150.0f;
+	/** Segundos registrando el cajon (se corta si te apartas). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Equipo")
+	float GearSeconds = 5.0f;
+	/** A que distancia se oye revolver el cajon (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Equipo")
+	float GearHeard = 600.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Equipo")
+	bool bGearTaken = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Equipo")
+	bool bGearBack = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Equipo")
+	bool bGearSearching = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Equipo")
+	int32 GearTries = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Equipo")
+	int32 GearDarts = 0;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Equipo")
+	void TakeGear();
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Equipo")
+	FString GearPrompt() const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Equipo")
+	bool GearInteract();
+	void GearNag();
+	void GearTick(float DeltaSeconds);
+	float GearT = 0.0f;
+	float GearNoiseT = 0.0f;
+	float GearNagT = 0.0f;
+	bool bGearHadTorch = true;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Calabozo")
 	void AnswerCell(int32 Option);
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Calabozo")
@@ -969,6 +1007,12 @@ public:
 	float HitFlashT = 0.0f;
 	float ShotFlashT = 0.0f;
 	FVector ShotFlashAt = FVector::ZeroVector;
+	UPROPERTY() TObjectPtr<class UPointLightComponent> ShotLight;
+	/** Lumenes del fogonazo del disparo de un guardia (dura ShotFlashT). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ShotFlashLm = 2500.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 ShotFlashes = 0;
 	float AimHoldT = 0.0f;
 	float AimerDist = 0.0f;
 	float HaltT = 0.0f;

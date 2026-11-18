@@ -24,7 +24,7 @@ void ATarsisDirector::ToggleTorch()
 
 void ATarsisDirector::SetTorch(bool bOn)
 {
-	if (bOn && !bHasTorch) bOn = false;
+	if (bOn && !bHasTorch) { bOn = false; GearNag(); }
 	if (bOn && !PlayerTorch)
 	{
 		ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));

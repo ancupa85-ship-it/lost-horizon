@@ -250,3 +250,15 @@ respuesta buena que no pide nada (escucharle, decir lo que se oye, rezar con él
 La buena cambia de sitio en cada paso (2, 3, 1). La medalla y la llave siguen valiendo. Vidal, 35 cm a la izquierda
 del eje de la puerta (`vidal_offset`): estaba metido en la pared del vestíbulo.
 
+## Tanda 39: combate, tus cosas y lomos
+
+- **Combate** (`TarsisCombat.cpp`): nadie detiene sin haber dado el alto (`bWarned`); fogonazo en cada tiro
+  (`ShotLight`, `ShotFlashLm`); al elegir cobertura, el segundo guardia busca otro ángulo (menos de unos 50° con un
+  compañero ya cubierto, penaliza); filo rojo de la herida, estrecho. Falta la animación de agacharse a cubierto.
+- **Tus cosas** (`TarsisEquipo.cpp`, `bGearRule`): al encerrarte te quitan linterna, prismáticos y dardos. Están en el
+  cajón de Peris (`gear_spot` en mision1.json). Registrar lleva `GearSeconds`, suena (lo oyen a `GearHeard` cm) y se
+  corta si te apartas. No es obligatorio. Línea secundaria `sec_equipo`. Prueba: `prueba_equipo`.
+- **Vidal**: luz floja en la cara desde el lado de la reja (`VidalLightLm`).
+- **Lomos**: `legajos_lomo` y `legajos_oscuros_lomo` (ambiente.py): cinta y tejuelo de geometría, sin texturas.
+- La batería cierra la partida al acabar.
+

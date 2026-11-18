@@ -604,6 +604,18 @@ def legajos():
     tela basta clara (MI_colchon) y madera oscura (MI_madera), así que no suman memoria de vídeo."""
     _malla_cajas('/Game/Tarsis/Atrezo/legajos/SM_legajos', _fila_legajos(34), 0.25, 'MI_colchon')
     _malla_cajas('/Game/Tarsis/Atrezo/legajos_oscuros/SM_legajos_oscuros', _fila_legajos(35), 0.25, 'MI_madera')
+    # tanda 39: lomos. A cada legajo, la cinta que lo ata (una banda algo más ancha que la carpeta) y el tejuelo en
+    # el lomo, por las dos caras (la fila se coloca girada a un lado o a otro). Sin texturas: es geometría con el
+    # material contrario al de la carpeta (oscuro sobre las claras, claro sobre las oscuras)
+    def lomos(cajas):
+        out = []
+        for cx, cy, cz, g, fondo, alto in cajas:
+            out.append((cx, cy, alto * 0.30, g + 0.3, fondo + 0.3, 1.0))
+            for lado in (-1.0, 1.0):
+                out.append((cx, cy + lado * (fondo / 2.0 + 0.1), alto * 0.68, g * 0.72, 0.3, min(6.5, alto * 0.22)))
+        return out
+    _malla_cajas('/Game/Tarsis/Atrezo/legajos_lomo/SM_legajos_lomo', lomos(_fila_legajos(34)), 0.0, 'MI_madera')
+    _malla_cajas('/Game/Tarsis/Atrezo/legajos_oscuros_lomo/SM_legajos_oscuros_lomo', lomos(_fila_legajos(35)), 0.0, 'MI_colchon')
     hojas = [(0, 0, 0.6, 21.0, 29.7, 1.2), (17, 9, 0.15, 21.0, 29.7, 0.3), (-15, -12, 0.15, 29.7, 21.0, 0.3), (6, -24, 0.15, 21.0, 14.8, 0.3)]
     _malla_cajas('/Game/Tarsis/Atrezo/papeles/SM_papeles', hojas, 0.0, 'MI_colchon')
 
