@@ -821,7 +821,9 @@
   "perro_grune": "EL PERRO TE HA OLIDO\nGrune: todavia no ladra. Apartate despacio y se le pasa. La sombra y la caja no le enganan.\nQuiza algo de comer le haga cambiar de idea.",
   "perro_ladra": "EL PERRO LADRA\nLos guardias de cerca vienen a ver que le pasa. Sal del hangar y espera a que se calle.",
   "perro_amigo": "EL PERRO\nSuelta el grunido a medias, olfatea el trapo y te quita el hueso de la mano. Se sienta a roerlo.\nYa no ladrara por ti.",
-  "ensena_tercera": "TERCERA PERSONA\nLa camara va detras del hombro: ves por encima de las cajas sin asomarte. Los guardias te ven igual que antes.\nG vuelve a la vista de siempre."
+  "ensena_tercera": "TERCERA PERSONA\nLa camara va detras del hombro: ves por encima de las cajas sin asomarte. Los guardias te ven igual que antes.\nG vuelve a la vista de siempre.",
+  "ensena_escucha": "A LA ESCUCHA\nCon la base tranquila, la emisora deja oir lo que hablan los soldados cuando se cruzan en sus rondas.\nQuedate junto a ella y espera.",
+  "escucha_quien": "EMISORA - {0}"
  },
  "datos": [
   {

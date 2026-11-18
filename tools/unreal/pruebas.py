@@ -3083,6 +3083,12 @@ def prueba_cruce():
     check('hablan donde se cruzan, no en el sitio fijo', math.hypot(sp.x - (sx - 900), sp.y - sy) < 500 and math.hypot(sp.x - sx, sp.y - sy) > 400, '%.0f %.0f frente a %s %s' % (sp.x, sp.y, sx, sy))
     yield ('hasta', lambda: director().get_editor_property('talk_phase') == 1 or director().get_editor_property('talk_idx') < 0, P('talk_gather') + 5.0)
     check('se juntan y empiezan', P('talk_phase') == 1, P('talk_phase'))
+    # tanda 47b: junto a la emisora, con la base tranquila, se oye como si estuvieras al lado
+    em = P('emisora_loc'); h0 = P('tap_lines_heard'); f0 = d.facts_known()
+    tp(em.x + 150, em.y); yield 0.3
+    check('junto a la emisora y sin alarma estás a la escucha', d.at_emisora(), '%s base %s' % (d.at_emisora(), d.base_state()))
+    yield ('hasta', lambda: director().get_editor_property('tap_lines_heard') > h0 or director().get_editor_property('talk_idx') < 0, P('talk_line_seconds') * 2 + 6.0)
+    check('desde la emisora oyes la frase aunque hablen lejos', P('tap_lines_heard') > h0 and any('EMISORA' in str(x) for x in list(P('subtitle_log'))[-3:]), '%s %s' % (P('tap_lines_heard'), list(P('subtitle_log'))[-2:]))
     d.set_editor_property('talk_rule', False); yield 0.3    # se corta: la prueba de las charlas empieza de cero
     d.set_editor_property('talk_rule', True)
     jugador().set_actor_hidden_in_game(False)

@@ -1126,6 +1126,16 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
 	FVector TalkSpotNow = FVector::ZeroVector;
 	bool StartTalkAt(int32 Index, const FVector& Spot);
+	/** Tanda 47 (idea de Andres): junto a la emisora de transmisiones, con la base tranquila y la red viva, se oyen las
+	charlas como si estuvieras al lado, segun se van cruzando. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	bool bRadioTap = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float RadioTapDist = 320.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
+	int32 TapLinesHeard = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Charlas")
+	bool AtEmisora() const;
 	float TalkCrossT = 0.0f;
 
 	// ---- tanda 47: cuerpo de Cuttlas y tercera persona (TarsisTercera.cpp). La G alterna
