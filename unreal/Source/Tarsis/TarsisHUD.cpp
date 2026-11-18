@@ -59,8 +59,8 @@ void ATarsisHUD::DrawHUD()
 			Cap.ParseIntoArray(Rows, TEXT("\n"), false);
 			for (int32 i = 0; i < Rows.Num(); ++i)
 			{
-				Text(Rows[i], VX + 42.0f * S + 2.0f, VY + VH - (96.0f - i * 30.0f) * S + 2.0f, FLinearColor(0.0f, 0.0f, 0.0f, 0.85f), 1.15f * S, false);
-				Text(Rows[i], VX + 42.0f * S, VY + VH - (96.0f - i * 30.0f) * S, FLinearColor(0.93f, 0.93f, 0.88f, 1.0f), 1.15f * S, false);
+				Text(Rows[i], VX + 42.0f * S + 2.0f, VY + VH - (130.0f - i * 42.0f) * S + 2.0f, FLinearColor(0.0f, 0.0f, 0.0f, 0.85f), 1.7f * S, false);
+				Text(Rows[i], VX + 42.0f * S, VY + VH - (130.0f - i * 42.0f) * S, FLinearColor(0.93f, 0.93f, 0.88f, 1.0f), 1.7f * S, false);
 			}
 		}
 		if (D->MovieT < 4.0f) Text(TEXT("E / ESPACIO"), Canvas->ClipX - 150.0f * S, Canvas->ClipY - 34.0f * S, FLinearColor(1.0f, 1.0f, 1.0f, 0.45f), 0.7f * S, false);

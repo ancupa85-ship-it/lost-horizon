@@ -68,7 +68,9 @@
     0,
     -14,
     7
-   ]
+   ],
+   "movie_caption_at": 3.0,
+   "movie_caption_rate": 20.0
   },
   "guardias": {
    "*": {

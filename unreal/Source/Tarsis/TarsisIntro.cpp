@@ -2,7 +2,7 @@
 // Antes de dar el mando, la mision ensena un video (Content/Movies/<IntroMovie>): Cuttlas entra por la brecha. El rotulo
 // de lugar y fecha no viene en el video: lo teclea el juego al pie, letra a letra, para que salga nitido y se pueda
 // traducir. E o Espacio la saltan. Si el archivo no esta (o el video no arranca), la mision empieza con el sobrevuelo
-// de siempre. Necesita el modulo MediaAssets en Tarsis.Build.cs.
+// de siempre. Necesita MediaAssets y AudioMixer en el Build.cs del modulo (PruebaLumen.Build.cs, que no esta en el repo).
 #include "TarsisDirector.h"
 
 #include "FileMediaSource.h"
@@ -73,6 +73,8 @@ void ATarsisDirector::MovieTick(float DeltaSeconds)
 {
 	if (!bMovie) return;
 	MovieT += DeltaSeconds;
+	// con tirones el reloj del juego se queda atras del video: manda el del video
+	if (IntroPlayer && IntroPlayer->IsPlaying()) MovieT = FMath::Max(MovieT, static_cast<float>(IntroPlayer->GetTime().GetTotalSeconds()));
 	// se acabo, no ha arrancado en tres segundos o se pasa del tope: a jugar
 	const bool bRunning = IntroPlayer && (IntroPlayer->IsPlaying() || IntroPlayer->IsPreparing() || IntroPlayer->IsBuffering());
 	if (MovieT > MovieMaxSeconds || (MovieT > 3.0f && !bRunning)) EndIntroMovie();
