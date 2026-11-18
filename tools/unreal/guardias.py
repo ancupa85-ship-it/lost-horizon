@@ -3,7 +3,7 @@
 Se ejecuta en el editor con el nivel abierto (montar_base.py lo llama al final si la clase está compilada).
 Rondas por casillas del plano (como en tools/blender/escena_base.py y escenario/visor.js); cada casilla mide T m.
 """
-import os, sys, json, importlib
+import os, sys, json, math, importlib
 import unreal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -17,8 +17,19 @@ GUARDIAS = {
     'Ibarra': ([[13, 4], [13, 9], [9, 9], [9, 4]], 2.5, 'ibarra'),   # patio norte, con la llave de la jefatura
     'Moya': ([[20, 19], [33, 19], [33, 20], [20, 20]], 3.0, 'moya'),   # patio central
     'Peris': ([[28, 7], [28, 8], [23, 8], [28, 8]], [9.0, 0.5, 16.0, 0.5], 'peris'),   # cuartelero: sale a fumar a la puerta y vuelve a la mesa
-    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], 2.5, 'moya'),   # portón
-    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], 2.5, 'peris'),   # barracón
+    # Vega y Ramos se asoman a un rincón y vuelven: allí se paran a mirar (6 s); en la esquina de paso, apenas.
+    # Con la misma espera en todos los puntos, ese ir y volver de pocos metros parecía un guardia en bucle.
+    'Vega': ([[6, 24], [20, 24], [20, 21], [20, 24]], [2.5, 1.0, 6.0, 1.0], 'vega'),   # portón
+    'Ramos': ([[2, 13], [13, 13], [13, 11], [13, 13]], [3.0, 1.0, 6.0, 1.0], 'ramos'),   # barracón
+    # tanda 21: el perímetro deja de estar vacío. Casillas de fuera del plano (columnas negativas o filas de más de 27):
+    # el anillo entre el muro antiguo y el nuevo. Ninguno pisa el camino (filas 27-29): por ahí pasa el camión.
+    # Los de las garitas esperan junto a la puerta y cada poco dan unos pasos a lo largo del camino y vuelven: al llegar
+    # a cada punto se quedan mirando hacia donde iban (uno hacia el portón, el otro hacia dentro de la base).
+    'Lobato': ([[-7, 26], [-5, 26]], [14.0, 6.0], 'centinela'),   # garita del portón de entrada
+    'Sanz': ([[42, 26], [40, 26]], [16.0, 7.0], 'centinela'),     # control de salida: 16 s mirando al portón, 7 s hacia dentro
+    # la ronda del anillo sur: va y vuelve entre portón y portón, al borde de los charcos de luz de las farolas del camino,
+    # y pasa a unos 8 m del portillo de la marisma
+    'Carmona': ([[-5, 33], [18, 33], [18, 31], [-5, 31]], 4.0, 'centinela'),   # tanda 40: hasta el hangar (x 40 m), que ocupa la franja
 }
 
 def log(*a):
@@ -42,6 +53,19 @@ def cuerpo(g, nombre):
     if not p:
         return
     g.set_editor_property('body_mesh', p['malla'])
+    # idle, andar y trotar del maniquí de la plantilla retargeteados a su esqueleto (tools/unreal/animaciones.py);
+    # si no se puede, se quedan las del .glb. Apuntar y caer siguen siendo las del .glb.
+    try:
+        import animaciones
+        importlib.reload(animaciones)
+        a = animaciones.preparar(nombre, p)
+    except Exception as e:
+        log('AVISO: sin animaciones retargeteadas para', nombre, repr(e))
+        a = None
+    if a:
+        p = dict(p, idle=a['idle'], walk=a['walk'], blend=a['blend'])
+        g.set_editor_property('walk_anim_speed', a['walk_speed'])
+        g.set_editor_property('run_anim_speed', a['run_speed'])
     for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim'), ('down_anim', 'down'), ('move_blend', 'blend')):
         if p.get(k):
             g.set_editor_property(prop, p[k])
@@ -60,7 +84,12 @@ def navegacion():
     filas = len(DATA['map'])
     cols = max(len(f) for f in DATA['map'])
     ancho, largo = cols * T * 100.0, filas * T * 100.0
-    v = eas.spawn_actor_from_class(unreal.NavMeshBoundsVolume, unreal.Vector(ancho / 2, largo / 2, 300.0), unreal.Rotator(0, 0, 0))
+    cx, cy = ancho / 2, largo / 2
+    ext = DATA.get('ext')   # tanda 20: el muro perimetral está más afuera que el plano; el mapa de navegación llega hasta él
+    if ext:
+        ancho, largo = (ext['x1'] - ext['x0']) * 100.0, (ext['y1'] - ext['y0']) * 100.0
+        cx, cy = (ext['x0'] + ext['x1']) * 50.0, (ext['y0'] + ext['y1']) * 50.0
+    v = eas.spawn_actor_from_class(unreal.NavMeshBoundsVolume, unreal.Vector(cx, cy, 300.0), unreal.Rotator(0, 0, 0))
     v.set_actor_label('MapaNavegacion')
     v.set_folder_path('Guardias')
     # la caja por defecto mide 200 cm de lado
@@ -71,35 +100,72 @@ def navegacion():
         log('AVISO: no se pudo reconstruir la navegación:', repr(e))
     log('mapa de navegación', round(ancho / 100), 'x', round(largo / 100), 'm')
 
+CASETA_LM, CASETA_RADIO, CASETA_ALTO, CASETA_COLOR = 300.0, 420.0, 150.0, (1.0, 0.55, 0.25, 1.0)
+
 def centinelas(eas, cls):
-    # un centinela en cada torre (TOWERS del visor), en la plataforma, junto a su foco, que gira con él
+    # un centinela en cada torre vieja (TOWERS del visor), en la plataforma, junto a su foco, que gira con él.
+    # Tanda 30: las torres de esquina («grande») llevan dos puestos, cada uno con su centinela y su foco: el de dentro
+    # se llama «centinela de la torre N» y el de fuera «vigia de la torre N» (sus recorridos, en mision1.json)
     import math
     focos = [a for a in eas.get_all_level_actors() if isinstance(a, unreal.SpotLight)]
+    usados = set()
     n = 0
+    # tanda 31: una luz cálida y floja bajo el tejadillo de cada torre de esquina. De noche la torre era una silueta;
+    # con ella el centinela se recorta y desde el patio se lee una garita ocupada. Etiqueta «decorado»: no cuenta para
+    # el sigilo ni se rompe, y con 4,2 m de radio no llega al suelo. Valores medidos en el PC
+    for a in eas.get_all_level_actors():
+        if a.actor_has_tag('luz_caseta'):
+            eas.destroy_actor(a)
     for i, t in enumerate(DATA.get('torres', [])):
-        bx, by = t['pos'][0], t['pos'][1]
-        loc = unreal.Vector((bx - 0.25) * 100.0, -by * 100.0, t.get('altura', 4.2) * 100.0 + 95.0)
-        d = t['foco']['dir']
-        yaw = math.degrees(math.atan2(-d[1], d[0]))   # Blender -> Unreal: Y cambia de signo
-        g = eas.spawn_actor_from_class(cls, loc, unreal.Rotator(roll=0, pitch=0, yaw=yaw))
-        g.set_actor_label('Centinela_' + t['name'])
-        g.set_editor_property('guard_name', 'centinela de la torre %d' % (i + 1))
-        g.set_folder_path('Guardias')
-        g.set_editor_property('tower_sentry', True)
-        g.set_editor_property('tower_yaw', yaw)
-        g.set_editor_property('view_distance', 2500.0)
-        g.set_editor_property('view_half_angle', 32.0)
-        fp = t['foco']['pos']
-        fl = unreal.Vector(fp[0] * 100.0, -fp[1] * 100.0, fp[2] * 100.0)
-        if focos:
-            f = min(focos, key=lambda a: (a.get_actor_location() - fl).length())
-            if (f.get_actor_location() - fl).length() < 400:
-                f.get_editor_property('root_component').set_editor_property('mobility', unreal.ComponentMobility.MOVABLE)
-                g.set_editor_property('tower_light', f)
-            else:
-                log('AVISO: no encuentro el foco de', t['name'])
-        cuerpo(g, 'moya')
-        n += 1
+        grande = bool(t.get('grande'))
+        if grande:
+            lc = eas.spawn_actor_from_class(unreal.PointLight, unreal.Vector(t['pos'][0] * 100.0, -t['pos'][1] * 100.0, t.get('altura', 7.5) * 100.0 + CASETA_ALTO), unreal.Rotator(0, 0, 0))
+            lc.set_actor_label('caseta_' + t['name'])
+            lc.set_folder_path('Luces')
+            lc.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+            c = lc.get_component_by_class(unreal.PointLightComponent)
+            c.set_editor_property('intensity_units', unreal.LightUnits.LUMENS)
+            c.set_editor_property('intensity', CASETA_LM)
+            c.set_editor_property('attenuation_radius', CASETA_RADIO)
+            c.set_editor_property('cast_shadows', False)
+            c.set_light_color(unreal.LinearColor(*CASETA_COLOR))   # unreal.Color posicional cambia el orden de los canales
+            lc.tags = [unreal.Name('decorado'), unreal.Name('luz_caseta')]
+        puestos = t.get('puestos') or [{'rol': 'dentro', 'pos': [t['pos'][0] - 0.25, t['pos'][1], 0.0], 'foco': t['foco']}]
+        for pu in puestos:
+            fuera = pu.get('rol') == 'fuera'
+            loc = unreal.Vector(pu['pos'][0] * 100.0, -pu['pos'][1] * 100.0, t.get('altura', 4.2) * 100.0 + 95.0)
+            d = pu['foco']['dir']
+            yaw = math.degrees(math.atan2(-d[1], d[0]))   # Blender -> Unreal: Y cambia de signo
+            g = eas.spawn_actor_from_class(cls, loc, unreal.Rotator(roll=0, pitch=0, yaw=yaw))
+            g.set_actor_label(('Vigia_' if fuera else 'Centinela_') + t['name'])
+            g.set_editor_property('guard_name', '%s de la torre %d' % ('vigia' if fuera else 'centinela', i + 1))
+            g.set_folder_path('Guardias')
+            g.set_editor_property('tower_sentry', True)
+            g.set_editor_property('tower_yaw', yaw)
+            # los de esquina de dentro ven más corto: su torre queda lejos y el portillo de la marisma tiene que seguir siendo posible
+            g.set_editor_property('view_distance', 1800.0 if grande and not fuera else 2500.0)
+            g.set_editor_property('view_half_angle', 32.0)
+            fp = pu['foco']['pos']
+            fl = unreal.Vector(fp[0] * 100.0, -fp[1] * 100.0, fp[2] * 100.0)
+            libres = [a for a in focos if a not in usados]
+            if libres:
+                f = min(libres, key=lambda a: (a.get_actor_location() - fl).length())
+                if (f.get_actor_location() - fl).length() < 400:
+                    usados.add(f)
+                    f.get_editor_property('root_component').set_editor_property('mobility', unreal.ComponentMobility.MOVABLE)
+                    if grande:
+                        # alumbra desde lejos y casi de lado: haz más prieto para que la mancha no sea una franja de 60 m,
+                        # y alcance para llegar. El de dentro da sombra (delata y no atraviesa cajas); el de fuera no
+                        c = f.get_component_by_class(unreal.SpotLightComponent)
+                        c.set_editor_property('cast_shadows', not fuera)
+                        c.set_editor_property('attenuation_radius', 6500.0)
+                        c.set_editor_property('outer_cone_angle', 6.0 if fuera else 5.0)
+                        c.set_editor_property('inner_cone_angle', 4.0 if fuera else 3.5)
+                    g.set_editor_property('tower_light', f)
+                else:
+                    log('AVISO: no encuentro el foco de', t['name'], pu.get('rol'))
+            cuerpo(g, 'centinela')
+            n += 1
     return n
 
 def colocar():
@@ -140,6 +206,21 @@ def colocar():
         d.set_editor_property('cell_spot', unreal.Vector(31 * T * 100 + T * 50, 12 * T * 100 + T * 50 + 340.0, 110.0))
         d.set_editor_property('cell_yaw', -90.0)
         d.set_editor_property('cell_door', unreal.Vector(31 * T * 100 + T * 50, 13 * T * 100, 0.0))
+        # tanda 37: escaleras de las torres (pie de la escalera y centro de la plataforma, en cm)
+        tt = [t for t in DATA.get('torres', []) if t.get('escala')]
+        d.set_editor_property('ladders', [unreal.Vector(t['escala'][0] * 100.0, -t['escala'][1] * 100.0, 0.0) for t in tt])
+        def _arriba(t):
+            # en el borde de la plataforma del lado de la escalera (en el centro apareces pegado al centinela)
+            cx, cy, ex, ey = t['pos'][0] * 100.0, -t['pos'][1] * 100.0, t['escala'][0] * 100.0, -t['escala'][1] * 100.0
+            n = max(math.hypot(ex - cx, ey - cy), 1.0)
+            return unreal.Vector(cx + (ex - cx) / n * 130.0, cy + (ey - cy) / n * 130.0, t.get('altura', 7.5) * 100.0)
+        d.set_editor_property('ladder_tops', [_arriba(t) for t in tt])
+        # textos, objetivos, puntos de interacción y ajustes de la misión 1 (assets/unreal/mision1.json)
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        import mision
+        importlib.reload(mision)
+        mision.aplicar(d)
     log('guardias colocados', n, '- director', 'sí' if dcls else 'no compilado')
     return n
 

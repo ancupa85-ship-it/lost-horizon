@@ -11,3 +11,34 @@ Plan completo: «Plan de migración a Unreal Engine 5 — Lost Horizon» (Claude
    Necesita el plugin «Python Editor Script Plugin» activo en el proyecto.
 
 Sin texturas todavía: los materiales llevan el color, la rugosidad y la emisión del visor.
+
+## Aspecto final por zonas (tanda 18: el barracón oeste)
+
+Con el editor abierto y el nivel Tarsis cargado, en este orden (cada uno se puede repetir: quita lo suyo y lo vuelve a poner):
+
+1. `py tools/unreal/materiales.py` (si cambia el maestro M_LH: ahora lleva suciedad, manchas de ruido y zócalo sucio).
+2. `py tools/unreal/atrezo.py`: descarga de Poly Haven (CC0) los modelos de `assets/unreal/atrezo.json` (no van a git),
+   los importa en `/Game/Tarsis/Atrezo` (una malla por modelo, con LOD, colisión simple y texturas de 1024), quita de las
+   mallas fusionadas de la base los muebles de Blender de esa zona («vaciar») y coloca las piezas.
+3. `py tools/unreal/ambiente.py`: la taquilla de chapa (Geometry Script), las luces de la zona, sus sonidos (zumbido,
+   radio, gotera), el posprocesado y las manchas. Necesita el plugin **GeometryScripting** activo en el proyecto.
+4. Reconstruir la navegación (`RebuildNavigation`) y guardar el nivel.
+5. `py tools/unreal/cielo.py` (tanda 25): la cúpula del cielo (estrellas, luna y nubes), el halo de cada luminaria de
+   fuera, el relleno de las farolas y el material del bastón luminoso. `montar_base.py` ya lo llama, pero hay que volver
+   a pasarlo después de `ambiente.py`: la bombilla de la puerta norte la pone `ambiente.py`, y sin esta segunda pasada
+   se queda sin halo. La textura de estrellas sale de `python tools/texturas/estrellas.py` (Python normal).
+
+6. **Cerrar y volver a abrir el editor antes de probar, medir o capturar.** En la tanda 25 las mallas de la base no
+   llegaban a guardarse con sus instancias (poner `static_materials` por Python no marca el paquete como cambiado, y
+   `save_loaded_asset(x)` a secas solo guarda «si ha cambiado»): la batería pasaba con el editor abierto y al reabrirlo
+   la base volvía al material liso del glTF. Los guiones usan ya `x.modify()` y `save_loaded_asset(x, False)`, pero la
+   comprobación que vale es la de después de reabrir: una prueba que lee parámetros no prueba lo que se ve.
+
+Para comprobar: `py tools/unreal/medir.py` (fps y VRAM en tres sitios; tabla en `docs/rendimiento.md`),
+`py tools/unreal/capturas.py <prefijo> [serie]` (cámaras fijas, en `Saved/Capturas`; la serie `tanda26` trae los focos,
+la sombra y un cuarto por cámara), `py tools/unreal/barracon.py` (qué cuesta cada luz en el barracón oeste y las sombras
+de las farolas, cambiando una cosa cada vez) y `py tools/unreal/pruebas.py`. `python3 tools/unreal/ies.py` (fuera de
+Unreal) escribe el perfil del haz de los faros del camión; `cielo.py` lo importa.
+`py tools/unreal/memoria.py` hace el inventario de la memoria de vídeo que piden las texturas (no cambia nada).
+Los sonidos nuevos salen de `python tools/sonido/generar_sonidos.py` (fluorescente, radio_barracon, gotera) y se importan
+con `py tools/unreal/sonidos.py`.

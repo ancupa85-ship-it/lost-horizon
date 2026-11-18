@@ -59,7 +59,7 @@ def importar(nombre, forzar=False):
     for p in res or []:
         a = eal.load_asset(str(p).split("'")[1] if "'" in str(p) else str(p))
         if a:
-            eal.save_loaded_asset(a)
+            eal.save_loaded_asset(a, False)
     log('persona importada', nombre, len(res or []), 'assets')
     return ruta
 
@@ -114,7 +114,10 @@ def mezcla(ruta, malla, idle, walk, andar=150.0):
         m.set_editor_property('sample_value', unreal.Vector(v, 0.0, 0.0))
         muestras.append(m)
     bs.set_editor_property('sample_data', muestras)
-    eal.save_loaded_asset(bs)
+    # sin esto la mezcla no avanza en el juego (ver animaciones.reconstruir)
+    if hasattr(unreal, 'TarsisGuard') and hasattr(unreal.TarsisGuard, 'rebuild_blend_space'):
+        unreal.TarsisGuard.rebuild_blend_space(bs)
+    eal.save_loaded_asset(bs, False)
     log('mezcla creada', nombre)
     return bs
 

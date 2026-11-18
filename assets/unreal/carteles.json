@@ -1,0 +1,390 @@
+{
+ "_leeme": "Carteles, rótulos y etiquetas (tanda 24). Texturas: tools/carteles/generar.py -> assets/unreal/carteles/<tex>.png. Los coloca tools/unreal/carteles.py. clase «placa»: chapa (plano) en pos, mirando hacia «mira» (yaw de la normal, grados), tam [ancho, alto] en cm; «poste»: alto del poste en cm (la placa va en un poste clavado en el suelo); «panel» [x, y, ancho, alto, grosor]: murete que se levanta detrás si no hay pared. clase «pintado»: calcomanía en una pared que mira hacia «mira». clase «suelo»: calcomanía en el suelo, tam [a lo ancho del camino (Y), a lo largo (X)], «giro» en grados. «fuerza»: cuánta pintura (0-1). «orden»: orden de dibujo de la calcomanía. «brillo» (tanda 25, solo placas): luz propia de la chapa, como pintura reflectante (0 = nada; 0,12 se lee de noche sin foco).",
+ "carteles": [
+  {
+   "nombre": "Jefatura",
+   "tex": "jefatura",
+   "clase": "placa",
+   "pos": [
+    900,
+    3073.5,
+    258
+   ],
+   "mira": -90,
+   "tam": [
+    88,
+    22
+   ]
+  },
+  {
+   "nombre": "Archivo",
+   "tex": "archivo",
+   "clase": "placa",
+   "pos": [
+    1273.5,
+    3500,
+    262
+   ],
+   "mira": 180,
+   "tam": [
+    80,
+    40
+   ]
+  },
+  {
+   "nombre": "Dormitorio",
+   "tex": "dormitorio",
+   "clase": "placa",
+   "pos": [
+    1500,
+    2073.5,
+    258
+   ],
+   "mira": -90,
+   "tam": [
+    110,
+    27.5
+   ]
+  },
+  {
+   "nombre": "CuerpoGuardia",
+   "tex": "cuerpo_guardia",
+   "clase": "placa",
+   "pos": [
+    5073.5,
+    1700,
+    258
+   ],
+   "mira": 180,
+   "tam": [
+    110,
+    27.5
+   ]
+  },
+  {
+   "nombre": "Calabozo",
+   "tex": "calabozo",
+   "clase": "placa",
+   "pos": [
+    6300,
+    2473.5,
+    258
+   ],
+   "mira": -90,
+   "tam": [
+    80,
+    20
+   ]
+  },
+  {
+   "nombre": "ZonaRestringida",
+   "tex": "zona_restringida",
+   "clase": "placa",
+   "pos": [
+    3673.5,
+    900,
+    262
+   ],
+   "mira": 180,
+   "tam": [
+    100,
+    50
+   ]
+  },
+  {
+   "nombre": "ZonaMilitar_S1",
+   "tex": "zona_militar",
+   "clase": "placa",
+   "pos": [
+    1500,
+    7453.5,
+    200
+   ],
+   "mira": -90,
+   "tam": [
+    200,
+    100
+   ],
+   "brillo": 0.12
+  },
+  {
+   "nombre": "ZonaMilitar_S2",
+   "tex": "zona_militar",
+   "clase": "placa",
+   "pos": [
+    4800,
+    7453.5,
+    200
+   ],
+   "mira": -90,
+   "tam": [
+    200,
+    100
+   ],
+   "brillo": 0.12
+  },
+  {
+   "nombre": "ZonaMilitar_S3",
+   "tex": "zona_militar",
+   "clase": "placa",
+   "pos": [
+    7600,
+    7453.5,
+    200
+   ],
+   "mira": -90,
+   "tam": [
+    200,
+    100
+   ],
+   "brillo": 0.12
+  },
+  {
+   "nombre": "ZonaMilitar_O",
+   "tex": "zona_militar",
+   "clase": "placa",
+   "pos": [
+    -1853.5,
+    4700,
+    200
+   ],
+   "mira": 0,
+   "tam": [
+    200,
+    100
+   ],
+   "brillo": 0.12
+  },
+  {
+   "nombre": "ZonaMilitar_E",
+   "tex": "zona_militar",
+   "clase": "placa",
+   "pos": [
+    9053.5,
+    6450,
+    200
+   ],
+   "mira": 180,
+   "tam": [
+    200,
+    100
+   ],
+   "brillo": 0.12
+  },
+  {
+   "nombre": "Portillo",
+   "tex": "portillo",
+   "clase": "placa",
+   "pos": [
+    450,
+    7453.5,
+    175
+   ],
+   "mira": -90,
+   "tam": [
+    60,
+    30
+   ]
+  },
+  {
+   "nombre": "Portillo_2",
+   "tex": "numero_2",
+   "clase": "pintado",
+   "pos": [
+    310,
+    7455,
+    330
+   ],
+   "mira": -90,
+   "tam": [
+    60,
+    60
+   ],
+   "fuerza": 0.85
+  },
+  {
+   "nombre": "Lema",
+   "tex": "lema",
+   "clase": "pintado",
+   "pos": [
+    -1855,
+    4500,
+    320
+   ],
+   "mira": 0,
+   "tam": [
+    800,
+    100
+   ],
+   "fuerza": 1.0,
+   "orden": -1
+  },
+  {
+   "nombre": "AltoControl",
+   "tex": "alto_control",
+   "clase": "placa",
+   "pos": [
+    8480,
+    6050,
+    190
+   ],
+   "mira": 180,
+   "tam": [
+    55,
+    110
+   ],
+   "poste": 250,
+   "brillo": 0.08
+  },
+  {
+   "nombre": "Velocidad",
+   "tex": "velocidad_20",
+   "clase": "placa",
+   "pos": [
+    -1300,
+    6050,
+    215
+   ],
+   "mira": 180,
+   "tam": [
+    60,
+    60
+   ],
+   "poste": 250
+  },
+  {
+   "nombre": "AltaTension",
+   "tex": "alta_tension",
+   "clase": "placa",
+   "pos": [
+    4190,
+    1810,
+    150
+   ],
+   "mira": 180,
+   "tam": [
+    40,
+    80
+   ],
+   "poste": 195
+  },
+  {
+   "nombre": "Gasoleo",
+   "tex": "gasoleo",
+   "clase": "placa",
+   "pos": [
+    4420,
+    1830,
+    165
+   ],
+   "mira": 90,
+   "tam": [
+    70,
+    35
+   ],
+   "poste": 190
+  },
+  {
+   "nombre": "Botiquin",
+   "tex": "botiquin",
+   "clase": "placa",
+   "pos": [
+    4660,
+    146.5,
+    207
+   ],
+   "mira": 90,
+   "tam": [
+    56,
+    28
+   ],
+   "panel": [
+    4660,
+    135,
+    120,
+    235,
+    20
+   ]
+  },
+  {
+   "nombre": "AltoSuelo",
+   "tex": "alto_suelo",
+   "clase": "suelo",
+   "pos": [
+    8330,
+    5700,
+    4
+   ],
+   "giro": 90,
+   "tam": [
+    300,
+    150
+   ],
+   "fuerza": 0.8
+  },
+  {
+   "nombre": "LineaAlto",
+   "tex": "linea_alto",
+   "clase": "suelo",
+   "pos": [
+    8475,
+    5700,
+    4
+   ],
+   "giro": 0,
+   "tam": [
+    560,
+    30
+   ],
+   "fuerza": 0.85
+  },
+  {
+   "nombre": "Etiqueta_1",
+   "tex": "etiqueta_1",
+   "clase": "placa",
+   "pos": [
+    1500,
+    2938.6,
+    176
+   ],
+   "mira": -90,
+   "tam": [
+    12,
+    6
+   ],
+   "pequeno": true
+  },
+  {
+   "nombre": "Etiqueta_2",
+   "tex": "etiqueta_2",
+   "clase": "placa",
+   "pos": [
+    1700,
+    2938.6,
+    176
+   ],
+   "mira": -90,
+   "tam": [
+    12,
+    6
+   ],
+   "pequeno": true
+  },
+  {
+   "nombre": "Etiqueta_3",
+   "tex": "etiqueta_3",
+   "clase": "placa",
+   "pos": [
+    5330,
+    1261.4,
+    176
+   ],
+   "mira": 90,
+   "tam": [
+    12,
+    6
+   ],
+   "pequeno": true
+  }
+ ]
+}

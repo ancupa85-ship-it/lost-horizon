@@ -1,9 +1,9 @@
 """Modela el pastor de la perrera para el visor: cuerpo y cuatro patas sueltas (el visor las balancea), con el color en los vértices.
 Sale en assets/modelos-ph/perro/perro.glb. Mira hacia -Y (en el visor, +Z, como las personas). LH_PREVIEW=carpeta guarda un render.
 Uso: python3 tools/blender/perro.py"""
-import bpy, os, math
+import bpy, bmesh, os, math
 from mathutils import Vector
-R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); OUT = os.path.join(R, 'assets', 'modelos-ph', 'perro'); PREVIEW = os.environ.get('LH_PREVIEW')
+R = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); OUT = os.path.join(R, 'assets', 'modelos-ph', 'perro'); PREVIEW = os.environ.get('LH_PREVIEW'); DIBUJO = os.environ.get('LH_ESTILO') == 'dibujo'   # LH_ESTILO=dibujo: pocas caras planas y dos colores sin degradado
 bpy.ops.wm.read_factory_settings(use_empty=True); os.makedirs(OUT, exist_ok=True)
 K = 1.75   # la superficie de una metabola queda hacia la mitad de su radio: se compensa para dar las medidas en metros reales
 def blob(name, balls, origin=(0, 0, 0)):
@@ -20,16 +20,18 @@ body = blob('cuerpo', chain((-0.30, 0, 0.50, 0.125), (0.22, 0, 0.50, 0.15), 7) +
             + chain((0.27, 0, 0.56, 0.115), (0.38, 0, 0.68, 0.085), 5) + [(0.43, 0, 0.715, 0.085)]                                  # cuello y cráneo
             + chain((0.48, 0, 0.70, 0.056), (0.62, 0, 0.675, 0.036), 6)                                                           # hocico
             + chain((-0.38, 0, 0.50, 0.05), (-0.56, 0, 0.26, 0.03), 9)                                                            # cola caída
-            + [(0.41, sx * 0.055, 0.795, 0.03) for sx in (-1, 1)] + [(0.405, sx * 0.058, 0.83, 0.021) for sx in (-1, 1)] + [(0.4, sx * 0.06, 0.855, 0.013) for sx in (-1, 1)])        # orejas tiesas
+            + [b for sx in (-1, 1) for b in chain((0.415, sx * 0.052, 0.785, 0.036), (0.39, sx * 0.07, 0.915, 0.011), 7)]
+            + [(0.47, sx * 0.03, 0.755, 0.03) for sx in (-1, 1)] + [(0.5, sx * 0.03, 0.665, 0.03) for sx in (-1, 1)])        # orejas tiesas
 legs = []
 for name, f, sx, back in (('pata_dl', 0.22, 1, False), ('pata_dr', 0.22, -1, False), ('pata_tl', -0.27, 1, True), ('pata_tr', -0.27, -1, True)):
     if back: b = chain((0, 0, 0, 0.085), (-0.05, 0, -0.17, 0.05), 6) + chain((-0.05, 0, -0.17, 0.045), (-0.1, 0, -0.33, 0.03), 7) + chain((-0.1, 0, -0.33, 0.03), (-0.07, 0, -0.45, 0.028), 6) + [(-0.05, 0, -0.47, 0.033), (-0.03, 0, -0.475, 0.03)]
     else: b = chain((0, 0, 0.02, 0.07), (0, 0, -0.2, 0.04), 7) + chain((0, 0, -0.2, 0.038), (0.0, 0, -0.45, 0.029), 11) + [(0.015, 0, -0.47, 0.033), (0.035, 0, -0.475, 0.03)]
     legs.append(blob(name, b, origin=(f, sx * 0.085, 0.5)))
 # color por vértice: fuego en patas, vientre y cara; manto negro en el lomo, el hocico y las orejas
-TAN = (0.17, 0.105, 0.05); NEG = (0.03, 0.028, 0.026)
+TAN = (0.2, 0.09, 0.03); NEG = (0.03, 0.028, 0.026)
+if DIBUJO: TAN = (0.42, 0.19, 0.05); NEG = (0.05, 0.045, 0.045)
 for o in [body] + legs:
-    me = o.data; ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT'); me.polygons.foreach_set('use_smooth', [True] * len(me.polygons))
+    me = o.data; ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT'); me.polygons.foreach_set('use_smooth', [not DIBUJO] * len(me.polygons))
     for v in me.vertices:
         w = o.location + v.co; f = -w.y; z = w.z
         k = 0.0
@@ -37,16 +39,47 @@ for o in [body] + legs:
             k = min(1.0, max(0.0, (z - 0.47 - max(0.0, f - 0.18) * 1.15) / 0.07)) if f < 0.42 else 0.0                    # manto
             if f > 0.52 or z > 0.79: k = 1.0                                                  # hocico y orejas
             if f < -0.36: k = max(k, 0.7)                                                     # cola
-        t = k * k * (3 - 2 * k); ca.data[v.index].color = tuple(TAN[i] + (NEG[i] - TAN[i]) * t for i in range(3)) + (1.0,)
+        t = (1.0 if k > 0.5 else 0.0) if DIBUJO else k * k * (3 - 2 * k); ca.data[v.index].color = tuple(TAN[i] + (NEG[i] - TAN[i]) * t for i in range(3)) + (1.0,)
     mat = bpy.data.materials.new('pelo'); mat.use_nodes = True; nt = mat.node_tree; bs = nt.nodes['Principled BSDF']; bs.inputs['Roughness'].default_value = 0.85
     vc = nt.nodes.new('ShaderNodeVertexColor'); vc.layer_name = 'Col'; nt.links.new(vc.outputs['Color'], bs.inputs['Base Color']); me.materials.append(mat)
-    d = o.modifiers.new('dec', 'DECIMATE'); d.ratio = 0.12
+    d = o.modifiers.new('dec', 'DECIMATE'); d.ratio = 0.03 if DIBUJO else 0.12
+# detalles: ojos, trufa, lengua no; collar de cuero con chapa
+def bola(name, f, sd, z, r, col, rough=0.25, sc=(1, 1, 1)):
+    me = bpy.data.meshes.new(name); bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=8 if DIBUJO else 16, v_segments=6 if DIBUJO else 10, radius=r); bm.to_mesh(me); bm.free()
+    me.polygons.foreach_set('use_smooth', [not DIBUJO] * len(me.polygons)); o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o); o.location = (sd, -f, z); o.scale = sc
+    m = bpy.data.materials.new(name); m.use_nodes = True; b = m.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value = col + (1,); b.inputs['Roughness'].default_value = rough; me.materials.append(m); return o
+extras = []
+bpy.context.view_layer.update()
+def toca(o, d):
+    """Punto de la piel del cuerpo que encuentra un rayo desde o en la dirección d (coordenadas de Blender)."""
+    ok, loc, nor, idx = body.ray_cast(Vector(o), Vector(d).normalized()); return loc if ok else None
+for sx in (-1, 1):
+    h = toca((sx * 0.3, -0.487, 0.75), (-sx, 0, 0))
+    if h: e = bola('ojo', 0, 0, 0, 0.015, (0.05, 0.02, 0.006), 0.1); e.location = h + Vector((-sx * 0.006, -0.003, 0)); extras.append(e)
+h = toca((0, -1.0, 0.682), (0, 1, 0))
+if h: t = bola('trufa', 0, 0, 0, 0.017, (0.006, 0.006, 0.006), 0.2, (1.15, 0.7, 0.9)); t.location = h + Vector((0, 0.006, 0.004)); extras.append(t)
+TA = math.radians(42.5); C0 = Vector((0, -0.325, 0.62)); AX = Vector((0, -math.sin(TA), math.cos(TA))); UU = Vector((0, math.cos(TA), math.sin(TA))); XX = Vector((1, 0, 0))
+def piel(d):
+    ok, loc, nor, idx = body.ray_cast(C0 + d * 0.5, -d); return (loc - C0).length if ok else 0.1
+me = bpy.data.meshes.new('collar'); bm = bmesh.new(); N = 10 if DIBUJO else 28; vs = []
+for i in range(N):
+    a = 2 * math.pi * i / N; d = XX * math.cos(a) + UU * math.sin(a); r = piel(d); ring = []
+    for dr, dh in ((-0.004, -0.015), (0.007, -0.015), (0.007, 0.015), (-0.004, 0.015)): ring.append(bm.verts.new(C0 + d * (r + dr) + AX * dh))
+    vs.append(ring)
+for i in range(N):
+    for k in range(4): bm.faces.new((vs[i][k], vs[(i + 1) % N][k], vs[(i + 1) % N][(k + 1) % 4], vs[i][(k + 1) % 4]))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces); bm.to_mesh(me); bm.free(); co = bpy.data.objects.new('collar', me); bpy.context.scene.collection.objects.link(co)
+me.polygons.foreach_set('use_smooth', [False] * len(me.polygons))
+m = bpy.data.materials.new('cuero'); m.use_nodes = True; m.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.09, 0.02, 0.012, 1); me.materials.append(m); extras.append(co)
+ch = bola('chapa', 0, 0, 0, 0.017, (0.7, 0.55, 0.2), 0.3, (1, 0.35, 1)); ch.location = C0 - UU * (piel(-UU) + 0.014) - AX * 0.012; ch.data.materials[0].node_tree.nodes['Principled BSDF'].inputs['Metallic'].default_value = 1.0; extras.append(ch)
 print('PERRO', {o.name: len(o.data.polygons) for o in [body] + legs}, flush=True)
 if PREVIEW:
     sc = bpy.context.scene; sc.render.engine = 'CYCLES'; sc.cycles.samples = 24; sc.render.resolution_x = 900; sc.render.resolution_y = 600
     cam = bpy.data.objects.new('c', bpy.data.cameras.new('c')); sc.collection.objects.link(cam); cam.location = (2.0, -1.2, 0.75); cam.rotation_euler = (math.radians(84), 0, math.radians(59)); cam.data.lens = 50; sc.camera = cam
-    l = bpy.data.objects.new('l', bpy.data.lights.new('l', 'AREA')); l.data.energy = 300; l.data.size = 2; l.location = (2, -2, 2.5); l.rotation_euler = (math.radians(50), 0, math.radians(40)); sc.collection.objects.link(l)
+    l = bpy.data.objects.new('l', bpy.data.lights.new('l', 'AREA')); l.data.energy = 190; l.data.size = 2; l.location = (2, -2, 2.5); l.rotation_euler = (math.radians(50), 0, math.radians(40)); sc.collection.objects.link(l)
+    pl = bpy.data.meshes.new('suelo'); pl.from_pydata([(-4, -4, 0.02), (4, -4, 0.02), (4, 4, 0.02), (-4, 4, 0.02)], [], [(0, 1, 2, 3)]); po = bpy.data.objects.new('suelo', pl); sc.collection.objects.link(po); po.hide_select = True
     sc.world = bpy.data.worlds.new('w'); sc.world.color = (0.2, 0.2, 0.22); sc.render.filepath = os.path.join(PREVIEW, 'perro.png'); bpy.ops.render.render(write_still=True)
+    cam.location = (0.75, -1.2, 0.8); cam.rotation_euler = (math.radians(92), 0, math.radians(47)); cam.data.lens = 60; sc.render.filepath = os.path.join(PREVIEW, 'cabeza.png'); bpy.ops.render.render(write_still=True)
 for o in bpy.data.objects: o.select_set(o.type == 'MESH')
 f = os.path.join(OUT, 'perro.glb')
 bpy.ops.export_scene.gltf(filepath=f, export_format='GLB', use_selection=True, export_yup=True, export_apply=True, export_animations=False, export_vertex_color='ACTIVE', export_all_vertex_colors=True)

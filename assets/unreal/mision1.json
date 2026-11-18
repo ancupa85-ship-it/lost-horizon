@@ -1,0 +1,1086 @@
+{
+ "_leeme": "Mision 1 de Tarsis en datos. tools/unreal/mision.py lo vuelca en el director del nivel (y guardias.py al colocarlo). Textos en ASCII: la fuente del HUD no lleva tildes. {0}, {1}... son los datos que pone el juego (nombres, teclas, cifras). Tanda 41: «datos» son las lineas del mapa mental (ficha del soldado, clave del texto, clase, enlace con otra ficha y bandera que pone); «charlas», las conversaciones entre dos guardias (sitio en cm, desde que segundo, y por frase: quien, clave del texto y dato que da al oirla de cerca).",
+ "ajustes": {
+  "director": {
+   "vault_code": "0129",
+   "truck_lamp_paint": 2.5,
+   "cell_time": 25.0,
+   "repair_seconds": 12.0,
+   "noise_radius": 900.0,
+   "exit_loc": [
+    9050,
+    5700,
+    0
+   ],
+   "exit_radius": 420.0,
+   "wicket_loc": [
+    310,
+    7390,
+    0
+   ],
+   "exit_barrier_loc": [
+    8600,
+    5400,
+    0
+   ],
+   "exit_barrier_yaw": 90.0,
+   "exit_barrier_length": 600.0,
+   "truck_first_delay": 75.0,
+   "truck_interval": 170.0,
+   "truck_speed": 400.0,
+   "truck_papers_time": 4.5,
+   "truck_horn_wait": 8.0,
+   "truck_self_wait": 30.0,
+   "render_c_vars": [
+    "r.Nanite.Streaming.StreamingPoolSize=128",
+    "r.ShadowQuality=3",
+    "r.Streaming.PoolSize=400"
+   ],
+   "shadow_tells": true,
+   "torch_near_min": 0.008,
+   "torch_near_dist": 1000.0,
+   "cell_slab": [
+    6545,
+    2640,
+    3.5
+   ],
+   "vidal_offset": [
+    0,
+    -140,
+    0
+   ],
+   "vidal_yaw": 90.0,
+   "vidal_wall_yaw": 0.0,
+   "gear_spot": [
+    5700,
+    1385,
+    0
+   ],
+   "truck_entry_papers": 5.0,
+   "truck_stay_x": 4900.0,
+   "truck_stay_seconds": 600.0,
+   "uniform_dist": 900.0,
+   "talk_hear_dist": 900.0,
+   "dog_mesh_yaw": 270.0,
+   "dog_scale": 1.0,
+   "talk_retry": 25.0,
+   "aim_arms_shift": [
+    0,
+    -14,
+    7
+   ],
+   "movie_caption_at": 3.0,
+   "movie_caption_rate": 20.0
+  },
+  "guardias": {
+   "*": {
+    "knock_out_time": 100.0
+   },
+   "centinela de la torre 1": {
+    "sweep_path": [
+     [
+      2700,
+      500,
+      0
+     ],
+     [
+      1300,
+      1500,
+      0
+     ],
+     [
+      700,
+      -900,
+      0
+     ]
+    ],
+    "sweep_loop": true,
+    "sweep_speed": 350.0,
+    "sweep_stops": [
+     2.5,
+     2.0,
+     2.0
+    ],
+    "sweep_phase": 0.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "centinela de la torre 2": {
+    "sweep_path": [
+     [
+      6600,
+      600,
+      0
+     ],
+     [
+      4400,
+      700,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 250.0,
+    "sweep_stops": [
+     2.5,
+     2.5
+    ],
+    "sweep_phase": 11.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "centinela de la torre 3": {
+    "sweep_path": [
+     [
+      5200,
+      5700,
+      0
+     ],
+     [
+      7600,
+      5700,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 250.0,
+    "sweep_stops": [
+     3.0,
+     3.0
+    ],
+    "sweep_phase": 7.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "centinela de la torre 4": {
+    "sweep_path": [
+     [
+      2300,
+      5700,
+      0
+     ],
+     [
+      -300,
+      5700,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 250.0,
+    "sweep_stops": [
+     3.0,
+     3.0
+    ],
+    "sweep_phase": 19.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 1": {
+    "sweep_path": [
+     [
+      -2700,
+      800,
+      0
+     ],
+     [
+      -2700,
+      -2700,
+      0
+     ],
+     [
+      800,
+      -2700,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 600.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 5.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 2": {
+    "sweep_path": [
+     [
+      6400,
+      -2700,
+      0
+     ],
+     [
+      9900,
+      -2700,
+      0
+     ],
+     [
+      9900,
+      800,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 600.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 13.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 3": {
+    "sweep_path": [
+     [
+      9900,
+      5600,
+      0
+     ],
+     [
+      9900,
+      8300,
+      0
+     ],
+     [
+      5700,
+      8300,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 600.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 23.0,
+    "sweep_ref_dist": 3000.0
+   },
+   "vigia de la torre 4": {
+    "sweep_path": [
+     [
+      400,
+      8300,
+      0
+     ],
+     [
+      -2700,
+      8300,
+      0
+     ],
+     [
+      -2700,
+      5600,
+      0
+     ]
+    ],
+    "sweep_loop": false,
+    "sweep_speed": 600.0,
+    "sweep_stops": [
+     2.0,
+     0.0,
+     2.0
+    ],
+    "sweep_phase": 29.0,
+    "sweep_ref_dist": 3000.0
+   }
+  },
+  "montaje": {
+   "_leeme": "Lo lee tools/unreal/montar_base.py al montar el nivel. farolas_con_sombra: \"todas\", \"ninguna\" o una lista de nombres (farola_8...). Solo las farolas con sombra delatan con tu sombra.",
+   "farolas_con_sombra": "todas"
+  }
+ },
+ "objetivos": [
+  {
+   "si": "expediente",
+   "texto": "obj_salir"
+  },
+  {
+   "si": "archivo_abierto",
+   "texto": "obj_expediente"
+  },
+  {
+   "si": "nota_leida",
+   "texto": "obj_archivo"
+  },
+  {
+   "si": "jefatura_abierta",
+   "texto": "obj_mesa"
+  },
+  {
+   "si": "llave_jefatura",
+   "texto": "obj_jefatura"
+  },
+  {
+   "si": "",
+   "texto": "obj_llave"
+  }
+ ],
+ "puntos": [
+  {
+   "id": "jefatura",
+   "nota": "puerta de la jefatura, en el muro de la fila 15",
+   "celda": [
+    4,
+    15
+   ],
+   "radio": 190,
+   "aviso": "p_jefatura_abrir",
+   "aviso_cerrado": "p_jefatura_cerrada",
+   "necesita": "llave_jefatura",
+   "si_falta_texto": "jefatura_cerrada",
+   "si_falta_sonido": "candado",
+   "pone": "jefatura_abierta",
+   "sonido": "puerta_madera",
+   "texto": "jefatura_abierta",
+   "segundos": 4.0,
+   "punto_de_control": "cp_jefatura",
+   "lo_notan": true,
+   "quita": "puerta_jefatura"
+  },
+  {
+   "id": "mesa_alarcon",
+   "nota": "la nota con la clave; se puede releer",
+   "celda": [
+    3,
+    17
+   ],
+   "radio": 150,
+   "aviso": "p_nota",
+   "necesita": "jefatura_abierta",
+   "pone": "nota_leida",
+   "repetible": true,
+   "sonido": "recoger",
+   "texto": "mesa_alarcon",
+   "segundos": 12.0
+  },
+  {
+   "id": "litera_ramos",
+   "nota": "carta sin terminar en la litera de Ramos (barracon oeste)",
+   "pos": [
+    1130,
+    2850,
+    0
+   ],
+   "radio": 150,
+   "aviso": "p_carta",
+   "pone": "carta_leida",
+   "pone_tambien": "sabe_de_ramos",
+   "sonido": "recoger",
+   "texto": "carta_ramos",
+   "segundos": 12.0,
+   "quita": "carta"
+  },
+  {
+   "id": "botiquin",
+   "nota": "botiquin del veterinario, muro norte del patio este",
+   "pos": [
+    4660,
+    300,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_botiquin_abrir",
+   "aviso_cerrado": "p_botiquin_cerrado",
+   "necesita": "llave_botiquin",
+   "si_falta_texto": "botiquin_cerrado",
+   "si_falta_sonido": "candado",
+   "si_falta_pone": "sabe_de_ramos",
+   "pone": "botiquin_abierto",
+   "sonido": "candado",
+   "texto": "pistola_dardos",
+   "segundos": 5.0,
+   "punto_de_control": "cp_botiquin",
+   "lo_notan": true,
+   "quita": "puerta_botiquin",
+   "dardos": 5
+  },
+  {
+   "id": "expediente",
+   "nota": "en la mesa del archivo",
+   "celda": [
+    9,
+    17
+   ],
+   "radio": 160,
+   "aviso": "p_expediente",
+   "necesita": "archivo_abierto",
+   "pone": "expediente",
+   "sonido": "recoger",
+   "texto": "expediente_cogido",
+   "segundos": 5.0,
+   "punto_de_control": "cp_expediente",
+   "quita": "expediente"
+  },
+  {
+   "id": "emisora",
+   "nota": "emisora de la red de la base, en transmisiones (edificio este): dejarla muda",
+   "pos": [
+    6275,
+    2000,
+    0
+   ],
+   "radio": 190,
+   "aviso": "p_emisora",
+   "pone": "emisora_muda",
+   "sonido": "candado",
+   "texto": "emisora_muda",
+   "segundos": 7.0
+  },
+  {
+   "id": "caja",
+   "nota": "caja de carton vacia, al fondo del hangar (tanda 40). X para ponersela",
+   "pos": [
+    5480,
+    7080,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_caja",
+   "pone": "caja",
+   "sonido": "recoger",
+   "texto": "caja_cogida",
+   "segundos": 9.0
+  },
+  {
+   "id": "uniforme",
+   "nota": "capote y casco colgados en el barracon oeste, a 70 cm de la pared norte (tanda 40; medido en el PC)",
+   "pos": [
+    330,
+    2270,
+    0
+   ],
+   "radio": 150,
+   "aviso": "p_uniforme",
+   "pone": "uniforme",
+   "sonido": "recoger",
+   "texto": "uniforme_cogido",
+   "segundos": 7.0
+  },
+  {
+   "id": "hueso",
+   "nota": "olla fria del rincon suroeste de la cocina (tanda 42): el hueso para el perro",
+   "pos": [
+    5895,
+    3645,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_hueso",
+   "pone": "hueso",
+   "sonido": "recoger",
+   "texto": "hueso_cogido",
+   "segundos": 7.0
+  },
+  {
+   "id": "raciones",
+   "nota": "parte de raciones clavado junto al fogon de la cocina (tanda 42): sobran diecinueve bocas",
+   "pos": [
+    6190,
+    3300,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_raciones",
+   "pone": "vio_raciones",
+   "repetible": true,
+   "sonido": "recoger",
+   "texto": "raciones",
+   "segundos": 9.0
+  },
+  {
+   "id": "trampilla",
+   "nota": "trampilla de acero al fondo del hangar (tanda 42): no se abre en esta mision",
+   "pos": [
+    4480,
+    6880,
+    0
+   ],
+   "radio": 190,
+   "aviso": "p_trampilla",
+   "pone": "vio_trampilla",
+   "repetible": true,
+   "sonido": "candado",
+   "texto": "trampilla",
+   "segundos": 9.0
+  }
+ ],
+ "textos": {
+  "intro": "TARSIS, DE NOCHE\nHas entrado por una brecha del muro norte. Busca la sombra. Agachado ({0}) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n{1} lanza una piedra para distraer. {2} prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo ({3}) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control.",
+  "calabozo": "CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja: no amenaces ni compres, escuchale.",
+  "cogido_punto": "TE HAN COGIDO\nVuelves al ultimo punto de control: {0}.",
+  "cogido_entrada": "TE HAN COGIDO\nVuelves a la brecha del muro.",
+  "celda_abierta": "CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris: sala de guardia, al norte por el pasillo.",
+  "ensena_derribo": "{0} DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma.",
+  "ramos_radio": "RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, en el muro sur, junto al agua.\"",
+  "p_taquilla_salir": "E   SALIR DE LA TAQUILLA",
+  "p_soltar": "E   SOLTAR EL CUERPO",
+  "p_ramos_eleccion": "1   VENTE CONMIGO        2   DERRIBARLO",
+  "p_ramos_agarrar": "E   AGARRAR A RAMOS",
+  "p_derribar": "E   DERRIBAR",
+  "p_empujar": "E   EMPUJAR (queda aturdido 2 s; hace ruido)",
+  "p_te_ve": "TE VE: huye, rodealo o distraelo ({0})",
+  "p_llave_ibarra": "E   QUITARLE LA LLAVE",
+  "p_llave_ramos": "E   QUITARLE LA LLAVE DEL BOTIQUIN",
+  "p_dardo": "E   RECUPERAR EL DARDO",
+  "p_arrastrar": "E   ARRASTRAR (escondelo en la sombra)",
+  "p_teclado": "E   TECLADO DEL ARCHIVO",
+  "p_portillo": "E   PORTILLO DE LA MARISMA",
+  "p_generador_parado": "GENERADOR: PARADO",
+  "p_generador": "E   CORTAR EL GENERADOR (apaga las luces)",
+  "p_taquilla": "E   ESCONDERTE EN LA TAQUILLA",
+  "obj_fin": "MISION CUMPLIDA",
+  "ensena_cuerpo": "CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca.",
+  "ramos_dialogo": "RAMOS, EL CUARTELERO\n\"No me haga nada. El jueves bajo con los partes y no pienso volver.\"\n\"Llevo la llave del botiquin del veterinario: dentro hay una pistola de dardos. Si me saca de aqui, es suya.\"\n1   \"Vente conmigo\"          2   Derribarlo",
+  "ensena_de_frente": "DE FRENTE TE VE\n{0} esta en alerta: no se deja. Huye, rodealo o distraelo con una piedra ({1}).",
+  "llave_ramos": "LLAVE DE RAMOS\n\"Botiquin - veterinario\". Esta en el muro norte del patio este.",
+  "llave_ibarra": "LLAVE DE LA JEFATURA\nSe la quitas a Ibarra del cinturon. Ahora puedes arrastrarlo a la sombra (E).",
+  "cp_llave": "LA LLAVE DE IBARRA",
+  "ensena_dardo_recuperado": "DARDO RECUPERADO\nSe lo sacas del cuello a {0}. Los que llevas, abajo a la derecha.",
+  "portillo_cerrado": "PORTILLO DE LA MARISMA\nCerrado. La llave la guarda el cuartelero del barracon oeste.",
+  "portillo_sin_expediente": "PORTILLO DE LA MARISMA\nRamos lo abrira cuando tengas el expediente.",
+  "portillo_espera": "ESPERA A RAMOS\nEl trae la llave del portillo.",
+  "archivo_abierto": "ARCHIVO ABIERTO\nLa puerta blindada se abre con un chasquido.",
+  "ensena_arrastrar": "ARRASTRAS A {0}\nLlevalo a la sombra y sueltalo con E. Si un guardia te ve con el, dara la alarma.",
+  "ensena_piedra": "CLAC\nNadie lo ha oido: la piedra solo atrae a los que estan cerca.",
+  "ensena_marcado": "{0} MARCADO\nLo veras aunque haya paredes por medio.",
+  "ramos_contigo": "RAMOS ESTA CONTIGO\nTe da la llave del botiquin del veterinario (muro norte del patio este).\nSigue su ronda para que no le echen en falta, y ya no te delatara.",
+  "ramos_derribado": "RAMOS DERRIBADO\nLleva encima la llave del botiquin.",
+  "sec_portillo": "Otra salida: Ramos te espera en el portillo de la marisma (muro sur)",
+  "sec_ramos_contigo": "Ramos esta contigo: con el expediente, saldra por la marisma",
+  "sec_botiquin": "Abre el botiquin del veterinario: muro norte del patio este",
+  "sec_ramos": "Ramos, el cuartelero del barracon oeste, lleva la llave del botiquin: agarralo por la espalda",
+  "ensena_dormido": "{0} DORMIDO\nEl dardo se recupera: acercate al cuerpo y pulsa E.",
+  "final_garita": "En la garita, {0} levanta la barrera y mira hacia la marisma.",
+  "final_datos": "Tiempo {0}:{1}   Te vieron {2}   Capturas {3}   Derribos {4}\nSIGILO: {5} puntos - {6} ({7})",
+  "final_marisma": "EL QUE NO ENTREGO\nRamos abre el portillo y rema sin encender la linterna. El expediente sigue en tu chaqueta.\nControl pierde tu rastro en la marisma.",
+  "final_salida": "MISION CUMPLIDA\nSales de Tarsis con el expediente LH-07.",
+  "final_ramos": "Ramos sale solo por la marisma y os espera en el camino de Trebujena.",
+  "ensena_empujon": "EMPUJAS A {0}\nAturdido 2 s: rodealo y derribalo (E) o vete. El golpe se oye: los que esten cerca vienen.",
+  "ensena_taquilla": "EN LA TAQUILLA\nNo te ven ni te oyen, salvo que te hayan visto meterte. E para salir.",
+  "nombre_centinela": "CENTINELA",
+  "radio_responde": "{0}, responde. {0}?",
+  "radio_luz": "Se ha ido la luz en toda la base! {0}, mira el generador.",
+  "ensena_generador": "GENERADOR CORTADO\nSe apagan farolas y focos: la oscuridad te esconde. La base se pone en guardia.",
+  "ensena_luz_vuelve": "VUELVE LA LUZ\n{0} ha arrancado el generador.",
+  "ensena_reserva": "VUELVE LA LUZ (A MEDIAS)\nEl generador de reserva no da para todo: la mitad de las farolas se quedan apagadas.",
+  "radio_comova": "{0}, como va eso?",
+  "radio_reserva": "{0}, como va eso? ... {0}? Entra la reserva. Todos al generador, ya!",
+  "titulo": "LOST HORIZON: DE PROFUNDIS\nMision 1 - Tarsis\nUna base en la marisma. Esta noche, el expediente LH-07 sale de ahi contigo.\n\n(E o Espacio para saltar)",
+  "farol_roto": "FAROL ROTO\nEl control queda a oscuras.{0}",
+  "farola_rota": "FAROLA ROTA\nEsta zona queda a oscuras.{0}",
+  "farol_viene": "{0} ha oido los cristales y viene a mirar.",
+  "partida_cargada": "PARTIDA CARGADA\nUltimo punto de control: {0}.",
+  "calidad": "CALIDAD GRAFICA\nElegida segun tu PC: {0}. Se cambia en Pausa (P).",
+  "nombre_central": "CENTRAL (RADIO)",
+  "taquilla_pillado": "{0} TE VIO METERTE EN LA TAQUILLA\nLa abre de un tiron. {1}",
+  "radio_todos": "A todas las unidades: {0} esta en el suelo. Hay alguien dentro. Buscadlo.",
+  "hud_base_alerta": "BASE: ALERTA",
+  "hud_base_guardia": "BASE: EN GUARDIA  {0} s",
+  "hud_base_tranquila": "BASE: TRANQUILA",
+  "voz_quien": "Quien anda ahi?",
+  "voz_ruido": "Que ha sido eso?",
+  "voz_viento": "Bah. Habra sido el viento.",
+  "voz_alto": "Alto! Quieto ahi!",
+  "voz_nadie": "Aqui no hay nadie.",
+  "voz_suelo": "Central, aqui patio. He encontrado a uno en el suelo.",
+  "voz_puerta": "Esta puerta estaba cerrada.",
+  "voz_luz": "Y la luz?",
+  "voz_donde": "Donde se ha metido? No contesta.",
+  "voz_eh": "Eh! Pero que...?",
+  "voz_farola": "Central, aqui hay una farola rota. Cristales por el suelo... esto no es el viento.",
+  "voz_apoyo": "Central, ahi no hay luz. Yo solo no entro: mandadme a alguien.",
+  "voz_voy": "Voy para alla. No te muevas.",
+  "parte_aqui": "Aqui {0}. {1}",
+  "parte_coaccion": "Todo tranquilo.",
+  "parte_ibarra": "Sin novedad. Y que siga asi.",
+  "parte_moya": "Nada. Corto.",
+  "parte_peris": "Sin novedad a las... y cuarto, mas o menos.",
+  "parte_vega": "Sin novedad. Los mosquitos, como siempre.",
+  "parte_ramos": "Barracon en orden. Todos durmiendo.",
+  "parte_lobato": "Sin novedad, mi sargento. Digo, central.",
+  "parte_sanz": "Sin novedad en el control.",
+  "parte_carmona": "Sin novedad... y con frio.",
+  "radio_contesta": "LA CENTRAL LLAMA A {0}. SU RADIO LA TIENES TU:\n1   {1}\n2   {2}\n3   {3}",
+  "radio_tu": "TU (RADIO)",
+  "radio_recibido": "Recibido, {0}.",
+  "radio_coaccion": "Recibido, {0}. Aguanta ahi.",
+  "radio_repite": "{0}? Ese parte no es el tuyo. Voy a mandar a alguien.",
+  "ensena_parte": "PARTE OIDO\nCada centinela da el parte a su manera. Si la central llama a uno que has dejado en el suelo, contesta como el.",
+  "ensena_coaccion": "TODO TRANQUILO\nEs lo que dice un centinela cuando le estan apuntando. La central ha mandado gente.",
+  "voz_farol": "Central, el farol del control esta roto. Cristales por el suelo... esto no es el viento.",
+  "voz_cuerpo": "Eh... ese de ahi esta en el suelo?",
+  "voz_despierta": "Ay, mi cabeza... Quien ha sido?",
+  "voz_tengo": "Te tengo!",
+  "voz_perdido": "Lo he perdido.",
+  "voz_yacasi": "Ya casi esta.",
+  "clima_despejado": "DESPEJADO\nLa vista y el oido de los guardias, normales.",
+  "clima_lluvia": "LLUVIA\nLos guardias ven menos de lejos y el agua tapa tus pasos fuera.",
+  "clima_niebla": "NIEBLA\nLos guardias ven mucho menos de lejos; tus pasos se oyen igual.",
+  "p_jefatura_abrir": "E   ABRIR LA JEFATURA",
+  "p_jefatura_cerrada": "JEFATURA: CERRADA CON LLAVE",
+  "jefatura_cerrada": "JEFATURA CERRADA\nHace falta la llave. La lleva el sargento Ibarra.",
+  "jefatura_abierta": "JEFATURA ABIERTA\nEl despacho de Alarcon. Al fondo, la puerta blindada del archivo.",
+  "cp_jefatura": "LA JEFATURA",
+  "p_nota": "E   LEER LA NOTA",
+  "mesa_alarcon": "MESA DE ALARCON\nUna Vulgata gastada, abierta por un salmo subrayado a lapiz: \"De profundis clamavi ad te, Domine\".\nEn el margen: \"Ella tambien clama. Nadie la oye. - A.\"\nUna nota: \"Clave: la de siempre. No apuntar.\"",
+  "p_carta": "E   LEER LA CARTA",
+  "carta_ramos": "LITERA DE RAMOS - CARTA SIN TERMINAR\n\"Padre: el jueves me toca bajar con los partes. No se lo diga a madre.\"\n\"El veterinario se dejo la pistola de dardos en el botiquin y la llave la llevo encima.\"\n\"A veces pienso en dormirlos a todos y salir andando por la marisma.\"\nEn el sobre: Julian Ramos, Trebujena.",
+  "p_botiquin_abrir": "E   ABRIR EL BOTIQUIN",
+  "p_botiquin_cerrado": "E   BOTIQUIN DEL VETERINARIO",
+  "botiquin_cerrado": "BOTIQUIN DEL VETERINARIO\nCandado. La llave la lleva Ramos, el cuartelero del barracon oeste.",
+  "pistola_dardos": "PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres.",
+  "cp_botiquin": "EL BOTIQUIN",
+  "p_expediente": "E   COGER EL EXPEDIENTE LH-07",
+  "expediente_cogido": "EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base: por el porton de salida, al este, o escondido en el camion que para en el hangar.",
+  "cp_expediente": "EL EXPEDIENTE",
+  "obj_salir": "Sal por el porton de salida (muro este, por el camino)",
+  "obj_expediente": "Coge el expediente LH-07 del archivo",
+  "obj_archivo": "Abre el archivo: la clave es \"la de siempre\" de Alarcon",
+  "obj_mesa": "Registra la mesa de Alarcon en la jefatura",
+  "obj_jefatura": "Abre la jefatura (se entra por el barracon oeste)",
+  "obj_llave": "Consigue la llave de la jefatura: la lleva Ibarra (patio norte)",
+  "salida_sin_expediente": "NO PUEDES IRTE TODAVIA\nFalta el expediente de la jefatura.",
+  "ensena_camion": "VIENE UN CAMION\nEntra por el porton del oeste y cruza la base por el camino. Sus faros alumbran lo que tiene delante; detras de el, todo queda a oscuras.",
+  "camion_visto": "TE HA VISTO EL CAMION\nEstabas en la luz de sus faros. El conductor toca el claxon y los guardias de cerca vienen a mirar.",
+  "camion_paso": "ESTAS EN MEDIO DEL CAMINO\nEl camion frena y toca el claxon. Los guardias de cerca vienen a mirar.",
+  "p_camion_bajar": "E   BAJAR DEL CAMION",
+  "p_camion_subir": "E   SUBIR A LA CAJA DEL CAMION",
+  "final_salida_camion": "MISION CUMPLIDA\nSales de Tarsis bajo la lona del camion de suministros, con el expediente LH-07 en la chaqueta.",
+  "camion_nadie_abre": "NADIE ABRE AL CAMION\nEn el control no hay quien mire los papeles. El conductor toca el claxon: los guardias de cerca vienen a ver.",
+  "camion_sin_expediente": "TE BAJAS DEL CAMION\nSin el expediente no puedes irte de Tarsis. El camion arranca: apartate de la luz del control.",
+  "camion_caja_vista": "TE HAN VISTO SUBIR\nEl que te persigue sabe donde estas: si llega a la trasera, te saca. E para bajar.",
+  "ensena_camion_caja": "EN LA CAJA DEL CAMION\nBajo la lona no te ven. En el control miran los papeles del conductor; con la base en guardia registran tambien la caja.\nSin el expediente no puedes irte: bajate (E) antes de que salga.",
+  "ensena_camion_salir": "EN LA CAJA DEL CAMION\nCon el expediente, el camion te saca de la base. En el control miran los papeles del conductor; con la base en guardia registran tambien la caja.",
+  "camion_no_bajar": "NO PUEDES BAJAR AQUI\nHay algo justo detras del camion.",
+  "camion_pillado": "{0} LEVANTA LA LONA\nTe saca de la caja del camion. {1}",
+  "voz_papeles": "Para ahi. Los papeles del porte.",
+  "voz_pase": "Todo en orden. Tira.",
+  "voz_registro": "Hay orden de mirar la carga. Abre atras.",
+  "ensena_sombra": "TU SOMBRA TE DELATA\nBajo una luz, tu sombra llega antes que tu. Agachate, quedate quieto o rodea la luz.",
+  "codec_menu": "RADIO - ELIGE FRECUENCIA",
+  "codec_colgar": "{0}    colgar",
+  "codec_llamada": "LLAMADA  {0}  -  pulsa {1}",
+  "codec_espera": "{1}: llamada en espera ({0})",
+  "codec_seguir": "E o Espacio: seguir     Esc: colgar",
+  "codec_inicio": "C|Cuttlas. Estas dentro del perimetro de Tarsis. Esta frecuencia no figura en ningun manual: si me necesitas, usa la radio.\nC|Quiero el expediente LH-07. Esta en el archivo de la jefatura, el edificio del oeste. La llave la lleva el sargento Ibarra, que ronda el patio norte.\nC|El archivo tiene un teclado. La clave no te la doy porque no la tengo: sacasela a la base. No hables con nadie que no haga falta. No leas lo que no es tuyo.\nT|...Y que es mio?\nC|Esta noche, el expediente. Corto.",
+  "codec_alarma": "C|Te han visto. Ahora eres ruido. Rompe la linea de vision, busca la sombra y espera: se cansan antes que tu.\nC|Si te cogen, no te conocemos. Si sales, tampoco.",
+  "codec_archivo": "C|Puerta abierta. Coge el expediente y sal por el porton del este. No lo leas, Cuttlas. Eso no esta en la mision.",
+  "codec_expediente": "C|Lo tienes. No lo abras: eso no esta en la mision.\nC|Porton del este, por el camino. Entregalo y por la manana no te acordaras de nada. Corto.\nF|de profundis clamavi ad te. te oigo contar. tu tambien cuentas como ellos.\nT|Quien habla?\nF|la que tambien clama. nadie la oye. tu si.",
+  "codec_fuente_luz": "F|se ha ido la luz. asi descanso. tu tambien deberias.\nF|no bajes todavia. aun no sabes tu numero.",
+  "codec_control_llave": "C|La llave de la jefatura la lleva el sargento Ibarra, en el patio norte. Llega por detras, sin correr, y quitasela.\nT|Y si grita?\nC|Entonces habras llegado tarde.",
+  "codec_control_jefatura": "C|Tienes la llave. A la jefatura se entra por el barracon oeste. Dentro duermen: agachado no te oyen.",
+  "codec_control_mesa": "C|Registra la mesa de Alarcon. Ese hombre no apunta nada: reza. Lee lo que tenga abierto.",
+  "codec_control_archivo": "C|El archivo pide cuatro cifras. Alarcon reza en latin, con la Vulgata, y la Vulgata no cuenta los salmos como nosotros. Piensa en que salmo tenia abierto.",
+  "codec_control_expediente": "C|Dentro del archivo, el archivador. Coge LH-07 y no lo leas.",
+  "codec_control_salir": "C|Porton de salida, muro este, por el camino. Hay un control: cruzalo por la sombra o espera al camion.\nC|Sin muertos. Asi se sale de los sitios sin haber estado.",
+  "codec_control_alerta": "C|Te buscan. No corras en linea recta y no te quedes en la luz. Cuando dejen de verte, cuenta hasta treinta antes de moverte.",
+  "codec_control_celda": "C|No podemos sacarte. Oficialmente no estas ahi; oficialmente no estamos hablando.\nC|El de la reja es el cabo Vidal. Su hermano bajo en octubre y no volvio. No le amenaces: hablale de lo que se oye por las noches.\nC|Lo de abajo esta vivo y sufre. Una doctora, Halloran, lo puso por escrito y ya no firma nada. Diselo.\nC|Y registra la celda: el ultimo que durmio en ese catre no se fiaba de nadie.",
+  "codec_control_extra_0": "T|Quien eres?\nC|La voz que te dice adonde ir. Antes habia otra. Tu la apagaste, o te la apagaron.\nC|Corto.",
+  "codec_control_extra_1": "C|Guardo lo que haces cuando pasa algo importante. Si caes, vuelves al ultimo punto. No preguntes como; yo tampoco lo se.\nC|Corto.",
+  "codec_control_extra_2": "C|Los centinelas dan el parte cada uno a su manera. Escuchalos de cerca: alguna vez tendras que contestar por ellos.\nC|Corto.",
+  "codec_control_extra_3": "C|Una farola rota es una pregunta. Alguien ira a hacerla, y no ira solo. Usalo o evitalo.\nC|Corto.",
+  "codec_roig_0": "R|Estoy fuera, en la carretera de Rota, con el motor apagado. No me pidas que entre: no figuro en esta mision. No figuro en ninguna.",
+  "codec_roig_1": "R|Hablas dormido, Cuttlas. Cuentas. Siempre te paras en ciento veintinueve y vuelves a empezar.",
+  "codec_roig_2": "R|Cuando esto acabe te llevo a esa cocina que ves cuando duermes. Si existe. Si no, a otra.",
+  "codec_roig_3": "R|Aqui fuera solo llueve y pasa un camion de vez en cuando. Entra y sale por el porton. Yo que tu me fijaria en el.",
+  "codec_roig_salmo": "R|De profundis. Mi madre lo rezaba en latin. En la Biblia de casa viene como el ciento treinta, con el ciento veintinueve entre parentesis: el numero de los curas.\nR|Alarcon reza con la Vulgata, y la Vulgata va uno por detras.\nT|Ciento veintinueve.\nR|Cuatro cifras, Cuttlas. Ponle un cero delante.",
+  "codec_roig_salida": "R|Lo tienes? Entonces sal ya. Porton del este. Veo las farolas desde aqui: no pases por debajo.",
+  "codec_fuente_0": "F|baja.\nF|te oigo contar. uno. dos. ciento veintinueve. vuelves a empezar.",
+  "codec_fuente_1": "F|el que reza arriba cuenta igual que yo.",
+  "codec_fuente_2": "F|tienes una cocina dentro. luz de tarde. yo tambien tenia. me la quitaron para dar luz a otros.",
+  "codec_fuente_3": "F|cuando apagan el generador no me callo. descanso.",
+  "ensena_linterna": "LINTERNA\nVes en lo oscuro, pero con ella encendida te ven como a plena luz. Si alumbras a un guardia, viene a mirar.",
+  "ensena_linterna_guardia": "LE HAS ALUMBRADO\n{0} viene a mirar de donde sale esa luz. Apagala ({1}) y muevete.",
+  "ensena_deslumbrar": "DESLUMBRADO\n{0} no ve nada unos segundos. Luego ira a por ti, y la segunda vez se tapara los ojos.",
+  "p_emisora": "E   AFLOJAR UNA VALVULA DE LA EMISORA",
+  "emisora_muda": "RED MUDA\nSin emisora, la central no echa de menos a nadie ni da voces.\nEn minuto y medio mandaran a uno a mirarla.",
+  "voz_sinradio": "Central? ... Central? Esto no da senal.",
+  "voz_emisora": "Quien ha tocado esto? Una valvula floja... Ya casi.",
+  "radio_red": "Vuelve la red. Alguien ha tocado la emisora. Todas las unidades: ojo, y parte uno por uno.",
+  "charla_1": "Carmona, una cosa. Si me apuntan y no puedo hablar claro, que digo?",
+  "charla_2": "Todo tranquilo. Asi, tal cual. Aqui eso no lo dice nadie de verdad.",
+  "charla_3": "Y entonces?",
+  "charla_4": "Entonces la central manda a los dos que tenga mas cerca. Y corta, que nos oye el sargento.",
+  "charla_central": "Lobato, Carmona: esta red no es para charlar.",
+  "p_losa": "E   LOSA SUELTA",
+  "p_reja_llave": "E   ABRIR LA REJA CON LA LLAVE",
+  "p_vidal_ido": "VIDAL YA NO ESCUCHA",
+  "p_vidal": "E   HABLAR CON EL CABO VIDAL",
+  "losa": "LOSA SUELTA\nBajo la losa, en un trapo, una llave de hierro y una medalla con un nombre rayado a navaja: VIDAL, J.\nLa llave encaja en la reja. La medalla, a Vidal, le dira mas que tu.",
+  "vidal_ido": "CABO VIDAL\nReza de cara a la pared y no se vuelve.\nEn el rincon, a la derecha de la reja, una losa baila bajo el pie.",
+  "vidal_q1": "Vidal no te mira. Mueve los labios: reza.",
+  "vidal_1a": "\"Abre, o cuando salga te busco a ti primero.\"",
+  "vidal_1b": "\"Lo oyes por las noches? Lo de abajo.\"",
+  "vidal_1c": "\"Alarcon te ascendera si me sueltas. Yo se lo dire.\"",
+  "vidal_q2": "\"Y usted que sabe de lo de abajo?\"",
+  "vidal_2a": "\"Es combustible. Un deposito. Me lo dijo Ibarra.\"",
+  "vidal_2b_voz": "\"Que esta vivo y sufre. Lo he oido en una frecuencia que no existe.\"",
+  "vidal_2b_sabe": "\"Que esta vivo y sufre. Halloran lo firmo y le tacharon la firma.\"",
+  "vidal_2b": "\"Que grita. Alguien grita ahi abajo y nadie baja a mirar.\"",
+  "vidal_2c": "\"Que es el viento en la marisma. Nada mas.\"",
+  "vidal_q3": "\"Aunque le creyera. Por que iba a abrir?\"",
+  "vidal_3a_sabe": "\"He leido el expediente. Alarcon firma los traslados abajo, y el proximo lleva tu apellido.\"",
+  "vidal_3a": "\"Hay bajas por voces. A vosotros no os lo cuentan.\"",
+  "vidal_3b_sabe": "\"Reza conmigo. De profundis clamavi ad te, Domine.\"",
+  "vidal_3b": "\"Reza conmigo. Yo tambien lo he oido.\"",
+  "vidal_3c": "\"Te dare el expediente. Vendelo.\"",
+  "vidal_cede": "CABO VIDAL\n{0}",
+  "vidal_sigue": "CABO VIDAL\n{0}",
+  "vidal_falla": "CABO VIDAL\n{0}\nAsi no. Prueba otra cosa.",
+  "celda_llave": "CELDA ABIERTA\nLa llave del hermano gira sin ruido. Vidal reza de espaldas y no lo ve.\nNo tardaran en encontrar la celda vacia. Tus cosas las tiene Peris: sala de guardia, al norte por el pasillo.",
+  "celda_vidal": "CELDA ABIERTA\nVidal abre y se queda rezando de cara a la pared. \"Yo no le he visto.\"\nNadie dara la alarma. Tus cosas las tiene Peris: sala de guardia, al norte por el pasillo.",
+  "celda_fuga": "El calabozo esta vacio. Todas las unidades: ojo, y parte uno por uno.",
+  "vidal_r1a": "\"Amenace. Aqui dentro no cuesta nada.\" No levanta la vista.",
+  "vidal_r1b": "Deja de rezar. \"Todos lo oimos. Nadie lo dice.\"",
+  "vidal_r1c": "\"Alarcon no asciende. Alarcon baja gente.\" Vuelve al rezo.",
+  "vidal_r2a": "\"Ibarra dice lo que le mandan.\" Vuelve al rezo.",
+  "vidal_r2b": "\"Mi hermano bajo en octubre. Volvio sordo. Luego dijeron que habia desertado.\"",
+  "vidal_r2c": "Casi se rie. \"El viento no llama a nadie por su nombre.\"",
+  "vidal_r3a": "Se queda callado. \"Vidal, J. Octubre. Y ahora yo.\" La llave le tiembla en la cerradura.",
+  "vidal_r3b": "Se le quiebra la voz en el segundo verso. \"Desde lo profundo...\" Abre sin mirarte. \"Ella tambien clama, verdad?\"",
+  "vidal_r3c": "\"Y que hago yo con eso?\" Vuelve al rezo.",
+  "vidal_r3a_no": "\"Palabras.\" Vuelve al rezo.",
+  "clave_alarma": "TECLADO DEL ARCHIVO\nDos claves malas seguidas: el teclado se bloquea un momento y avisa a la central.",
+  "radio_teclado": "Clave erronea en el archivo, dos veces. Todas las unidades: ojo, y parte uno por uno.",
+  "vidal_nombre": "CABO VIDAL",
+  "vidal_2b_control": "\"Que esta vivo y sufre. Una doctora lo escribio y ya no firma nada.\"",
+  "vidal_3a_medalla": "(Le das la medalla entre los barrotes.) \"Tu hermano durmio en este catre.\"",
+  "vidal_4": "(Callar y abrir con la llave del hermano)",
+  "vidal_pista3": "Sin pruebas no te cree. Prueba otra cosa, o registra la celda.",
+  "vidal_falta": "CABO VIDAL\n{0}\n{1}",
+  "vidal_rezo": "De profundis clamavi ad te, Domine... Domine, exaudi vocem meam...",
+  "vidal_r3a_medalla": "Coge la medalla por entre los barrotes y la aprieta en el puno. No dice nada. Abre.",
+  "ensena_alto": "TE APUNTAN\nQuieto, se acercan y te detienen. Si te mueves, disparan: rompe la linea de vision o cubrete.",
+  "alto_quieto": "NO TE MUEVES\nUno de ellos se acerca a detenerte. Aun puedes echar a correr.",
+  "radio_refuerzos": "Intruso a la vista. Las unidades mas cercanas, a apoyar. El resto, cada uno en su puesto.",
+  "herido_cae": "CAES\nEl tercer tiro te tumba. Vienen a por ti.",
+  "herido": "HERIDO {0}/{1}\nCubrete o quedate quieto.",
+  "p_bajar_torre": "E   BAJAR POR LA ESCALERA",
+  "p_subir_torre": "E   SUBIR A LA TORRE",
+  "hud_disparan": "TE DISPARAN  -  CUBRETE",
+  "hud_detienen": "QUIETO  -  VIENEN A DETENERTE",
+  "hud_alto": "ALTO!  TE APUNTAN  -  QUIETO O DISPARAN",
+  "hud_herido": "HERIDO {0}/{1}",
+  "equipo_falta": "TE LO HAN QUITADO\nLinterna, prismaticos y dardos estan en el cajon de Peris: sala de guardia, al norte del calabozo por el pasillo.",
+  "p_cajon": "E   REGISTRAR EL CAJON DE PERIS",
+  "p_cajon_buscando": "REGISTRANDO EL CAJON...  {0} s",
+  "cajon_dejado": "CAJON A MEDIAS\nTe apartas y lo dejas como estaba. Hay que empezar otra vez.",
+  "equipo_vuelve": "TUS COSAS\nLinterna, prismaticos y dardos, envueltos en tu propia chaqueta.\nDebajo, un reloj de pulsera parado a las tres y dos.",
+  "sec_equipo": "Sin equipo: tus cosas estan en el cajon de Peris (sala de guardia, al norte del calabozo)",
+  "p_caja": "E   COGER UNA CAJA DE CARTON VACIA",
+  "caja_cogida": "UNA CAJA DE CARTON\nGrande, vacia, con un asa recortada a cada lado. Cabes dentro.\nX: te la echas encima. Quieto no te ve nadie; si la caja anda, si.\nEn la caja del camion, con ella puesta, el registro del control no te encuentra.",
+  "caja_estorba": "CON LA CAJA PUESTA, NO\nQuitatela antes (X).",
+  "ensena_caja": "DENTRO DE LA CAJA\nQuieto no te ve nadie. Si la caja anda, te ven como siempre.\nEn la caja del camion, con ella puesta, el registro no te encuentra. X para quitartela.",
+  "caja_registro": "LEVANTA LA LONA\nCajas. Una mas no le dice nada.",
+  "ensena_camion_hangar": "EL CAMION PARA EN EL HANGAR\nSe queda un rato descargando y luego sigue hasta el control de salida. Parado, se sube a la caja por detras.",
+  "p_uniforme": "E   COGER EL CAPOTE Y EL CASCO",
+  "uniforme_cogido": "CAPOTE Y CASCO\nDe pie y andando, de lejos pasas por un guardia mas. De cerca no cuela.\nNo vale agachado, corriendo ni con la base en alarma.",
+  "mapa_nuevo": "APUNTADO: {0}\n{1}\nM abre el mapa.",
+  "charla_cortada": "SE CALLAN\nLa charla se corta. Volveran a hablar mas tarde.",
+  "charla_murmullo": "(Hablan en voz baja. Desde aqui no se entiende: acercate o apuntales con los prismaticos.)",
+  "ch_camion_1": "El camion otra vez. Tres cuartos de minuto parado en el hangar y ni Dios mira lo que lleva.",
+  "ch_camion_2": "Sanz mira los papeles. La caja, solo si hay alarma.",
+  "ch_camion_3": "Y si hay alarma, que? Levanta la lona, ve cajas y a correr.",
+  "ch_camion_4": "Pues eso. Una caja de carton entre cajas, quien la va a abrir. Anda, a tu garita.",
+  "ch_llaves_1": "Ramos. La llave del botiquin sigue en tu bolsillo?",
+  "ch_llaves_2": "Si, mi sargento. El veterinario se dejo dentro la pistola de dardos.",
+  "ch_llaves_3": "Pues que no salga de ahi. La de jefatura tampoco sale del mio: quien la quiera, que venga a quitarmela.",
+  "ch_llaves_4": "El jueves bajo con los partes, mi sargento. Quien se queda la del botiquin?",
+  "ch_llaves_5": "El jueves ya veremos quien baja.",
+  "ch_puesto_1": "Mi sargento. La noche del puesto cuatro oi dos chapoteos en la marisma. Dos.",
+  "ch_puesto_2": "Ranas, Vega. Oiste ranas.",
+  "ch_puesto_3": "Las ranas no apagan el generador media hora.",
+  "ch_puesto_4": "Tu ronda acaba en el porton. Lo que pase mas alla no es tuyo.",
+  "ch_medalla_1": "Otra vez bajas el jueves con los partes?",
+  "ch_medalla_2": "Y no vuelvo. Le he dejado a Vidal la medalla de su hermano en la celda, bajo la losa que baila.",
+  "ch_medalla_3": "Calla. Alarcon firma los traslados de abajo y tu eres el siguiente.",
+  "ch_medalla_4": "Por eso. Guardame el sitio en tu cajon, con lo de los presos. Y sal a fumar menos, que se te ve la brasa.",
+  "dt_sanz_registro": "Solo registra la caja del camion si hay alarma.",
+  "dt_sanz_cajas": "Si levanta la lona y ve cajas, no las abre.",
+  "dt_camion_hangar": "El camion para tres cuartos de minuto ante el hangar.",
+  "dt_ramos_botiquin": "Lleva la llave del botiquin. Dentro esta la pistola de dardos.",
+  "dt_ibarra_llave": "No suelta la llave de la jefatura: hay que quitarsela.",
+  "dt_ramos_jueves": "El jueves le toca bajar con los partes.",
+  "dt_vega_chapoteos": "Oyo dos chapoteos en la marisma la noche del puesto cuatro.",
+  "dt_moya_rapido": "Contesta demasiado deprisa cuando le nombran el puesto cuatro.",
+  "dt_generador": "Esa noche el generador estuvo apagado media hora.",
+  "dt_ramos_novuelve": "Peris sabe que baja el jueves; Ramos dice que no piensa volver.",
+  "dt_vidal_medalla": "La medalla de su hermano esta en la celda, bajo la losa que baila.",
+  "dt_alarcon_traslados": "Firma los traslados de abajo.",
+  "dt_peris_cajon": "Guarda en su cajon lo de los presos, y sale a fumar a la puerta.",
+  "dt_carmona_hangar": "Sabe que nadie mira lo que lleva el camion.",
+  "p_hueso": "E   MIRAR EN LA OLLA",
+  "hueso_cogido": "HUESO DE JAMON\nEn el fondo de la olla fria, un hueso con algo de carne. Lo envuelves en un trapo.\nA ti no te sirve. A alguien de cuatro patas, quiza si.",
+  "p_raciones": "E   LEER EL PARTE DE RACIONES",
+  "raciones": "PARTE DE RACIONES\n\"Tropa: 12. Calabozo: 1. ABAJO: 19, sin sal, en cubos. Se dejan en la trampilla del hangar y NO SE ESPERA.\"\nDoce soldados en la base. Y diecinueve bocas mas, abajo.",
+  "p_trampilla": "E   TRAMPILLA",
+  "trampilla": "TRAMPILLA\nAcero nuevo en un suelo viejo. Tres cerrojos con candado, por fuera: no es para que nadie entre.\nPor la rendija sube aire tibio, una luz roja y un zumbido grave. Hoy no se abre.",
+  "ensena_bengala": "BENGALA\nMientras cae, la base se ve como de dia. A la sombra de un muro o bajo techo sigues a oscuras: no cruces lo abierto hasta que se apague.",
+  "dia": "DE DIA\nA cielo abierto se te ve desde lejos. Bajo techo, algo menos.",
+  "noche": "DE NOCHE",
+  "int_ya": "YA HA HABLADO\n{0} no sabe mas. Derribalo o dejalo pasar.",
+  "int_nada": "No se nada mas. Se lo juro.",
+  "int_habla": "No dispare. Le digo lo que se.",
+  "ensena_interrogar": "INTERROGADO\n{0} habla y se queda quieto unos segundos. Derribalo (E) antes de que se rehaga, o ira a por ti.",
+  "ensena_asomarse": "ASOMADO\nSolo sacas la cabeza: desde la esquina ves sin que te vean. Suelta la tecla para volver.",
+  "busca_pareja": "Lo he perdido por aqui. {0}, cubre ese lado.",
+  "ensena_ultimo": "TE BUSCAN DONDE TE VIERON\nLa silueta es el ultimo sitio donde te vieron: van a registrarlo entre dos. Alejate de ella.",
+  "p_derribar_int": "E   DERRIBAR        {0}   INTERROGAR",
+  "dt_cocina_raciones": "La cocina saca diecinueve raciones de mas cada noche. Las dejan en la trampilla del hangar.",
+  "dt_bengala_torres": "Las torres tiran una bengala cada cinco minutos, mas o menos. Arde un cuarto de minuto.",
+  "p_perro_hueso": "E   DARLE EL HUESO AL PERRO",
+  "perro_grune": "EL PERRO TE HA OLIDO\nGrune: todavia no ladra. Apartate despacio y se le pasa. La sombra y la caja no le enganan.\nQuiza algo de comer le haga cambiar de idea.",
+  "perro_ladra": "EL PERRO LADRA\nLos guardias de cerca vienen a ver que le pasa. Sal del hangar y espera a que se calle.",
+  "perro_amigo": "EL PERRO\nSuelta el grunido a medias, olfatea el trapo y te quita el hueso de la mano. Se sienta a roerlo.\nYa no ladrara por ti.",
+  "ensena_tercera": "TERCERA PERSONA\nLa camara va detras del hombro: ves por encima de las cajas sin asomarte. Los guardias te ven igual que antes.\nG vuelve a la vista de siempre.",
+  "ensena_escucha": "A LA ESCUCHA\nCon la base tranquila, la emisora deja oir lo que hablan los soldados cuando se cruzan en sus rondas.\nQuedate junto a ella y espera.",
+  "escucha_quien": "EMISORA - {0}",
+  "escucha_nada": "(Emisora: solo estatica. Nadie habla ahora. Espera.)",
+  "intro_rotulo": "BASE DE TARSIS. MURO NORTE\n29 DE NOVIEMBRE DE 1983. 23:10"
+ },
+ "datos": [
+  {
+   "id": "sanz_registro",
+   "ficha": "Sanz",
+   "texto": "dt_sanz_registro",
+   "clase": "costumbre"
+  },
+  {
+   "id": "sanz_cajas",
+   "ficha": "Sanz",
+   "texto": "dt_sanz_cajas",
+   "clase": "debilidad",
+   "enlace": "Carmona"
+  },
+  {
+   "id": "camion_hangar",
+   "ficha": "Lobato",
+   "texto": "dt_camion_hangar",
+   "clase": "costumbre",
+   "enlace": "Sanz"
+  },
+  {
+   "id": "ramos_botiquin",
+   "ficha": "Ramos",
+   "texto": "dt_ramos_botiquin",
+   "clase": "objeto",
+   "pone": "sabe_de_ramos"
+  },
+  {
+   "id": "ibarra_llave",
+   "ficha": "Ibarra",
+   "texto": "dt_ibarra_llave",
+   "clase": "objeto"
+  },
+  {
+   "id": "ramos_jueves",
+   "ficha": "Ramos",
+   "texto": "dt_ramos_jueves",
+   "clase": "historia",
+   "enlace": "Ibarra"
+  },
+  {
+   "id": "vega_chapoteos",
+   "ficha": "Vega",
+   "texto": "dt_vega_chapoteos",
+   "clase": "historia",
+   "enlace": "Moya"
+  },
+  {
+   "id": "moya_rapido",
+   "ficha": "Moya",
+   "texto": "dt_moya_rapido",
+   "clase": "debilidad"
+  },
+  {
+   "id": "generador",
+   "ficha": "Moya",
+   "texto": "dt_generador",
+   "clase": "historia"
+  },
+  {
+   "id": "ramos_novuelve",
+   "ficha": "Ramos",
+   "texto": "dt_ramos_novuelve",
+   "clase": "historia",
+   "enlace": "Alarcon"
+  },
+  {
+   "id": "vidal_medalla",
+   "ficha": "Vidal",
+   "texto": "dt_vidal_medalla",
+   "clase": "objeto",
+   "enlace": "Ramos"
+  },
+  {
+   "id": "alarcon_traslados",
+   "ficha": "Alarcon",
+   "texto": "dt_alarcon_traslados",
+   "clase": "historia"
+  },
+  {
+   "id": "peris_cajon",
+   "ficha": "Peris",
+   "texto": "dt_peris_cajon",
+   "clase": "costumbre"
+  },
+  {
+   "id": "carmona_hangar",
+   "ficha": "Carmona",
+   "texto": "dt_carmona_hangar",
+   "clase": "costumbre"
+  },
+  {
+   "id": "cocina_raciones",
+   "ficha": "Lobato",
+   "texto": "dt_cocina_raciones",
+   "clase": "historia",
+   "enlace": "Alarcon"
+  },
+  {
+   "id": "bengala_torres",
+   "ficha": "Vega",
+   "texto": "dt_bengala_torres",
+   "clase": "costumbre"
+  }
+ ],
+ "charlas": [
+  {
+   "id": "camion",
+   "nota": "junto a la garita de entrada, del lado norte del camino (sitio sin medir)",
+   "a": "Lobato",
+   "b": "Carmona",
+   "sitio": [
+    -1300,
+    4950,
+    0
+   ],
+   "desde": 30,
+   "frases": [
+    [
+     "Lobato",
+     "ch_camion_1",
+     "camion_hangar"
+    ],
+    [
+     "Carmona",
+     "ch_camion_2",
+     "sanz_registro"
+    ],
+    [
+     "Lobato",
+     "ch_camion_3",
+     "carmona_hangar"
+    ],
+    [
+     "Carmona",
+     "ch_camion_4",
+     "sanz_cajas"
+    ]
+   ]
+  },
+  {
+   "id": "llaves",
+   "nota": "patio norte, junto a la puerta del barracon (sitio sin medir)",
+   "a": "Ibarra",
+   "b": "Ramos",
+   "sitio": [
+    1900,
+    1700,
+    0
+   ],
+   "desde": 60,
+   "frases": [
+    [
+     "Ibarra",
+     "ch_llaves_1"
+    ],
+    [
+     "Ramos",
+     "ch_llaves_2",
+     "ramos_botiquin"
+    ],
+    [
+     "Ibarra",
+     "ch_llaves_3",
+     "ibarra_llave"
+    ],
+    [
+     "Ramos",
+     "ch_llaves_4",
+     "ramos_jueves"
+    ],
+    [
+     "Ibarra",
+     "ch_llaves_5"
+    ]
+   ]
+  },
+  {
+   "id": "puesto",
+   "nota": "patio del porton, donde se cruzan las rondas de Vega y Moya (sitio sin medir)",
+   "a": "Vega",
+   "b": "Moya",
+   "sitio": [
+    3900,
+    4300,
+    0
+   ],
+   "desde": 100,
+   "frases": [
+    [
+     "Vega",
+     "ch_puesto_1",
+     "vega_chapoteos"
+    ],
+    [
+     "Moya",
+     "ch_puesto_2",
+     "moya_rapido"
+    ],
+    [
+     "Vega",
+     "ch_puesto_3",
+     "generador"
+    ],
+    [
+     "Moya",
+     "ch_puesto_4"
+    ]
+   ]
+  },
+  {
+   "id": "medalla",
+   "nota": "a la puerta de la sala de guardia, donde Peris sale a fumar",
+   "a": "Peris",
+   "b": "Ramos",
+   "sitio": [
+    4700,
+    1780,
+    0
+   ],
+   "desde": 160,
+   "frases": [
+    [
+     "Peris",
+     "ch_medalla_1",
+     "ramos_novuelve"
+    ],
+    [
+     "Ramos",
+     "ch_medalla_2",
+     "vidal_medalla"
+    ],
+    [
+     "Peris",
+     "ch_medalla_3",
+     "alarcon_traslados"
+    ],
+    [
+     "Ramos",
+     "ch_medalla_4",
+     "peris_cajon"
+    ]
+   ]
+  }
+ ]
+}

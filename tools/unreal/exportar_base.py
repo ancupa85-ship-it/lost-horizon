@@ -18,7 +18,10 @@ os.makedirs(OUT, exist_ok=True)
 # 1) la escena del visor, sin modelos de Poly Haven ni texturas (el aspecto final se hará con materiales de Unreal)
 tmp = tempfile.mkdtemp()
 glb0 = os.path.join(tmp, 'base.glb')
-env = dict(os.environ, LH_GLB=glb0, LH_NOPH='1', LH_NOTEX='1')
+# LH_EXT: casillas que se aleja el muro perimetral respecto al plano del juego (tanda 20: 10 casillas = 20 m, con portones,
+# camino y portillo; ver build_exterior en escena_base.py). El plano y todo lo de dentro quedan en las mismas coordenadas.
+EXT = int(os.environ.get('LH_EXT', '10'))
+env = dict(os.environ, LH_GLB=glb0, LH_NOPH='1', LH_NOTEX='1', LH_EXT=str(EXT))
 subprocess.run([sys.executable, os.path.join(R, 'tools', 'blender', 'escena_base.py')], env=env, check=True,
                stdout=subprocess.DEVNULL)
 
@@ -68,6 +71,11 @@ for key, args in re.findall(r'(?:^|[\s,{.])([a-z_]+)\s*[:=]\s*std\(\{(.*?)\}\)',
             d[k] = float(m.group(1))
     PAL[key] = d
 PAL.setdefault('hormigon', PAL.get('muro', {}))
+# materiales del anillo exterior, que el visor no tiene: losa de hormigón del camino y tierra con grava
+PAL.setdefault('camino', {'color': [lin(c) for c in (0x6e, 0x6d, 0x69)], 'roughness': 0.7})
+PAL.setdefault('tierra', {'color': [lin(c) for c in (0x5a, 0x52, 0x46)], 'roughness': 0.9})
+# tanda 22: alquitrán de las juntas y grietas selladas del camino (negro y algo brillante: de noche devuelve el reflejo de las farolas)
+PAL.setdefault('alquitran', {'color': [lin(c) for c in (0x17, 0x17, 0x18)], 'roughness': 0.34})
 
 for mat in bpy.data.materials:
     key = mat.name.split('.')[0][3:] if mat.name.startswith('lh_') else None
@@ -213,7 +221,63 @@ def torre(i, t):
                      'dir': [math.sin(t['yaw']) * math.cos(ph), -math.cos(t['yaw']) * math.cos(ph), -math.sin(ph)]}}
 
 import math
-TORRES = [torre(i, t) for i, t in enumerate(TOWERS)]
+# tanda 30: Andres quita las dos torres de dentro (las TOWERS del visor); quedan solo las cuatro de esquina. Con LH_EXT=0
+# (sin anillo) se levantan las de antes.
+TORRES = [torre(i, t) for i, t in enumerate(TOWERS)] if os.environ.get('LH_EXT', '10') == '0' else []
+
+# 4b bis) tanda 30: cuatro torres grandes, una en cada esquina del muro perimetral (por dentro), más altas que el muro.
+# Plataforma de 4,4 m para dos centinelas, cada uno con su foco: uno mira hacia dentro de la base y otro hacia fuera.
+# Los focos van en las dos esquinas de la plataforma que caen sobre la diagonal (la de dentro y la de fuera).
+TG = 7.5   # altura de la plataforma (el muro mide 4,6): alta para que el haz baje con ángulo sobre el camino y los patios
+
+def torre_grande(i, cx, cz):
+    L = {'madera': [], 'hierro': []}
+    def B(key, sx, sy, sz, px, py, pz, rx=0.0, ry=0.0, rz=0.0):
+        L[key].append((sx, sy, sz, cx + px, py, cz + pz, rx, ry, rz))
+    for a in (-1.9, 1.9):
+        for b in (-1.9, 1.9):
+            B('madera', 0.24, TG, 0.24, a, TG / 2, b)                       # patas
+            B('madera', 0.12, 2.45, 0.12, a, TG + 1.22, b)                  # pies derechos del tejadillo
+            B('hierro', 0.5, 0.25, 0.5, a, 0.12, b)                         # zapatas
+    B('madera', 4.4, 0.14, 4.4, 0, TG, 0)                                   # plataforma
+    for h in (1.8, 3.6, 5.4, 7.0):                                               # travesaños
+        for q in (-1.9, 1.9):
+            B('madera', 3.8, 0.1, 0.1, 0, h, q); B('madera', 0.1, 0.1, 3.8, q, h, 0)
+    for h0, h1 in ((0.2, 3.6), (3.6, TG)):                                  # cruces de San Andrés en los cuatro lados, dos pisos
+        lar = math.hypot(3.8, h1 - h0); ang = math.atan2(h1 - h0, 3.8); hm = (h0 + h1) / 2
+        for q in (-1.9, 1.9):
+            for sg in (-1, 1):
+                B('madera', lar, 0.08, 0.08, 0, hm, q, rz=sg * ang)
+                B('madera', 0.08, 0.08, lar, q, hm, 0, rx=sg * ang)
+    for q in (-2.1, 2.1):                                                   # peto de tablas y pasamanos; el lado +x se abre para la escala
+        B('madera', 4.2, 0.55, 0.04, 0, TG + 0.36, q); B('madera', 4.2, 0.07, 0.07, 0, TG + 1.1, q)
+    B('madera', 0.04, 0.55, 4.2, -2.1, TG + 0.36, 0); B('madera', 0.07, 0.07, 4.2, -2.1, TG + 1.1, 0)
+    for b in (-1.35, 1.35):
+        B('madera', 0.04, 0.55, 1.5, 2.1, TG + 0.36, b); B('madera', 0.07, 0.07, 1.5, 2.1, TG + 1.1, b)
+    B('hierro', 5.2, 0.06, 5.2, 0, TG + 2.48, 0, rz=0.04)                   # tejadillo de chapa
+    for b in (-0.26, 0.26):                                                 # escala
+        B('madera', 0.06, TG + 1.1, 0.06, 2.3, (TG + 1.1) / 2, b)
+    h = 0.3
+    while h < TG + 0.9:
+        B('madera', 0.04, 0.04, 0.55, 2.3, h, 0); h += 0.3
+    # hacia dentro: la diagonal que apunta al centro de la base
+    ux, uz = (1.0 if cx < 36 else -1.0) / math.sqrt(2), (1.0 if cz < 28 else -1.0) / math.sqrt(2)
+    puestos = []
+    for rol, sg, baja in (('dentro', 1.0, 0.38), ('fuera', -1.0, 0.30)):
+        fx, fz = sg * ux * 2.75, sg * uz * 2.75                             # el proyector, en su esquina
+        B('hierro', 0.5, 0.5, 0.42, fx, TG + 1.55, fz, ry=math.pi / 4)
+        B('hierro', 0.09, 1.3, 0.09, fx, TG + 0.65, fz)
+        lx, lz = cx + sg * ux * 3.25, cz + sg * uz * 3.25                   # la luz, medio metro por delante de la carcasa
+        puestos.append({'rol': rol, 'pos': [cx + sg * ux * 1.5, -(cz + sg * uz * 1.5), 0.0],
+                        'foco': {'pos': [lx, -lz, TG + 1.5], 'dir': [sg * ux * math.cos(baja), -sg * uz * math.cos(baja), -math.sin(baja)]}})
+    for key in ('madera', 'hierro'):
+        malla('torre%d_%s' % (i + 1, key), L[key], key)
+    return {'name': 'torre%d' % (i + 1), 'pos': [cx, -cz, 0.0], 'yaw': math.atan2(ux, -uz), 'altura': TG, 'grande': True,
+            'escala': [cx + 2.9, -cz, 0.0], 'foco': puestos[0]['foco'], 'puestos': puestos}
+
+ESQUINAS = [(-15.0, -15.0), (87.0, -15.0), (87.0, 71.0), (-15.0, 71.0)] if os.environ.get('LH_EXT', '10') != '0' else []   # NO, NE, SE, SO
+N_TORRES_VIEJAS = len(TORRES)
+TORRES += [torre_grande(N_TORRES_VIEJAS + k, cx, cz) for k, (cx, cz) in enumerate(ESQUINAS)]
 
 # 4c) recintos del visor (v51): vallas de tela metálica (f), huecos para pasar agachado (h) y contenedores (m).
 #     El plano se parchea como en visor.js y se levanta la misma geometría.
@@ -241,13 +305,41 @@ def mat_rgb(nombre, rgb, rough, metal):
     return m
 
 ROWS, COLS = len(MAP), max(len(r) for r in MAP)
-ch = lambda x, y: (MAP[y] if 0 <= y < ROWS else '')[x] if 0 <= y < ROWS and 0 <= x < len(MAP[y]) else '#'
+JEXT = json.load(open(os.path.splitext(glb0)[0] + '.json')).get('ext')
+ANILLO = {}   # casillas de fuera del plano: vallas del anillo y muro nuevo
+if JEXT:
+    E = JEXT['casillas']; conserva = {tuple(c) for c in JEXT['conserva']}
+    for x in range(-E, COLS + E):
+        for y in range(-E, ROWS + E):
+            if x in (-E, COLS + E - 1) or y in (-E, ROWS + E - 1):
+                ANILLO[(x, y)] = '.' if (y in JEXT['filas_porton'] and x in (-E, COLS + E - 1)) else '#'
+    for x0, y0, x1, y1 in JEXT.get('tabiques', []):
+        for y in range(y0, y1 + 1):
+            ANILLO[(x0, y)] = '#'
+    # vallas que antes morían en el muro y ahora cruzan el anillo hasta el muro nuevo, cada una con su hueco para pasar agachado:
+    # así el anillo no sirve de atajo entre zonas. [fila, primera columna, última columna, columna del hueco]
+    VALLAS_ANILLO = [(10, -E + 1, -1, -5), (12, COLS - 1, COLS + E - 2, COLS + 4), (23, COLS - 1, COLS + E - 2, COLS + 3)]
+    for fila, c0, c1, hueco in VALLAS_ANILLO:
+        for x in range(c0, c1 + 1):
+            ANILLO[(x, fila)] = 'h' if x == hueco else 'f'
+    JEXT['vallas'] = [list(v) for v in VALLAS_ANILLO]
+def ch(x, y):
+    if (x, y) in ANILLO:
+        return ANILLO[(x, y)]
+    if 0 <= y < ROWS and 0 <= x < len(MAP[y]):
+        if JEXT and (x in (0, COLS - 1) or y in (0, ROWS - 1)) and MAP[y][x] == '#':
+            return '#' if (x, y) in conserva else '.'   # el muro antiguo ya no está, salvo donde hace de pared de un edificio
+        return MAP[y][x]
+    return '.' if JEXT and -JEXT['casillas'] < x < COLS + JEXT['casillas'] - 1 and -JEXT['casillas'] < y < ROWS + JEXT['casillas'] - 1 else '#'
+EX = JEXT['casillas'] if JEXT else 0
 isF = lambda x, y: ch(x, y) in 'fh'
-con = lambda x, y: ch(x, y) in 'fh#W'
+solido = lambda x, y: ch(x, y) in 'fh#W'
+# para decidir hacia dónde corre cada valla cuenta también el muro antiguo: las de dentro quedan como estaban
+con = lambda x, y: solido(x, y) or (0 <= y < ROWS and 0 <= x < len(MAP[y]) and MAP[y][x] == '#')
 H, HH, PI = 2.3, 0.85, math.pi
 arms, holes, posts = [], [], []
-for y in range(ROWS):
-    for x in range(len(MAP[y])):
+for y in range(-EX, ROWS + EX):
+    for x in range(-EX, COLS + EX):
         if not isF(x, y):
             continue
         cx, cz = x * TT + TT / 2, y * TT + TT / 2
@@ -257,7 +349,7 @@ for y in range(ROWS):
         posts.append((cx, cz, 0))
         for d in ds:
             (holes if ch(x, y) == 'h' else arms).append((cx + d[0] * 0.5, cz + d[1] * 0.5, 0 if d[0] else PI / 2))
-            if not con(x + d[0], y + d[1]):
+            if not solido(x + d[0], y + d[1]):
                 posts.append((cx + d[0], cz + d[1], 0.5))
 tela, hierro = [], []
 for q in arms:   # la tela: placa fina (en Unreal se le pondrá un material de malla con transparencia)
@@ -284,17 +376,151 @@ malla('valla_hierro', hierro, 'hierro')
 # contenedores de 20 pies, cuatro colores como en el visor; los dobles llevan otro encima algo girado
 KC = [(0x6a, 0x2c, 0x20), (0x28, 0x46, 0x5a), (0x3a, 0x55, 0x37), (0x77, 0x67, 0x2a)]
 kont = [[] for _ in KC]
+# tanda 25: la chapa de verdad. Cada contenedor era una caja lisa; ahora lleva encima, en otra malla (contenedordet_N, que
+# en Unreal no tiene colisión: se anda, se dispara y se mira contra la caja de siempre), los pilares de las esquinas, los
+# largueros de arriba y de abajo, las costillas de la chapa ondulada en los costados, el testero y el techo, y en el otro
+# testero las puertas con sus cuatro barras de cierre. Unos 80 prismas por contenedor.
+kdet = [[] for _ in KC]
+def detalle_contenedor(col, largo, alto, ancho, cx, cy, cz, giro, puertas):
+    c_, s_ = math.cos(giro), math.sin(giro)
+    D = kdet[col % 4]
+    def B(sx, sy, sz, ox, oy, oz):     # prisma en los ejes del contenedor (x a lo largo, y arriba, z a lo ancho)
+        D.append((sx, sy, sz, cx + ox * c_ + oz * s_, cy + oy, cz - ox * s_ + oz * c_, 0, giro, 0))
+    hx, hy, hz = largo / 2, alto / 2, ancho / 2
+    for ex in (-1, 1):
+        for ez in (-1, 1):             # pilares: sobresalen 2,5 cm por los dos lados
+            B(0.17, alto + 0.03, 0.17, ex * (hx - 0.06), 0, ez * (hz - 0.06))
+    for ey in (-1, 1):                 # largueros y travesaños
+        for ez in (-1, 1):
+            B(largo - 0.3, 0.15, 0.06, 0, ey * (hy - 0.075), ez * (hz + 0.005))
+        for ex in (-1, 1):
+            B(0.06, 0.15, ancho - 0.3, ex * (hx + 0.005), ey * (hy - 0.075), 0)
+    n = int((largo - 0.5) / 0.26)      # costillas de los costados, cada 26 cm
+    for i in range(n):
+        ox = (i - (n - 1) / 2) * 0.26
+        for ez in (-1, 1):
+            B(0.11, alto - 0.3, 0.036, ox, 0, ez * (hz + 0.012))
+    m_ = int((ancho - 0.4) / 0.26)
+    for i in range(m_):                # testero ciego
+        B(0.036, alto - 0.3, 0.11, -puertas * (hx + 0.012), 0, (i - (m_ - 1) / 2) * 0.26)
+    # puertas: el canto de las dos hojas, las cuatro barras de cierre con su maneta y las bisagras
+    px = puertas * (hx + 0.02)
+    B(0.03, alto - 0.32, 0.035, px - puertas * 0.005, 0, 0)
+    for oz in (-0.66, -0.24, 0.24, 0.66):
+        B(0.04, alto - 0.2, 0.04, px + puertas * 0.012, 0, oz)
+        B(0.035, 0.05, 0.2, px + puertas * 0.03, -0.25, oz + (0.09 if oz < 0 else -0.09))
+        for oy in (-0.8, 0.8):
+            B(0.05, 0.09, 0.07, px + puertas * 0.012, oy, oz)
+    for ez in (-1, 1):
+        for oy in (-0.95, -0.3, 0.35, 0.98):
+            B(0.05, 0.12, 0.05, px, oy, ez * (hz - 0.2))
+    t = int((largo - 0.4) / 0.52)      # techo: costillas atravesadas, cada 52 cm
+    for i in range(t):
+        B(0.12, 0.03, ancho - 0.28, (i - (t - 1) / 2) * 0.52, hy + 0.008, 0)
 for i, k in enumerate(KONT):
     L = k[3]
     def caja(col, y, dx, ry):
-        kont[col % 4].append((L * TT - 0.12, 2.6, TT - 0.1, (k[0] + (L / 2 if k[2] else 0.5)) * TT + dx, y,
-                              (k[1] + (0.5 if k[2] else L / 2)) * TT, 0, (0 if k[2] else PI / 2) + ry, 0))
+        q = (L * TT - 0.12, 2.6, TT - 0.1, (k[0] + (L / 2 if k[2] else 0.5)) * TT + dx, y,
+             (k[1] + (0.5 if k[2] else L / 2)) * TT, 0, (0 if k[2] else PI / 2) + ry, 0)
+        kont[col % 4].append(q)
+        detalle_contenedor(col, q[0], q[1], q[2], q[3], q[4], q[5], q[7], 1 if (i + col) % 2 else -1)
     caja(i, 1.3, 0, 0)
     if k[4]:
         caja(i + 2, 3.9, 0.12, 0.03)
 for c, L in enumerate(kont):
     if L:
         malla('contenedor_%d' % c, L, None, mat_rgb('lh_contenedor_%d' % c, KC[c], 0.62, 0.35))
+        malla('contenedordet_%d' % c, kdet[c], None, mat_rgb('lh_contenedor_%d' % c, KC[c], 0.62, 0.35))
+
+# 4d) tanda 22: hierbajos al pie de las vallas y del muro, en los bordes del camino y en alguna junta de la losa. Una sola malla
+#     («hierbajos») de planos cruzados con sus propias UV sobre la textura de cuatro matas (tools/texturas/hierbajo.py); cada plano
+#     va por las dos caras y con la normal hacia arriba, para que la luz le dé como al suelo que pisa. En Unreal lleva el material
+#     recortado M_Hierbajo, sin colisión, sin sombra y sin contar para la navegación (tools/unreal/montar_base.py).
+import random
+def hierbajos():
+    HG = (JEXT or {}).get('hangar'); CK = (JEXT or {}).get('cocina')
+    rs = random.Random(2207); V, F, UV = [], [], []
+    TAM = (0.78, 0.6, 0.92, 0.56)     # lado del plano de cada mata (m): hierba seca alta, mata verde, cardo, roseta
+    def mata(px, py, z=0.0, k=1.0, var=None):
+        v = var if var is not None else rs.choices((0, 1, 2, 3), (35, 35, 12, 18))[0]
+        s = TAM[v] * k * rs.uniform(0.72, 1.25); w, h = s * rs.uniform(0.9, 1.15), s * rs.uniform(0.9, 1.1)
+        a0 = rs.uniform(0, PI); c, r = v % 2, v // 2; pad = 0.004
+        u0, u1 = c * 0.5 + pad, (c + 1) * 0.5 - pad
+        vb, vt = 1 - (r + 1) * 0.5 + pad, 1 - r * 0.5 - pad
+        lx, ly = rs.uniform(-0.07, 0.07) * h, rs.uniform(-0.07, 0.07) * h     # ninguna sale a plomo
+        for a in (a0, a0 + PI / 2 + rs.uniform(-0.25, 0.25)):
+            dx, dy = math.cos(a) * w / 2, math.sin(a) * w / 2
+            if rs.random() < 0.5: u0, u1 = u1, u0
+            q = [(px - dx, py - dy, z - 0.025), (px + dx, py + dy, z - 0.025), (px + dx + lx, py + dy + ly, z + h - 0.025), (px - dx + lx, py - dy + ly, z + h - 0.025)]
+            uv = [(u0, vb), (u1, vb), (u1, vt), (u0, vt)]
+            for orden in ((0, 1, 2, 3), (3, 2, 1, 0)):
+                if HG and HG['x0'] - 0.6 < px < HG['x1'] + 0.6 and 60.2 < py < HG['y1'] + 0.6: continue   # tanda 40: dentro del hangar y en su rampa no crece nada
+                if CK and CK['x0'] - 0.4 < px < CK['x1'] + 0.4 and CK['y0'] - 0.4 < py < CK['y1'] + 0.4: continue   # tanda 42: ni dentro de la cocina
+                n = len(V); V.extend((q[i][0], -q[i][1], q[i][2]) for i in orden); UV.extend(uv[i] for i in orden); F.append((n, n + 1, n + 2, n + 3))
+    def linea(xa, ya, xb, yb, nx, ny, dens, z=0.0, k=1.0, saltos=()):
+        """Matas al pie de una línea (muro, bordillo). (nx, ny): hacia dónde se separan de ella; saltos: tramos, en metros desde
+        el principio, que se dejan limpios. Salen a rodales, no repartidas por igual."""
+        L = math.hypot(xb - xa, yb - ya); f = rs.uniform(0, 6.28); s = rs.uniform(0, 0.5)
+        while s < L:
+            rodal = 0.5 + 0.5 * math.sin(s * 0.41 + f) * math.sin(s * 0.13 + f * 2.7)
+            if rs.random() < dens * (0.15 + 1.7 * rodal) and not any(a <= s <= b for a, b in saltos):
+                d = rs.uniform(0.04, 0.2); t = s / L; mata(xa + (xb - xa) * t + nx * d, ya + (yb - ya) * t + ny * d, z, k)
+            s += rs.uniform(0.3, 0.7)
+    def corro(px, py, r0, r1, n, k=1.0, z=0.0):
+        for _ in range(n):
+            a = rs.uniform(0, 2 * PI); r = rs.uniform(r0, r1); mata(px + math.cos(a) * r, py + math.sin(a) * r, z, k)
+    # 1) las vallas: las del anillo, tupidas (nadie las desbroza); las de dentro, alguna mata suelta. Los huecos de pasar agachado, limpios
+    for qx, qz, rot in arms:
+        fuera = qx < 0 or qx > COLS * TT or qz < 0 or qz > ROWS * TT
+        for _ in range(2 if fuera else 1):
+            if rs.random() < (0.62 if fuera else 0.3):
+                u = rs.uniform(-0.48, 0.48); d = rs.choice((-1, 1)) * rs.uniform(0.04, 0.16)
+                mata(qx + (u if rot == 0 else d), qz + (d if rot == 0 else u), 0.0, 1.0 if fuera else 0.8)
+    if JEXT:
+        X0, X1, Y0, Y1 = JEXT['x0'], JEXT['x1'], JEXT['y0'], JEXT['y1']; cam = JEXT['camino']
+        ya, yb = cam['y'] - cam['ancho'] / 2, cam['y'] + cam['ancho'] / 2; zl = cam['alto']
+        xi0, xi1, yi0, yi1 = X0 + 1.45, X1 - 1.45, Y0 + 1.45, Y1 - 1.45          # caras de dentro del muro
+        # 2) pie del muro por dentro. Sin matas en los portones ni en el carril de las hojas correderas (al sur de cada portón), ni en el portillo
+        px = JEXT['portillo'][0]; carril = (ya - 1.0 - yi0, yb + 7.6 - yi0)
+        linea(xi0, yi0, xi1, yi0, 0, 1, 0.22)
+        linea(xi0, yi1, xi1, yi1, 0, -1, 0.24, saltos=((px - 1.0 - xi0, px + 1.0 - xi0),))
+        linea(xi0, yi0, xi0, yi1, 1, 0, 0.22, saltos=(carril,))
+        linea(xi1, yi0, xi1, yi1, -1, 0, 0.22, saltos=(carril,))
+        # 3) bordes del camino por fuera del bordillo: dentro de la base y los primeros 45 m del terraplén (más crecidos: ahí no pisa nadie)
+        for yy, s in ((ya - 0.22, -1), (yb + 0.22, 1)):
+            linea(X0 + 2.2, yy, X1 - 2.2, yy, 0, s, 0.2)
+            linea(X0 - 45.0, yy, X0 - 0.7, yy, 0, s, 0.42, z=-0.02, k=1.15)
+            linea(X1 + 0.7, yy, X1 + 45.0, yy, 0, s, 0.42, z=-0.02, k=1.15)
+        for k in range(8):       # y al pie de los hitos del terraplén
+            for q in (-5.6, 5.6):
+                for xh in (X0 - 3 - k * 6, X1 + 3 + k * 6):
+                    if rs.random() < 0.6: corro(xh, cam['y'] + q, 0.14, 0.3, rs.randint(1, 3), 1.1, -0.02)
+        # 4) al pie de las farolas, de los báculos de los portones y de las garitas (por los lados que no dan al camino)
+        for fx, fy, _ in JEXT.get('farolas', []): corro(fx, yb + 0.5, 0.24, 0.42, rs.randint(2, 4))
+        for key in ('entrada', 'salida'):
+            g = JEXT[key]; corro(g['baculo'][0], g['baculo'][1] - 0.1, 0.24, 0.4, 2, 0.8)
+            gx, gy = g['garita']
+            linea(gx - 1.35, gy - 1.38, gx + 1.35, gy - 1.38, 0, -1, 0.5)
+            lado = -1 if key == 'entrada' else 1       # el lado contrario a la puerta
+            linea(gx + lado * 1.38, gy - 1.3, gx + lado * 1.38, gy + 1.0, lado, 0, 0.45)
+        # 5) en la losa: una mata pequeña donde alguna junta llega al bordillo y en la punta de alguna grieta
+        for xj in JEXT['desgaste']['juntas']:
+            for yy, s in ((ya, 1), (yb, -1)):
+                if rs.random() < 0.5: mata(xj + rs.uniform(-0.05, 0.05), yy + s * rs.uniform(0.05, 0.16), zl, rs.uniform(0.38, 0.55), rs.choice((1, 1, 3, 0)))
+        for gx0, gy0, gx1, gy1 in JEXT['desgaste']['grietas']:
+            if X0 + 2 < gx1 < X1 - 2 and rs.random() < 0.5 and abs(gy1 - cam['y']) > 1.3:
+                mata(gx1, gy1, zl, rs.uniform(0.32, 0.46), rs.choice((1, 3)))
+    me = bpy.data.meshes.new('hierbajos'); me.from_pydata(V, [], F)
+    uvl = me.uv_layers.new(name='UVMap')
+    for poly in me.polygons:
+        for li, vi in zip(poly.loop_indices, poly.vertices): uvl.data[li].uv = UV[vi]
+    me.normals_split_custom_set([(0.0, 0.0, 1.0)] * len(me.loops))
+    me.materials.append(mat_rgb('lh_hierbajo', (84, 98, 52), 0.85, 0.0))
+    bpy.context.scene.collection.objects.link(bpy.data.objects.new('hierbajos', me))
+    return len(F) // 4
+N_MATAS = hierbajos()
+if JEXT: JEXT['hierbajos'] = N_MATAS
+print('HIERBAJOS', N_MATAS, 'matas')
 
 glb = os.path.join(OUT, 'base.glb')
 kw = dict(filepath=glb, export_format='GLB', export_yup=True, export_cameras=False, export_lights=False,
@@ -314,11 +540,34 @@ lights = [l for l in j['lights'] if l.get('name') not in ('foco_torreta', 'farol
 f0 = next(l for l in j['lights'] if l.get('name') == 'farola')
 for w in FAROLA_POS:
     lights.append(dict(f0, pos=[w[0], w[1], f0['pos'][2]]))
-for tw in TORRES:
+if JEXT:   # báculo del portón de entrada (el farol de la salida lo crea el director junto a la barrera)
+    q = JEXT['entrada']['farol']
+    lights.append(dict(f0, pos=[q[0], -q[1], q[2] + 0.2]))
+for tw in TORRES[:N_TORRES_VIEJAS]:
     lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': tw['foco']['pos'], 'dir': tw['foco']['dir'],
                    'color': [0.8, 0.9, 1.0], 'power': 90000})
-json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'marcas': MARCAS, 'torres': TORRES,
-           'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
+if JEXT:   # tanda 21: farolas del camino y aplique del portillo. Al final de la lista: las luces de antes conservan su número
+    for q in JEXT.get('farolas', []):
+        lights.append(dict(f0, pos=[q[0], -q[1], q[2] + 0.2]))
+    if JEXT.get('portillo_luz'):
+        q = JEXT['portillo_luz']
+        lights.append({'kind': 'POINT', 'name': 'aplique', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.7, 0.4], 'power': 260})
+# tanda 30: los ocho focos de las torres de esquina, al final (las luces de antes conservan su número)
+for tw in TORRES[N_TORRES_VIEJAS:]:
+    for pu in tw['puestos']:
+        lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': pu['foco']['pos'], 'dir': pu['foco']['dir'],
+                       'color': [0.8, 0.9, 1.0], 'power': 90000})
+spawn_yaw = None
+if JEXT and JEXT.get('brecha'):   # tanda 40: se empieza junto a la brecha del muro norte, mirando hacia dentro
+    q = JEXT['brecha']; spawn = [q['inicio'][0], -q['inicio'][1], 0.0]; spawn_yaw = q['giro']
+if JEXT and JEXT.get('hangar'):   # la bombilla del hangar: foco hacia abajo, al final de la lista
+    q = JEXT['hangar']['luz']
+    lights.append({'kind': 'POINT', 'name': 'hangar', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.82, 0.55], 'power': 900})
+if JEXT and JEXT.get('cocina'):   # tanda 42: la bombilla de la cocina
+    q = JEXT['cocina']['luz']
+    lights.append({'kind': 'POINT', 'name': 'cocina', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.8, 0.5], 'power': 500})
+json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'spawn_yaw': spawn_yaw, 'marcas': MARCAS, 'torres': TORRES,
+           **({'ext': JEXT} if JEXT else {}), 'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
           open(os.path.join(OUT, 'base.json'), 'w'), indent=1)
 shutil.rmtree(tmp, ignore_errors=True)
 n = len([o for o in bpy.data.objects if o.type == 'MESH'])
