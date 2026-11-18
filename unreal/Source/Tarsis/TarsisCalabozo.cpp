@@ -64,6 +64,7 @@ void ATarsisDirector::CalmBase()
 		if (It->bAlly) continue;
 		It->Recover();
 	}
+	DogReset();
 	++Calms;
 }
 

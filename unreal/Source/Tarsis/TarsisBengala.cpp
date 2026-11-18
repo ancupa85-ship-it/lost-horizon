@@ -17,6 +17,7 @@
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/Light.h"
 #include "Components/LightComponent.h"
+#include "Components/LocalLightComponent.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SpotLight.h"
 #include "Engine/StaticMesh.h"
@@ -217,12 +218,18 @@ void ATarsisDirector::SetDay(bool bNewDay)
 		for (TActorIterator<ALight> It(GetWorld()); It; ++It)
 		{
 			ULightComponent* L = It->GetLightComponent();
-			if (!L || !L->IsVisible() || BrokenLights.Contains(L) || (*It != GateLamp.Get() && !BreakableLamp(*It))) continue;
+			if (!L || !L->IsVisible() || BrokenLights.Contains(L) || !L->IsA<ULocalLightComponent>() || It->ActorHasTag(FName(TEXT("decorado")))) continue;
 			FCollisionQueryParams Q2 = Q;
 			Q2.AddIgnoredActor(*It);
 			FHitResult Hit;
 			const FVector P = It->GetActorLocation();
-			if (GetWorld()->LineTraceSingleByChannel(Hit, P + FVector(0.0f, 0.0f, 60.0f), P + FVector(0.0f, 0.0f, 2500.0f), ECC_Visibility, Q2)) continue;   // bajo techo
+			// a cielo abierto ella o un punto a metro y medio (los apliques de fachada van bajo su propio alero)
+			bool bOpen = false;
+			static const FVector Off[5] = { FVector(0.0f), FVector(150.0f, 0.0f, 0.0f), FVector(-150.0f, 0.0f, 0.0f), FVector(0.0f, 150.0f, 0.0f), FVector(0.0f, -150.0f, 0.0f) };
+			int32 OpenN = 0;
+			for (const FVector& O : Off) { if (!GetWorld()->LineTraceSingleByChannel(Hit, P + O + FVector(0.0f, 0.0f, 60.0f), P + O + FVector(0.0f, 0.0f, 2500.0f), ECC_Visibility, Q2)) ++OpenN; }
+			bOpen = OpenN >= 2 || (OpenN >= 1 && (*It == GateLamp.Get() || BreakableLamp(*It)));
+			if (!bOpen) continue;   // bajo techo
 			L->SetVisibility(false);
 			DayOffLights.Add(*It);
 		}

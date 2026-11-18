@@ -39,6 +39,19 @@ for o, nom in partes:
         for x, c in ws: vg[c].add([v.index], x / tot, 'REPLACE')
 for o, nom in partes: o.select_set(True)
 bpy.context.view_layer.objects.active = partes[0][0]; bpy.ops.object.join(); perro = partes[0][0]; perro.name = 'perro'; perro.data.name = 'perro'
+# el color del pelo, de los vertices a una textura de 64 px (Unreal no lee el color por vertice del glTF sin tocar el material):
+# la U de cada vertice es cuanto tiene de manto negro
+srgb = lambda c: 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+img = bpy.data.images.new('perro_pelo', 64, 4); px = []
+for y in range(4):
+    for x in range(64):
+        u = x / 63.0; px += [srgb(TAN[i] + (NEG[i] - TAN[i]) * u) for i in range(3)] + [1.0]
+img.pixels = px; img.filepath_raw = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'perro_pelo.png'); img.file_format = 'PNG'; img.save(); img.pack()
+me = perro.data; uv = me.uv_layers.new(name='UVMap'); ca = me.color_attributes.get('Col')
+for lp in me.loops:
+    c = ca.data[lp.vertex_index].color if ca else (TAN[0], 0, 0, 1)
+    u = (c[0] - TAN[0]) / (NEG[0] - TAN[0]); uv.data[lp.index].uv = (0.02 + 0.96 * max(0.0, min(1.0, u)), 0.5)
+nt = pelo.node_tree; tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = img; nt.links.new(tex.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
 # --- esqueleto
 ad = bpy.data.armatures.new('perro_esq'); arm = bpy.data.objects.new('perro_esq', ad); sc.collection.objects.link(arm); bpy.context.view_layer.objects.active = arm
 bpy.ops.object.select_all(action='DESELECT'); arm.select_set(True); bpy.ops.object.mode_set(mode='EDIT')
@@ -98,5 +111,5 @@ if PV:
 pose({}); bpy.context.view_layer.update()
 for o in bpy.data.objects: o.select_set(o in (arm, perro))
 f = os.path.join(R, 'assets', 'unreal', 'perro.glb')
-bpy.ops.export_scene.gltf(filepath=f, export_format='GLB', use_selection=True, export_yup=True, export_animations=True, export_animation_mode='NLA_TRACKS', export_vertex_color='ACTIVE', export_all_vertex_colors=True, export_skins=True)
+bpy.ops.export_scene.gltf(filepath=f, export_format='GLB', use_selection=True, export_yup=True, export_animations=True, export_animation_mode='NLA_TRACKS', export_vertex_color='NONE', export_skins=True)
 print('PERRO_UNREAL', len(perro.data.polygons), 'caras', os.path.getsize(f) // 1024, 'KB', flush=True)

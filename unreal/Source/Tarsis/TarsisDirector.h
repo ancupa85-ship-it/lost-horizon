@@ -1107,6 +1107,87 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
 	int32 Calms = 0;
 	void TacticsTick(float DeltaSeconds);
+
+	// ---- tanda 46: el perro del hangar (TarsisPerro.cpp). No ve: huele. Grune de aviso, ladra y llama a los guardias;
+	// con el hueso de la cocina se hace amigo
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	bool bDog = true;
+	/** Las dos puntas de su ronda (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	FVector DogA = FVector(4350.0f, 6600.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	FVector DogB = FVector(5550.0f, 6600.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogSpeed = 110.0f;
+	/** Segundos sentado en cada punta. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogRest = 7.0f;
+	/** A menos de esto (cm) te huele, vayas como vayas. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogSmell = 550.0f;
+	/** A menos de esto (cm) te oye si corres; y hasta aqui sigue ladrando una vez que ha empezado. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogHear = 1100.0f;
+	/** Segundos de grunido antes de ladrar: el aviso. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogGrowlSeconds = 3.5f;
+	/** Los guardias a menos de esto (cm) oyen los ladridos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogBarkRadius = 3000.0f;
+	/** Desde aqui (cm) se le puede dar el hueso. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogGiveDist = 480.0f;
+	/** Giro de la malla respecto a su frente (grados) y escala: se ajustan al importar el modelo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogMeshYaw = 90.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogScale = 1.0f;
+	/** 0 ronda, 1 grune, 2 ladra, 3 amigo. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogState = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogGrowls = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogBarks = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogCalls = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	bool DogReady() const { return DogMesh != nullptr; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	FVector DogLocation() const { return DogLoc; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	float DogFacing() const { return DogYaw; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	int32 DogAnimIndex() const { return DogAnimNow; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	int32 DogAnimCount() const { int32 N = 0; for (int32 i = 0; i < 4; ++i) if (DogAnims[i]) ++N; return N; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	FString DogPrompt() const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Perro")
+	void GiveBone();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Perro")
+	void DogReset();
+	bool DogInteract();
+	void SpawnDog();
+	void DogPlace();
+	void DogAnim(int32 Which, bool bLoop);
+	void DogFace(const FVector& To, float DeltaSeconds);
+	void DogTick(float DeltaSeconds);
+	UPROPERTY()
+	TObjectPtr<class USkeletalMeshComponent> DogMesh;
+	UPROPERTY()
+	TObjectPtr<class UAnimationAsset> DogAnims[4];
+	bool bDogTried = false;
+	bool DogToB = true;
+	FVector DogLoc = FVector::ZeroVector;
+	float DogZ = 0.0f;
+	float DogYaw = 0.0f;
+	float DogSitT = 0.0f;
+	float DogGrowlT = 0.0f;
+	float DogCalmT = 0.0f;
+	float DogBarkT = 0.0f;
+	int32 DogBarkN = 0;
+	int32 DogAnimNow = -1;
 	FVector FlareDrift = FVector::ZeroVector;
 
 	/** Dia (true) o noche. La mision 1 es de noche; la de los inspectores sera de dia. Se cambia en Pausa. */

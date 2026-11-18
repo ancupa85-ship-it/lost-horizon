@@ -391,6 +391,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	TalkTick(DeltaSeconds);
 	FlareTick(DeltaSeconds);
 	TacticsTick(DeltaSeconds);
+	DogTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
 	ClimbTick(DeltaSeconds);
 }
@@ -513,6 +514,7 @@ FString ATarsisDirector::InteractPrompt() const
 	{ const FString GP = GearPrompt(); if (!GP.IsEmpty()) return GP; }
 	if (CanBoardTruck()) return Tx(TEXT("p_camion_subir"), TEXT("E   SUBIR A LA CAJA DEL CAMION"));
 	if (bCellPuzzle && InCell()) return CellPrompt();
+	{ const FString DP = DogPrompt(); if (!DP.IsEmpty()) return DP; }
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear())
 	{
@@ -605,6 +607,7 @@ void ATarsisDirector::Interact()
 	if (GearInteract()) return;
 	if (CanBoardTruck()) { BoardTruck(); return; }
 	if (CellInteract()) return;
+	if (DogInteract()) return;
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear()) { UsePoint(*Pt); return; }
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))
@@ -1493,6 +1496,12 @@ void ATarsisDirector::SetupSound()
 			StepSnds[s * 3 + i] = S;
 		}
 	}
+	// tanda 46: lo que suena por primera vez en mitad de la partida paraba el juego al cargarse (tirones): se carga aqui
+	static const TCHAR* Pre[] = { TEXT("codec_abrir"), TEXT("codec_cerrar"), TEXT("codec_llamada"), TEXT("codec_tecla"), TEXT("codec_tecla_grave"), TEXT("reja"),
+		TEXT("candado"), TEXT("recoger"), TEXT("empujon"), TEXT("bengala"), TEXT("disparo"), TEXT("llaves"), TEXT("clave_ok"), TEXT("clave_mal"), TEXT("barrera"),
+		TEXT("claxon"), TEXT("taquilla"), TEXT("puerta_madera"), TEXT("puerta_blindada"), TEXT("camion_subir"), TEXT("camion_caja"), TEXT("camion_junta"),
+		TEXT("ladrido"), TEXT("grunido") };
+	for (const TCHAR* N : Pre) Sfx(N);
 	StoneSnd = LoadSnd(TEXT("piedra"));
 	DartSnd = LoadSnd(TEXT("dardo"));
 	WindSnd = LoadSnd(TEXT("viento"));

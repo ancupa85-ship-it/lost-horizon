@@ -3056,6 +3056,53 @@ def prueba_armados():
         check('de vuelta al pie', l.z < 300 and dist2d(l, b) < 200, '%d,%d,%d' % (l.x, l.y, l.z))
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_perro():
+    """Tanda 46. El perro del hangar ronda entre dos puntas; no ve, huele: a menos de DogSmell gruñe (aviso, sin ladrar),
+    si no te apartas ladra y llama a los guardias de cerca, y si te vas se calla. Con el hueso de la olla se le puede dar
+    desde DogGiveDist: se sienta, queda amigo y ya no ladra. Al capturarte vuelve a su ronda."""
+    d = director()
+    P = lambda k: d.get_editor_property(k)
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 1.0
+    check('el perro está en el hangar (modelo importado con sus cuatro animaciones)', d.dog_ready() and d.dog_anim_count() == 4, '%s %s' % (d.dog_ready(), d.dog_anim_count()))
+    if not d.dog_ready():
+        return
+    l0 = d.dog_location()
+    hg = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']['hangar']
+    check('nace dentro del hangar y sobre el suelo', hg['x0'] * 100 < l0.x < hg['x1'] * 100 and hg['y0'] * 100 < l0.y < hg['y1'] * 100 and abs(l0.z) < 60, '%.0f %.0f %.0f' % (l0.x, l0.y, l0.z))
+    yield 3.0
+    l1 = d.dog_location()
+    check('ronda: anda sin que nadie lo moleste', P('dog_state') == 0 and math.hypot(l1.x - l0.x, l1.y - l0.y) > 150 and d.dog_anim_index() == 1, '%.0f cm, estado %s, anim %s' % (math.hypot(l1.x - l0.x, l1.y - l0.y), P('dog_state'), d.dog_anim_index()))
+    mira = math.degrees(math.atan2(l1.y - l0.y, l1.x - l0.x))
+    check('mira hacia donde anda', abs((d.dog_facing() - mira + 540) % 360 - 180) < 25, '%.0f frente a %.0f' % (d.dog_facing(), mira))
+    # agachado y a oscuras da igual: huele
+    cerca = lambda r: tp(d.dog_location().x, d.dog_location().y + r)
+    b0 = P('dog_barks')
+    cerca(P('dog_smell') - 120); jugador().crouch(); yield 0.6
+    check('a un paso te huele y gruñe, sin ladrar todavía', P('dog_state') == 1 and P('dog_growls') == 1 and P('dog_barks') == b0, '%s %s %s' % (P('dog_state'), P('dog_growls'), P('dog_barks')))
+    check('no ofrece nada si no llevas el hueso', 'HUESO' not in str(d.interact_prompt()), str(d.interact_prompt()))
+    cerca(P('dog_smell') * 1.25 + 300); yield 2.2
+    check('si te apartas, se le pasa', P('dog_state') == 0 and P('dog_barks') == b0, '%s %s' % (P('dog_state'), P('dog_barks')))
+    cerca(P('dog_smell') - 120); yield P('dog_growl_seconds') + 2.0
+    check('si te quedas, ladra', P('dog_state') == 2 and P('dog_barks') > b0, '%s %s' % (P('dog_state'), P('dog_barks')))
+    for g in guardias():
+        g.hold(0.0)
+    yield 3.0
+    check('los ladridos llaman a guardias de cerca (si los hay a menos de DogBarkRadius)', P('dog_calls') >= 0, P('dog_calls'))
+    aparte(); yield 4.5
+    check('lejos, se calla y vuelve a la ronda', P('dog_state') == 0, P('dog_state'))
+    # el hueso
+    d.set_flag('hueso')
+    b1 = P('dog_barks')
+    cerca(P('dog_give_dist') - 60); yield 0.5
+    check('con el hueso, la E es dárselo', 'HUESO' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 1.5
+    check('se lo come: amigo, sentado, y ya no llevas el hueso', P('dog_state') == 3 and d.has_flag('perro_amigo') and not d.has_flag('hueso') and d.dog_anim_index() in (2, 3), '%s anim %s' % (P('dog_state'), d.dog_anim_index()))
+    cerca(100); yield 5.0
+    check('amigo: ni gruñe ni ladra aunque lo pises', P('dog_barks') == b1 and P('dog_state') == 3, '%s %s' % (P('dog_barks'), P('dog_state')))
+    jugador().un_crouch()
+
 def prueba_tactica():
     """Tanda 43. Interrogar por la espalda (T) da un dato que le toca a ese guardia y lo deja quieto unos segundos;
     asomarse (Z, V) saca la cámara de lado sin mover el cuerpo; y el que te pierde deja tu silueta en el último sitio
@@ -3157,7 +3204,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas], [prueba_bengala], [prueba_tactica]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas], [prueba_bengala], [prueba_tactica], [prueba_perro]]
 PRUEBAS = []
 
 
@@ -3226,6 +3273,7 @@ def _limpieza(siguiente):
         # tanda 42: ni bengalas ni parpadeo de tu linterna fuera de su prueba (cambian la luz que miden las demás), y de noche
         # tanda 43: la búsqueda en pareja, solo en su prueba (las demás dan alarmas para medir otra cosa)
         d.set_editor_property('last_seen_rule', siguiente is prueba_tactica)
+        d.set_editor_property('dog', siguiente is prueba_perro)   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
         d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
         # tanda 44: la caja que se nota de cerca, solo en su prueba (las de la caja se escribieron pegadas al guardia)
         d.set_editor_property('box_notice_dist', 150.0 if siguiente is prueba_tactica else 0.0)

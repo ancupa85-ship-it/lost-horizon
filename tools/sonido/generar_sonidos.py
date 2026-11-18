@@ -218,6 +218,39 @@ def bengala():
     x[c:] += hp(lp(r.normal(0, 1, n - c), 0.3), 0.85) * (0.32 + 0.1 * np.sin(2 * np.pi * 7 * tc)) * np.minimum(1.0, tc / 0.05) * np.exp(-tc / 2.2)
     return x
 
+def _voz_perro(dur, f0, f1, aspereza, r):
+    """Pulso glotal grave (diente de sierra que baja de f0 a f1) pasado por dos resonancias de hocico, con ruido encima."""
+    n = int(dur * SR); t = np.arange(n) / SR
+    f = f0 + (f1 - f0) * (t / dur) ** 0.6
+    f = f * (1.0 + 0.04 * np.sin(2 * np.pi * 31 * t) + aspereza * 0.25 * lp(r.normal(0, 1, n), 0.98) * 6)
+    ph = np.cumsum(f) / SR
+    src = 2.0 * (ph % 1.0) - 1.0 + aspereza * r.normal(0, 1, n) * 0.6
+    y = np.zeros(n)
+    for fc, q, g in ((520, 5.0, 1.0), (1150, 6.0, 0.7), (2300, 7.0, 0.3)):
+        w = 2 * np.pi * fc / SR; rr = 1.0 - w / (2 * q); a1 = 2 * rr * np.cos(w); a2 = -rr * rr
+        z = np.zeros(n); z1 = z2 = 0.0
+        for i in range(n):
+            v = src[i] + a1 * z1 + a2 * z2; z[i] = v; z2 = z1; z1 = v
+        y += g * z / (np.max(np.abs(z)) + 1e-9)
+    return y
+
+def ladrido():
+    # tanda 46: dos ladridos secos de perro grande. Generador de azar propio
+    r = np.random.default_rng(46)
+    out = np.zeros(int(0.95 * SR))
+    for t0, f0 in ((0.0, 430), (0.42, 400)):
+        y = _voz_perro(0.26, f0, 190, 0.5, r); n = len(y); t = np.arange(n) / SR
+        y *= np.minimum(1.0, t / 0.012) * np.exp(-t / 0.085) ** 0.9
+        a = int(t0 * SR); out[a:a + n] += y
+    return out
+
+def grunido():
+    # tanda 46: grunido bajo y sostenido, con el temblor de la garganta
+    r = np.random.default_rng(47)
+    y = _voz_perro(2.4, 95, 80, 0.9, r); n = len(y); t = np.arange(n) / SR
+    y *= (0.65 + 0.35 * np.sin(2 * np.pi * 23 * t)) * np.minimum(1.0, t / 0.35) * np.minimum(1.0, (2.4 - t) / 0.5)
+    return lp(y, 0.6)
+
 def disparo():
     # tanda 37: tiro de fusil a media distancia: chasquido seco, cuerpo grave y la cola que devuelve el patio.
     # Con su propio generador de azar, para no mover los sonidos de antes
@@ -507,3 +540,6 @@ if __name__ == '__main__':
     save('disparo', disparo(), 0.9)
     # tanda 42: la bengala de las torres
     save('bengala', bengala(), 0.8)
+    # tanda 46: el perro del hangar
+    save('ladrido', ladrido(), 0.85)
+    save('grunido', grunido(), 0.5)

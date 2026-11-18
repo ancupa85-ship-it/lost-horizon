@@ -816,7 +816,11 @@
   "ensena_ultimo": "TE BUSCAN DONDE TE VIERON\nLa silueta es el ultimo sitio donde te vieron: van a registrarlo entre dos. Alejate de ella.",
   "p_derribar_int": "E   DERRIBAR        {0}   INTERROGAR",
   "dt_cocina_raciones": "La cocina saca diecinueve raciones de mas cada noche. Las dejan en la trampilla del hangar.",
-  "dt_bengala_torres": "Las torres tiran una bengala cada cinco minutos, mas o menos. Arde un cuarto de minuto."
+  "dt_bengala_torres": "Las torres tiran una bengala cada cinco minutos, mas o menos. Arde un cuarto de minuto.",
+  "p_perro_hueso": "E   DARLE EL HUESO AL PERRO",
+  "perro_grune": "EL PERRO TE HA OLIDO\nGrune: todavia no ladra. Apartate despacio y se le pasa. La sombra y la caja no le enganan.\nQuiza algo de comer le haga cambiar de idea.",
+  "perro_ladra": "EL PERRO LADRA\nLos guardias de cerca vienen a ver que le pasa. Sal del hangar y espera a que se calle.",
+  "perro_amigo": "EL PERRO\nSuelta el grunido a medias, olfatea el trapo y te quita el hueso de la mano. Se sienta a roerlo.\nYa no ladrara por ti."
  },
  "datos": [
   {
