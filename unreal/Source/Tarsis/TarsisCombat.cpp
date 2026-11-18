@@ -65,7 +65,7 @@ bool ATarsisGuard::FindCover(const FVector& Threat, FVector& Out) const
 			// tanda 39: ni por el mismo lado. Si un companero ya te apunta desde alli, este busca otro angulo (menos
 			// de unos 50 grados entre los dos, visto desde ti, penaliza): entre dos te cierran, no hacen fila
 			const FVector A = (It->CoverLoc - Threat).GetSafeNormal2D(), B = (L - Threat).GetSafeNormal2D();
-			if (FVector::DotProduct(A, B) > 0.64f) Score += 450.0f;
+			if (FVector::DotProduct(A, B) > 0.5f) Score += 1200.0f;   // medido en el PC: con 450 quedaban a 28 grados uno de otro
 		}
 		if (Score < Best) { Best = Score; Out = L + FVector(0.0f, 0.0f, HalfH); bGotCover = true; }
 	}

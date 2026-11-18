@@ -2195,6 +2195,16 @@
    "giro": 70
   },
   {
+   "nombre": "cg_mesa",
+   "modelo": "metal_office_desk",
+   "pos": [
+    5700,
+    1255,
+    60
+   ],
+   "giro": 0
+  },
+  {
    "nombre": "tx_mesa",
    "modelo": "metal_office_desk",
    "pos": [

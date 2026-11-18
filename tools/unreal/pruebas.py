@@ -2636,6 +2636,8 @@ def prueba_equipo():
     check('la linterna no enciende, y dice dónde está', not P('torch') and 'PERIS' in msg().upper(), msg()[:40])
     check('la línea secundaria lo recuerda', 'Peris' in str(d.side_objective()), str(d.side_objective()))
     c = P('gear_spot')
+    # Peris ha salido a fumar: si está en su mesa, la E es para él (empujar o derribar), no para el cajón
+    guardia('Peris').set_actor_location(unreal.Vector(4700.0, 1700.0, guardia('Peris').get_actor_location().z), False, True)
     tp(c.x + 60, c.y, 180.0); yield 0.3
     check('junto a la mesa de Peris, el aviso del cajón', 'CAJON' in str(d.interact_prompt()), str(d.interact_prompt()))
     d.interact(); yield 0.5

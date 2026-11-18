@@ -53,7 +53,7 @@
    "vidal_wall_yaw": 0.0,
    "gear_spot": [
     5700,
-    1500,
+    1385,
     0
    ]
   },
@@ -416,7 +416,7 @@
   "calabozo": "CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja: no amenaces ni compres, escuchale.",
   "cogido_punto": "TE HAN COGIDO\nVuelves al ultimo punto de control: {0}.",
   "cogido_entrada": "TE HAN COGIDO\nVuelves a la entrada de la base.",
-  "celda_abierta": "CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris en la sala de guardia.",
+  "celda_abierta": "CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris: sala de guardia, al norte por el pasillo.",
   "ensena_derribo": "{0} DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma.",
   "ramos_radio": "RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, en el muro sur, junto al agua.\"",
   "p_taquilla_salir": "E   SALIR DE LA TAQUILLA",
@@ -634,8 +634,8 @@
   "vidal_cede": "CABO VIDAL\n{0}",
   "vidal_sigue": "CABO VIDAL\n{0}",
   "vidal_falla": "CABO VIDAL\n{0}\nAsi no. Prueba otra cosa.",
-  "celda_llave": "CELDA ABIERTA\nLa llave del hermano gira sin ruido. Vidal reza de espaldas y no lo ve.\nNo tardaran en encontrar la celda vacia. Tus cosas las tiene Peris en la sala de guardia.",
-  "celda_vidal": "CELDA ABIERTA\nVidal abre y se queda rezando de cara a la pared. \"Yo no le he visto.\"\nNadie dara la alarma. Tus cosas las tiene Peris en la sala de guardia.",
+  "celda_llave": "CELDA ABIERTA\nLa llave del hermano gira sin ruido. Vidal reza de espaldas y no lo ve.\nNo tardaran en encontrar la celda vacia. Tus cosas las tiene Peris: sala de guardia, al norte por el pasillo.",
+  "celda_vidal": "CELDA ABIERTA\nVidal abre y se queda rezando de cara a la pared. \"Yo no le he visto.\"\nNadie dara la alarma. Tus cosas las tiene Peris: sala de guardia, al norte por el pasillo.",
   "celda_fuga": "El calabozo esta vacio. Todas las unidades: ojo, y parte uno por uno.",
   "vidal_r1a": "\"Amenace. Aqui dentro no cuesta nada.\" No levanta la vista.",
   "vidal_r1b": "Deja de rezar. \"Todos lo oimos. Nadie lo dice.\"",
@@ -668,11 +668,11 @@
   "hud_detienen": "QUIETO  -  VIENEN A DETENERTE",
   "hud_alto": "ALTO!  TE APUNTAN  -  QUIETO O DISPARAN",
   "hud_herido": "HERIDO {0}/{1}",
-  "equipo_falta": "TE LO HAN QUITADO\nLinterna, prismaticos y dardos estan en el cajon de Peris, en la sala de guardia.",
+  "equipo_falta": "TE LO HAN QUITADO\nLinterna, prismaticos y dardos estan en el cajon de Peris: sala de guardia, al norte del calabozo por el pasillo.",
   "p_cajon": "E   REGISTRAR EL CAJON DE PERIS",
   "p_cajon_buscando": "REGISTRANDO EL CAJON...  {0} s",
   "cajon_dejado": "CAJON A MEDIAS\nTe apartas y lo dejas como estaba. Hay que empezar otra vez.",
   "equipo_vuelve": "TUS COSAS\nLinterna, prismaticos y dardos, envueltos en tu propia chaqueta.\nDebajo, un reloj de pulsera parado a las tres y dos.",
-  "sec_equipo": "Sin equipo: tus cosas estan en el cajon de Peris, en la sala de guardia"
+  "sec_equipo": "Sin equipo: tus cosas estan en el cajon de Peris (sala de guardia, al norte del calabozo)"
  }
 }
