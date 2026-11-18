@@ -2837,7 +2837,7 @@ def prueba_bengala():
     check('y vuelve a noche', not P('day') and 'NOCHE' in str(d.menu_lines()[16]), str(d.menu_lines()[16]))
     d.press_key('P'); yield 0.3
     # día: a cielo abierto se te ve; bajo techo, penumbra
-    abierto = V(3000, 4600, 100); dentro = V((ck['x0'] + ck['x1']) * 50 + 250, (ck['y0'] + ck['y1']) * 50 + 120, 100)
+    abierto = V(4300, 3500, 100); dentro = V((ck['x0'] + ck['x1']) * 50 + 250, (ck['y0'] + ck['y1']) * 50 + 120, 100)
     n0 = luz_en(abierto)
     d.set_day(True); yield 0.3
     check('de día, a cielo abierto, luz alta', luz_en(abierto) >= 0.85, luz_en(abierto))
