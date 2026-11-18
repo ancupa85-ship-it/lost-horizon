@@ -1461,7 +1461,14 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	if (!bInCone && D > NearDistance) return 0.0f;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisVista), true, this);
 	FHitResult Hit;
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Aim, ECC_Visibility, Q) && Hit.GetActor() != Target)
+	// tanda 42: el de la torre mira desde la boca de su foco; desde sus ojos la linea chocaba con su propia caseta (medido en el PC)
+	FVector From = Eye;
+	if (bTowerSentry && TowerLight)
+	{
+		Q.AddIgnoredActor(TowerLight.Get());
+		From = TowerLight->GetActorLocation() + (Aim - TowerLight->GetActorLocation()).GetSafeNormal() * 90.0f;
+	}
+	if (GetWorld()->LineTraceSingleByChannel(Hit, From, Aim, ECC_Visibility, Q) && Hit.GetActor() != Target)
 	{
 		return 0.0f;   // pared, cajas o contenedor por medio
 	}
