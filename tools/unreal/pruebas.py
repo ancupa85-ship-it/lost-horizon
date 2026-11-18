@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp', 'TarsisCaja.cpp', 'TarsisCharlas.cpp', 'TarsisBengala.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp', 'TarsisCaja.cpp', 'TarsisCharlas.cpp', 'TarsisBengala.cpp', 'TarsisTactica.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -3020,11 +3020,88 @@ def prueba_armados():
         check('de vuelta al pie', l.z < 300 and dist2d(l, b) < 200, '%d,%d,%d' % (l.x, l.y, l.z))
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_tactica():
+    """Tanda 43. Interrogar por la espalda (T) da un dato que le toca a ese guardia y lo deja quieto unos segundos;
+    asomarse (Z, V) saca la cámara de lado sin mover el cuerpo; y el que te pierde deja tu silueta en el último sitio
+    donde te vio y llama a un compañero para registrarlo."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    datos = MISION['datos']
+    le_toca = lambda n: [q['id'] for q in datos if q.get('enlace') == n] + [q['id'] for q in datos if q['ficha'] == n]
+    nombre = lambda g: str(g.get_editor_property('guard_name'))
+    yield ('hasta', lambda: all(estado(x) == 'PATROL' for x in guardias() if not x.get_editor_property('tower_sentry')), 30.0)
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) == 'PATROL' and nombre(g) != 'Ramos']
+    # ---- interrogar
+    con_dato = [g for g in ronda if le_toca(nombre(g))]
+    check('hay guardias de ronda con algo que contar', len(con_dato) >= 2, [nombre(g) for g in con_dato])
+    g = con_dato[0]
+    g.hold(3600.0)
+    d.forget_interrogations()
+    d.simulate_key('C'); yield 0.3
+    for _ in range(3):
+        detras_de(g, 90); yield 0.1
+    check('por la espalda, el aviso ofrece interrogar', 'INTERROGAR' in str(d.interact_prompt()) and 'DERRIBAR' in str(d.interact_prompt()), d.interact_prompt())
+    n0, i0, f0 = d.facts_known(), P('interrogations'), P('interrogation_facts')
+    d.simulate_key('T'); yield 0.3
+    check('la T de verdad lo interroga', P('interrogations') == i0 + 1, P('interrogations'))
+    check('y suelta un dato de los que le tocan', d.facts_known() == n0 + 1 and P('interrogation_facts') == f0 + 1 and any(d.has_flag('dato_' + i) for i in le_toca(nombre(g))), '%d datos; %s' % (d.facts_known(), le_toca(nombre(g))))
+    check('se queda quieto, a mano para derribarlo', g.is_stunned() and estado(g) != 'ALERT' and 'DERRIBAR' in str(d.interact_prompt()), '%s / %s' % (estado(g), d.interact_prompt()))
+    check('ya no se ofrece interrogarlo otra vez', 'INTERROGAR' not in str(d.interact_prompt()), d.interact_prompt())
+    d.interrogate(); yield 0.1
+    check('y si insistes, no cuenta ni da más datos', P('interrogations') == i0 + 1 and d.facts_known() == n0 + 1, P('interrogations'))
+    d.simulate_key('E'); yield 0.3
+    check('con la E cae', estado(g) == 'DOWN', estado(g))
+    d.simulate_key('C'); yield 0.3
+    # quien no tiene nada que le toque, no llena el mapa
+    sin = [x for x in ronda if not le_toca(nombre(x)) and x != g]
+    if sin:
+        x = sin[0]; x.hold(3600.0)
+        for _ in range(3):
+            detras_de(x, 90); yield 0.1
+        n1 = d.facts_known()
+        d.interrogate(); yield 0.2
+        check('el que no sabe nada lo dice y no apunta ningún dato', d.facts_known() == n1 and P('interrogations') == i0 + 2, '%s: %d' % (nombre(x), d.facts_known()))
+        d.simulate_key('E'); yield 0.3
+    # ---- asomarse, en lo abierto
+    tp(3000, 4600, 0); yield 0.3
+    cam = lambda: jugador().get_component_by_class(unreal.CameraComponent).get_world_location()
+    lado = lambda a, b: (b.x - a.x) * r.x + (b.y - a.y) * r.y
+    c0 = cam(); p0 = jugador().get_actor_location(); r = jugador().get_actor_right_vector()
+    d.simulate_key('V', True, False); yield 0.7
+    c1 = cam()
+    check('la V saca la cámara a la derecha', 35.0 < lado(c0, c1) <= P('lean_dist') + 1.0 and abs(P('lean_now') - lado(c0, c1)) < 3.0, '%.0f cm (lean_now %.0f)' % (lado(c0, c1), P('lean_now')))
+    check('sin mover el cuerpo', dist2d(p0, jugador().get_actor_location()) < 3.0, dist2d(p0, jugador().get_actor_location()))
+    d.simulate_key('V', False, True); yield 0.7
+    check('al soltarla vuelve', abs(lado(c0, cam())) < 2.0 and abs(P('lean_now')) < 1.0, lado(c0, cam()))
+    d.simulate_key('Z', True, False); yield 0.7
+    check('y la Z la saca a la izquierda', lado(c0, cam()) < -35.0, lado(c0, cam()))
+    d.simulate_key('Z', False, True); yield 0.7
+    check('la línea de teclas lo nombra', 'asomarse' in str(d.help_line()), str(d.help_line())[-70:])
+    # ---- el último sitio donde te vieron: el que te pierde deja la silueta y llama al libre más cercano
+    libres = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and nombre(x) != 'Ramos']
+    pares = sorted(((dist2d(a.get_actor_location(), b.get_actor_location()), i, j) for i, a in enumerate(libres) for j, b in enumerate(libres) if i != j))
+    if not pares:
+        check('quedan dos guardias de ronda para la búsqueda en pareja', False); return
+    dd, i, j = pares[0]; a, b = libres[i], libres[j]
+    la = a.get_actor_location()
+    jugador().set_actor_hidden_in_game(True)   # se mide que te pierdan, no que te vean
+    m0, s0 = P('last_known_marks'), P('partner_searches')
+    a.alarm(la)
+    yield ('hasta', lambda: director().get_editor_property('last_known_marks') > m0, 20.0)
+    check('al perderte queda la silueta donde te vio', P('last_known_marks') == m0 + 1 and P('last_known_t') > 0.0 and dist2d(P('last_known'), la) < 50.0, '%s, %.0f s' % (P('last_known_marks'), P('last_known_t')))
+    if dd < P('partner_dist'):
+        yield 0.3
+        check('y llama al compañero más cercano', P('partner_searches') == s0 + 1 and estado(b) in ('SUSPICIOUS', 'SEARCH'), '%s a %.0f cm: %s' % (nombre(b), dd, estado(b)))
+    t0 = P('last_known_t')
+    yield 1.0
+    check('la silueta se va con el tiempo', P('last_known_t') < t0, P('last_known_t'))
+    jugador().set_actor_hidden_in_game(False)
+
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas], [prueba_bengala]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas], [prueba_bengala], [prueba_tactica]]
 PRUEBAS = []
 
 
@@ -3091,6 +3168,9 @@ def _limpieza(siguiente):
         d.set_editor_property('truck_entry_papers', 0.0)
         d.set_editor_property('truck_stay_seconds', 0.0)
         # tanda 42: ni bengalas ni parpadeo de tu linterna fuera de su prueba (cambian la luz que miden las demás), y de noche
+        # tanda 43: la búsqueda en pareja, solo en su prueba (las demás dan alarmas para medir otra cosa)
+        d.set_editor_property('last_seen_rule', siguiente is prueba_tactica)
+        d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
         d.set_editor_property('flares', False)
         d.set_editor_property('torch_flicker', False)
         if d.get_editor_property('day'):

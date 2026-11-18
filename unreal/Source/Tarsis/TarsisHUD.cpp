@@ -59,6 +59,7 @@ void ATarsisHUD::DrawHUD()
 	DrawBox(D);
 	DrawBinoculars(D);
 	DrawMarked();
+	DrawLastKnown(D);
 	DrawHeard(D);
 	DrawLight(D, C && C->bIsCrouched);
 	DrawAlert();
@@ -225,6 +226,30 @@ void ATarsisHUD::DrawMarked()
 		Panel(Scr.X - 3.0f * S, Scr.Y + 4.0f * S, 6.0f * S, 6.0f * S, Col);
 		Text(L, Scr.X, Scr.Y - 20.0f * S, Col, 0.7f * S, true);
 	}
+}
+
+// tanda 43: tu silueta en el ultimo sitio donde te vieron (alli van a buscar)
+void ATarsisHUD::DrawLastKnown(ATarsisDirector* D)
+{
+	if (!D || D->LastKnownT <= 0.0f) return;
+	APlayerController* PC = GetOwningPlayerController();
+	const APawn* Pl = GetOwningPawn();
+	if (!PC || !Pl) return;
+	const float S = UiScale();
+	const FVector Feet(D->LastKnown.X, D->LastKnown.Y, D->LastKnown.Z - 88.0f);
+	FVector2D A, B;
+	if (!PC->ProjectWorldLocationToScreen(Feet, A, true) || !PC->ProjectWorldLocationToScreen(Feet + FVector(0.0f, 0.0f, 180.0f), B, true)) return;
+	if (A.X < 0.0f || A.X > Canvas->ClipX || B.Y > Canvas->ClipY || A.Y < 0.0f) return;
+	const float Tall = FMath::Clamp(A.Y - B.Y, 10.0f * S, Canvas->ClipY * 0.6f);
+	const float Fade = FMath::Clamp(D->LastKnownT / 3.0f, 0.0f, 1.0f) * (0.75f + 0.25f * FMath::Sin(GetWorld()->GetTimeSeconds() * 5.0f));
+	const FLinearColor Col(1.0f, 0.82f, 0.23f, 0.34f * Fade);
+	// cabeza, tronco y piernas: una figura, no un icono
+	Panel(A.X - Tall * 0.065f, A.Y - Tall, Tall * 0.13f, Tall * 0.13f, Col);
+	Panel(A.X - Tall * 0.15f, A.Y - Tall * 0.85f, Tall * 0.30f, Tall * 0.40f, Col);
+	Panel(A.X - Tall * 0.13f, A.Y - Tall * 0.45f, Tall * 0.11f, Tall * 0.45f, Col);
+	Panel(A.X + Tall * 0.02f, A.Y - Tall * 0.45f, Tall * 0.11f, Tall * 0.45f, Col);
+	const int32 M = FMath::RoundToInt(FVector::Dist2D(D->LastKnown, Pl->GetActorLocation()) / 100.0f);
+	Text(FString::Printf(TEXT("TE VIERON AQUI  %dm"), M), A.X, A.Y - Tall - 20.0f * S, FLinearColor(1.0f, 0.82f, 0.23f, 0.85f * Fade), 0.7f * S, true);
 }
 
 void ATarsisHUD::DrawHeard(ATarsisDirector* D)

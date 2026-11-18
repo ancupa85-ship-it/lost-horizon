@@ -1046,6 +1046,62 @@ public:
 	float FlareT = 0.0f;
 	FVector FlareFrom = FVector::ZeroVector;
 	FVector FlareTop = FVector::ZeroVector;
+
+	// ---- tanda 43: interrogar, asomarse y el ultimo sitio donde te vieron (TarsisTactica.cpp)
+	/** Interrogar (T) al guardia que tienes a mano por la espalda: suelta un dato y se queda quieto estos segundos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	bool bInterrogation = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	float InterrogateSeconds = 5.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	int32 Interrogations = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	int32 InterrogationFacts = 0;
+	UPROPERTY() TSet<FString> Interrogated;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tactica")
+	void Interrogate();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tactica")
+	bool CanInterrogate(const class ATarsisGuard* G) const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tactica")
+	void ForgetInterrogations() { Interrogated.Reset(); }
+	/** Asomarse (Z izquierda, V derecha, mantenidas): cuanto sale la camara de lado (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	bool bLeanRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	float LeanDist = 55.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	float LeanNow = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	int32 Leans = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	bool bLeanLeft = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	bool bLeanRight = false;
+	bool bLeanTaught = false;
+	void LeanLeftOn() { bLeanLeft = true; }
+	void LeanLeftOff() { bLeanLeft = false; }
+	void LeanRightOn() { bLeanRight = true; }
+	void LeanRightOff() { bLeanRight = false; }
+	void LeanTick(float DeltaSeconds);
+	/** Ultimo avistamiento: el que te pierde deja marcado el sitio y llama al companero libre mas cercano (a menos de PartnerDist). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	bool bLastSeenRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	float LastKnownSeconds = 14.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tactica")
+	float PartnerDist = 3000.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	FVector LastKnown = FVector::ZeroVector;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	float LastKnownT = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	int32 LastKnownMarks = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Tactica")
+	int32 PartnerSearches = 0;
+	float PartnerCoolT = 0.0f;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tactica")
+	void LostPlayer(class ATarsisGuard* G, const FVector& Where);
+	void TacticsTick(float DeltaSeconds);
 	FVector FlareDrift = FVector::ZeroVector;
 
 	/** Dia (true) o noche. La mision 1 es de noche; la de los inspectores sera de dia. Se cambia en Pausa. */

@@ -993,6 +993,11 @@ void ATarsisGuard::SetState(ETarsisGuardState NewState)
 			if (It->bTowerSentry) It->CallBeam(Where, It->BeamCallSeconds);
 		}
 	}
+	// tanda 43: el que te pierde deja marcado el sitio y llama a un companero (lo decide el director)
+	if (NewState == ETarsisGuardState::Search && State == ETarsisGuardState::Alert && !bTowerSentry && !bAlly && GetWorld())
+	{
+		for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt) { Dt->LostPlayer(this, LastSeen.IsZero() ? GetActorLocation() : LastSeen); break; }
+	}
 	if (NewState != ETarsisGuardState::Alert) { bRadioCall = false; bHasCover = false; AimT = 0.0f; }
 	if (NewState == ETarsisGuardState::Alert || NewState == ETarsisGuardState::Patrol || NewState == ETarsisGuardState::Down) bNoiseSearch = false;
 	State = NewState;

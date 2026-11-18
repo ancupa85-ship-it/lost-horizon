@@ -806,7 +806,17 @@
   "trampilla": "TRAMPILLA\nAcero nuevo en un suelo viejo. Tres cerrojos con candado, por fuera: no es para que nadie entre.\nPor la rendija sube aire tibio, una luz roja y un zumbido grave. Hoy no se abre.",
   "ensena_bengala": "BENGALA\nMientras cae, la base se ve como de dia. A la sombra de un muro o bajo techo sigues a oscuras: no cruces lo abierto hasta que se apague.",
   "dia": "DE DIA\nA cielo abierto se te ve desde lejos. Bajo techo, algo menos.",
-  "noche": "DE NOCHE"
+  "noche": "DE NOCHE",
+  "int_ya": "YA HA HABLADO\n{0} no sabe mas. Derribalo o dejalo pasar.",
+  "int_nada": "No se nada mas. Se lo juro.",
+  "int_habla": "No dispare. Le digo lo que se.",
+  "ensena_interrogar": "INTERROGADO\n{0} habla y se queda quieto unos segundos. Derribalo (E) antes de que se rehaga, o ira a por ti.",
+  "ensena_asomarse": "ASOMADO\nSolo sacas la cabeza: desde la esquina ves sin que te vean. Suelta la tecla para volver.",
+  "busca_pareja": "Lo he perdido por aqui. {0}, cubre ese lado.",
+  "ensena_ultimo": "TE BUSCAN DONDE TE VIERON\nLa silueta es el ultimo sitio donde te vieron: van a registrarlo entre dos. Alejate de ella.",
+  "p_derribar_int": "E   DERRIBAR        T   INTERROGAR",
+  "dt_cocina_raciones": "La cocina saca diecinueve raciones de mas cada noche. Las dejan en la trampilla del hangar.",
+  "dt_bengala_torres": "Las torres tiran una bengala cada cinco minutos, mas o menos. Arde un cuarto de minuto."
  },
  "datos": [
   {
@@ -898,6 +908,19 @@
    "id": "carmona_hangar",
    "ficha": "Carmona",
    "texto": "dt_carmona_hangar",
+   "clase": "costumbre"
+  },
+  {
+   "id": "cocina_raciones",
+   "ficha": "Lobato",
+   "texto": "dt_cocina_raciones",
+   "clase": "historia",
+   "enlace": "Alarcon"
+  },
+  {
+   "id": "bengala_torres",
+   "ficha": "Vega",
+   "texto": "dt_bengala_torres",
    "clase": "costumbre"
   }
  ],
