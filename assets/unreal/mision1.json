@@ -60,7 +60,9 @@
    "truck_stay_x": 4900.0,
    "truck_stay_seconds": 600.0,
    "uniform_dist": 900.0,
-   "talk_hear_dist": 550.0
+   "talk_hear_dist": 550.0,
+   "dog_mesh_yaw": 270.0,
+   "dog_scale": 1.0
   },
   "guardias": {
    "*": {

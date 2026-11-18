@@ -227,7 +227,8 @@ void ATarsisDirector::SetDay(bool bNewDay)
 			bool bOpen = false;
 			static const FVector Off[5] = { FVector(0.0f), FVector(150.0f, 0.0f, 0.0f), FVector(-150.0f, 0.0f, 0.0f), FVector(0.0f, 150.0f, 0.0f), FVector(0.0f, -150.0f, 0.0f) };
 			int32 OpenN = 0;
-			for (const FVector& O : Off) { if (!GetWorld()->LineTraceSingleByChannel(Hit, P + O + FVector(0.0f, 0.0f, 60.0f), P + O + FVector(0.0f, 0.0f, 2500.0f), ECC_Visibility, Q2)) ++OpenN; }
+			// (las trazas salen a 15 cm: a 60 empezaban por encima de los techos bajos, como el de la cocina a 30 cm de su bombilla)
+			for (const FVector& O : Off) { if (!GetWorld()->LineTraceSingleByChannel(Hit, P + O + FVector(0.0f, 0.0f, 15.0f), P + O + FVector(0.0f, 0.0f, 2500.0f), ECC_Visibility, Q2)) ++OpenN; }
 			bOpen = OpenN >= 2 || (OpenN >= 1 && (*It == GateLamp.Get() || BreakableLamp(*It)));
 			if (!bOpen) continue;   // bajo techo
 			L->SetVisibility(false);
