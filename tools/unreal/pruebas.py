@@ -3069,7 +3069,7 @@ def prueba_cruce():
     jugador().set_actor_hidden_in_game(True)
     for g in guardias():
         g.hold(0.0 if g in (a, b) else 3600.0)
-    d.set_editor_property('mission_time', max(P('mission_time'), float(c.get('desde', 0)) + 1.0))
+    yield ('hasta', lambda: director().get_editor_property('mission_time') > float(c.get('desde', 0)) + 1.0, float(c.get('desde', 0)) + 30.0)   # antes de su hora no hablan
     sx, sy = c['sitio'][0], c['sitio'][1]
     juntos = lambda: (a.set_actor_location(V(sx - 900, sy - 250, a.get_actor_location().z), False, True), b.set_actor_location(V(sx - 900, sy + 250, b.get_actor_location().z), False, True))
     n0 = P('talks_crossed')
