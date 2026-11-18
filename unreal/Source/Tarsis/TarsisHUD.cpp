@@ -262,7 +262,7 @@ void ATarsisHUD::DrawMarked()
 void ATarsisHUD::DrawTalk(ATarsisDirector* D)
 {
 	// tanda 47: un bocadillo sobre los dos que hablan, para que sepas que hay charla y vayas hacia ella
-	if (!D || D->TalkIdx < 0 || D->TalkPhase != 1) return;
+	if (!D || D->TalkIdx < 0 || D->TalkPhase != 1 || D->bTalkRadio) return;
 	APlayerController* PC = GetOwningPlayerController();
 	const APawn* Pl = GetOwningPawn();
 	if (!PC || !Pl) return;

@@ -1415,6 +1415,9 @@ public:
 	int32 TalkNext = 0;
 	bool bTalkHeardAny = false;
 	bool bTalkMurmur = false;
+	/** Tanda 47: charla por la red, oida desde la emisora: cada uno habla desde donde esta, sin dejar la ronda. */
+	bool bTalkRadio = false;
+	bool StartTalkRadio(int32 Index);
 	// ---- tanda 40: la caja de carton (X) y el uniforme (TarsisCaja.cpp)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
 	bool bBoxOn = false;

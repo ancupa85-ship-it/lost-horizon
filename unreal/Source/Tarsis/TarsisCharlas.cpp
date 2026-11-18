@@ -72,8 +72,9 @@ void ATarsisDirector::ToggleMindMap()
 void ATarsisDirector::EndTalk(bool bCut)
 {
 	if (TalkIdx < 0) return;
-	if (TalkA) TalkA->EndErrandIn(bCut ? 0.0f : 1.5f);
-	if (TalkB) TalkB->EndErrandIn(bCut ? 0.0f : 1.5f);
+	if (TalkA && !bTalkRadio) TalkA->EndErrandIn(bCut ? 0.0f : 1.5f);
+	if (TalkB && !bTalkRadio) TalkB->EndErrandIn(bCut ? 0.0f : 1.5f);
+	bTalkRadio = false;
 	if (bCut && TalkPhase == 1 && bTalkHeardAny) ShowMessage(Tx(TEXT("charla_cortada"), TEXT("SE CALLAN\nLa charla se corta. Volveran a hablar mas tarde.")), 3.5f);
 	if (bCut) ++TalkCuts;
 	TalkIdx = -1;
@@ -91,6 +92,28 @@ bool ATarsisDirector::AtEmisora() const
 bool ATarsisDirector::StartTalk(int32 Index)
 {
 	return Talks.IsValidIndex(Index) && StartTalkAt(Index, Talks[Index].Spot);
+}
+
+bool ATarsisDirector::StartTalkRadio(int32 Index)
+{
+	// junto a la emisora: los dos hablan por la red desde donde esten, sin dejar la ronda
+	if (TalkIdx >= 0 || !Talks.IsValidIndex(Index)) return false;
+	ATarsisGuard* GA = TalkGuard(GetWorld(), Talks[Index].A);
+	ATarsisGuard* GB = TalkGuard(GetWorld(), Talks[Index].B);
+	if (!GA || !GB || GA->State != ETarsisGuardState::Patrol || GB->State != ETarsisGuardState::Patrol || GA->IsOnErrand() || GB->IsOnErrand()) return false;
+	TalkSpotNow = GA->GetActorLocation();
+	TalkIdx = Index;
+	TalkPhase = 1;
+	TalkLine = 0;
+	TalkT = TalkLineSeconds - 1.0f;
+	TalkLineWait = TalkLineSeconds;
+	TalkA = GA;
+	TalkB = GB;
+	bTalkHeardAny = false;
+	bTalkMurmur = false;
+	bTalkRadio = true;
+	++TalksStarted;
+	return true;
 }
 
 bool ATarsisDirector::StartTalkAt(int32 Index, const FVector& Spot)
@@ -161,7 +184,7 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 				if (!bTap && FVector::Dist2D(Pl->GetActorLocation(), T.Spot) > TalkNearDist) continue;
 				TalkCrossT += 2.0f;
 				if (TalkCrossT < (bTap ? RadioTapWait : TalkCrossWait)) continue;
-				if (StartTalk(k)) { TalkCrossT = 0.0f; TalkNext = k + 1; break; }
+				if (bTap ? StartTalkRadio(k) : StartTalk(k)) { TalkCrossT = 0.0f; TalkNext = k + 1; break; }
 				continue;
 			}
 			if (FVector::Dist2D(Pl->GetActorLocation(), T.Spot) > TalkStartDist) continue;
@@ -171,7 +194,9 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 	}
 	const FTarsisTalk& T = Talks[TalkIdx];
 	// uno de los dos ha dejado el recado (te ha visto, ha oido algo, lo han tumbado): se acabo
-	if (!TalkA || !TalkB || !TalkA->IsOnErrand() || !TalkB->IsOnErrand()) { EndTalk(true); return; }
+	if (!TalkA || !TalkB) { EndTalk(true); return; }
+	if (bTalkRadio) { if (TalkA->State != ETarsisGuardState::Patrol || TalkB->State != ETarsisGuardState::Patrol || BaseState() != 0) { EndTalk(true); return; } }
+	else if (!TalkA->IsOnErrand() || !TalkB->IsOnErrand()) { EndTalk(true); return; }
 	TalkT += DeltaSeconds;
 	if (TalkPhase == 0)
 	{
@@ -188,9 +213,11 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 		EndTalk(false);
 		return;
 	}
-	const float D = FVector::Dist2D(Pl->GetActorLocation(), TalkSpotNow);
+	// por la red no hay sitio al que acercarse: solo se oye desde la emisora
+	const float D = bTalkRadio ? 1.0e9f : FVector::Dist2D(Pl->GetActorLocation(), TalkSpotNow);
 	const FString Who = T.Who.IsValidIndex(TalkLine) ? T.Who[TalkLine] : T.A;
-	if (ATarsisGuard* Sp = Who.Equals(T.B, ESearchCase::IgnoreCase) ? TalkB.Get() : TalkA.Get()) Sp->PlayGesture(TEXT("pase"), 1.2f, (Sp == TalkA ? TalkB : TalkA)->GetActorLocation());
+	if (bTalkRadio) {}
+	else if (ATarsisGuard* Sp = Who.Equals(T.B, ESearchCase::IgnoreCase) ? TalkB.Get() : TalkA.Get()) Sp->PlayGesture(TEXT("pase"), 1.2f, (Sp == TalkA ? TalkB : TalkA)->GetActorLocation());
 	const bool bTapNow = AtEmisora();
 	// tanda 47: con los prismaticos, apuntando a los que hablan, se les oye de lejos
 	bool bScope = false;
