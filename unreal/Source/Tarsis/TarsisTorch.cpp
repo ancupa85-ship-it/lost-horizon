@@ -19,6 +19,7 @@
 void ATarsisDirector::ToggleTorch()
 {
 	if (bCodec || bMenu || bCine || bDone) return;
+	if (!bTorch && BoxBlocks()) return;
 	SetTorch(!bTorch);
 }
 

@@ -2912,6 +2912,286 @@
    ],
    "giro": -8,
    "pequeno": true
+  },
+  {
+   "nombre": "han_carton0",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    5560,
+    7180,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "han_carton1",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    5480,
+    7190,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "han_carton2",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    5560,
+    7100,
+    60
+   ],
+   "giro": 12
+  },
+  {
+   "nombre": "han_carton3",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    5545,
+    7175,
+    180
+   ],
+   "giro": -8
+  },
+  {
+   "nombre": "han_carton4",
+   "modelo": "cardboard_box_01",
+   "pos": [
+    5400,
+    7200,
+    60
+   ],
+   "giro": 12
+  },
+  {
+   "nombre": "han_cajon_e0",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5640,
+    6900,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "han_cajon_e1",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5640,
+    6780,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "han_cajon_e2",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5640,
+    6840,
+    180
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "han_cajon_e3",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5520,
+    6500,
+    60
+   ],
+   "giro": 5
+  },
+  {
+   "nombre": "han_cajon_e4",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    5640,
+    6520,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "han_bidon0",
+   "modelo": "barrel_03",
+   "pos": [
+    4130,
+    7200,
+    60
+   ],
+   "giro": 3
+  },
+  {
+   "nombre": "han_bidon1",
+   "modelo": "barrel_03",
+   "pos": [
+    4215,
+    7215,
+    60
+   ],
+   "giro": 67
+  },
+  {
+   "nombre": "han_bidon2",
+   "modelo": "barrel_03",
+   "pos": [
+    4135,
+    7110,
+    60
+   ],
+   "giro": 16
+  },
+  {
+   "nombre": "han_bidon3",
+   "modelo": "barrel_03",
+   "pos": [
+    4300,
+    7225,
+    60
+   ],
+   "giro": 7
+  },
+  {
+   "nombre": "han_saco0",
+   "modelo": "cement_bag",
+   "pos": [
+    4150,
+    6800,
+    60
+   ],
+   "giro": 8
+  },
+  {
+   "nombre": "han_saco1",
+   "modelo": "cement_bag",
+   "pos": [
+    4150,
+    6730,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "han_saco2",
+   "modelo": "cement_bag",
+   "pos": [
+    4150,
+    6765,
+    120
+   ],
+   "giro": 8
+  },
+  {
+   "nombre": "han_saco3",
+   "modelo": "cement_bag",
+   "pos": [
+    4240,
+    6790,
+    60
+   ],
+   "giro": 8
+  },
+  {
+   "nombre": "han_rueda0",
+   "modelo": "old_tyre",
+   "pos": [
+    4140,
+    6480,
+    60
+   ],
+   "giro": 29
+  },
+  {
+   "nombre": "han_rueda1",
+   "modelo": "old_tyre",
+   "pos": [
+    4150,
+    6490,
+    120
+   ],
+   "giro": 54
+  },
+  {
+   "nombre": "han_rueda2",
+   "modelo": "old_tyre",
+   "pos": [
+    4260,
+    6460,
+    60
+   ],
+   "giro": 3
+  },
+  {
+   "nombre": "han_cajon_f0",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    4700,
+    7230,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "han_cajon_f1",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    4830,
+    7230,
+    60
+   ],
+   "giro": 95
+  },
+  {
+   "nombre": "han_cajon_f2",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    4765,
+    7230,
+    180
+   ],
+   "giro": 85
+  },
+  {
+   "nombre": "han_cajon_f3",
+   "modelo": "wooden_military_crate",
+   "pos": [
+    4960,
+    7235,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "han_jerry0",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    4380,
+    7240,
+    60
+   ],
+   "giro": 20
+  },
+  {
+   "nombre": "han_jerry1",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    4420,
+    7250,
+    60
+   ],
+   "giro": -30
+  },
+  {
+   "nombre": "han_estante",
+   "modelo": "steel_frame_shelves_01",
+   "pos": [
+    5200,
+    7270,
+    60
+   ],
+   "giro": 0
   }
  ],
  "vaciar": {

@@ -1406,6 +1406,9 @@ void ATarsisGuard::ShowTorch(bool bOn)
 	if (TorchGlow) TorchGlow->SetVisibility(bOn);
 }
 
+float ATarsisGuard::GSeenMul = 1.0f;
+float ATarsisGuard::GFarLimit = 0.0f;
+
 float ATarsisGuard::Visibility(const AActor* Target) const
 {
 	// oculto: durante una cinemática o metido en una taquilla; aturdido por un empujón no ve nada
@@ -1413,6 +1416,11 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 70.0f);
 	const FVector Aim = Target->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f);
 	const float D = FVector::Dist(Eye, Aim);
+	// tanda 40: quieto dentro de la caja de carton no te ve; con uniforme, de lejos eres uno mas (si no te persigue ya)
+	if (const APawn* TP = Cast<APawn>(Target))
+	{
+		if (TP->IsPlayerControlled() && (GSeenMul <= 0.0f || (GFarLimit > 0.0f && D > GFarLimit && State != ETarsisGuardState::Alert))) return 0.0f;
+	}
 	// en el cono de su linterna te ve de más lejos que a simple vista (pero solo de frente: el cono es estrecho)
 	bool bTorch = false;
 	if (HasFlashlightOn() && D < Flashlight->AttenuationRadius)
@@ -1505,7 +1513,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		if (StunT <= 0.0f)
 		{
 			APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
-			if (Pl && !Pl->IsHidden()) { Meter = 1.0f; UnseenT = 0.0f; LastSeen = Pl->GetActorLocation(); SetState(ETarsisGuardState::Alert); }
+			if (Pl && !Pl->IsHidden() && GSeenMul > 0.0f) { Meter = 1.0f; UnseenT = 0.0f; LastSeen = Pl->GetActorLocation(); SetState(ETarsisGuardState::Alert); }
 			else { LastSeen = GetActorLocation(); Meter = 0.6f; SetState(ETarsisGuardState::Search); }   // te has escondido: busca alrededor
 		}
 		return;

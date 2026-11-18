@@ -31,6 +31,7 @@ private:
 	void DrawMenu(class ATarsisDirector* D);
 	void DrawReport(class ATarsisDirector* D);
 	void DrawHint(class ATarsisDirector* D);
+	void DrawBox(class ATarsisDirector* D);
 	void DrawHiding(class ATarsisDirector* D);
 	void DrawRadioAsk(class ATarsisDirector* D);
 	void DrawCellAsk(class ATarsisDirector* D);

@@ -438,6 +438,7 @@ for c, L in enumerate(kont):
 #     recortado M_Hierbajo, sin colisión, sin sombra y sin contar para la navegación (tools/unreal/montar_base.py).
 import random
 def hierbajos():
+    HG = (JEXT or {}).get('hangar')
     rs = random.Random(2207); V, F, UV = [], [], []
     TAM = (0.78, 0.6, 0.92, 0.56)     # lado del plano de cada mata (m): hierba seca alta, mata verde, cardo, roseta
     def mata(px, py, z=0.0, k=1.0, var=None):
@@ -453,6 +454,7 @@ def hierbajos():
             q = [(px - dx, py - dy, z - 0.025), (px + dx, py + dy, z - 0.025), (px + dx + lx, py + dy + ly, z + h - 0.025), (px - dx + lx, py - dy + ly, z + h - 0.025)]
             uv = [(u0, vb), (u1, vb), (u1, vt), (u0, vt)]
             for orden in ((0, 1, 2, 3), (3, 2, 1, 0)):
+                if HG and HG['x0'] - 0.6 < px < HG['x1'] + 0.6 and 60.2 < py < HG['y1'] + 0.6: continue   # tanda 40: dentro del hangar y en su rampa no crece nada
                 n = len(V); V.extend((q[i][0], -q[i][1], q[i][2]) for i in orden); UV.extend(uv[i] for i in orden); F.append((n, n + 1, n + 2, n + 3))
     def linea(xa, ya, xb, yb, nx, ny, dens, z=0.0, k=1.0, saltos=()):
         """Matas al pie de una línea (muro, bordillo). (nx, ny): hacia dónde se separan de ella; saltos: tramos, en metros desde
@@ -554,7 +556,13 @@ for tw in TORRES[N_TORRES_VIEJAS:]:
     for pu in tw['puestos']:
         lights.append({'kind': 'SPOT', 'name': 'foco_torreta', 'pos': pu['foco']['pos'], 'dir': pu['foco']['dir'],
                        'color': [0.8, 0.9, 1.0], 'power': 90000})
-json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'marcas': MARCAS, 'torres': TORRES,
+spawn_yaw = None
+if JEXT and JEXT.get('brecha'):   # tanda 40: se empieza junto a la brecha del muro norte, mirando hacia dentro
+    q = JEXT['brecha']; spawn = [q['inicio'][0], -q['inicio'][1], 0.0]; spawn_yaw = q['giro']
+if JEXT and JEXT.get('hangar'):   # la bombilla del hangar: foco hacia abajo, al final de la lista
+    q = JEXT['hangar']['luz']
+    lights.append({'kind': 'POINT', 'name': 'hangar', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.82, 0.55], 'power': 900})
+json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'spawn_yaw': spawn_yaw, 'marcas': MARCAS, 'torres': TORRES,
            **({'ext': JEXT} if JEXT else {}), 'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
           open(os.path.join(OUT, 'base.json'), 'w'), indent=1)
 shutil.rmtree(tmp, ignore_errors=True)

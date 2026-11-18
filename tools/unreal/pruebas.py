@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp', 'TarsisCaja.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -976,7 +976,7 @@ def prueba_perimetro():
     check('el portillo sin Ramos está cerrado', 'PORTILLO DE LA MARISMA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
     # la partida sigue empezando donde siempre
     ps = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.PlayerStart)
-    check('el jugador sigue empezando en (500, 500)', ps and dist2d(ps[0].get_actor_location(), V(500, 500, 0)) < 150, [ps[0].get_actor_location() if ps else None])
+    check('el jugador empieza junto a la brecha del muro norte (tanda 40)', ps and dist2d(ps[0].get_actor_location(), V(2120, -1640, 0)) < 150, [ps[0].get_actor_location() if ps else None])
     aparte()
 
 
@@ -2656,6 +2656,111 @@ def prueba_equipo():
     aparte()
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_hangar():
+    """Tanda 40. Se empieza junto a la brecha del muro norte; hay un hangar en la franja sur; el camión pasa control al
+    entrar, para un rato ante el hangar y sigue al control de salida; la caja de cartón (X) te esconde quieto y en la
+    caja del camión burla el registro; el uniforme te hace pasar por guardia de lejos."""
+    d = director(); w = mundo()
+    P = lambda k: director().get_editor_property(k)
+    estado_c = lambda: director().get_editor_property('truck_state')
+    cx = lambda: director().truck_location().x
+    traza = lambda a, b: unreal.SystemLibrary.line_trace_single(w, a, b, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [jugador()], unreal.DrawDebugTrace.NONE, True)
+    for g in guardias():
+        g.hold(3600.0)
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    b, hg = ext['brecha'], ext['hangar']
+    ps = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.PlayerStart)
+    check('se empieza junto a la brecha', ps and dist2d(ps[0].get_actor_location(), V(b['inicio'][0] * 100, b['inicio'][1] * 100, 0)) < 60, [ps[0].get_actor_location() if ps else None])
+    check('la brecha es un boquete en el muro (a 1 m del suelo se ve el otro lado)', traza(V(b['pos'][0] * 100, b['pos'][1] * 100 + 150, 125), V(b['pos'][0] * 100, b['pos'][1] * 100 - 150, 125)) is None)
+    check('y a su lado el muro sigue entero', traza(V(b['pos'][0] * 100 + 300, b['pos'][1] * 100 + 150, 125), V(b['pos'][0] * 100 + 300, b['pos'][1] * 100 - 150, 125)) is not None)
+    tp(b['pos'][0] * 100, b['pos'][1] * 100 + 110, -90); yield 0.2
+    jugador().crouch(); yield 0.3
+    for _ in range(8):
+        jugador().launch_character(V(0, -300, 0), True, False); yield 0.15
+    check('por el boquete no se vuelve a salir (el cascote lo ciega)', jugador().get_actor_location().y > b['pos'][1] * 100 - 20, jugador().get_actor_location().y)
+    jugador().un_crouch(); yield 0.2
+    # el hangar
+    cxh, cyh = (hg['x0'] + hg['x1']) * 50, (hg['y0'] + hg['y1']) * 50
+    h = traza(V(cxh, cyh, 1200), V(cxh + 150, cyh + 150, 100))
+    check('el hangar tiene cubierta', h is not None and h.to_tuple()[4].z > hg['alto'] * 100 - 20, h.to_tuple()[4].z if h else None)
+    check('portón abierto hacia el camino', traza(V(cxh, hg['y0'] * 100 - 200, 150), V(cxh, hg['y0'] * 100 + 300, 150)) is None)
+    check('y pared a los lados del portón', traza(V(hg['x0'] * 100 + 200, hg['y0'] * 100 - 200, 150), V(hg['x0'] * 100 + 200, hg['y0'] * 100 + 300, 150)) is not None)
+    tp(cxh, cyh, 0); yield 0.3
+    check('dentro se puede estar de pie', abs(jugador().get_actor_location().z - 100) < 40, jugador().get_actor_location().z)
+    # la caja
+    d.toggle_box(); yield 0.1
+    check('sin caja, la X no hace nada', not P('box_on'))
+    pt = next(q for q in MISION['puntos'] if q['id'] == 'caja')
+    tp(pt['pos'][0] - 90, pt['pos'][1] - 90, 45); yield 0.3
+    check('al fondo del hangar, el aviso de la caja', 'CAJA' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.3
+    check('la coges', d.has_flag('caja') and 'CARTON' in str(P('message')), str(P('message'))[:30])
+    check('la línea de teclas la nombra', 'X caja' in str(d.help_line()), str(d.help_line())[-60:])
+    sanz = guardia('Sanz')
+    a_la_vista_de(sanz, 500); yield 0.3
+    v0 = sanz.visibility(jugador())
+    d.toggle_box(); yield 0.2
+    check('recién puesta aún te ven (medio segundo)', P('box_on') and not d.box_cloaked() and sanz.visibility(jugador()) > 0, sanz.visibility(jugador()))
+    yield 0.8
+    check('quieto dentro de la caja no te ve', v0 > 0 and d.box_cloaked() and sanz.visibility(jugador()) == 0 and jugador().get_editor_property('is_crouched'), '%.2f antes, %.2f con caja' % (v0, sanz.visibility(jugador())))
+    d.throw_stone(); yield 0.2
+    check('con la caja puesta no hay piedra, y lo dice', 'CAJA PUESTA' in str(P('message')), str(P('message'))[:30])
+    jugador().launch_character(V(250, 0, 0), True, False); yield 0.15
+    check('si la caja anda, te ven', not d.box_cloaked(), P('box_on'))
+    d.toggle_box(); yield 0.2
+    check('la X la quita', not P('box_on') and sanz.visibility(jugador()) > 0)
+    # el uniforme
+    if jugador().get_editor_property('is_crouched'):
+        jugador().un_crouch(); yield 0.3
+    a_la_vista_de(sanz, 1500); yield 0.3
+    v1 = sanz.visibility(jugador())
+    d.set_flag('uniforme'); yield 0.2
+    check('con uniforme, de pie y de lejos, eres uno más', d.uniform_works() and sanz.visibility(jugador()) == 0, '%.2f sin, %.2f con' % (v1, sanz.visibility(jugador())))
+    a_la_vista_de(sanz, 500); yield 0.2
+    check('de cerca no cuela', sanz.visibility(jugador()) > 0, sanz.visibility(jugador()))
+    a_la_vista_de(sanz, 1500); yield 0.1
+    jugador().crouch(); yield 0.4
+    check('agachado, el uniforme no vale', not d.uniform_works())
+    jugador().un_crouch(); yield 0.3
+    pu = next(q for q in MISION['puntos'] if q['id'] == 'uniforme')
+    hu = traza(V(pu['pos'][0], pu['pos'][1], 300), V(pu['pos'][0], pu['pos'][1], -20))
+    check('el punto del uniforme está bajo techo y en suelo libre', hu is not None and hu.to_tuple()[4].z < 30, hu.to_tuple()[4].z if hu else None)
+    # el camión: control al entrar, parada ante el hangar y registro burlado con la caja
+    aparte()
+    d.set_editor_property('truck', True)
+    d.set_editor_property('truck_entry_papers', 3.0)
+    d.set_editor_property('truck_stay_seconds', 8.0)
+    d.set_editor_property('truck_start', V(-7000, 5700, 4))
+    d.set_editor_property('truck_end_x', 13000.0)
+    lob = guardia('Lobato')
+    if lob:
+        lob.hold(0.0)
+    sanz.hold(0.0)
+    e0, s0, c0 = P('truck_entry_checks'), P('truck_stays'), P('captures')
+    d.set_flag('expediente')
+    d.set_editor_property('tension_t', 300.0)
+    yield ('hasta', lambda: estado_c() == 0, 40.0)
+    d.truck_skip_wait()
+    yield ('hasta', lambda: estado_c() == 2, 30.0)
+    yield 1.6
+    check('ante el portón le piden los papeles y la hoja sigue cerrada', P('truck_entry_checks') == e0 + 1 and P('entry_gate_t') < 0.05, '%s, hoja %.2f' % (P('truck_entry_checks'), P('entry_gate_t')))
+    yield ('hasta', lambda: estado_c() == 6, 60.0)
+    check('para ante el hangar', estado_c() == 6 and abs(cx() - P('truck_stay_x')) < 40 and P('truck_stays') == s0 + 1, '%s, x %d' % (estado_c(), cx()))
+    tp(cx() - 265, 5700, 0); yield 0.1
+    check('parado se puede subir', d.can_board_truck())
+    d.interact(); yield 0.3
+    d.toggle_box(); yield 0.8
+    check('en la caja del camión, dentro de la de cartón', P('riding') and P('box_on') and d.box_cloaked())
+    yield ('hasta', lambda: estado_c() == 3, 12.0)
+    check('al rato arranca hacia el control', estado_c() == 3 and P('riding'), estado_c())
+    yield ('hasta', lambda: estado_c() == 4, 45.0)
+    b0 = P('truck_box_passes')
+    yield ('hasta', lambda: director().get_editor_property('truck_box_passes') > b0 or director().get_editor_property('capturing'), 50.0)
+    check('con la base en guardia registran la caja y no te encuentran', P('truck_box_passes') == b0 + 1 and not P('capturing') and P('captures') == c0, '%s, capturas %s' % (P('truck_box_passes'), P('captures') - c0))
+    yield ('hasta', lambda: director().get_editor_property('done'), 45.0)
+    check('y el camión te saca de la base', P('done') and P('left_by_truck'), str(P('message'))[:40].replace('\n', ' / '))
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
 def prueba_armados():
     """Tanda 37. Con fusil no se corre a por nadie: el guardia que te ve se queda a distancia, te apunta y da el alto.
     Quieto, uno se acerca a detenerte; si te mueves, disparan, y a la tercera herida caes. Al dar el alto piden
@@ -2735,7 +2840,7 @@ def prueba_armados():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar]]
 PRUEBAS = []
 
 
@@ -2792,6 +2897,12 @@ def _limpieza(siguiente):
         # tanda 37: guardias armados (alto, cobertura, disparos), solo en su prueba: las demás se escribieron con
         # guardias que corren a cogerte y miden otra cosa
         d.set_editor_property('armed_rule', siguiente is prueba_armados)
+        # tanda 40: el control de entrada y la parada del camión ante el hangar, solo en su prueba (las del camión miden
+        # tiempos de la pasada de antes); y la caja de cartón, quitada
+        d.set_editor_property('truck_entry_papers', 0.0)
+        d.set_editor_property('truck_stay_seconds', 0.0)
+        if d.get_editor_property('box_on'):
+            d.toggle_box()
         d.set_editor_property('player_speed_override', -1.0)
         d.set_editor_property('armed_aim', 1.0)
         d.set_editor_property('wounds', 0)

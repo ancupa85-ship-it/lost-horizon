@@ -55,7 +55,11 @@
     5700,
     1385,
     0
-   ]
+   ],
+   "truck_entry_papers": 5.0,
+   "truck_stay_x": 4900.0,
+   "truck_stay_seconds": 45.0,
+   "uniform_dist": 900.0
   },
   "guardias": {
    "*": {
@@ -409,13 +413,43 @@
    "sonido": "candado",
    "texto": "emisora_muda",
    "segundos": 7.0
+  },
+  {
+   "id": "caja",
+   "nota": "caja de carton vacia, al fondo del hangar (tanda 40). X para ponersela",
+   "pos": [
+    5480,
+    7080,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_caja",
+   "pone": "caja",
+   "sonido": "recoger",
+   "texto": "caja_cogida",
+   "segundos": 9.0
+  },
+  {
+   "id": "uniforme",
+   "nota": "capote y casco colgados en el barracon oeste, pared norte (tanda 40). Posicion sin medir: comprobar en el PC",
+   "pos": [
+    330,
+    2330,
+    0
+   ],
+   "radio": 150,
+   "aviso": "p_uniforme",
+   "pone": "uniforme",
+   "sonido": "recoger",
+   "texto": "uniforme_cogido",
+   "segundos": 7.0
   }
  ],
  "textos": {
-  "intro": "TARSIS, DE NOCHE\nBusca la sombra. Agachado ({0}) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n{1} lanza una piedra para distraer. {2} prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo ({3}) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control.",
+  "intro": "TARSIS, DE NOCHE\nHas entrado por una brecha del muro norte. Busca la sombra. Agachado ({0}) te ven menos y por los huecos de las vallas se pasa agachado.\nEl expediente LH-07 esta en el archivo de la jefatura. La llave la lleva el sargento Ibarra.\n{1} lanza una piedra para distraer. {2} prismaticos: marca a los guardias que mires.\nTus pasos se oyen: corriendo ({3}) y sobre la gravilla mas que dentro. Agachado, nada.\nP: pausa, opciones, controles y cargar el ultimo punto de control.",
   "calabozo": "CALABOZO\nDespiertas tras la reja. Al otro lado, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja: no amenaces ni compres, escuchale.",
   "cogido_punto": "TE HAN COGIDO\nVuelves al ultimo punto de control: {0}.",
-  "cogido_entrada": "TE HAN COGIDO\nVuelves a la entrada de la base.",
+  "cogido_entrada": "TE HAN COGIDO\nVuelves a la brecha del muro.",
   "celda_abierta": "CELDA ABIERTA\nVidal abre, se aparta al rincon y se queda rezando de cara a la pared. No dara la alarma.\nTus cosas las tiene Peris: sala de guardia, al norte por el pasillo.",
   "ensena_derribo": "{0} DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma.",
   "ramos_radio": "RAMOS, POR RADIO\n\"Ya lo tiene? Le espero en el portillo de la marisma, en el muro sur, junto al agua.\"",
@@ -538,7 +572,7 @@
   "pistola_dardos": "PISTOLA DE DARDOS\n5 dardos. Clic izquierdo: duerme sin ruido al guardia que apuntes, tambien a los de las torres.",
   "cp_botiquin": "EL BOTIQUIN",
   "p_expediente": "E   COGER EL EXPEDIENTE LH-07",
-  "expediente_cogido": "EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base por el porton de salida, al este.",
+  "expediente_cogido": "EXPEDIENTE LH-07\nLo tienes. Ahora sal de la base: por el porton de salida, al este, o escondido en el camion que para en el hangar.",
   "cp_expediente": "EL EXPEDIENTE",
   "obj_salir": "Sal por el porton de salida (muro este, por el camino)",
   "obj_expediente": "Coge el expediente LH-07 del archivo",
@@ -673,6 +707,14 @@
   "p_cajon_buscando": "REGISTRANDO EL CAJON...  {0} s",
   "cajon_dejado": "CAJON A MEDIAS\nTe apartas y lo dejas como estaba. Hay que empezar otra vez.",
   "equipo_vuelve": "TUS COSAS\nLinterna, prismaticos y dardos, envueltos en tu propia chaqueta.\nDebajo, un reloj de pulsera parado a las tres y dos.",
-  "sec_equipo": "Sin equipo: tus cosas estan en el cajon de Peris (sala de guardia, al norte del calabozo)"
+  "sec_equipo": "Sin equipo: tus cosas estan en el cajon de Peris (sala de guardia, al norte del calabozo)",
+  "p_caja": "E   COGER UNA CAJA DE CARTON VACIA",
+  "caja_cogida": "UNA CAJA DE CARTON\nGrande, vacia, con un asa recortada a cada lado. Cabes dentro.\nX: te la echas encima. Quieto no te ve nadie; si la caja anda, si.\nEn la caja del camion, con ella puesta, el registro del control no te encuentra.",
+  "caja_estorba": "CON LA CAJA PUESTA, NO\nQuitatela antes (X).",
+  "ensena_caja": "DENTRO DE LA CAJA\nQuieto no te ve nadie. Si la caja anda, te ven como siempre.\nEn la caja del camion, con ella puesta, el registro no te encuentra. X para quitartela.",
+  "caja_registro": "LEVANTA LA LONA\nCajas. Una mas no le dice nada.",
+  "ensena_camion_hangar": "EL CAMION PARA EN EL HANGAR\nSe queda un rato descargando y luego sigue hasta el control de salida. Parado, se sube a la caja por detras.",
+  "p_uniforme": "E   COGER EL CAPOTE Y EL CASCO",
+  "uniforme_cogido": "CAPOTE Y CASCO\nDe pie y andando, de lejos pasas por un guardia mas. De cerca no cuela.\nNo vale agachado, corriendo ni con la base en alarma."
  }
 }

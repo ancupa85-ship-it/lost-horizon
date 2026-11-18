@@ -29,7 +29,7 @@ GUARDIAS = {
     'Sanz': ([[42, 26], [40, 26]], [16.0, 7.0], 'centinela'),     # control de salida: 16 s mirando al portón, 7 s hacia dentro
     # la ronda del anillo sur: va y vuelve entre portón y portón, al borde de los charcos de luz de las farolas del camino,
     # y pasa a unos 8 m del portillo de la marisma
-    'Carmona': ([[-5, 33], [40, 33], [40, 31], [-5, 31]], 4.0, 'centinela'),
+    'Carmona': ([[-5, 33], [18, 33], [18, 31], [-5, 31]], 4.0, 'centinela'),   # tanda 40: hasta el hangar (x 40 m), que ocupa la franja
 }
 
 def log(*a):

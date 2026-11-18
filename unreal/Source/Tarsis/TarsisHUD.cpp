@@ -56,6 +56,7 @@ void ATarsisHUD::DrawHUD()
 		return;
 	}
 	DrawHiding(D);
+	DrawBox(D);
 	DrawBinoculars(D);
 	DrawMarked();
 	DrawHeard(D);
@@ -285,8 +286,10 @@ void ATarsisHUD::DrawPrompt(ATarsisDirector* D)
 	float W = 200.0f * S, H = 0.0f;
 	if (F) GetTextSize(P, W, H, F, 1.05f * S);
 	W += 40.0f * S;
-	Panel(Canvas->ClipX / 2.0f - W / 2.0f, Canvas->ClipY * 0.56f, W, 40.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
-	Text(P, Canvas->ClipX / 2.0f, Canvas->ClipY * 0.56f + 6.0f * S, FLinearColor(1.0f, 1.0f, 1.0f), 1.05f * S, true);
+	// tanda 40: en el calabozo el aviso baja, para no tapar a Vidal al otro lado de la reja
+	const float Py = Canvas->ClipY * (D->InCell() ? 0.74f : 0.56f);
+	Panel(Canvas->ClipX / 2.0f - W / 2.0f, Py, W, 40.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f));
+	Text(P, Canvas->ClipX / 2.0f, Py + 6.0f * S, FLinearColor(1.0f, 1.0f, 1.0f), 1.05f * S, true);
 }
 
 void ATarsisHUD::DrawKeypad(ATarsisDirector* D)
@@ -531,6 +534,27 @@ void ATarsisHUD::DrawHint(ATarsisDirector* D)
 	Text(D->Hint, X + 14.0f * S, Y + 7.0f * S, FLinearColor(0.85f, 1.0f, 0.6f), 0.8f * S);
 }
 
+void ATarsisHUD::DrawBox(ATarsisDirector* D)
+{
+	// tanda 40: dentro de la caja de carton se mira por la ranura del asa. El carton se aclara cuando ya no te ven
+	if (!D || !D->bBoxOn) return;
+	const float X = Canvas->ClipX, Y = Canvas->ClipY, S = UiScale();
+	const FLinearColor Card(0.16f, 0.11f, 0.06f, 1.0f), Edge(0.07f, 0.045f, 0.025f, 1.0f);
+	const float Top = Y * 0.33f, Bot = Y * 0.60f, L = X * 0.16f, R = X * 0.84f;
+	Panel(0.0f, 0.0f, X, Top, Card);
+	Panel(0.0f, Bot, X, Y - Bot, Card);
+	Panel(0.0f, Top, L, Bot - Top, Card);
+	Panel(R, Top, X - R, Bot - Top, Card);
+	Panel(L, Top - 6.0f * S, R - L, 6.0f * S, Edge);
+	Panel(L, Bot, R - L, 6.0f * S, Edge);
+	Panel(L - 6.0f * S, Top - 6.0f * S, 6.0f * S, Bot - Top + 12.0f * S, Edge);
+	Panel(R, Top - 6.0f * S, 6.0f * S, Bot - Top + 12.0f * S, Edge);
+	const bool bOk = D->BoxCloaked();
+	Text(bOk ? TEXT("CAJA: QUIETO, NO TE VEN") : (D->bBoxSeen ? TEXT("CAJA: SABEN QUE ESTAS DEBAJO") : TEXT("CAJA: SI ANDA, TE VEN")), X / 2.0f, Bot + 22.0f * S,
+		bOk ? FLinearColor(0.6f, 0.9f, 0.7f) : FLinearColor(1.0f, 0.75f, 0.45f), 0.95f * S, true);
+	Text(TEXT("X  quitartela"), X / 2.0f, Bot + 52.0f * S, FLinearColor(0.8f, 0.8f, 0.75f), 0.8f * S, true);
+}
+
 void ATarsisHUD::DrawHiding(ATarsisDirector* D)
 {
 	// dentro de la taquilla: todo a oscuras salvo las rendijas de la puerta, a la altura de los ojos
@@ -671,7 +695,7 @@ void ATarsisHUD::DrawCodecRing(ATarsisDirector* D)
 {
 	if (!D) return;
 	const FString T = D->CodecPendingText();
-	if (T.IsEmpty()) return;
+	if (T.IsEmpty() || D->bCellAsk) return;   // hablando con Vidal no se pinta la llamada en espera
 	const float S = UiScale();
 	const bool bRing = D->CodecRingT > 0.0f;
 	const float Now = GetWorld() ? (float)GetWorld()->GetRealTimeSeconds() : 0.0f;

@@ -455,6 +455,7 @@ public:
 	void TruckSkipWait() { if (TruckState == 0) TruckT = 0.05f; }
 
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Camion")
+	float TruckStopX() const { return (bTruckStayed || TruckStaySeconds <= 0.0f) ? TruckBarrierStopX : TruckStayX; }
 	FVector TruckLocation() const { return FVector(TruckX, TruckStart.Y, TruckStart.Z); }
 
 	/** Tanda 22: vas escondido en la caja del camión. Se sube por detrás con la E cuando está parado o cruza la base al
@@ -482,6 +483,25 @@ public:
 	/** Segundos que mira los papeles en la cabina. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
 	float TruckPapersTime = 4.5f;
+	/** Tanda 40: control tambien al entrar (segundos de papeles ante el porton; 0 = sin control) y parada ante el hangar
+	(x del morro y segundos; 0 = no para). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckEntryPapers = 5.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckStayX = 4900.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Camion")
+	float TruckStaySeconds = 45.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckStays = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckEntryChecks = 0;
+	/** Veces que el registro del control miro la caja del camion contigo dentro de la de carton y no te encontro. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Camion")
+	int32 TruckBoxPasses = 0;
+	bool bTruckStayed = false;
+	bool bEntryOpened = false;
+	bool bEntryAsked = false;
+	float TruckStayT = 0.0f;
 
 	/** Si en el control no hay quien abra: a los TruckHornWait segundos el conductor toca el claxon y a los TruckSelfWait
 	 *  se baja y levanta la barrera él. */
@@ -928,6 +948,32 @@ public:
 	int32 GearDarts = 0;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Equipo")
 	void TakeGear();
+	// ---- tanda 40: la caja de carton (X) y el uniforme (TarsisCaja.cpp)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
+	bool bBoxOn = false;
+	/** Por debajo de esta velocidad (cm/s) la caja cuenta como quieta; y los segundos quieto hasta que deja de verse. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
+	float BoxStillSpeed = 20.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
+	float BoxSettle = 0.5f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Caja")
+	int32 BoxUses = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Caja")
+	bool bBoxSeen = false;
+	/** Con uniforme, de pie y andando: mas lejos de esto (cm) los guardias te toman por uno de los suyos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
+	float UniformDist = 900.0f;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Caja")
+	void ToggleBox();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Caja")
+	bool BoxCloaked() const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Caja")
+	bool UniformWorks() const;
+	bool BoxBlocks();
+	void BoxTick(float DeltaSeconds);
+	float BoxStillT = 0.0f;
+	float BoxNagT = 0.0f;
+	bool bUniformNow = false;
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Equipo")
 	FString GearPrompt() const;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Equipo")

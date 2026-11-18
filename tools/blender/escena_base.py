@@ -374,6 +374,62 @@ def desgaste_camino(X0, X1, ya, yb, CAUSE):
             lengua('tierra', xg + s * rs.uniform(-0.6, 3.5), yc + rs.choice((-0.9, 0.9)) + rs.uniform(-0.35, 0.35), rs.uniform(0.5, 1.4), rs.uniform(0.12, 0.3), zt + 0.003, rs)
     EXT_OUT['desgaste'] = {'juntas': [round(v, 2) for v in xs if X0 < v < X1], 'grietas': grietas, 'parches': [list(q) for q in parches]}
 
+def brecha(x, y):
+    """Tanda 40 (Andres, 2026-11-18): la misión empieza en el borde de la base, recién colado por una brecha pequeña del muro.
+    El tramo del muro queda roto: dos muñones, el dintel que aguanta y un boquete bajo medio cegado por el cascote (por él
+    no se vuelve a salir: quedan 55 cm libres). Cascotes a los dos lados y una laja apoyada."""
+    p = wpos(x, y); g = T * 0.45; R = random.Random(4040)
+    box('muro', (0.45, g, HW), p + Vector((-0.775, 0, HW / 2))); box('muro', (0.4, g, HW), p + Vector((0.8, 0, HW / 2)))
+    box('muro', (1.15, g, HW - 1.5), p + Vector((0.025, 0, 1.5 + (HW - 1.5) / 2)))
+    for dx, w, h in ((-0.47, 0.18, 1.2), (0.52, 0.16, 0.9), (-0.38, 0.12, 0.5), (0.4, 0.2, 0.35)):   # canto roto del boquete
+        box('muro', (w, g * 0.8, h), p + Vector((dx, 0, 1.5 - h / 2)), rotz=R.uniform(-0.08, 0.08))
+    for k in range(7):                                                                                # el cascote que lo ciega
+        w, d, h = R.uniform(0.3, 0.6), R.uniform(0.4, 0.9), R.uniform(0.25, 0.5)
+        box('muro', (w, d, h), p + Vector((R.uniform(-0.38, 0.4), R.uniform(-0.25, 0.25), 0.12 + k * 0.115)), rot=Matrix.Rotation(R.uniform(-0.5, 0.5), 4, 'Z') @ Matrix.Rotation(R.uniform(-0.25, 0.25), 4, 'X'))
+    for k in range(16):                                                                               # desparramado dentro y fuera
+        s = -1 if k % 4 else 1; q = R.uniform(0.6, 2.4)
+        w = R.uniform(0.12, 0.42) * (1.2 - q / 4)
+        box('muro', (w, w * R.uniform(0.6, 1.3), w * R.uniform(0.4, 0.8)), p + Vector((R.uniform(-1.3, 1.3), s * q, w * 0.25)), rot=Matrix.Rotation(R.uniform(0, 3.1), 4, 'Z') @ Matrix.Rotation(R.uniform(-0.4, 0.4), 4, 'Y'))
+    box('muro', (0.7, 0.12, 0.95), p + Vector((1.45, -0.8, 0.4)), rot=Matrix.Rotation(0.3, 4, 'Z') @ Matrix.Rotation(-0.5, 4, 'X'))   # laja caída contra el muro
+    EXT_OUT['brecha'] = {'pos': [round(p.x, 2), round(-p.y, 2)], 'inicio': [round(p.x + 0.2, 2), round(-p.y + 2.6, 2)], 'giro': 90}
+
+def hangar():
+    """Tanda 40: hangar de suministros en la franja sur, entre el camino y el muro, que era lo más vacío de la base. Nave de
+    18 x 10,6 m con cubierta en arco de chapa, portón corredero abierto de 7 m hacia el camino (el camión para delante) y
+    una sola bombilla de foco en el centro: las esquinas quedan a oscuras."""
+    x0, x1, y0, y1, Hh, g = 40.0, 58.0, 63.0, 73.6, 4.2, 0.3
+    W, D, cx, cy, pw, ph = x1 - x0, y1 - y0, (x0 + x1) / 2, (y0 + y1) / 2, 7.0, 3.6
+    box('hormigon', (W, D, 0.08), Mp(cx, cy, 0.0)); box('hormigon', (pw + 1.0, y0 - 60.1, 0.06), Mp(cx, (y0 + 60.1) / 2, -0.01))   # solera y rampa al camino
+    for xx in (x0 + g / 2, x1 - g / 2): box('pared', (g, D, Hh), Mp(xx, cy, Hh / 2))
+    box('pared', (W, g, Hh), Mp(cx, y1 - g / 2, Hh / 2))
+    lado = (W - pw) / 2
+    for xx in (x0 + lado / 2, x1 - lado / 2): box('pared', (lado, g, Hh), Mp(xx, y0 + g / 2, Hh / 2))
+    box('pared', (pw, g, Hh - ph), Mp(cx, y0 + g / 2, ph + (Hh - ph) / 2))
+    for xx in (cx - pw / 2 - 0.12, cx + pw / 2 + 0.12): box('hierro', (0.24, g + 0.1, ph + 0.1), Mp(xx, y0 + g / 2, (ph + 0.1) / 2))   # jambas de perfil
+    # cubierta: arco rebajado de chapa (N tramos) sobre cerchas, y testeros escalonados que cierran los hastiales
+    N_, rise = 10, 1.5
+    arco = lambda t: Hh + rise * math.sin(math.pi * t)
+    for k in range(N_):
+        ta, tb = k / N_, (k + 1) / N_; ya_, yb_, za, zb = y0 + D * ta, y0 + D * tb, arco(ta), arco(tb)
+        L_ = math.hypot(yb_ - ya_, zb - za); ang = math.atan2(zb - za, yb_ - ya_)
+        box('tejado', (W + 0.7, L_ + 0.05, 0.07), Mp(cx, (ya_ + yb_) / 2, (za + zb) / 2 + 0.03), rot=Matrix.Rotation(-ang, 4, 'X'))
+        hm = min(za, zb) - Hh
+        if hm > 0.02:
+            for xx in (x0 + g / 2, x1 - g / 2): box('pared', (g, yb_ - ya_, hm), Mp(xx, (ya_ + yb_) / 2, Hh + hm / 2))
+    for xx in (x0 + 4.5, cx, x1 - 4.5):
+        box('hierro', (0.1, D - 0.4, 0.14), Mp(xx, cy, Hh - 0.07))                                   # tirante de la cercha
+        for k in range(1, N_):
+            t = k / N_; box('hierro', (0.06, 0.06, arco(t) - Hh), Mp(xx, y0 + D * t, (arco(t) + Hh) / 2))
+    # portón corredero, abierto: dos hojas de chapa corridas a los lados por fuera, con su guía
+    box('hierro', (W - 1.0, 0.08, 0.12), Mp(cx, y0 - 0.1, ph + 0.2))
+    for s in (-1, 1):
+        xh = cx + s * (pw / 2 + 1.85)
+        box('hierro', (3.6, 0.07, ph), Mp(xh, y0 - 0.1, ph / 2 + 0.06))
+        for q in (-1.2, 0.0, 1.2): box('oscuro', (0.06, 0.1, ph - 0.1), Mp(xh + q, y0 - 0.12, ph / 2 + 0.06))
+    box('aviso', (1.6, 0.03, 0.5), Mp(cx, y0 - 0.03, ph + 0.75))
+    box('oscuro', (0.03, 0.03, Hh + rise - 3.9 - 0.1), Mp(cx, cy, (Hh + rise + 3.9) / 2)); box('bombilla', (0.3, 0.3, 0.12), Mp(cx, cy, 3.9))
+    EXT_OUT['hangar'] = {'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'alto': Hh, 'puerta': [cx, y0, pw, ph], 'luz': [cx, cy, 3.8]}
+
 def build_exterior():
     """Tanda 20 (Andres, 2026-11-14): el muro perimetral EXT casillas más afuera por los cuatro lados, un portón de entrada al oeste
     y otro de salida al este, y un camino que cruza la base de uno a otro por la franja sur. Dentro del muro antiguo no se mueve nada."""
@@ -394,8 +450,12 @@ def build_exterior():
         p = wpos(x, y); box('muro', size, p + Vector((0, 0, HW / 2)))
         if (x + y) % 3 == 0 and y not in (GR[0] - 1, GR[-1] + 1):
             box('muro', (0.6, 0.6, HW + 0.1), p + Vector((0, 0, HW / 2))); box('oscuro', (0.06, 0.06, 1.0), p + Vector((0, 0, HW + 0.5)))
+    BX = 10   # tanda 40: columna de la brecha del muro norte (por ahí entra Cuttlas)
     for x in range(-EXT, COLS + EXT):
-        for y in (-EXT, ROWS + EXT - 1): tramo(x, y, (T, T * 0.45, HW))
+        for y in (-EXT, ROWS + EXT - 1):
+            if x == BX and y == -EXT: brecha(x, y); continue
+            tramo(x, y, (T, T * 0.45, HW))
+    hangar()
     for y in range(-EXT + 1, ROWS + EXT - 1):
         if y in GR: continue
         for x in (-EXT, COLS + EXT - 1): tramo(x, y, (T * 0.45, T, HW))

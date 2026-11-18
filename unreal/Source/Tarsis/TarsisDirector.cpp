@@ -222,7 +222,7 @@ void ATarsisDirector::CloseCell()
 	// reja de 2 m: barrotes cada 20 cm y dos travesaños (el hueco de la puerta va a lo largo de X)
 	for (int32 i = -4; i <= 4; ++i)
 	{
-		if (Cyl) Add(Cyl, CellDoor + FVector(i * 20.0f, 0.0f, 110.0f), FVector(0.05f, 0.05f, 2.2f));
+		if (Cyl) Add(Cyl, CellDoor + FVector(i * 20.0f, 0.0f, 110.0f), FVector(0.03f, 0.03f, 2.2f));   // tanda 40: de 5 a 3 cm (de cerca tapaban a Vidal)
 	}
 	if (Cube)
 	{
@@ -270,7 +270,7 @@ void ATarsisDirector::Takedown()
 void ATarsisDirector::ToggleCrouch()
 {
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	if (!C || bRiding) return;   // en la caja del camión ya vas encogido
+	if (!C || bRiding || bBoxOn) return;   // en la caja del camión ya vas encogido; y con la de cartón puesta, agachado
 	if (C->bIsCrouched) C->UnCrouch(); else C->Crouch();
 }
 
@@ -385,6 +385,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	}
 	CellTick(DeltaSeconds);
 	GearTick(DeltaSeconds);
+	BoxTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
 	ClimbTick(DeltaSeconds);
 }
@@ -753,6 +754,7 @@ void ATarsisDirector::DragTick()
 void ATarsisDirector::ThrowStone()
 {
 	if (StoneT > 0.0f || bKeypad || bDone || Dragged) return;
+	if (BoxBlocks()) return;
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!PC || !Pl) return;
@@ -811,6 +813,7 @@ void ATarsisDirector::ToggleBinoculars()
 	if (!Cam) return;
 	if (!bBinoculars && (bKeypad || Dragged)) return;
 	if (!bBinoculars && bGearTaken) { GearNag(); return; }
+	if (!bBinoculars && BoxBlocks()) return;
 	bBinoculars = !bBinoculars;
 	if (bBinoculars) { SavedFov = Cam->FieldOfView; Cam->SetFieldOfView(18.0f); }
 	else Cam->SetFieldOfView(SavedFov > 0.0f ? SavedFov : 90.0f);
@@ -890,6 +893,7 @@ void ATarsisDirector::ShootDart()
 {
 	if (bGearTaken && Darts <= 0 && !bKeypad && !bMenu && !bCodec && !bCellAsk) { GearNag(); return; }
 	if (Darts <= 0 || DartT > 0.0f || bKeypad || bChoice || bDone || Dragged || bRiding) return;
+	if (!bMenu && !bCodec && !bCellAsk && BoxBlocks()) return;
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!PC || !Pl) return;
@@ -1005,7 +1009,7 @@ void ATarsisDirector::Finish(bool bByMarsh)
 void ATarsisDirector::SprintOn()
 {
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	if (!C || Dragged || bDone || bRiding) return;
+	if (!C || Dragged || bDone || bRiding || bBoxOn) return;
 	if (BaseWalk <= 0.0f) BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
 	bSprint = true;
 	C->GetCharacterMovement()->MaxWalkSpeed = BaseWalk * 1.5f;
@@ -1066,7 +1070,7 @@ int32 ATarsisDirector::MeasureShadows()
 	ShadowTips.Reset();
 	ShadowContrasts.Reset();
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	if (!C || bDone || bCine || bCapturing || bHiding || bRiding || C->IsHidden()) return 0;
+	if (!C || bDone || bCine || bCapturing || bHiding || bRiding || C->IsHidden() || BoxCloaked()) return 0;
 	TArray<float> Heights;
 	if (C->bIsCrouched) Heights = { 110.0f, 70.0f, 35.0f };
 	else Heights = { 170.0f, 110.0f, 45.0f };
@@ -2498,6 +2502,9 @@ void ATarsisDirector::TruckReset(float Wait)
 	TruckX = TruckStart.X;
 	TruckV = 0.0f;
 	TruckWaitT = TruckSeenT = TruckBlockT = 0.0f;
+	bTruckStayed = false;
+	bEntryOpened = bEntryAsked = false;
+	TruckStayT = 0.0f;
 	EntryGateTarget = 0.0f;
 	bEntryGateShut = false;
 	if (!bDone) BarrierTarget = 0.0f;
@@ -2566,17 +2573,56 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 		StopX = TruckGateStopX;
 		// al pasar a 3 la parada es la del control: con la del portón (Left ~ 0) saltaba enseguida a 4 y levantaba la barrera
 		// del control con el camión aún en el portón de entrada
-		if (EntryGateT > 0.98f && TruckWaitT > 1.5f) { TruckState = 3; TruckWaitT = 0.0f; StopX = TruckBarrierStopX; }
+		// tanda 40: control tambien al entrar. El centinela de la garita pide los papeles y hasta que no pasan
+		// TruckEntryPapers segundos la hoja no corre
+		if (!bEntryOpened)
+		{
+			ATarsisGuard* Gate = nullptr;
+			float GateD = 2500.0f;
+			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+			{
+				if (It->bTowerSentry || It->bAlly || It->State == ETarsisGuardState::Down || It->IsStunned()) continue;
+				const float Dg = FVector::Dist2D(It->GetActorLocation(), EntryGateLoc);
+				if (Dg < GateD) { GateD = Dg; Gate = *It; }
+			}
+			if (!bEntryAsked && TruckWaitT > 1.0f && TruckEntryPapers > 0.0f)
+			{
+				bEntryAsked = true;
+				++TruckEntryChecks;
+				if (Gate) GuardSay(Gate, TEXT("papeles"));
+			}
+			if (TruckWaitT > TruckEntryPapers)
+			{
+				bEntryOpened = true;
+				TruckWaitT = 0.0f;
+				EntryGateTarget = 1.0f;
+				bEntryGateShut = false;
+				PlaySfx(TEXT("porton"), EntryGateLoc, 1.0f);
+				if (Gate && bEntryAsked) GuardSay(Gate, TEXT("pase"));
+			}
+			break;
+		}
+		if (EntryGateT > 0.98f && TruckWaitT > 1.5f) { TruckState = 3; TruckWaitT = 0.0f; StopX = TruckStopX(); }
 		break;
 	case 3:
 		Want = TruckSpeed;
-		StopX = TruckBarrierStopX;
+		StopX = TruckStopX();
 		// con la trasera ya dentro, la hoja se cierra detrás
 		if (!bEntryGateShut && TruckX > EntryGateLoc.X + 520.0f)
 		{
 			bEntryGateShut = true;
 			EntryGateTarget = 0.0f;
 			PlaySfx(TEXT("porton"), EntryGateLoc, 1.0f);
+		}
+		break;
+	case 6:
+		StopX = TruckStayX;
+		TruckStayT += DeltaSeconds;
+		if (TruckStayT > TruckStaySeconds)
+		{
+			bTruckStayed = true;
+			TruckState = 3;
+			StopX = TruckBarrierStopX;
 		}
 		break;
 	case 4:
@@ -2632,9 +2678,17 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 		TruckState = 2;
 		TruckV = 0.0f;
 		TruckWaitT = 0.0f;
-		EntryGateTarget = 1.0f;
-		bEntryGateShut = false;
-		PlaySfx(TEXT("porton"), EntryGateLoc, 1.0f);
+		bEntryOpened = false;
+		bEntryAsked = false;
+	}
+	else if (TruckState == 3 && Left < 10.0f && !bTruckStayed && TruckStaySeconds > 0.0f)
+	{
+		// tanda 40: para ante el hangar a descargar; al rato arranca y sigue hasta el control de salida
+		TruckState = 6;
+		TruckV = 0.0f;
+		TruckStayT = 0.0f;
+		++TruckStays;
+		Teach(TEXT("ensena_camion_hangar"), TEXT("EL CAMION PARA EN EL HANGAR\nSe queda un rato descargando y luego sigue hasta el control de salida. Parado, se sube a la caja por detras."), {}, 5.0f);
 	}
 	else if (TruckState == 3 && Left < 10.0f)
 	{
@@ -2665,7 +2719,7 @@ void ATarsisDirector::TruckTick(float DeltaSeconds)
 	if (TruckSeenT > 0.0f && TruckHornT > 0.0f) TruckSeenT = 0.0f;
 	ACharacter* PC = Cast<ACharacter>(Player);
 	bool bSeen = false;
-	if (PC && !bDone && !bCine && !bCapturing && !bHiding && !bRiding && !PC->IsHidden() && TruckHornT <= 0.0f)
+	if (PC && !bDone && !bCine && !bCapturing && !bHiding && !bRiding && !PC->IsHidden() && !BoxCloaked() && !bUniformNow && TruckHornT <= 0.0f)
 	{
 		const FVector Eye = FVector(TruckX + 235.0f, TruckStart.Y, TruckStart.Z + 165.0f);
 		const FVector To = PC->GetActorLocation() - Eye;
@@ -2795,6 +2849,17 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 		break;
 	case 4:
 		if (TruckCheckT < 1.3f) break;
+		if (bRiding && bBoxOn && !bCapturing && !bDone)
+		{
+			// tanda 40: levanta la lona y ve una caja de carton entre las demas
+			++TruckBoxPasses;
+			GuardSay(G, TEXT("nadie"));
+			G->PlayGesture(TEXT("pase"), 2.2f, ExitLoc);
+			G->HoldBaton(2.4f);
+			ShowMessage(Tx(TEXT("caja_registro"), TEXT("LEVANTA LA LONA\nCajas. Una mas no le dice nada.")), 4.0f);
+			Lift(2.0f);
+			break;
+		}
 		if (bRiding && !bCapturing && !bDone)
 		{
 			BeginCapture(G);       // te baja de la caja (LeaveTruck) y la escena de siempre
@@ -2829,7 +2894,7 @@ void ATarsisDirector::TruckControlTick(float DeltaSeconds)
 bool ATarsisDirector::CanBoardTruck() const
 {
 	if (!bTruck || bRiding || bHiding || bCapturing || bDone || bCine || bChoice || bKeypad || Dragged) return false;
-	if (TruckParts.Num() == 0 || TruckState < 3 || TruckState > 5) return false;
+	if (TruckParts.Num() == 0 || TruckState < 3 || TruckState > 6) return false;
 	if (TruckState == 5 && !bFile) return false;        // sin el expediente no te vas
 	if (TruckV > TruckSpeed + 30.0f) return false;      // ya va lanzado
 	// la trasera, dentro de la base: pasado el portón de entrada y antes del punto de salida
@@ -3628,6 +3693,7 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[3], IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
 	InputComponent->BindKey(ActionKeys[5], IE_Pressed, this, &ATarsisDirector::CycleWeather);
 	InputComponent->BindKey(ActionKeys[6], IE_Pressed, this, &ATarsisDirector::ToggleTorch);
+	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &ATarsisDirector::ToggleBox);   // tanda 40: la caja de cartón (tecla fija)
 	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);
 	InputComponent->BindKey(ActionKeys[4], IE_Released, this, &ATarsisDirector::SprintOff);
 	{
@@ -3687,6 +3753,7 @@ FString ATarsisDirector::HelpLine() const
 	FString S = FString::Printf(TEXT("%s agacharse   %s correr   %s piedra   %s prismaticos"), *K(0), *K(4), *K(2), *K(3));
 	if (Darts > 0) S += FString::Printf(TEXT("   CLIC dardo (%d)"), Darts);
 	if (bHasTorch) S += FString::Printf(TEXT("   %s linterna"), *K(6));
+	if (HasFlag(FName(TEXT("caja")))) S += TEXT("   X caja");
 	if (bPowerOff) S += TEXT("   sin luz: busca la sombra de las linternas");
 	S += FString::Printf(TEXT("   %s radio   P pausa"), *K(7));
 	return S;

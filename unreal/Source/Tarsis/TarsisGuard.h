@@ -459,6 +459,10 @@ public:
 	void StartRepair(const FVector& Center);
 	void StopRepair();
 	bool IsRepairing() const { return bRepairing; }
+	/** Tanda 40 (los pone el director cada tick): la caja de carton (0 = nadie te ve) y el uniforme (mas lejos de
+	GFarLimit cm no te distinguen de un guardia; 0 = sin uniforme). */
+	static float GSeenMul;
+	static float GFarLimit;
 
 	/** Dormido con un dardo: se le puede quitar (E) y vuelve a la pistola. */
 	bool bDarted = false;
