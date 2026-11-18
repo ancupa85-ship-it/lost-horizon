@@ -1101,6 +1101,9 @@ public:
 	float PartnerCoolT = 0.0f;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tactica")
 	void LostPlayer(class ATarsisGuard* G, const FVector& Where);
+	/** Toda la base vuelve a su ronda y nadie queda en alerta (al encerrarte en el calabozo). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Tactica")
+	void CalmBase();
 	void TacticsTick(float DeltaSeconds);
 	FVector FlareDrift = FVector::ZeroVector;
 
@@ -1472,7 +1475,7 @@ public:
 	int32 WaitKeyFor = -1;
 
 	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
-	static constexpr int32 NumActions = 8;
+	static constexpr int32 NumActions = 13;   // tanda 43: caja, mapa, interrogar y asomarse tambien se ven y se cambian en CONTROLES
 	FKey ActionKeys[NumActions];
 	static const TCHAR* ActionName(int32 I);
 

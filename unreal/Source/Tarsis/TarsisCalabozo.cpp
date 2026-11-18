@@ -30,6 +30,7 @@ void ATarsisDirector::LockInCell(APawn* Player)
 	const FRotator R(0.0f, CellYaw, 0.0f);
 	Player->TeleportTo(CellSpot, R);
 	if (Ctl) Ctl->SetControlRotation(R);
+	CalmBase();
 	CloseCell();
 	PlaySfx(TEXT("reja"), CellDoor + FVector(0.0f, 0.0f, 100.0f));
 	CellT = bCellPuzzle ? 0.0f : CellTime;
@@ -39,6 +40,22 @@ void ATarsisDirector::LockInCell(APawn* Player)
 	// lo que estuviera sonando en la radio ya no importa: llama Control, que es quien sabe con quien hablas ahi dentro
 	if (bCellPuzzle && !bCodec) { CodecPending = NAME_None; CodecRingT = 0.0f; CellCallT = 9.0f; }
 	ShowMessage(Tx(TEXT("calabozo"), TEXT("CALABOZO\nDespiertas tras la reja. Al otro lado, a un paso de la reja, el cabo Vidal hace guardia y reza en voz baja.\nHabla con el por la reja. Vidal no es como los demas.")), 8.0f);
+}
+
+// Te han cogido: nadie sigue en alerta por alguien que ya esta preso (los de la torre te veian en la escena de la
+// captura y volvian a dar la voz; los mandados por radio seguian corriendo al sitio)
+void ATarsisDirector::CalmBase()
+{
+	TensionT = 0.0f;
+	LastKnownT = 0.0f;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->State == ETarsisGuardState::Down || It->bAlly) continue;
+		It->Meter = 0.0f;
+		It->UnseenT = 0.0f;
+		It->BeamCallT = 0.0f;
+		if (It->State != ETarsisGuardState::Patrol) It->SetState(It->bTowerSentry ? ETarsisGuardState::Patrol : ETarsisGuardState::Return);
+	}
 }
 
 bool ATarsisDirector::InCell() const

@@ -178,6 +178,7 @@ void ATarsisDirector::Captured(APawn* Player)
 	bKeypad = false;
 	if (bBinoculars) ToggleBinoculars();
 	++Captures;
+	CalmBase();   // ya estas preso: nadie sigue en alerta
 	ACharacter* C = Cast<ACharacter>(Player);
 	if (C && C->bIsCrouched) C->UnCrouch();
 	AController* Ctl = Player->GetController();
@@ -498,7 +499,7 @@ FString ATarsisDirector::InteractPrompt() const
 	{ const FString L = LadderPrompt(); if (!L.IsEmpty()) return L; }
 	if (ATarsisGuard* T = TakedownTarget())
 	{
-		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? Tx(TEXT("p_ramos_agarrar"), TEXT("E   AGARRAR A RAMOS")) : (CanInterrogate(T) ? Tx(TEXT("p_derribar_int"), TEXT("E   DERRIBAR        T   INTERROGAR")) : Tx(TEXT("p_derribar"), TEXT("E   DERRIBAR")));
+		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? Tx(TEXT("p_ramos_agarrar"), TEXT("E   AGARRAR A RAMOS")) : (CanInterrogate(T) ? Tx(TEXT("p_derribar_int"), TEXT("E   DERRIBAR        {0}   INTERROGAR"), { ActionKeys[10].GetDisplayName().ToString().ToUpper() }) : Tx(TEXT("p_derribar"), TEXT("E   DERRIBAR")));
 	}
 	if (ShoveTarget()) return Tx(TEXT("p_empujar"), TEXT("E   EMPUJAR (queda aturdido 2 s; hace ruido)"));
 	if (FacingAlertGuard()) return Tx(TEXT("p_te_ve"), TEXT("TE VE: huye, rodealo o distraelo ({0})"), { ActionKeys[2].GetDisplayName().ToString().ToUpper() });
@@ -3683,7 +3684,8 @@ void ATarsisDirector::LoadOptions()
 
 const TCHAR* ATarsisDirector::ActionName(int32 I)
 {
-	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA"), TEXT("LINTERNA"), TEXT("RADIO") };
+	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA"), TEXT("LINTERNA"), TEXT("RADIO"),
+		TEXT("CAJA DE CARTON"), TEXT("MAPA MENTAL"), TEXT("INTERROGAR (por la espalda)"), TEXT("ASOMARSE A LA IZQUIERDA"), TEXT("ASOMARSE A LA DERECHA") };
 	return (I >= 0 && I < NumActions) ? N[I] : TEXT("");
 }
 
@@ -3697,6 +3699,11 @@ void ATarsisDirector::DefaultKeys()
 	ActionKeys[5] = EKeys::Y;
 	ActionKeys[6] = EKeys::F;
 	ActionKeys[7] = EKeys::R;
+	ActionKeys[8] = EKeys::X;
+	ActionKeys[9] = EKeys::M;
+	ActionKeys[10] = EKeys::T;
+	ActionKeys[11] = EKeys::Z;
+	ActionKeys[12] = EKeys::V;
 }
 
 void ATarsisDirector::BindAll()
@@ -3710,14 +3717,14 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[3], IE_Pressed, this, &ATarsisDirector::ToggleBinoculars);
 	InputComponent->BindKey(ActionKeys[5], IE_Pressed, this, &ATarsisDirector::CycleWeather);
 	InputComponent->BindKey(ActionKeys[6], IE_Pressed, this, &ATarsisDirector::ToggleTorch);
-	InputComponent->BindKey(EKeys::M, IE_Pressed, this, &ATarsisDirector::ToggleMindMap);   // tanda 41: el mapa mental (tecla fija)
-	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &ATarsisDirector::ToggleBox);   // tanda 40: la caja de cartón (tecla fija)
+	InputComponent->BindKey(ActionKeys[9], IE_Pressed, this, &ATarsisDirector::ToggleMindMap);   // tanda 41: el mapa mental (tecla fija)
+	InputComponent->BindKey(ActionKeys[8], IE_Pressed, this, &ATarsisDirector::ToggleBox);   // tanda 40: la caja de cartón (tecla fija)
 	// tanda 43: interrogar y asomarse (teclas fijas)
-	InputComponent->BindKey(EKeys::T, IE_Pressed, this, &ATarsisDirector::Interrogate);
-	InputComponent->BindKey(EKeys::Z, IE_Pressed, this, &ATarsisDirector::LeanLeftOn);
-	InputComponent->BindKey(EKeys::Z, IE_Released, this, &ATarsisDirector::LeanLeftOff);
-	InputComponent->BindKey(EKeys::V, IE_Pressed, this, &ATarsisDirector::LeanRightOn);
-	InputComponent->BindKey(EKeys::V, IE_Released, this, &ATarsisDirector::LeanRightOff);
+	InputComponent->BindKey(ActionKeys[10], IE_Pressed, this, &ATarsisDirector::Interrogate);
+	InputComponent->BindKey(ActionKeys[11], IE_Pressed, this, &ATarsisDirector::LeanLeftOn);
+	InputComponent->BindKey(ActionKeys[11], IE_Released, this, &ATarsisDirector::LeanLeftOff);
+	InputComponent->BindKey(ActionKeys[12], IE_Pressed, this, &ATarsisDirector::LeanRightOn);
+	InputComponent->BindKey(ActionKeys[12], IE_Released, this, &ATarsisDirector::LeanRightOff);
 	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);
 	InputComponent->BindKey(ActionKeys[4], IE_Released, this, &ATarsisDirector::SprintOff);
 	{
@@ -3777,9 +3784,9 @@ FString ATarsisDirector::HelpLine() const
 	FString S = FString::Printf(TEXT("%s agacharse   %s correr   %s piedra   %s prismaticos"), *K(0), *K(4), *K(2), *K(3));
 	if (Darts > 0) S += FString::Printf(TEXT("   CLIC dardo (%d)"), Darts);
 	if (bHasTorch) S += FString::Printf(TEXT("   %s linterna"), *K(6));
-	if (HasFlag(FName(TEXT("caja")))) S += TEXT("   X caja");
-	if (bLeanRule) S += TEXT("   Z V asomarse");
-	if (FactsLearned > 0 || FactsKnown() > 0) S += TEXT("   M mapa");
+	if (HasFlag(FName(TEXT("caja")))) S += FString::Printf(TEXT("   %s caja"), *K(8));
+	if (bLeanRule) S += FString::Printf(TEXT("   %s %s asomarse"), *K(11), *K(12));
+	if (FactsLearned > 0 || FactsKnown() > 0) S += FString::Printf(TEXT("   %s mapa"), *K(9));
 	if (bPowerOff) S += TEXT("   sin luz: busca la sombra de las linternas");
 	S += FString::Printf(TEXT("   %s radio   P pausa"), *K(7));
 	return S;

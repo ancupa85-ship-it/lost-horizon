@@ -2208,7 +2208,7 @@ def prueba_controles():
     d = director()
     yield from teclas(d, 'P', *(['Down'] * 9), 'Enter')
     ls = lineas(d)
-    check('CONTROLES abre la página de teclas', len(ls) == 10 and 'VOLVER' in ls[-1], ' / '.join(ls))
+    check('CONTROLES abre la página de teclas', len(ls) == 15 and 'VOLVER' in ls[-1], ' / '.join(ls))
     tecla0 = ls[0]
     yield from teclas(d, 'Enter')
     check('Intro no se asigna a sí misma (espera tecla)', 'PULSA UNA TECLA' in lineas(d)[0], lineas(d)[0])
@@ -2219,7 +2219,7 @@ def prueba_controles():
     yield from teclas(d, 'Enter', 'E')
     ls = lineas(d)
     check('si la tecla choca, se intercambian', '[ E ]' in ls[0] and '[ X ]' in ls[1], '%s / %s' % (ls[0], ls[1]))
-    yield from teclas(d, *(['Down'] * 8), 'Enter')   # ocho acciones desde la tanda 32 (la radio)
+    yield from teclas(d, *(['Down'] * 13), 'Enter')   # trece acciones desde la tanda 43
     ls = lineas(d)
     check('TECLAS POR DEFECTO lo deshace', ls[0] == tecla0 and ls[1] == interact, '%s / %s' % (ls[0], ls[1]))
     yield from teclas(d, 'Escape')
