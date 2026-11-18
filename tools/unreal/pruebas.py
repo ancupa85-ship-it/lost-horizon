@@ -2814,6 +2814,7 @@ def prueba_bengala():
     d.set_editor_property('has_torch', True)
     d.set_torch(True); yield 0.2
     lm = d.torch_now()
+    dim0 = max(d.torch_dim_now(), 0.01)   # cerca de una pared la linterna se atenúa sola: se compara sin eso
     check('linterna encendida con sus lúmenes', P('torch') and lm > 1.0, lm)
     f0 = P('torch_flickers')
     d.set_editor_property('torch_flicker', True); d.set_editor_property('torch_flicker_next', 0.1)
@@ -2824,7 +2825,7 @@ def prueba_bengala():
     check('parpadea', P('torch_flickers') == f0 + 1 and len(vistos) >= 2 and min(vistos) < 0.7, sorted(vistos))
     check('el siguiente hueco sale de la lista (6, 10, 12 o 30 s)', 4.0 < P('torch_flicker_next') <= 30.0, P('torch_flicker_next'))
     yield 1.2
-    check('y vuelve a su luz', abs(d.torch_now() - lm) < lm * 0.05, [d.torch_now(), lm])
+    check('y vuelve a su luz', abs(d.torch_now() / max(d.torch_dim_now(), 0.01) - lm / dim0) < lm / dim0 * 0.05, [d.torch_now(), lm])
     d.set_editor_property('torch_flicker', False); d.set_torch(False); yield 0.1
     # bengala
     tp(abierto.x, abierto.y, 0); yield 0.2

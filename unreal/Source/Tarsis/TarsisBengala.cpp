@@ -101,6 +101,7 @@ void ATarsisDirector::FireFlare()
 		L->SetVisibility(true);
 	}
 	FlareLight->SetActorLocation(FlareFrom);
+	FlareLight->SetActorRotation(FRotator(-90.0f, 0.0f, 0.0f));   // mirando abajo: el giro de SpawnActor no se quedaba (alumbraba de lado)
 	if (FlareGlow) FlareGlow->SetVisibility(true);
 	FlareT = 0.001f;
 	++FlaresFired;
