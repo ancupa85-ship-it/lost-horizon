@@ -60,6 +60,8 @@ public:
 	UPROPERTY() bool bColorblind = false;
 	UPROPERTY() bool bSubtitles = false;
 	UPROPERTY() int32 Difficulty = 1;
+	UPROPERTY() int32 Brightness = 0;     // tanda 42: pasos de un cuarto de diafragma
+	UPROPERTY() float TorchMul = 1.0f;    // tanda 42: intensidad de tu linterna
 	UPROPERTY() TArray<FName> Keys;    // teclas de las acciones, en el orden de ATarsisDirector::ActionName
 	UPROPERTY() TArray<FName> Flags;   // banderas de la misión (ATarsisDirector::SetFlag)
 };

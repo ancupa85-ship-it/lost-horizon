@@ -45,8 +45,8 @@ void ATarsisDirector::SetTorch(bool bOn)
 	bTorch = bOn;
 	if (PlayerTorch)
 	{
-		if (!bOn) TorchDim = 1.0f;
-		PlayerTorch->SetIntensity(TorchLumens * TorchDim);
+		if (!bOn) { TorchDim = 1.0f; TorchFlick = 1.0f; TorchFlickT = 0.0f; }
+		PlayerTorch->SetIntensity(TorchNow());
 		PlayerTorch->SetAttenuationRadius(TorchRange);
 		PlayerTorch->SetOuterConeAngle(TorchCone);
 		PlayerTorch->SetInnerConeAngle(TorchCone * 0.45f);
@@ -90,8 +90,37 @@ void ATarsisDirector::TorchTick(float DeltaSeconds)
 			Want = FMath::Clamp(FMath::Square(Near.Distance / TorchNearDist), TorchNearMin, 1.0f);
 		}
 		TorchDim = FMath::FInterpTo(TorchDim, Want, DeltaSeconds, Want < TorchDim ? 9.0f : 3.0f);
-		PlayerTorch->SetIntensity(TorchLumens * TorchDim);
 	}
+	// tanda 42: parpadea cada pocos segundos (pilas flojas). El hueco hasta el siguiente sale al azar de la lista
+	// (6, 12, 10 o 30 s); el parpadeo son unas decimas de luz a saltos, y a veces un apagon corto entero
+	if (bTorchFlicker && TorchFlickerGaps.Num() > 0)
+	{
+		if (TorchFlickT > 0.0f)
+		{
+			TorchFlickT -= DeltaSeconds;
+			TorchFlickStep -= DeltaSeconds;
+			if (TorchFlickT <= 0.0f) TorchFlick = 1.0f;
+			else if (TorchFlickStep <= 0.0f)
+			{
+				static const float Lv[] = { 0.0f, 0.12f, 0.45f, 1.0f, 0.25f, 0.8f, 0.0f, 0.6f };
+				TorchFlick = Lv[FMath::RandRange(0, 7)];
+				TorchFlickStep = FMath::FRandRange(0.03f, 0.11f);
+			}
+		}
+		else
+		{
+			TorchFlickerNext -= DeltaSeconds;
+			if (TorchFlickerNext <= 0.0f)
+			{
+				TorchFlickT = FMath::FRandRange(TorchFlickerMin, FMath::Max(TorchFlickerMin, TorchFlickerMax));
+				TorchFlickStep = 0.0f;
+				TorchFlickerNext = FMath::Max(1.0f, TorchFlickerGaps[FMath::RandRange(0, TorchFlickerGaps.Num() - 1)]);
+				++TorchFlickers;
+			}
+		}
+	}
+	else TorchFlick = 1.0f;
+	PlayerTorch->SetIntensity(TorchNow());
 	// a bocajarro y de cara: le deslumbras. Se queda unos segundos sin ver ni andar (puedes pasar, huir o derribarle
 	// como tras un empujon) y al rehacerse va a por ti; la segunda vez seguida ya se tapa los ojos
 	if (APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0))

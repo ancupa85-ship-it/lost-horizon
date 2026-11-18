@@ -590,6 +590,11 @@ for i, l in enumerate(DATA['lights']):
             c.set_editor_property('attenuation_radius', 1100.0)
             c.set_editor_property('cast_shadows', HANGAR_SOMBRA)
             c.set_editor_property('source_radius', 6.0)
+        if l['name'] == 'cocina':   # tanda 42: bombilla de la cocina, con sombra (no debe calar al calabozo ni al patio)
+            c.set_editor_property('intensity', 350.0)
+            c.set_editor_property('attenuation_radius', 800.0)
+            c.set_editor_property('cast_shadows', True)
+            c.set_editor_property('source_radius', 5.0)
         if l['name'] == 'aplique':   # bombilla de pared (portillo): alumbra la puerta y poco más, sin sombras
             c.set_editor_property('attenuation_radius', 700.0)
             c.set_editor_property('cast_shadows', False)

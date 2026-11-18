@@ -3192,6 +3192,162 @@
     60
    ],
    "giro": 0
+  },
+  {
+   "nombre": "coc_olla_mesa",
+   "modelo": "pot_enamel_01",
+   "pos": [
+    6120,
+    3500,
+    150
+   ],
+   "giro": 20,
+   "pequeno": true
+  },
+  {
+   "nombre": "coc_latas0",
+   "modelo": "russian_food_cans_01",
+   "pos": [
+    6400,
+    3700,
+    120
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "coc_latas1",
+   "modelo": "russian_food_cans_01",
+   "pos": [
+    6560,
+    3700,
+    175
+   ],
+   "giro": 180,
+   "pequeno": true
+  },
+  {
+   "nombre": "coc_olla_est",
+   "modelo": "pot_enamel_01",
+   "pos": [
+    6330,
+    3700,
+    175
+   ],
+   "giro": 70,
+   "pequeno": true
+  },
+  {
+   "nombre": "coc_termo",
+   "modelo": "modified_thermos",
+   "pos": [
+    6700,
+    3620,
+    150
+   ],
+   "giro": 10,
+   "pequeno": true
+  },
+  {
+   "nombre": "coc_lata_poyo",
+   "modelo": "can_rusted",
+   "pos": [
+    6690,
+    3470,
+    150
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "coc_cubo0",
+   "modelo": "wooden_bucket_02",
+   "pos": [
+    6050,
+    3260,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "coc_cubo1",
+   "modelo": "wooden_bucket_02",
+   "pos": [
+    6005,
+    3300,
+    60
+   ],
+   "giro": 40
+  },
+  {
+   "nombre": "coc_cubo2",
+   "modelo": "wooden_bucket_02",
+   "pos": [
+    5960,
+    3255,
+    60
+   ],
+   "giro": 15
+  },
+  {
+   "nombre": "coc_saco0",
+   "modelo": "cement_bag",
+   "pos": [
+    6090,
+    3685,
+    60
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "coc_saco1",
+   "modelo": "cement_bag",
+   "pos": [
+    6160,
+    3685,
+    60
+   ],
+   "giro": 84
+  },
+  {
+   "nombre": "coc_saco2",
+   "modelo": "cement_bag",
+   "pos": [
+    6125,
+    3685,
+    120
+   ],
+   "giro": 95
+  },
+  {
+   "nombre": "coc_barril",
+   "modelo": "barrel_03",
+   "pos": [
+    5870,
+    3260,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "coc_taburete0",
+   "modelo": "metal_stool_01",
+   "pos": [
+    6100,
+    3640,
+    60
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "coc_taburete1",
+   "modelo": "metal_stool_01",
+   "pos": [
+    6310,
+    3500,
+    60
+   ],
+   "giro": 30
   }
  ],
  "vaciar": {

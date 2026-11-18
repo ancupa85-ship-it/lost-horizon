@@ -202,6 +202,22 @@ def dardo():
     x += 0.3 * np.sin(2 * np.pi * 180 * t) * env(n, 0.001, 0.01)
     return x
 
+def bengala():
+    # tanda 42: bengala de iluminacion desde una torre: golpe sordo del lanzador, silbido que sube, estallido arriba
+    # y el siseo del magnesio mientras cae. Generador de azar propio
+    r = np.random.default_rng(42)
+    n = int(5.5 * SR); t = np.arange(n) / SR
+    x = np.zeros(n)
+    k = int(0.5 * SR); tk = np.arange(k) / SR
+    x[:k] += lp(r.normal(0, 1, k), 0.95) * np.exp(-tk / 0.06) * 2.4 + np.sin(2 * np.pi * (80 - 30 * np.minimum(tk / 0.1, 1.0)) * tk) * np.exp(-tk / 0.07) * 1.5
+    a, b = int(0.08 * SR), int(1.55 * SR); ts = np.arange(b - a) / SR
+    f = 700 + 1500 * (ts / ts[-1]) ** 0.7
+    x[a:b] += (np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.25 + hp(r.normal(0, 1, b - a), 0.5) * 0.3) * np.minimum(1.0, ts / 0.1) * (1.0 - ts / ts[-1]) ** 0.5
+    c = int(1.6 * SR); tc = np.arange(n - c) / SR
+    x[c:] += hp(r.normal(0, 1, n - c), 0.4) * np.exp(-tc / 0.025) * 1.6 + lp(r.normal(0, 1, n - c), 0.9) * np.exp(-tc / 0.12) * 1.2
+    x[c:] += hp(lp(r.normal(0, 1, n - c), 0.3), 0.85) * (0.32 + 0.1 * np.sin(2 * np.pi * 7 * tc)) * np.minimum(1.0, tc / 0.05) * np.exp(-tc / 2.2)
+    return x
+
 def disparo():
     # tanda 37: tiro de fusil a media distancia: chasquido seco, cuerpo grave y la cola que devuelve el patio.
     # Con su propio generador de azar, para no mover los sonidos de antes
@@ -489,3 +505,5 @@ if __name__ == '__main__':
     save('camion_caja', camion_caja(), 0.5)
     # tanda 37: el tiro de los guardias
     save('disparo', disparo(), 0.9)
+    # tanda 42: la bengala de las torres
+    save('bengala', bengala(), 0.8)

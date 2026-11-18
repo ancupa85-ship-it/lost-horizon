@@ -81,6 +81,7 @@ void ATarsisDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// y la base seca para el editor
 	if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Mojado"), 0.0f);
 	if (WetMPC) UKismetMaterialLibrary::SetScalarParameterValue(this, WetMPC, TEXT("Nublado"), 0.0f);   // y el cielo raso
+	ATarsisGuard::SetDayAmbient(0.0f, 0.0f);   // tanda 42: el fondo de luz de dia es estatico; que no pase a la partida siguiente
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -387,6 +388,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	GearTick(DeltaSeconds);
 	BoxTick(DeltaSeconds);
 	TalkTick(DeltaSeconds);
+	FlareTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
 	ClimbTick(DeltaSeconds);
 }
@@ -2097,6 +2099,7 @@ void ATarsisDirector::CutPower()
 		if (!L || !L->IsVisible()) continue;
 		if (It->ActorHasTag(FName(TEXT("camion")))) continue;   // los faros del camión van con su batería
 		if (It->ActorHasTag(FName(TEXT("decorado")))) continue; // el resplandor de relleno sigue a su farola (ZonesTick)
+		if (It->ActorHasTag(FName(TEXT("bengala")))) continue;  // la bengala no va enchufada
 		PendingOff.Add(L);
 	}
 	const FVector G = GeneratorLoc;
@@ -3482,6 +3485,9 @@ TArray<FString> ATarsisDirector::MenuLines() const
 	L.Add(FString::Printf(TEXT("TAMANO DEL TEXTO   < %d %% >"), FMath::RoundToInt(OptTextScale * 100.0f)));
 	L.Add(FString::Printf(TEXT("COLORES PARA DALTONISMO   < %s >"), bColorblind ? TEXT("SI") : TEXT("NO")));
 	L.Add(FString::Printf(TEXT("SUBTITULOS DE SONIDOS   < %s >"), bSubtitles ? TEXT("SI") : TEXT("NO")));
+	L.Add(FString::Printf(TEXT("BRILLO   < %+d >"), OptBrightness));
+	L.Add(FString::Printf(TEXT("INTENSIDAD DE LA LINTERNA   < %d lm >"), FMath::RoundToInt(TorchLumens * OptTorchMul)));
+	L.Add(FString::Printf(TEXT("HORA   < %s >"), bDay ? TEXT("DIA") : TEXT("NOCHE")));
 	L.Add(TEXT("SALIR DEL JUEGO"));
 	return L;
 }
@@ -3545,7 +3551,10 @@ void ATarsisDirector::MenuActivate(int32 Dir)
 	case 11: OptTextScale = FMath::Clamp(FMath::RoundToFloat((OptTextScale + 0.1f * Step) * 10.0f) / 10.0f, 0.8f, 1.4f); break;
 	case 12: bColorblind = !bColorblind; break;
 	case 13: bSubtitles = !bSubtitles; break;
-	case 14:
+	case 14: OptBrightness = FMath::Clamp(OptBrightness + Step, -4, 8); break;
+	case 15: OptTorchMul = FMath::Clamp(FMath::RoundToFloat((OptTorchMul + 0.1f * Step) * 10.0f) / 10.0f, 0.3f, 3.0f); break;
+	case 16: SetDay(!bDay); return;
+	case 17:
 		if (Dir == 0) UKismetSystemLibrary::QuitGame(this, UGameplayStatics::GetPlayerController(this, 0), EQuitPreference::Quit, false);
 		return;
 	default: return;
@@ -3579,6 +3588,8 @@ void ATarsisDirector::ApplyOptions()
 		PC->InputYawScale_DEPRECATED = BaseYawScale * OptSensitivity;
 		PC->InputPitchScale_DEPRECATED = BasePitchScale * OptSensitivity * (bOptInvertY ? -1.0f : 1.0f);
 	}
+	ApplyBrightness();
+	if (PlayerTorch && bTorch) PlayerTorch->SetIntensity(TorchNow());
 	MusicTick(0.0f);   // en pausa MusicTick no corre: que el volumen de la música cambie ya, con el menú abierto
 	if (GEngine)
 	{
@@ -3616,6 +3627,8 @@ void ATarsisDirector::SaveOptions() const
 	S->bColorblind = bColorblind;
 	S->bSubtitles = bSubtitles;
 	S->Difficulty = Difficulty;
+	S->Brightness = OptBrightness;
+	S->TorchMul = OptTorchMul;
 	for (int32 i = 0; i < NumActions; ++i) S->Keys.Add(ActionKeys[i].GetFName());
 	UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisOpciones"), 0);
 }
@@ -3654,6 +3667,8 @@ void ATarsisDirector::LoadOptions()
 		bColorblind = S->bColorblind;
 		bSubtitles = S->bSubtitles;
 		Difficulty = FMath::Clamp(S->Difficulty, 0, 2);
+		OptBrightness = FMath::Clamp(S->Brightness, -4, 8);
+		OptTorchMul = FMath::Clamp(S->TorchMul, 0.3f, 3.0f);
 		for (int32 i = 0; i < NumActions && i < S->Keys.Num(); ++i)
 		{
 			const FKey K(S->Keys[i]);

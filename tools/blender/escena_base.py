@@ -429,6 +429,61 @@ def hangar():
     box('aviso', (1.6, 0.03, 0.5), Mp(cx, y0 - 0.03, ph + 0.75))
     box('oscuro', (0.03, 0.03, Hh + rise - 3.9 - 0.1), Mp(cx, cy, (Hh + rise + 3.9) / 2)); box('bombilla', (0.3, 0.3, 0.12), Mp(cx, cy, 3.9))
     EXT_OUT['hangar'] = {'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'alto': Hh, 'puerta': [cx, y0, pw, ph], 'luz': [cx, cy, 3.8]}
+    # tanda 42: la trampilla. Acero nuevo en una solera vieja, al fondo, entre los bidones y los cajones: tres cerrojos por
+    # fuera, bisagras gruesas y una rendija por la que sale un hilo de luz roja. No se abre en esta misión
+    tx, ty = 44.8, 69.9
+    box('hormigon', (2.5, 2.5, 0.05), Mp(tx, ty, 0.055)); box('oscuro', (2.02, 2.02, 0.02), Mp(tx, ty, 0.078))             # brocal y foso (negro)
+    box('baliza', (1.98, 0.035, 0.012), Mp(tx, ty - 0.985, 0.084))                                                        # la rendija encendida, del lado de la puerta
+    box('metal', (1.96, 1.9, 0.035), Mp(tx, ty + 0.03, 0.105))                                                            # la hoja
+    for q in (-0.62, 0.0, 0.62): box('hierro', (0.05, 1.84, 0.03), Mp(tx + q, ty + 0.03, 0.135))                          # nervios
+    for q in (-0.7, 0.7): box('hierro', (0.26, 0.12, 0.07), Mp(tx + q, ty + 0.99, 0.125)); cyl('oscuro', 0.035, 0.3, Mp(tx + q, ty + 1.02, 0.15), rot=Matrix.Rotation(math.pi / 2, 4, 'Y'), seg=10)   # bisagras
+    for q in (-0.7, 0.0, 0.7):                                                                                             # cerrojos con candado
+        box('hierro', (0.1, 0.34, 0.035), Mp(tx + q, ty - 0.9, 0.14)); box('oscuro', (0.16, 0.08, 0.06), Mp(tx + q, ty - 1.08, 0.115)); box('aviso', (0.07, 0.05, 0.09), Mp(tx + q, ty - 1.13, 0.1))
+    box('hierro', (0.36, 0.05, 0.05), Mp(tx, ty - 0.3, 0.15))                                                              # asa
+    EXT_OUT['trampilla'] = {'pos': [tx, ty], 'lado': 2.0}
+
+def cocina():
+    """Tanda 42 (Andres, 2026-11-18): la cocina de la tropa, pegada al sur del calabozo, donde el patio estaba vacío. Nave baja
+    de 9,6 x 5,4 m con puerta al patio (oeste), fogón de hierro con su tubo, mesa de despiece, poyo de acero y despensa. En la
+    olla del rincón queda el hueso que le gusta al perro."""
+    x0, x1, y0, y1, Hh, g = 58.0, 67.6, 32.0, 37.4, 2.9, 0.25
+    W, D, cx, cy, dy, dw, dh = x1 - x0, y1 - y0, (x0 + x1) / 2, (y0 + y1) / 2, 35.6, 1.1, 2.1
+    box('suelo_int', (W - 0.1, D - 0.1, 0.06), Mp(cx, cy, 0.03))
+    box('pared', (W, 0.14, Hh), Mp(cx, y0 + 0.07, Hh / 2)); box('pared', (W, g, Hh), Mp(cx, y1 - g / 2, Hh / 2)); box('pared', (g, D, Hh), Mp(x1 - g / 2, cy, Hh / 2))
+    na, nb = (dy - dw / 2) - y0, y1 - (dy + dw / 2)                                                 # pared oeste: dos paños y el dintel
+    box('pared', (g, na, Hh), Mp(x0 + g / 2, y0 + na / 2, Hh / 2)); box('pared', (g, nb, Hh), Mp(x0 + g / 2, y1 - nb / 2, Hh / 2))
+    box('pared', (g, dw, Hh - dh), Mp(x0 + g / 2, dy, dh + (Hh - dh) / 2))
+    for q in (-1, 1): box('madera', (g + 0.06, 0.08, dh), Mp(x0 + g / 2, dy + q * (dw / 2 - 0.04), dh / 2))   # marco
+    box('madera', (g + 0.06, dw, 0.08), Mp(x0 + g / 2, dy, dh - 0.04))
+    box('madera', (0.05, dw - 0.2, dh - 0.12), Mp(x0 - 0.5, dy - dw / 2 - 0.02, dh / 2), rotz=math.radians(78))   # hoja abierta hacia fuera
+    box('aviso', (0.03, 0.9, 0.3), Mp(x0 - 0.02, dy, dh + 0.38))
+    box('techo_int', (W - 0.2, D - 0.2, 0.05), Mp(cx, cy, Hh - 0.025)); box('tejado', (W + 0.5, D + 0.3, 0.1), Mp(cx, cy + 0.1, Hh + 0.05))
+    box('ventana_on', (1.3, 0.04, 0.7), Mp(x0 + 2.2, y1 + 0.01, 1.75)); box('ventana_on', (0.04, 0.9, 0.5), Mp(x1 + 0.01, cy, 2.0))   # se ve encendida desde el patio
+    # fogón de hierro contra la pared norte, con campana y tubo que sale por la cubierta (se lee «cocina» desde fuera)
+    fx = 63.4
+    box('oscuro', (2.4, 0.85, 0.82), Mp(fx, y0 + 0.6, 0.41)); box('hierro', (2.5, 0.95, 0.05), Mp(fx, y0 + 0.62, 0.845))
+    for q in (-0.75, 0.0, 0.75): cyl('oscuro', 0.2, 0.02, Mp(fx + q, y0 + 0.62, 0.88), seg=14); box('hierro', (0.5, 0.03, 0.34), Mp(fx + q, y0 + 1.04, 0.42))
+    box('metal', (2.6, 1.0, 0.5), Mp(fx, y0 + 0.62, 2.05)); cyl('metal', 0.14, Hh + 1.3 - 2.3, Mp(fx, y0 + 0.5, (Hh + 1.3 + 2.3) / 2), seg=12)
+    cyl('metal', 0.2, 0.06, Mp(fx, y0 + 0.5, Hh + 1.36), seg=12)
+    cyl('metal', 0.3, 0.42, Mp(fx - 0.75, y0 + 0.62, 1.1), seg=16); cyl('oscuro', 0.2, 0.26, Mp(fx + 0.75, y0 + 0.62, 1.02), seg=14)   # ollas sobre el fuego
+    # poyo de acero con pila en la pared este, y barra de ganchos encima
+    box('metal', (0.7, 3.4, 0.05), Mp(x1 - g - 0.37, cy + 0.5, 0.88)); box('oscuro', (0.62, 3.3, 0.82), Mp(x1 - g - 0.37, cy + 0.5, 0.42)); box('oscuro', (0.5, 0.7, 0.03), Mp(x1 - g - 0.37, cy + 1.4, 0.9))
+    cyl('hierro', 0.015, 3.0, Mp(x1 - g - 0.12, cy + 0.5, 1.95), rot=Matrix.Rotation(math.pi / 2, 4, 'X'), seg=8)
+    for k in range(6):
+        yy = cy - 0.75 + k * 0.5; box('hierro', (0.012, 0.012, 0.14), Mp(x1 - g - 0.12, yy, 1.88))
+        if k % 2 == 0: cyl('oscuro', 0.13, 0.02, Mp(x1 - g - 0.1, yy, 1.66), rot=Matrix.Rotation(math.pi / 2, 4, 'Y'), seg=14); box('oscuro', (0.015, 0.03, 0.24), Mp(x1 - g - 0.1, yy, 1.86))   # sartenes
+    # mesa de despiece en el centro
+    box('madera', (2.2, 0.95, 0.07), Mp(61.6, cy + 0.2, 0.8))
+    for a in (-1, 1):
+        for b in (-1, 1): box('madera', (0.09, 0.09, 0.78), Mp(61.6 + a * 0.98, cy + 0.2 + b * 0.38, 0.39))
+    box('hierro', (0.34, 0.07, 0.012), Mp(61.2, cy + 0.1, 0.845), rotz=0.5)                                 # cuchilla
+    # despensa: estantes de tabla en la pared sur y el rincón de la olla fría (suroeste), con su tajo
+    for z in (0.5, 1.05, 1.6): box('madera', (3.6, 0.36, 0.035), Mp(64.6, y1 - g - 0.19, z))
+    for xx in (62.8, 64.6, 66.4): box('madera', (0.05, 0.36, 1.65), Mp(xx, y1 - g - 0.19, 0.83))
+    ox, oy = x0 + 0.95, y1 - 0.95
+    cyl('madera', 0.32, 0.5, Mp(ox + 0.9, oy + 0.1, 0.25), seg=14)                                           # tajo
+    cyl('metal', 0.34, 0.5, Mp(ox, oy, 0.25), seg=18); cyl('oscuro', 0.31, 0.02, Mp(ox, oy, 0.47), seg=18)   # la olla grande, en el suelo
+    EXT_OUT['cocina'] = {'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'alto': Hh, 'puerta': [x0, dy, dw, dh], 'luz': [cx - 0.6, cy + 0.3, 2.6], 'olla': [ox, oy], 'fogon': [fx, y0 + 0.6]}
 
 def build_exterior():
     """Tanda 20 (Andres, 2026-11-14): el muro perimetral EXT casillas más afuera por los cuatro lados, un portón de entrada al oeste
@@ -455,7 +510,7 @@ def build_exterior():
         for y in (-EXT, ROWS + EXT - 1):
             if x == BX and y == -EXT: brecha(x, y); continue
             tramo(x, y, (T, T * 0.45, HW))
-    hangar()
+    hangar(); cocina()
     for y in range(-EXT + 1, ROWS + EXT - 1):
         if y in GR: continue
         for x in (-EXT, COLS + EXT - 1): tramo(x, y, (T * 0.45, T, HW))

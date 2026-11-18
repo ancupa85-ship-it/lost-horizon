@@ -58,7 +58,7 @@
    ],
    "truck_entry_papers": 5.0,
    "truck_stay_x": 4900.0,
-   "truck_stay_seconds": 45.0,
+   "truck_stay_seconds": 600.0,
    "uniform_dist": 900.0
   },
   "guardias": {
@@ -443,6 +443,53 @@
    "sonido": "recoger",
    "texto": "uniforme_cogido",
    "segundos": 7.0
+  },
+  {
+   "id": "hueso",
+   "nota": "olla fria del rincon suroeste de la cocina (tanda 42): el hueso para el perro",
+   "pos": [
+    5895,
+    3645,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_hueso",
+   "pone": "hueso",
+   "sonido": "recoger",
+   "texto": "hueso_cogido",
+   "segundos": 7.0
+  },
+  {
+   "id": "raciones",
+   "nota": "parte de raciones clavado junto al fogon de la cocina (tanda 42): sobran diecinueve bocas",
+   "pos": [
+    6190,
+    3300,
+    0
+   ],
+   "radio": 170,
+   "aviso": "p_raciones",
+   "pone": "vio_raciones",
+   "repetible": true,
+   "sonido": "recoger",
+   "texto": "raciones",
+   "segundos": 9.0
+  },
+  {
+   "id": "trampilla",
+   "nota": "trampilla de acero al fondo del hangar (tanda 42): no se abre en esta mision",
+   "pos": [
+    4480,
+    6880,
+    0
+   ],
+   "radio": 190,
+   "aviso": "p_trampilla",
+   "pone": "vio_trampilla",
+   "repetible": true,
+   "sonido": "candado",
+   "texto": "trampilla",
+   "segundos": 9.0
   }
  ],
  "textos": {
@@ -749,7 +796,16 @@
   "dt_vidal_medalla": "La medalla de su hermano esta en la celda, bajo la losa que baila.",
   "dt_alarcon_traslados": "Firma los traslados de abajo.",
   "dt_peris_cajon": "Guarda en su cajon lo de los presos, y sale a fumar a la puerta.",
-  "dt_carmona_hangar": "Sabe que nadie mira lo que lleva el camion."
+  "dt_carmona_hangar": "Sabe que nadie mira lo que lleva el camion.",
+  "p_hueso": "E   MIRAR EN LA OLLA",
+  "hueso_cogido": "HUESO DE JAMON\nEn el fondo de la olla fria, un hueso con algo de carne. Lo envuelves en un trapo.\nA ti no te sirve. A alguien de cuatro patas, quiza si.",
+  "p_raciones": "E   LEER EL PARTE DE RACIONES",
+  "raciones": "PARTE DE RACIONES\n\"Tropa: 12. Calabozo: 1. ABAJO: 19, sin sal, en cubos. Se dejan en la trampilla del hangar y NO SE ESPERA.\"\nDoce soldados en la base. Y diecinueve bocas mas, abajo.",
+  "p_trampilla": "E   TRAMPILLA",
+  "trampilla": "TRAMPILLA\nAcero nuevo en un suelo viejo. Tres cerrojos con candado, por fuera: no es para que nadie entre.\nPor la rendija sube aire tibio, una luz roja y un zumbido grave. Hoy no se abre.",
+  "ensena_bengala": "BENGALA\nMientras cae, la base se ve como de dia. A la sombra de un muro o bajo techo sigues a oscuras: no cruces lo abierto hasta que se apague.",
+  "dia": "DE DIA\nA cielo abierto se te ve desde lejos. Bajo techo, algo menos.",
+  "noche": "DE NOCHE"
  },
  "datos": [
   {

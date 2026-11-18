@@ -1144,10 +1144,20 @@ static float BeamLumensOf(const FTarsisBeams& Beams, const AActor* LightActor)
 // toda la luz que llega a un punto, sin tope. Ignore: actor que no hace sombra (el propio jugador al medir la suya)
 static const float TorchStealthLumens = 2500.0f;   // lo que cuenta una linterna para el sigilo, pinte lo que pinte
 
+static float GDayOpen = 0.0f;
+static float GDayRoofed = 0.0f;
+void ATarsisGuard::SetDayAmbient(float Open, float Roofed) { GDayOpen = Open; GDayRoofed = Roofed; }
+
 static float LightSum(const UWorld* World, const FVector& Point, const AActor* Ignore, bool bTorches = true)
 {
 	float Sum = 0.12f;   // luna y cielo: de noche siempre se ve una silueta de cerca
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLuz), false);
+	if (GDayOpen > 0.0f)
+	{
+		// tanda 42, de dia: a cielo abierto se te ve como bajo una farola; bajo techo, penumbra
+		FHitResult Roof;
+		Sum = World->LineTraceSingleByChannel(Roof, Point + FVector(0.0f, 0.0f, 60.0f), Point + FVector(0.0f, 0.0f, 3000.0f), ECC_Visibility, Q) ? GDayRoofed : GDayOpen;
+	}
 	FTarsisBeams Beams;
 	CollectBeams(World, Beams);
 	for (TActorIterator<ALight> It(World); It; ++It)

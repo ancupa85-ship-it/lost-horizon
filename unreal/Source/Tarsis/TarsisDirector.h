@@ -713,6 +713,27 @@ public:
 	UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> BeamGlows;
 	float TorchNoticeT = 0.0f;
 	float TorchDim = 1.0f;   // tanda 32: 1 = toda la luz; baja cuando alumbras algo a un palmo
+	/** Tanda 42: tu linterna parpadea cada pocos segundos (el hueco entre parpadeos sale al azar de TorchFlickerGaps). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	bool bTorchFlicker = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	TArray<float> TorchFlickerGaps = { 6.0f, 12.0f, 10.0f, 30.0f };
+	/** Lo que dura un parpadeo (s), entre los dos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchFlickerMin = 0.35f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchFlickerMax = 0.9f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Linterna")
+	int32 TorchFlickers = 0;
+	/** Segundos hasta el proximo parpadeo (pruebas: ponerlo a 0,1). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Linterna")
+	float TorchFlickerNext = 6.0f;
+	/** Lumenes que da ahora mismo tu linterna (con el ajuste del menu, la atenuacion de cerca y el parpadeo). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Linterna")
+	float TorchNow() const { return TorchLumens * OptTorchMul * TorchDim * TorchFlick; }
+	float TorchFlick = 1.0f;
+	float TorchFlickT = 0.0f;
+	float TorchFlickStep = 0.0f;
 
 	// misión secundaria de Ramos: carta en su litera, agarrarlo por la espalda (1 te lo llevas, 2 lo derribas),
 	// llave del botiquín del veterinario con la pistola de dardos, y salida alternativa por el portillo de la marisma
@@ -979,6 +1000,98 @@ public:
 	int32 GearDarts = 0;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Equipo")
 	void TakeGear();
+	// ---- tanda 42: bengalas de las torres, dia o noche y brillo (TarsisBengala.cpp)
+	/** De vez en cuando una torre lanza una bengala: mientras cae, la base se ve como de dia salvo a la sombra o bajo techo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	bool bFlares = true;
+	/** Segundos entre bengalas (al azar entre los dos) y lo que dura cada una. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareEveryMin = 240.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareEveryMax = 420.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareSeconds = 14.0f;
+	/** Altura a la que estalla y a la que se apaga (cm), fuerza en candelas, radio y cono. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareHeight = 6500.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareEndHeight = 3200.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareCandelas = 6000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareRadius = 14000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareCone = 62.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	FLinearColor FlareColor = FLinearColor(1.0f, 0.52f, 0.36f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	bool bFlareShadows = true;
+	/** Bengalas lanzadas, y si hay una en el aire. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Bengala")
+	int32 FlaresFired = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Bengala")
+	bool FlareUp() const { return FlareT > 0.0f; }
+	/** Segundos que faltan para la siguiente (pruebas). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Bengala")
+	float FlareNext = 150.0f;
+	/** Lanza una ya, desde la torre mas cercana al jugador que tenga centinela (o sobre el jugador si no hay torres). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Bengala")
+	void FireFlare();
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Bengala")
+	FVector FlareLocation() const;
+	void FlareTick(float DeltaSeconds);
+	void EndFlare();
+	UPROPERTY() TObjectPtr<class ASpotLight> FlareLight;
+	UPROPERTY() TObjectPtr<class UStaticMeshComponent> FlareGlow;
+	float FlareT = 0.0f;
+	FVector FlareFrom = FVector::ZeroVector;
+	FVector FlareTop = FVector::ZeroVector;
+	FVector FlareDrift = FVector::ZeroVector;
+
+	/** Dia (true) o noche. La mision 1 es de noche; la de los inspectores sera de dia. Se cambia en Pausa. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Dia")
+	bool bDay = false;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Dia")
+	void SetDay(bool bNewDay);
+	/** Sol: lux (la luna da 0,8 con la exposicion fija del nivel), color, y cuanto baja (grados) sobre el horizonte. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	float DaySunLux = 5.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	FLinearColor DaySunColor = FLinearColor(1.0f, 0.95f, 0.86f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	float DaySunPitch = -48.0f;
+	/** Boveda de dia (en la escala de la exposicion fija: valores pequenos). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	FLinearColor DayZenith = FLinearColor(0.018f, 0.028f, 0.050f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	FLinearColor DayHorizon = FLinearColor(0.045f, 0.052f, 0.060f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	FLinearColor DayCloud = FLinearColor(0.070f, 0.070f, 0.070f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	FLinearColor DayFogColor = FLinearColor(0.030f, 0.034f, 0.040f);
+	/** Luz de sigilo de dia: a cielo abierto y bajo techo (de noche el fondo es 0,12). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	float DayAmbientOpen = 0.9f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	float DayAmbientRoofed = 0.4f;
+	/** De dia las farolas, focos y apliques de fuera se apagan (las de dentro siguen). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	bool bDayLampsOff = true;
+	UPROPERTY() TObjectPtr<class UMaterialInterface> NightSkyMat;
+	UPROPERTY() TArray<TObjectPtr<class ALight>> DayOffLights;
+	float BaseMoonLux = -1.0f;
+	FLinearColor BaseMoonColor = FLinearColor::White;
+	FRotator BaseMoonRot = FRotator::ZeroRotator;
+
+	/** Brillo (Pausa): pasos de un cuarto de diafragma sobre la exposicion fija del nivel, de -4 a +8. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	int32 OptBrightness = 0;
+	void ApplyBrightness();
+	float BaseExposure = -1000.0f;
+	/** Intensidad de tu linterna (Pausa): multiplica TorchLumens, de 0,3 a 3. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
+	float OptTorchMul = 1.0f;
+
 	// ---- tanda 41: charlas que se oyen de cerca y mapa mental (TarsisCharlas.cpp)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
 	bool bTalkRule = true;

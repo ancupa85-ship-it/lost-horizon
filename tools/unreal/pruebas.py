@@ -170,7 +170,7 @@ def prueba_datos():
     """La misión en datos: todo texto del C++ está en mision1.json, y el director tiene lo que dice el .json."""
     d = director()
     src = ''
-    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp', 'TarsisCaja.cpp', 'TarsisCharlas.cpp'):
+    for f in ('TarsisDirector.cpp', 'TarsisGuard.cpp', 'TarsisHUD.cpp', 'TarsisCodec.cpp', 'TarsisTorch.cpp', 'TarsisEmisora.cpp', 'TarsisCalabozo.cpp', 'TarsisCombat.cpp', 'TarsisEquipo.cpp', 'TarsisCaja.cpp', 'TarsisCharlas.cpp', 'TarsisBengala.cpp'):
         src += open(os.path.join(ROOT, 'unreal', 'Source', 'Tarsis', f), encoding='utf-8').read()
     claves = set(re.findall(r'(?:Tx|Teach)\(TEXT\("([a-z0-9_]+)"\)', src))
     claves |= {'voz_' + k for k in re.findall(r'Key == TEXT\("([a-z]+)"\)\) T = TEXT', src)}
@@ -575,7 +575,7 @@ def prueba_menu():
     d.press_key('P'); yield 0.2
     check('P abre el menú y pausa', d.get_editor_property('menu') and unreal.GameplayStatics.is_game_paused(mundo()))
     lineas = list(d.menu_lines())
-    check('el menú tiene sus 15 líneas', len(lineas) == 15, ' / '.join(lineas))
+    check('el menú tiene sus 18 líneas', len(lineas) == 18, ' / '.join(lineas))
     sens0 = float(lineas[2].split('<')[1].split('>')[0])
     for k in ('Down', 'Down', 'Right', 'Right', 'Right', 'Right', 'Right'):
         d.press_key(k); yield 0.1
@@ -2223,7 +2223,7 @@ def prueba_controles():
     ls = lineas(d)
     check('TECLAS POR DEFECTO lo deshace', ls[0] == tecla0 and ls[1] == interact, '%s / %s' % (ls[0], ls[1]))
     yield from teclas(d, 'Escape')
-    check('Esc vuelve a la página principal', len(lineas(d)) == 15, len(lineas(d)))
+    check('Esc vuelve a la página principal', len(lineas(d)) == 18, len(lineas(d)))
     yield from teclas(d, 'P')
     check('P cierra el menú', not d.get_editor_property('menu'))
 
@@ -2761,6 +2761,106 @@ def prueba_hangar():
     check('y el camión te saca de la base', P('done') and P('left_by_truck'), str(P('message'))[:40].replace('\n', ' / '))
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_bengala():
+    """Tanda 42. Brillo, día o noche e intensidad de la linterna en Pausa; tu linterna parpadea; una torre lanza una
+    bengala que alumbra lo abierto y no lo que queda bajo techo; la cocina (con su hueso y su parte de raciones) pegada
+    al calabozo y la trampilla del hangar, que no se abre."""
+    d = director(); w = mundo()
+    P = lambda k: director().get_editor_property(k)
+    traza = lambda a, b: unreal.SystemLibrary.line_trace_single(w, a, b, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [jugador()], unreal.DrawDebugTrace.NONE, True)
+    for g in guardias():
+        g.hold(3600.0)
+    ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
+    ck, tr = ext['cocina'], ext['trampilla']
+    # menú
+    d.press_key('P'); yield 0.2
+    L = [str(x) for x in d.menu_lines()]
+    check('Pausa: brillo, linterna y hora antes de salir', len(L) == 18 and 'BRILLO' in L[14] and 'LINTERNA' in L[15] and 'HORA' in L[16] and 'SALIR' in L[17], ' / '.join(L[13:]))
+    for _ in range(14):
+        d.press_key('Down')
+    b0 = P('opt_brightness')
+    d.press_key('Right'); yield 0.1
+    check('derecha sube el brillo un paso', P('opt_brightness') == b0 + 1, P('opt_brightness'))
+    d.press_key('Left'); yield 0.1
+    check('e izquierda lo deja como estaba', P('opt_brightness') == b0, P('opt_brightness'))
+    d.press_key('Down'); m0 = P('opt_torch_mul')
+    d.press_key('Right'); yield 0.1
+    check('la linterna sube una décima', abs(P('opt_torch_mul') - min(3.0, m0 + 0.1)) < 0.01 and 'lm' in str(d.menu_lines()[15]), str(d.menu_lines()[15]))
+    d.press_key('Left'); yield 0.1
+    d.press_key('Down'); d.press_key('Enter'); yield 0.2
+    check('la hora pasa a día', P('day') and 'DIA' in str(d.menu_lines()[16]), str(d.menu_lines()[16]))
+    d.press_key('Enter'); yield 0.2
+    check('y vuelve a noche', not P('day') and 'NOCHE' in str(d.menu_lines()[16]), str(d.menu_lines()[16]))
+    d.press_key('P'); yield 0.3
+    # día: a cielo abierto se te ve; bajo techo, penumbra
+    abierto = V(3000, 4600, 100); dentro = V((ck['x0'] + ck['x1']) * 50 + 250, (ck['y0'] + ck['y1']) * 50 + 120, 100)
+    n0 = luz_en(abierto)
+    d.set_day(True); yield 0.3
+    check('de día, a cielo abierto, luz alta', luz_en(abierto) >= 0.85, luz_en(abierto))
+    check('de día, bajo el techo de la cocina, menos', luz_en(dentro) < luz_en(abierto), [luz_en(dentro), luz_en(abierto)])
+    d.set_day(False); yield 0.3
+    check('de noche todo vuelve a su luz', abs(luz_en(abierto) - n0) < 0.05, [n0, luz_en(abierto)])
+    # linterna que parpadea
+    d.set_editor_property('has_torch', True)
+    d.set_torch(True); yield 0.2
+    lm = d.torch_now()
+    check('linterna encendida con sus lúmenes', P('torch') and lm > 1.0, lm)
+    f0 = P('torch_flickers')
+    d.set_editor_property('torch_flicker', True); d.set_editor_property('torch_flicker_next', 0.1)
+    vistos = set()
+    for _ in range(14):
+        yield 0.05
+        vistos.add(round(d.torch_now() / max(lm, 1.0), 2))
+    check('parpadea', P('torch_flickers') == f0 + 1 and len(vistos) >= 2 and min(vistos) < 0.7, sorted(vistos))
+    check('el siguiente hueco sale de la lista (6, 10, 12 o 30 s)', 4.0 < P('torch_flicker_next') <= 30.0, P('torch_flicker_next'))
+    yield 1.2
+    check('y vuelve a su luz', abs(d.torch_now() - lm) < lm * 0.05, [d.torch_now(), lm])
+    d.set_editor_property('torch_flicker', False); d.set_torch(False); yield 0.1
+    # bengala
+    tp(abierto.x, abierto.y, 0); yield 0.2
+    a0, i0, n = luz_en(abierto), luz_en(dentro), P('flares_fired')
+    d.set_editor_property('flare_seconds', 6.0)
+    d.fire_flare(); yield 0.2
+    check('la bengala sale', d.flare_up() and P('flares_fired') == n + 1, [d.flare_up(), P('flares_fired')])
+    yield 3.0
+    z = d.flare_location().z
+    check('arde arriba, sobre la base', z > 3000 and abs(d.flare_location().x - 3600) < 3500, d.flare_location())
+    check('lo abierto se ve como de día', luz_en(abierto) > max(0.6, a0 + 0.3), [a0, luz_en(abierto)])
+    check('bajo techo, no', luz_en(dentro) < i0 + 0.1, [i0, luz_en(dentro)])
+    yield ('hasta', lambda: not director().flare_up(), 8.0)
+    check('se apaga sola', not d.flare_up() and abs(luz_en(abierto) - a0) < 0.05, [d.flare_up(), luz_en(abierto)])
+    check('la siguiente queda para dentro de unos minutos', P('flare_next') >= P('flare_every_min') - 1, P('flare_next'))
+    # cocina
+    cxk, cyk = (ck['x0'] + ck['x1']) * 50, (ck['y0'] + ck['y1']) * 50
+    h = traza(V(cxk, cyk + 100, 1200), V(cxk, cyk + 100, 100))
+    check('la cocina tiene cubierta', h is not None and h.to_tuple()[4].z > ck['alto'] * 100 - 20, h.to_tuple()[4].z if h else None)
+    pu = ck['puerta']
+    check('puerta abierta al patio', traza(V(pu[0] * 100 - 150, pu[1] * 100, 120), V(pu[0] * 100 + 150, pu[1] * 100, 120)) is None)
+    check('y pared a su lado', traza(V(pu[0] * 100 - 150, pu[1] * 100 - 130, 120), V(pu[0] * 100 + 150, pu[1] * 100 - 130, 120)) is not None)
+    check('la ronda de Moya pasa libre por delante (y = 39 m)', traza(V(ck['x0'] * 100 - 300, 3900, 120), V(ck['x1'] * 100, 3900, 120)) is None)
+    pt = next(q for q in MISION['puntos'] if q['id'] == 'hueso')
+    tp(pt['pos'][0] + 90, pt['pos'][1] - 90, 135); yield 0.4
+    check('dentro se está de pie', abs(jugador().get_actor_location().z - 100) < 45, jugador().get_actor_location().z)
+    check('la olla ofrece mirar', 'OLLA' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.3
+    check('te llevas el hueso', d.has_flag('hueso') and 'HUESO' in str(P('message')), str(P('message'))[:30])
+    pt = next(q for q in MISION['puntos'] if q['id'] == 'raciones')
+    tp(pt['pos'][0], pt['pos'][1] + 80, -90); yield 0.4
+    check('el parte de raciones se puede leer', 'RACIONES' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.3
+    check('y habla de los de abajo', 'ABAJO' in str(P('message')), str(P('message'))[:40])
+    # trampilla
+    pt = next(q for q in MISION['puntos'] if q['id'] == 'trampilla')
+    tp(pt['pos'][0], pt['pos'][1] - 60, 90); yield 0.4
+    check('la trampilla está donde dice el plano', dist2d(V(pt['pos'][0], pt['pos'][1], 0), V(tr['pos'][0] * 100, tr['pos'][1] * 100, 0)) < 160)
+    check('ofrece mirarla', 'TRAMPILLA' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.3
+    check('no se abre, y queda vista', d.has_flag('vio_trampilla') and 'no se abre' in str(P('message')), str(P('message'))[-40:])
+    hz = traza(V(tr['pos'][0] * 100, tr['pos'][1] * 100, 200), V(tr['pos'][0] * 100, tr['pos'][1] * 100, -50))
+    check('la hoja levanta un palmo del suelo', hz is not None and 5 < hz.to_tuple()[4].z < 25, hz.to_tuple()[4].z if hz else None)
+    check('el camión para diez minutos ante el hangar (ajuste de la misión)', MISION['ajustes']['director']['truck_stay_seconds'] == 600.0)
+
+
 def prueba_charlas():
     """Tanda 41. Dos guardias se juntan a hablar; de lejos solo hay murmullo y de cerca se oye cada frase. Las frases con
     dato lo apuntan en la ficha del soldado (bandera dato_<id>), una charla cortada se repite, y el mapa se abre con la M."""
@@ -2914,7 +3014,7 @@ def prueba_armados():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_charlas], [prueba_bengala]]
 PRUEBAS = []
 
 
@@ -2980,6 +3080,11 @@ def _limpieza(siguiente):
             d.toggle_mind_map()
         d.set_editor_property('truck_entry_papers', 0.0)
         d.set_editor_property('truck_stay_seconds', 0.0)
+        # tanda 42: ni bengalas ni parpadeo de tu linterna fuera de su prueba (cambian la luz que miden las demás), y de noche
+        d.set_editor_property('flares', False)
+        d.set_editor_property('torch_flicker', False)
+        if d.get_editor_property('day'):
+            d.set_day(False)
         if d.get_editor_property('box_on'):
             d.toggle_box()
         d.set_editor_property('player_speed_override', -1.0)

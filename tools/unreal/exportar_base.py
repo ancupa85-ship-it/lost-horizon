@@ -438,7 +438,7 @@ for c, L in enumerate(kont):
 #     recortado M_Hierbajo, sin colisión, sin sombra y sin contar para la navegación (tools/unreal/montar_base.py).
 import random
 def hierbajos():
-    HG = (JEXT or {}).get('hangar')
+    HG = (JEXT or {}).get('hangar'); CK = (JEXT or {}).get('cocina')
     rs = random.Random(2207); V, F, UV = [], [], []
     TAM = (0.78, 0.6, 0.92, 0.56)     # lado del plano de cada mata (m): hierba seca alta, mata verde, cardo, roseta
     def mata(px, py, z=0.0, k=1.0, var=None):
@@ -455,6 +455,7 @@ def hierbajos():
             uv = [(u0, vb), (u1, vb), (u1, vt), (u0, vt)]
             for orden in ((0, 1, 2, 3), (3, 2, 1, 0)):
                 if HG and HG['x0'] - 0.6 < px < HG['x1'] + 0.6 and 60.2 < py < HG['y1'] + 0.6: continue   # tanda 40: dentro del hangar y en su rampa no crece nada
+                if CK and CK['x0'] - 0.4 < px < CK['x1'] + 0.4 and CK['y0'] - 0.4 < py < CK['y1'] + 0.4: continue   # tanda 42: ni dentro de la cocina
                 n = len(V); V.extend((q[i][0], -q[i][1], q[i][2]) for i in orden); UV.extend(uv[i] for i in orden); F.append((n, n + 1, n + 2, n + 3))
     def linea(xa, ya, xb, yb, nx, ny, dens, z=0.0, k=1.0, saltos=()):
         """Matas al pie de una línea (muro, bordillo). (nx, ny): hacia dónde se separan de ella; saltos: tramos, en metros desde
@@ -562,6 +563,9 @@ if JEXT and JEXT.get('brecha'):   # tanda 40: se empieza junto a la brecha del m
 if JEXT and JEXT.get('hangar'):   # la bombilla del hangar: foco hacia abajo, al final de la lista
     q = JEXT['hangar']['luz']
     lights.append({'kind': 'POINT', 'name': 'hangar', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.82, 0.55], 'power': 900})
+if JEXT and JEXT.get('cocina'):   # tanda 42: la bombilla de la cocina
+    q = JEXT['cocina']['luz']
+    lights.append({'kind': 'POINT', 'name': 'cocina', 'pos': [q[0], -q[1], q[2]], 'color': [1.0, 0.8, 0.5], 'power': 500})
 json.dump({'T': T, 'map': MAP, 'lights': lights, 'spawn': spawn, 'spawn_yaw': spawn_yaw, 'marcas': MARCAS, 'torres': TORRES,
            **({'ext': JEXT} if JEXT else {}), 'mallas': len([o for o in bpy.data.objects if o.type == 'MESH'])},
           open(os.path.join(OUT, 'base.json'), 'w'), indent=1)
