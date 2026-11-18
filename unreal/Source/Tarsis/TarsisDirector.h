@@ -1149,7 +1149,7 @@ public:
 	float BaseExposure = -1000.0f;
 	/** Intensidad de tu linterna (Pausa): multiplica TorchLumens, de 0,3 a 3. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Menu")
-	float OptTorchMul = 1.0f;
+	float OptTorchMul = 0.3f;   // Andres (2026-11-18): se queda con la linterna al minimo (90 lm)
 
 	// ---- tanda 41: charlas que se oyen de cerca y mapa mental (TarsisCharlas.cpp)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
