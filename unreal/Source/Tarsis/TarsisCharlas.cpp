@@ -94,8 +94,8 @@ bool ATarsisDirector::StartTalk(int32 Index)
 	const FVector Side = (GB->GetActorLocation() - GA->GetActorLocation()).GetSafeNormal2D();
 	const FVector Dir = Side.IsNearlyZero() ? FVector(1.0f, 0.0f, 0.0f) : Side;
 	const FVector PA = T.Spot - Dir * 65.0f, PB = T.Spot + Dir * 65.0f;
-	if (!GA->Errand(PA, PB, TalkGather + T.Lines.Num() * TalkLineSeconds + 10.0f)) return false;
-	if (!GB->Errand(PB, PA, TalkGather + T.Lines.Num() * TalkLineSeconds + 10.0f)) { GA->EndErrand(); return false; }
+	if (!GA->Errand(PA, PB, TalkGather + T.Lines.Num() * (TalkLineSeconds + 3.0f) + 10.0f)) return false;
+	if (!GB->Errand(PB, PA, TalkGather + T.Lines.Num() * (TalkLineSeconds + 3.0f) + 10.0f)) { GA->EndErrand(); return false; }
 	TalkIdx = Index;
 	TalkPhase = 0;
 	TalkLine = 0;
@@ -135,12 +135,13 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 	TalkT += DeltaSeconds;
 	if (TalkPhase == 0)
 	{
-		if (TalkA->AtErrand() && TalkB->AtErrand()) { TalkPhase = 1; TalkT = TalkLineSeconds - 1.0f; TalkLine = 0; }
+		if (TalkA->AtErrand() && TalkB->AtErrand()) { TalkPhase = 1; TalkT = TalkLineSeconds - 1.0f; TalkWait = TalkLineSeconds; TalkLine = 0; }
 		else if (TalkT > TalkGather) EndTalk(true);
 		return;
 	}
-	if (TalkT < TalkLineSeconds) return;
+	if (TalkT < TalkWait) return;
 	TalkT = 0.0f;
+	TalkWait = TalkLineSeconds;
 	if (TalkLine >= T.Lines.Num())
 	{
 		++TalksEnded;
@@ -155,7 +156,10 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 		bTalkHeardAny = true;
 		++TalkLinesHeard;
 		PlaySfx(TEXT("rumor"), T.Spot + FVector(0.0f, 0.0f, 150.0f), 0.5f);
-		SaySubtitle(Who.ToUpper(), Tx(T.Lines[TalkLine], TEXT("...")), TalkLineSeconds);
+		// tanda 42: las frases largas duran lo que se tarda en leerlas (16 letras por segundo), no 4 s justos
+		const FString Said = Tx(T.Lines[TalkLine], TEXT("..."));
+		TalkWait = FMath::Max(TalkLineSeconds, Said.Len() / 16.0f);
+		SaySubtitle(Who.ToUpper(), Said, TalkWait);
 		if (T.Facts.IsValidIndex(TalkLine)) LearnFact(T.Facts[TalkLine]);
 	}
 	else if (D < TalkSeeDist)

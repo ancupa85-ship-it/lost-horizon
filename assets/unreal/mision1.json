@@ -59,7 +59,8 @@
    "truck_entry_papers": 5.0,
    "truck_stay_x": 4900.0,
    "truck_stay_seconds": 600.0,
-   "uniform_dist": 900.0
+   "uniform_dist": 900.0,
+   "talk_hear_dist": 550.0
   },
   "guardias": {
    "*": {
@@ -431,10 +432,10 @@
   },
   {
    "id": "uniforme",
-   "nota": "capote y casco colgados en el barracon oeste, pared norte (tanda 40). Posicion sin medir: comprobar en el PC",
+   "nota": "capote y casco colgados en el barracon oeste, a 70 cm de la pared norte (tanda 40; medido en el PC)",
    "pos": [
     330,
-    2330,
+    2270,
     0
    ],
    "radio": 150,
@@ -907,8 +908,8 @@
    "a": "Lobato",
    "b": "Carmona",
    "sitio": [
-    -900,
-    5280,
+    -1300,
+    4950,
     0
    ],
    "desde": 60,

@@ -1154,6 +1154,7 @@ public:
 	UPROPERTY()
 	TObjectPtr<class ATarsisGuard> TalkB;
 	float TalkT = 0.0f;
+	float TalkWait = 4.0f;
 	int32 TalkNext = 0;
 	bool bTalkHeardAny = false;
 	bool bTalkMurmur = false;

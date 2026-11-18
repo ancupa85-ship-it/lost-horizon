@@ -3099,19 +3099,21 @@
    "pos": [
     4140,
     6480,
-    60
+    30
    ],
-   "giro": 29
+   "giro": 29,
+   "colgar": true
   },
   {
    "nombre": "han_rueda1",
    "modelo": "old_tyre",
    "pos": [
     4150,
-    6490,
-    120
+    6555,
+    30
    ],
-   "giro": 54
+   "giro": 20,
+   "colgar": true
   },
   {
    "nombre": "han_rueda2",
@@ -3119,9 +3121,10 @@
    "pos": [
     4260,
     6460,
-    60
+    30
    ],
-   "giro": 3
+   "giro": 3,
+   "colgar": true
   },
   {
    "nombre": "han_cajon_f0",

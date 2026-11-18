@@ -2910,7 +2910,7 @@ def prueba_charlas():
             ok = d.start_talk(k); yield 0.2
             yield ('hasta', lambda: director().get_editor_property('talk_phase') == 1 or director().get_editor_property('talk_idx') < 0, P('talk_gather') + 5.0)
         jugador().set_actor_location(V(sx + 300, sy, 150), False, True)
-        yield ('hasta', lambda: director().get_editor_property('talk_idx') < 0, len(c['frases']) * P('talk_line_seconds') + 12.0)
+        yield ('hasta', lambda: director().get_editor_property('talk_idx') < 0, len(c['frases']) * (P('talk_line_seconds') + 3.0) + 12.0)
         todos = [f[2] for f in c['frases'] if len(f) > 2]
         check('%s: oída entera, sus %d datos quedan apuntados' % (c['id'], len(todos)), all(d.fact_known(x) for x in todos), [x for x in todos if not d.fact_known(x)])
         yield 2.0
