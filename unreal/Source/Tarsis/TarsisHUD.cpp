@@ -59,6 +59,7 @@ void ATarsisHUD::DrawHUD()
 	DrawBox(D);
 	DrawBinoculars(D);
 	DrawAim(D);
+	DrawTalk(D);
 	DrawMarked();
 	DrawLastKnown(D);
 	DrawHeard(D);
@@ -258,6 +259,32 @@ void ATarsisHUD::DrawMarked()
 }
 
 // tanda 43: tu silueta en el ultimo sitio donde te vieron (alli van a buscar)
+void ATarsisHUD::DrawTalk(ATarsisDirector* D)
+{
+	// tanda 47: un bocadillo sobre los dos que hablan, para que sepas que hay charla y vayas hacia ella
+	if (!D || D->TalkIdx < 0 || D->TalkPhase != 1) return;
+	APlayerController* PC = GetOwningPlayerController();
+	const APawn* Pl = GetOwningPawn();
+	if (!PC || !Pl) return;
+	const float Dist = FVector::Dist2D(D->TalkSpotNow, Pl->GetActorLocation());
+	if (Dist > D->TalkIconDist) return;
+	FVector2D A;
+	if (!PC->ProjectWorldLocationToScreen(D->TalkSpotNow + FVector(0.0f, 0.0f, 215.0f), A, true)) return;
+	if (A.X < 0.0f || A.X > Canvas->ClipX || A.Y < 0.0f || A.Y > Canvas->ClipY) return;
+	const float S = UiScale();
+	const float Fade = FMath::Clamp((D->TalkIconDist - Dist) / 400.0f, 0.0f, 1.0f);
+	const float W = 34.0f * S, T = 20.0f * S;
+	Panel(A.X - W * 0.5f - 2.0f * S, A.Y - T - 2.0f * S, W + 4.0f * S, T + 4.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f * Fade));
+	Panel(A.X - W * 0.5f, A.Y - T, W, T, FLinearColor(0.92f, 0.9f, 0.82f, 0.8f * Fade));
+	Panel(A.X - 3.0f * S, A.Y, 6.0f * S, 5.0f * S, FLinearColor(0.92f, 0.9f, 0.82f, 0.8f * Fade));   // el pico del bocadillo
+	// tres puntos que se van encendiendo
+	const int32 On = static_cast<int32>(GetWorld()->GetTimeSeconds() * 2.5f) % 4;
+	for (int32 i = 0; i < 3; ++i)
+	{
+		Panel(A.X - 11.0f * S + i * 9.0f * S, A.Y - T * 0.5f - 2.0f * S, 4.0f * S, 4.0f * S, FLinearColor(0.08f, 0.08f, 0.08f, (i < On ? 0.95f : 0.25f) * Fade));
+	}
+}
+
 void ATarsisHUD::DrawLastKnown(ATarsisDirector* D)
 {
 	if (!D || D->LastKnownT <= 0.0f) return;

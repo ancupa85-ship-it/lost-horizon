@@ -60,9 +60,10 @@
    "truck_stay_x": 4900.0,
    "truck_stay_seconds": 600.0,
    "uniform_dist": 900.0,
-   "talk_hear_dist": 550.0,
+   "talk_hear_dist": 900.0,
    "dog_mesh_yaw": 270.0,
-   "dog_scale": 1.0
+   "dog_scale": 1.0,
+   "talk_retry": 25.0
   },
   "guardias": {
    "*": {
@@ -768,7 +769,7 @@
   "uniforme_cogido": "CAPOTE Y CASCO\nDe pie y andando, de lejos pasas por un guardia mas. De cerca no cuela.\nNo vale agachado, corriendo ni con la base en alarma.",
   "mapa_nuevo": "APUNTADO: {0}\n{1}\nM abre el mapa.",
   "charla_cortada": "SE CALLAN\nLa charla se corta. Volveran a hablar mas tarde.",
-  "charla_murmullo": "(Hablan en voz baja. Desde aqui no se entiende: acercate.)",
+  "charla_murmullo": "(Hablan en voz baja. Desde aquí no se entiende: acércate o apúntales con los prismáticos.)",
   "ch_camion_1": "El camion otra vez. Tres cuartos de minuto parado en el hangar y ni Dios mira lo que lleva.",
   "ch_camion_2": "Sanz mira los papeles. La caja, solo si hay alarma.",
   "ch_camion_3": "Y si hay alarma, que? Levanta la lona, ve cajas y a correr.",
@@ -825,7 +826,8 @@
   "perro_amigo": "EL PERRO\nSuelta el grunido a medias, olfatea el trapo y te quita el hueso de la mano. Se sienta a roerlo.\nYa no ladrara por ti.",
   "ensena_tercera": "TERCERA PERSONA\nLa camara va detras del hombro: ves por encima de las cajas sin asomarte. Los guardias te ven igual que antes.\nG vuelve a la vista de siempre.",
   "ensena_escucha": "A LA ESCUCHA\nCon la base tranquila, la emisora deja oir lo que hablan los soldados cuando se cruzan en sus rondas.\nQuedate junto a ella y espera.",
-  "escucha_quien": "EMISORA - {0}"
+  "escucha_quien": "EMISORA - {0}",
+  "escucha_nada": "(Emisora: solo estática. Nadie habla ahora. Espera.)"
  },
  "datos": [
   {
@@ -944,7 +946,7 @@
     4950,
     0
    ],
-   "desde": 60,
+   "desde": 30,
    "frases": [
     [
      "Lobato",
@@ -978,7 +980,7 @@
     1700,
     0
    ],
-   "desde": 90,
+   "desde": 60,
    "frases": [
     [
      "Ibarra",
@@ -1015,7 +1017,7 @@
     4300,
     0
    ],
-   "desde": 150,
+   "desde": 100,
    "frases": [
     [
      "Vega",
@@ -1048,7 +1050,7 @@
     1780,
     0
    ],
-   "desde": 240,
+   "desde": 160,
    "frases": [
     [
      "Peris",

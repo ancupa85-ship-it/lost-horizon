@@ -131,6 +131,9 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 		TalkWait = 2.0f;   // se vuelve a mirar cada dos segundos
 		const bool bTap = AtEmisora();
 		if (bTap) Teach(TEXT("ensena_escucha"), TEXT("A LA ESCUCHA\nCon la base tranquila, la emisora deja oir lo que hablan los soldados cuando se cruzan en sus rondas.\nQuedate junto a ella y espera."), {}, 7.0f);
+		// junto a la emisora y nadie habla: que se note que estas a la escucha
+		if (bTap) { TapHintT -= 2.0f; if (TapHintT <= 0.0f) { TapHintT = 12.0f; ShowSubtitleLine(Tx(TEXT("escucha_nada"), TEXT("(Emisora: solo estatica. Nadie habla ahora. Espera.)")), 4.0f); } }
+		else TapHintT = 0.0f;
 		// la primera charla que tenga algo que contarte, con sus dos guardias de ronda y contigo por la zona
 		for (int32 i = 0; i < Talks.Num(); ++i)
 		{
@@ -157,7 +160,7 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 				// no se cruzan y llevas un rato por su zona: quedan donde siempre
 				if (!bTap && FVector::Dist2D(Pl->GetActorLocation(), T.Spot) > TalkNearDist) continue;
 				TalkCrossT += 2.0f;
-				if (TalkCrossT < TalkCrossWait) continue;
+				if (TalkCrossT < (bTap ? RadioTapWait : TalkCrossWait)) continue;
 				if (StartTalk(k)) { TalkCrossT = 0.0f; TalkNext = k + 1; break; }
 				continue;
 			}
@@ -189,9 +192,17 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 	const FString Who = T.Who.IsValidIndex(TalkLine) ? T.Who[TalkLine] : T.A;
 	if (ATarsisGuard* Sp = Who.Equals(T.B, ESearchCase::IgnoreCase) ? TalkB.Get() : TalkA.Get()) Sp->PlayGesture(TEXT("pase"), 1.2f, (Sp == TalkA ? TalkB : TalkA)->GetActorLocation());
 	const bool bTapNow = AtEmisora();
-	if ((D < TalkHearDist && !bHiding) || bTapNow)
+	// tanda 47: con los prismaticos, apuntando a los que hablan, se les oye de lejos
+	bool bScope = false;
+	if (bBinoculars && D >= TalkHearDist && D < TalkScopeDist)
+	{
+		const FVector EyeP = Pl->GetPawnViewLocation();
+		bScope = FVector::DotProduct(Pl->GetControlRotation().Vector(), (TalkSpotNow + FVector(0.0f, 0.0f, 150.0f) - EyeP).GetSafeNormal()) >= FMath::Cos(FMath::DegreesToRadians(TalkScopeAngle));
+	}
+	if ((D < TalkHearDist && !bHiding) || bTapNow || bScope)
 	{
 		if (bTapNow && D >= TalkHearDist) ++TapLinesHeard;
+		else if (bScope) ++ScopeLinesHeard;
 		bTalkHeardAny = true;
 		++TalkLinesHeard;
 		PlaySfx(TEXT("rumor"), TalkSpotNow + FVector(0.0f, 0.0f, 150.0f), 0.5f);
@@ -207,7 +218,22 @@ void ATarsisDirector::TalkTick(float DeltaSeconds)
 		if (!bTalkMurmur)
 		{
 			bTalkMurmur = true;
-			ShowSubtitleLine(Tx(TEXT("charla_murmullo"), TEXT("(Hablan en voz baja. Desde aqui no se entiende: acercate.)")), 4.0f);
+			ShowSubtitleLine(Tx(TEXT("charla_murmullo"), TEXT("(Hablan en voz baja. Desde aqui no se entiende: acercate o apuntales con los prismaticos.)")), 4.0f);
+		}
+		else
+		{
+			// tanda 47: a media distancia llegan palabras sueltas (una de cada tres), sin dato: dan ganas de acercarse
+			TArray<FString> Words;
+			Tx(T.Lines[TalkLine], TEXT("...")).ParseIntoArray(Words, TEXT(" "), true);
+			FString Half;
+			bool bGap = false;
+			for (int32 w = 0; w < Words.Num(); ++w)
+			{
+				if ((w + TalkLine) % 3 == 0) { Half += (Half.IsEmpty() ? TEXT("") : TEXT(" ")) + Words[w]; bGap = false; }
+				else if (!bGap) { Half += TEXT("..."); bGap = true; }
+			}
+			++TalkLinesHalf;
+			SaySubtitle(Who.ToUpper(), Half, TalkLineSeconds);
 		}
 	}
 	++TalkLine;

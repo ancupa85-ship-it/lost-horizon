@@ -2941,8 +2941,9 @@ def prueba_charlas():
         if k == 0:
             # primero de lejos: se ve que hablan, no se entiende y no se apunta nada
             h0 = P('talk_lines_heard')
-            jugador().set_actor_location(V(sx + 800, sy, 150), False, True)
+            jugador().set_actor_location(V(sx + 1300, sy, 150), False, True)
             yield ('hasta', lambda: director().get_editor_property('talk_line') >= 2, 14.0)
+            check('a media distancia llegan palabras sueltas', P('talk_lines_half') >= 1, P('talk_lines_half'))
             check('de lejos solo hay murmullo', P('talk_lines_heard') == h0 and d.facts_known() == 0 and any('voz baja' in str(x) for x in P('subtitle_log')), [str(x)[:40] for x in list(P('subtitle_log'))[-2:]])
             jugador().set_actor_location(V(sx + 300, sy, 150), False, True)
             yield ('hasta', lambda: director().get_editor_property('talk_idx') < 0, 30.0)

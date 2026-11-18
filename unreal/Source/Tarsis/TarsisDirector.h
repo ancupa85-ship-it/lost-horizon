@@ -1132,6 +1132,22 @@ public:
 	bool bRadioTap = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
 	float RadioTapDist = 320.0f;
+	/** Junto a la emisora, si nadie se cruza en estos segundos, dos quedan a hablar en su sitio de siempre. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float RadioTapWait = 14.0f;
+	/** Con los prismaticos, apuntando a los que hablan, se les oye hasta esta distancia (cm) y dentro de este angulo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkScopeDist = 7000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkScopeAngle = 7.0f;
+	/** A menos de esto (cm) se ve un bocadillo sobre los que hablan. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
+	float TalkIconDist = 2500.0f;
+	UPROPERTY(VisibleInstanceOnly, Category = "Tarsis")
+	int32 TalkLinesHalf = 0;
+	float TapHintT = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, Category = "Tarsis")
+	int32 ScopeLinesHeard = 0;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Charlas")
 	int32 TapLinesHeard = 0;
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Charlas")
@@ -1313,6 +1329,11 @@ public:
 	/** De dia las farolas, focos y apliques de fuera se apagan (las de dentro siguen). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
 	bool bDayLampsOff = true;
+	/** Tanda 47: de dia los guardias de a pie ven esto mas lejos, y los de torre (sin foco) esto otro. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	float DayViewMul = 1.4f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Dia")
+	float DayTowerViewMul = 3.0f;
 	UPROPERTY() TObjectPtr<class UMaterialInterface> NightSkyMat;
 	UPROPERTY() TArray<TObjectPtr<class ALight>> DayOffLights;
 	float BaseMoonLux = -1.0f;
@@ -1339,7 +1360,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
 	float TalkHearDist = 450.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
-	float TalkSeeDist = 1100.0f;
+	float TalkSeeDist = 1800.0f;
 	/** Una charla solo empieza contigo a menos de esto de su sitio: no se gasta mientras estas en la otra punta. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Charlas")
 	float TalkStartDist = 3000.0f;

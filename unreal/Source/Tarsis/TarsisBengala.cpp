@@ -236,6 +236,7 @@ void ATarsisDirector::SetDay(bool bNewDay)
 		}
 	}
 	ATarsisGuard::SetDayAmbient(bDay ? DayAmbientOpen : 0.0f, bDay ? DayAmbientRoofed : 0.0f);
+	ATarsisGuard::SetDayView(bDay ? DayViewMul : 1.0f, bDay ? DayTowerViewMul : 1.0f);
 	if (HasActorBegunPlay()) ShowMessage(bDay ? Tx(TEXT("dia"), TEXT("DE DIA\nA cielo abierto se te ve desde lejos. Bajo techo, algo menos.")) : Tx(TEXT("noche"), TEXT("DE NOCHE")), 3.5f);
 }
 

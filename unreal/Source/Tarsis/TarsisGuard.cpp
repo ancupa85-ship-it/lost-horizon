@@ -1187,6 +1187,10 @@ static const float TorchStealthLumens = 2500.0f;   // lo que cuenta una linterna
 static float GDayOpen = 0.0f;
 static float GDayRoofed = 0.0f;
 void ATarsisGuard::SetDayAmbient(float Open, float Roofed) { GDayOpen = Open; GDayRoofed = Roofed; }
+// tanda 47: de dia se ve mas lejos (los de torre, mucho mas: ya no tienen foco)
+static float GDayGround = 1.0f;
+static float GDayTower = 1.0f;
+void ATarsisGuard::SetDayView(float Ground, float Tower) { GDayGround = FMath::Max(1.0f, Ground); GDayTower = FMath::Max(1.0f, Tower); }
 
 static float LightSum(const UWorld* World, const FVector& Point, const AActor* Ignore, bool bTorches = true)
 {
@@ -1498,7 +1502,8 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 		}
 	}
 	const bool bBeam = BeamV > 0.0f;
-	if (D > ViewDistance && !bTorch && !bBeam) return 0.0f;
+	const float ViewD = ViewDistance * (bTowerSentry ? GDayTower : GDayGround);
+	if (D > ViewD && !bTorch && !bBeam) return 0.0f;
 	const float CosA = FVector::DotProduct(GetActorForwardVector(), (Aim - Eye).GetSafeNormal2D());
 	const bool bInCone = bBeam || CosA >= FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle));
 	if (!bInCone && D > NearDistance) return 0.0f;
@@ -1518,7 +1523,7 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	float Light = LightAt(this, Aim);
 	// tanda 31: con tu linterna encendida eres tú la luz
 	if (GPlayerTorch.IsValid() && GPlayerTorch->IsVisible() && GPlayerTorch->GetOwner() == Target) Light = FMath::Max(Light, 0.85f);
-	float V = D < ViewDistance ? (1.0f - FMath::Pow(D / ViewDistance, 1.5f)) * (0.2f + 0.8f * Light) : 0.0f;
+	float V = D < ViewD ? (1.0f - FMath::Pow(D / ViewD, 1.5f)) * (0.2f + 0.8f * Light) : 0.0f;
 	if (bTorch) V = FMath::Max(V, 0.9f * (1.0f - FMath::Pow(D / Flashlight->AttenuationRadius, 2.0f)));
 	if (bBeam) V = FMath::Max(V, BeamV);
 	if (const ACharacter* C = Cast<ACharacter>(Target))

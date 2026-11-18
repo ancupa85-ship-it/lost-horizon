@@ -431,6 +431,8 @@ public:
 	static float AmbientAt(const UObject* WorldContext, FVector Point);
 	/** Tanda 42: de dia, el fondo de luz a cielo abierto y bajo techo (0 = noche, fondo 0,12). */
 	static void SetDayAmbient(float Open, float Roofed);
+	/** De dia la vista llega mas lejos: por cuanto se multiplica la de los de a pie y la de los de torre (1 de noche). */
+	static void SetDayView(float Ground, float Tower);
 	static void SetContextTorch(bool bOn);
 	/** Deslumbrado por tu linterna a bocajarro: aturdido Seconds y luego va a por ti. No repite hasta pasados Again segundos (se tapa los ojos). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Linterna")
