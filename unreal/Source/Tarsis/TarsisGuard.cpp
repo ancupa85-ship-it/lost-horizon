@@ -1438,9 +1438,26 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 		const FVector LP = Flashlight->GetComponentLocation();
 		bTorch = FVector::DotProduct(Flashlight->GetForwardVector(), (Aim - LP).GetSafeNormal()) >= FMath::Cos(FMath::DegreesToRadians(Flashlight->OuterConeAngle + 4.0f));
 	}
-	if (D > ViewDistance && !bTorch) return 0.0f;
+	// tanda 42: el centinela de torre ve lo que alumbra su foco, llegue hasta donde llegue. Desde que las torres estan en
+	// las esquinas, a 20 m del recinto, la mancha cae a 30-60 m y con su vista de 18 m podias cruzarla de pie sin que pasara nada
+	float BeamV = 0.0f;
+	if (bTowerSentry && TowerLight)
+	{
+		const USpotLightComponent* Beam = TowerLight->FindComponentByClass<USpotLightComponent>();
+		if (Beam && Beam->IsVisible() && Beam->AttenuationRadius > 1.0f)
+		{
+			const FVector BP = Beam->GetComponentLocation();
+			const float BD = FVector::Dist(BP, Aim);
+			if (BD < Beam->AttenuationRadius && FVector::DotProduct(Beam->GetForwardVector(), (Aim - BP).GetSafeNormal()) >= FMath::Cos(FMath::DegreesToRadians(Beam->OuterConeAngle + 1.5f)))
+			{
+				BeamV = 0.9f * (1.0f - FMath::Pow(BD / Beam->AttenuationRadius, 3.0f));
+			}
+		}
+	}
+	const bool bBeam = BeamV > 0.0f;
+	if (D > ViewDistance && !bTorch && !bBeam) return 0.0f;
 	const float CosA = FVector::DotProduct(GetActorForwardVector(), (Aim - Eye).GetSafeNormal2D());
-	const bool bInCone = CosA >= FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle));
+	const bool bInCone = bBeam || CosA >= FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle));
 	if (!bInCone && D > NearDistance) return 0.0f;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisVista), true, this);
 	FHitResult Hit;
@@ -1453,9 +1470,10 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 	if (GPlayerTorch.IsValid() && GPlayerTorch->IsVisible() && GPlayerTorch->GetOwner() == Target) Light = FMath::Max(Light, 0.85f);
 	float V = D < ViewDistance ? (1.0f - FMath::Pow(D / ViewDistance, 1.5f)) * (0.2f + 0.8f * Light) : 0.0f;
 	if (bTorch) V = FMath::Max(V, 0.9f * (1.0f - FMath::Pow(D / Flashlight->AttenuationRadius, 2.0f)));
+	if (bBeam) V = FMath::Max(V, BeamV);
 	if (const ACharacter* C = Cast<ACharacter>(Target))
 	{
-		if (C->bIsCrouched) V *= bTorch ? 0.8f : 0.55f;   // agachado en plena luz de linterna te esconde poco
+		if (C->bIsCrouched) V *= (bTorch || bBeam) ? 0.8f : 0.55f;   // agachado en plena luz de linterna te esconde poco
 	}
 	if (D < NearDistance)
 	{

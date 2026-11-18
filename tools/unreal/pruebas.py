@@ -2772,6 +2772,16 @@ def prueba_bengala():
         g.hold(3600.0)
     ext = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']
     ck, tr = ext['cocina'], ext['trampilla']
+    # el centinela de torre ve lo que alumbra su foco, aunque caiga más lejos que su vista (Andres: «los soldados del foco no me detectan»)
+    torre = next((g for g in guardias() if g.get_editor_property('tower_sentry') and len(g.get_editor_property('sweep_path')) >= 2 and g.get_editor_property('view_distance') < 2000), None)
+    if torre:
+        q = torre.get_editor_property('sweep_aim'); q = V(q.x, q.y, 100)
+        tp(q.x, q.y, 0); yield 0.2
+        lejos = torre.get_actor_location().distance(jugador().get_actor_location())
+        vis = torre.visibility(jugador())
+        check('en la mancha del foco, el de la torre te ve aunque estés más lejos que su vista', lejos > torre.get_editor_property('view_distance') and vis > 0.3, 'a %.0f cm, V %.2f' % (lejos, vis))
+        tp(q.x + 1500, q.y + 1500, 0); yield 0.2
+        check('y fuera de la mancha, a esa distancia, no', torre.visibility(jugador()) == 0.0 or torre.get_actor_location().distance(jugador().get_actor_location()) < torre.get_editor_property('view_distance'), torre.visibility(jugador()))
     # menú
     d.press_key('P'); yield 0.2
     L = [str(x) for x in d.menu_lines()]
