@@ -881,6 +881,9 @@ public:
 	/** Segundos que se lee lo que contesta Vidal antes de que vuelva la pregunta sola (0 = hay que pulsar E otra vez). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
 	float CellAutoAsk = 4.0f;
+	/** Lumenes de la luz que alumbra la cara de Vidal desde el lado de la reja (0 = sin luz). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
+	float VidalLightLm = 90.0f;
 	/** Veces que has contestado sin saber bastante (no cuenta como error; el juego dice que te falta). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Calabozo")
 	int32 CellLacks = 0;

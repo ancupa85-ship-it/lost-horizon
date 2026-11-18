@@ -80,7 +80,9 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	// tocarte es detenerte, pero solo si no vas huyendo: al que corre se le dispara, no se le atrapa al vuelo
 	// (ni al que se cruza andando con uno que llega de refuerzo: ese da el alto primero, como los demas)
 	const float PlSpeed = D->PlayerSpeedOverride >= 0.0f ? D->PlayerSpeedOverride : Player->GetVelocity().Size2D();
-	if (V > 0.0f && Dist < CatchDistance && !D->bFleeing && (D->ArrestGuard == this || PlSpeed < 40.0f)) { Caught(Player); return true; }
+	// Y nadie detiene sin haber dado antes el alto: el que te encuentra escondido te apunta primero
+	const bool bWarned = D->bHalt && D->HaltT > D->HaltGrace;
+	if (V > 0.0f && Dist < CatchDistance && !D->bFleeing && bWarned && (D->ArrestGuard == this || PlSpeed < 40.0f)) { Caught(Player); return true; }
 	if (V <= 0.0f)
 	{
 		// no te ve: aguanta en su sitio mirando a donde te perdio y luego avanza andando. Si le mandaron por radio,

@@ -622,7 +622,7 @@ void ATarsisHUD::DrawArmed(ATarsisDirector* D)
 	if (D->HitFlashT > 0.0f)
 	{
 		const float A = FMath::Clamp(D->HitFlashT / 0.6f, 0.0f, 1.0f) * 0.55f;
-		const float B = 70.0f * S;
+		const float B = 22.0f * S;   // un filo, no un marco: con 70 tapaba los avisos
 		const FLinearColor Red(0.6f, 0.02f, 0.02f, A);
 		Panel(0.0f, 0.0f, Canvas->ClipX, B, Red);
 		Panel(0.0f, Canvas->ClipY - B, Canvas->ClipX, B, Red);

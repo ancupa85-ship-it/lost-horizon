@@ -2705,6 +2705,11 @@ PRUEBAS = []
 # ---------------------------------------------------------------- ejecutor por ticks
 
 def _informe():
+    # al acabar se cierra la partida: si se queda abierta, desde fuera parece que alguien está jugando
+    try:
+        unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()
+    except Exception:
+        pass
     res = R['resultados']
     ok = sum(1 for r in res if r[2])
     lineas = ['Pruebas de Tarsis - %s' % time.strftime('%Y-%m-%d %H:%M:%S'), '%d de %d pasan  (%.0f s)' % (ok, len(res), time.time() - R['t0']), '']

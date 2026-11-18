@@ -17,6 +17,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "Components/PointLightComponent.h"
 #include "Kismet/GameplayStatics.h"
 
 // Textos solo en ASCII: MSVC lee los .cpp sin BOM como si no fueran UTF-8.
@@ -302,6 +303,21 @@ void ATarsisDirector::SpawnVidal()
 	if (Src->IdleAnim) M->PlayAnimation(Src->IdleAnim, true);
 	VidalMeshYaw = Rel.Rotator().Yaw;
 	VidalBody = M;
+	// tanda 38: una luz calida y floja entre el y la reja, a la altura de la cara. La del vestibulo le daba por
+	// detras y desde la celda era una silueta. Sin sombras y de corto alcance: no cuesta memoria ni cuenta para el sigilo
+	if (VidalLightLm > 0.0f)
+	{
+		UPointLightComponent* L = NewObject<UPointLightComponent>(this);
+		L->SetMobility(EComponentMobility::Movable);
+		L->SetIntensityUnits(ELightUnits::Lumens);
+		L->SetIntensity(VidalLightLm);
+		L->SetAttenuationRadius(260.0f);
+		L->SetCastShadows(false);
+		L->SetLightColor(FLinearColor(1.0f, 0.62f, 0.34f));
+		L->ComponentTags.Add(FName(TEXT("decorado")));
+		L->SetWorldLocation(FVector(At.X, At.Y, At.Z + 175.0f) + (CellDoor - At).GetSafeNormal2D() * 75.0f);
+		L->RegisterComponent();
+	}
 }
 
 void ATarsisDirector::FaceVidal(float Yaw)
