@@ -66,6 +66,13 @@ def cuerpo(g, nombre):
         p = dict(p, idle=a['idle'], walk=a['walk'], blend=a['blend'])
         g.set_editor_property('walk_anim_speed', a['walk_speed'])
         g.set_editor_property('run_anim_speed', a['run_speed'])
+    # tanda A: el IK Retargeter del maniquí UEFN (GASP) a esta persona, si existe (tools/unreal/gasp_guardia.py)
+    rtg = unreal.load_asset('/Game/Tarsis/Anim/RTG_UEFN_' + nombre)
+    if rtg:
+        try:
+            g.set_editor_property('gasp_retargeter', rtg)
+        except Exception as e:
+            log('AVISO: no se pudo poner gasp_retargeter', nombre, repr(e))
     for prop, k in (('idle_anim', 'idle'), ('walk_anim', 'walk'), ('aim_anim', 'aim'), ('down_anim', 'down'), ('move_blend', 'blend')):
         if p.get(k):
             g.set_editor_property(prop, p[k])
@@ -168,15 +175,25 @@ def centinelas(eas, cls):
             n += 1
     return n
 
+GASP_BP = '/Game/Tarsis/Anim/BP_GuardiaGASP.BP_GuardiaGASP_C'
+
 def colocar():
-    cls = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
-    if not cls:
+    base = unreal.load_class(None, '/Script/PruebaLumen.TarsisGuard')
+    if not base:
         log('AVISO: la clase TarsisGuard no está compilada; no se colocan guardias')
         return 0
+    # tanda A: con el Game Animation Sample migrado, la copia reparentada de su personaje (anima con Motion Matching);
+    # LH_GASP=0 vuelve a la clase C++ a secas
+    cls = base
+    if os.environ.get('LH_GASP', '1') != '0':
+        g_cls = unreal.load_class(None, GASP_BP)
+        if g_cls:
+            cls = g_cls
+            log('guardias con el ABP del GASP:', GASP_BP)
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     navegacion()
     for a in eas.get_all_level_actors():
-        if a.get_class() == cls:
+        if isinstance(a, unreal.TarsisGuard):
             eas.destroy_actor(a)
     n = 0
     for nombre, (ronda, espera, persona) in GUARDIAS.items():

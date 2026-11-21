@@ -330,6 +330,39 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	float RunAnimSpeed = 0.0f;
 
+	/** Tanda A (2026-11-21): con el Animation Blueprint del Game Animation Sample de Epic (Motion Matching). Solo actúa
+	 *  si la clase del guardia implementa BPI_SandboxCharacter_Pawn (la copia reparentada BP_GuardiaGASP) y están los
+	 *  assets migrados. Entonces GetMesh() pasa a ser el maniquí UEFN oculto que corre el ABP y el cuerpo de la persona
+	 *  (GaspBody) copia su pose con ABP_GenericRetarget y el IK Retargeter RTG_UEFN_<persona>. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	bool bGaspAnim = true;
+
+	/** IK Retargeter del maniquí UEFN a esta persona (si falta se busca RTG_UEFN_<persona> en /Game/Tarsis/Anim). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	TObjectPtr<UObject> GaspRetargeter;
+
+	/** Giro extra (grados) del cuerpo de la persona respecto al maniquí que conduce, por si el retarget lo deja de lado. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspBodyYaw = 0.0f;
+
+	/** Velocidad (cm/s) a partir de la cual se le pide al ABP el paso de correr en vez del de andar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspRunFrom = 320.0f;
+
+	/** Aceleración y frenada del CharacterMovementComponent con el GASP (las bases de Motion Matching se grabaron con
+	 *  arranques y paradas suaves; con los valores de la plantilla el guardia arranca en seco y el ABP elige mal). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspMaxAcceleration = 800.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspBrakingDeceleration = 800.0f;
+
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	bool UsesGasp() const { return GaspBody != nullptr; }
+
+	/** La malla con el esqueleto de la persona que se anima (de ella copian el cuerpo visible, los pasos y los gestos). */
+	USkeletalMeshComponent* AnimBody() const;
+
 	/** Giro actual de cabeza y cuello respecto al cuerpo (grados, + a la derecha): mira hacia un ruido, barre al buscar. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
 	float LookYaw = 0.0f;
@@ -613,4 +646,15 @@ private:
 	bool bSweepAway = false;
 	float BeamPaint = 0.0f;
 	TObjectPtr<UAnimationAsset> CurrentAnim;
+	// tanda A: animación de Epic
+	UPROPERTY() TObjectPtr<USkeletalMeshComponent> GaspBody;
+	UPROPERTY() TObjectPtr<UClass> GaspRetargetClass;
+	bool bGaspSingle = false;      // el cuerpo hace una animación suelta (caer, apuntar) en vez del retarget
+	FString GaspGaitNow;
+	bool SetupGasp();
+	void GaspPointRetargeter();
+	void GaspSingle(UAnimationAsset* A, bool bLoop);
+	void GaspRestore();
+	bool GaspSetEnum(FName Prop, const FString& Value);
+	bool GaspTick();   // true si el guardia anima con el GASP (UpdateAnim no hace nada más)
 };

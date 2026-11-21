@@ -311,14 +311,14 @@ void ATarsisDirector::SpawnVidal()
 		if (!Src) Src = *It;
 		if (It->GuardName == VidalLooksLike) { Src = *It; break; }
 	}
-	USkeletalMeshComponent* From = Src ? Src->GetMesh() : nullptr;
+	USkeletalMeshComponent* From = Src ? Src->AnimBody() : nullptr;   // con el GASP, el cuerpo de la persona (GetMesh es el maniquí que conduce)
 	if (!From) return;
 	FVector At = CellDoor + VidalOffset;
 	FHitResult Hit;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisVidal), false, this);
 	if (GetWorld()->LineTraceSingleByObjectType(Hit, FVector(At.X, At.Y, 160.0f), FVector(At.X, At.Y, -50.0f), FCollisionObjectQueryParams(ECC_WorldStatic), Q)) At.Z = Hit.ImpactPoint.Z;
 	const float HalfH = Src->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-	const FTransform Rel = From->GetRelativeTransform();
+	const FTransform Rel = From->GetComponentTransform().GetRelativeTransform(Src->GetActorTransform());   // respecto al guardia, cuelgue de donde cuelgue
 	USkeletalMeshComponent* M = NewObject<USkeletalMeshComponent>(this);
 	M->SetSkeletalMesh(Src->BodyMesh);
 	M->SetMobility(EComponentMobility::Movable);

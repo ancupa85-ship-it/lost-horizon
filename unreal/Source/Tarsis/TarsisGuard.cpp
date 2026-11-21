@@ -92,6 +92,7 @@ void ATarsisGuard::SetupBody()
 	Body->SetVisibility(!bHasBody);
 	Head->SetVisibility(!bHasBody);
 	if (!bHasBody || !M) return;
+	if (GaspBody || SetupGasp()) return;   // tanda A: anima el ABP de Epic (TarsisGasp.cpp)
 	M->SetSkeletalMesh(BodyMesh);
 	M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	M->SetAnimationMode(EAnimationMode::AnimationSingleNode);
@@ -134,6 +135,7 @@ void ATarsisGuard::UpdateAnim()
 {
 	USkeletalMeshComponent* M = GetMesh();
 	if (!BodyMesh || !M || State == ETarsisGuardState::Down) return;
+	if (GaspTick()) return;
 	const float Speed = GetVelocity().Size2D();
 	// con la mezcla, de quieto a andar sin saltos; apuntar (en alerta y parado) sigue siendo una animación suelta
 	if (MoveBlend && !(State == ETarsisGuardState::Alert && Speed <= 15.0f && AimAnim))
@@ -175,7 +177,7 @@ void ATarsisGuard::UpdateAnim()
 
 void ATarsisGuard::SetupPose()
 {
-	USkeletalMeshComponent* M = GetMesh();
+	USkeletalMeshComponent* M = AnimBody();
 	if (!BodyMesh || !M || Pose || !GetWorld() || !GetWorld()->IsGameWorld()) return;
 	const FReferenceSkeleton& Ref = BodyMesh->GetRefSkeleton();
 	auto Pick = [&Ref](std::initializer_list<const TCHAR*> Names) -> FName
@@ -210,7 +212,7 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 	}
 	PrevYaw = Yaw;
 	if (!Pose) return;
-	Pose->CopyPoseFromSkeletalComponent(GetMesh());
+	Pose->CopyPoseFromSkeletalComponent(AnimBody());
 	// adónde mira la cabeza, respecto al cuerpo: el cuerpo gira despacio y la cabeza se adelanta
 	auto Toward = [this](const FVector& P) -> float
 	{
@@ -504,7 +506,7 @@ void ATarsisGuard::FootTick(float DeltaSeconds)
 {
 	// un paso cuando un pie llega al suelo según la animación: el sonido va a compás de las piernas
 	if (!Pose || State == ETarsisGuardState::Down) { bFootInit = false; return; }
-	USkeletalMeshComponent* M = GetMesh();
+	USkeletalMeshComponent* M = AnimBody();
 	const float Speed = GetVelocity().Size2D();
 	const bool bMoving = Speed > 40.0f || bTurnStepping;
 	static const FName Feet[2] = { FName(TEXT("ball_l")), FName(TEXT("ball_r")) };
@@ -672,7 +674,11 @@ void ATarsisGuard::KnockOut()
 	bFound = false;
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);   // se le puede pasar por encima
 	USkeletalMeshComponent* M = GetMesh();
-	if (BodyMesh && M)
+	if (GaspBody)
+	{
+		GaspSingle(DownAnim, false);   // la caída sigue siendo la animación de la persona (tanda C: ragdoll)
+	}
+	else if (BodyMesh && M)
 	{
 		if (DownAnim) { M->PlayAnimation(DownAnim, false); CurrentAnim = DownAnim; }
 		M->SetPlayRate(1.0f);
