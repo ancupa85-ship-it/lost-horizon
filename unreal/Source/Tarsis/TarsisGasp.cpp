@@ -183,6 +183,25 @@ void ATarsisGuard::GaspSingle(UAnimationAsset* A, bool bLoop)
 	bGaspSingle = true;
 }
 
+bool ATarsisGuard::ScenePlay(UAnimSequenceBase* A)
+{
+	USkeletalMeshComponent* M = GetMesh();
+	if (!GaspBody || !M || !A) return false;
+	GaspTurn.Stop(this);
+	if (bGaspSingle) GaspRestore();   // la persona vuelve a copiar al maniquí
+	bSceneLock = true;
+	M->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	M->PlayAnimation(A, false);
+	return true;
+}
+
+void ATarsisGuard::SceneEnd()
+{
+	USkeletalMeshComponent* M = GetMesh();
+	if (M && M->GetAnimationMode() != EAnimationMode::AnimationBlueprint) M->SetAnimationMode(EAnimationMode::AnimationBlueprint);   // el ABP del GASP de nuevo
+	GaspGaitNow.Reset();
+}
+
 void ATarsisGuard::GaspRestore()
 {
 	if (!GaspBody || !GaspRetargetClass) return;
@@ -215,6 +234,7 @@ bool ATarsisGuard::GaspSetEnum(FName Prop, const FString& Value)
 bool ATarsisGuard::GaspTick()
 {
 	if (!GaspBody) return false;
+	if (bSceneLock) return true;   // tanda A, novena: la detención anima el maniquí (ScenePlay) o lo deja agachado
 	const float Speed = GetVelocity().Size2D();
 	bTurnStepping = false;   // los giros en el sitio los pone el ABP
 	// apuntar (en alerta y parado) y caer siguen siendo animaciones sueltas de la persona

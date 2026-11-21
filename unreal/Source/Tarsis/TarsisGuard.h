@@ -365,6 +365,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
 	bool UsesGasp() const { return GaspBody != nullptr; }
 
+	/** Tanda A, novena: la detención. Con bSceneLock el guardia no toca su animación (GaspTick no hace nada): ScenePlay
+	 *  pone una animación suelta en el maniquí del GASP (la persona la copia con el retarget) y SceneEnd le devuelve el
+	 *  ABP; el director lo agacha y lo suelta al acabar. */
+	bool bSceneLock = false;
+	bool ScenePlay(class UAnimSequenceBase* A);
+	void SceneEnd();
+
 	/** Giro en el sitio parado (TarsisGaspTurn.h): con las piernas a GaspTurnFrom grados o más de donde mira, WantsToAim
 	 *  un momento para que el ABP gire en el sitio. Más bajo que en Cuttlas: el guardia va en modo «orientar al
 	 *  movimiento», sin aim offset, y parado no gira ni el torso; solo la cabeza se adelanta. */

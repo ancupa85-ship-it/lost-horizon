@@ -93,3 +93,33 @@ su RTG. Se empieza con `MMDatabaseLOD` = 1 (Sparse) y se mide; Dense solo si sob
   `AddTickPrerequisiteComponent(CMC)`.
 - **Resultado**: por cada 1/30 s, la cámara se mueve 9-11 cm como mucho y la pelvis 2,5-6,5 cm; el pie no pasa de 6 cm
   sobre el suelo. Prueba nueva en `prueba_tercera`: «agacharse y levantarse en tercera, sin saltos de un fotograma».
+
+## La detención (2026-11-21, novena)
+- **Qué**: sustituye la escena de antes (giro de 0,75 s, «empujón» y negro) por dos, según cómo te pillen. La lógica de
+  cuándo te cogen no cambia; `BeginCapture` solo decide la escena (`TarsisCapturaEscena.cpp`).
+  - **Rendido** (te quedaste quieto con el alto y viene `ArrestGuard`, o te coge de cerca, o te saca de la taquilla o
+    del camión): pareja de **empujón parado** del GASP (`shove_stand`). El guardia hace `_A` con su maniquí (su persona
+    la copia con el retarget); Cuttlas hace `_V` con `ConductorGASP` (y `CuerpoCuttlas` la copia) y, en el segundo del
+    aviso `TriggerRagdoll`, pasa a física con `PA_UEFN_Mannequin`. El guardia suelta su parte donde acabó su raíz, se
+    acerca, se agacha sobre ti (agachado del ABP del GASP), suenan las esposas (`esposas.wav`, provisional, de
+    `tools/sonido/esposas.py`) y funde a negro. Despiertas en la celda como siempre.
+  - **Golpe** (huyendo, `bFleeing`, o el tercer tiro): pareja de **derribo parado** (`takedown_stand`) con sacudida y
+    «golpe» en el puñetazo; al caer, vista borrosa y doble (desenfoque, separación de colores y viñeta) medio segundo,
+    la cámara al suelo y negro; al despertar la vista se aclara en 2 s. Provisional hasta tener fusil y culatazo.
+- **Datos**: las 16 secuencias (`Interactions/Shoves` y `Interactions/Takedowns`, sin root motion, sin montajes) se
+  copiaron del GASP. `tools/unreal/captura_datos.py` lee de los montajes del GASP (copia temporal, se borra) los avisos y
+  de las secuencias la raíz al empezar, y escribe `TarsisCapturaDatos.inl`. Las raíces de `_A` y `_V` están grabadas en
+  el mismo espacio: las dos mallas se ponen en el mismo sitio (`SceneComp`, para que la raíz de `_V` caiga donde está
+  Cuttlas) y el guardia se lleva en 0,35 s a donde empieza la suya. La pareja (F, B, L, R) se elige por la dirección en
+  que está el guardia.
+- **Cámara**: en primera persona, una `ACameraActor` sigue a la cabeza de `ConductorGASP` con sacudida, mira del pecho
+  a las botas del guardia según cae y queda de lado en el suelo (alabeo 72°). En tercera la cámara se queda y se ve la
+  caída (`ThirdNow` admite la captura si ya estabas fuera).
+- **Respaldo**: sin el GASP en el guardia o en Cuttlas, sin las animaciones o con `bCaptureSceneRule` apagado, la escena
+  de antes.
+- **Medido** (`capturas-gaspA/captura_medidas_sin_fotos.txt`): rendido 5,1 s hasta el calabozo, golpe 3,3 s; la cámara de
+  primera persona baja de 162 a 16 cm. Capturas cada 0,1 s de juego en `capturas-gaspA/captura/`.
+- **Assets fuera del repositorio** (en PruebaLumen): las 16 secuencias se copiaron a mano de
+  `D:\GASP\Content\Characters\UEFN_Mannequin\Animations\Interactions\{Shoves,Takedowns}` (`M_relaxed_ragdoll_shove_stand_?_[AV]`
+  y `M_relaxed_takedown_stand_?_[AV]_`, solo dependen del esqueleto UEFN) y se les quitó el root motion; `esposas.wav` se
+  importa con `tools/unreal/sonidos.py` como los demás.

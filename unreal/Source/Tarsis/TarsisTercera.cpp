@@ -96,7 +96,7 @@ void ATarsisDirector::ToggleThird()
 
 bool ATarsisDirector::ThirdNow() const
 {
-	return bThirdRule && bThird && !bBinoculars && !bBoxOn && !bHiding && !bRiding && !bCine && !bCapturing && !bClimbing;
+	return bThirdRule && bThird && !bBinoculars && !bBoxOn && !bHiding && !bRiding && !bCine && (!bCapturing || bSceneThird) && !bClimbing;   // tanda A: en tercera, la detencion se ve desde fuera
 }
 
 void ATarsisDirector::ThirdTick(float DeltaSeconds)

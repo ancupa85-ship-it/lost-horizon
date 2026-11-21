@@ -87,6 +87,9 @@ struct FTarsisObjective
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Text;
 };
 
+// tanda A, novena: que escena de detencion se esta viendo (TarsisCapturaEscena.cpp)
+enum class ETarsisSceneKind : uint8 { None, Rendido, Golpe };
+
 UCLASS()
 class ATarsisDirector : public AActor
 {
@@ -1957,6 +1960,39 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	bool bCapturing = false;
 
+	// ---- tanda A, novena (TarsisCapturaEscena.cpp): la detención con las parejas del GASP. Rendido (ArrestGuard llega a
+	// por ti): empujón, caes, se agacha sobre ti, clic de esposas y negro. Huyendo o herido: derribo a golpes, vista
+	// borrosa y doble, la cámara al suelo, negro y despiertas con la vista desenfocada. Sin las animaciones o sin el GASP
+	// en el guardia o en Cuttlas, la escena de antes (giro, empujón y negro).
+	/** Apagado, siempre la escena de antes. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	bool bCaptureSceneRule = true;
+	/** Segundos que tarda el guardia en ponerse en su sitio antes de empezar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureSceneLead = 0.35f;
+	/** 0 escena de antes, 1 rendido (empujón y esposas), 2 golpe (huyendo o herido). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Captura")
+	int32 CaptureSceneKind() const { return (int32)SceneKind; }
+	/** La pareja que se usa: «shove_F», «takedown_L»... */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Captura")
+	FString CaptureScenePair() const { return ScenePairName; }
+	/** Cuttlas ya cae con física. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Captura")
+	bool CaptureSceneRagdoll() const { return bSceneRagdoll; }
+	/** Segundos desde que empezó la escena (también la de antes). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Captura")
+	float CaptureSceneTime() const { return CaptureT; }
+	/** Lo que pesa ahora la vista borrosa (golpe y despertar). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Captura")
+	float CaptureBlur() const { return SceneBlurW; }
+	/** El guardia ya está agachado sobre ti / ya sonaron las esposas. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Captura")
+	bool CaptureSceneCuffed() const { return bSceneCuffed; }
+	bool bCaptureWounded = false;   // la captura viene del tercer tiro (golpe)
+	/** Para las pruebas y las capturas: te coge G ya, como rendido o como huyendo (bHit). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Captura")
+	void TestCapture(class ATarsisGuard* G, bool bHit) { bCaptureWounded = bHit; BeginCapture(G); }
+
 	/** La central habla por radio: voz voz_central_<Key> y subtítulo (siempre, como las voces de los guardias). */
 	void CentralSay(const FString& Key, const FString& Text, float Delay = 0.0f);
 
@@ -2143,6 +2179,39 @@ private:
 	UPROPERTY()
 	TObjectPtr<class ATarsisGuard> Captor;
 	float CaptureT = 0.0f;
+	// la escena nueva (TarsisCapturaEscena.cpp)
+	ETarsisSceneKind SceneKind = ETarsisSceneKind::None;
+	int32 ScenePair = INDEX_NONE;
+	FString ScenePairName;
+	float SceneT = 0.0f;
+	bool bSceneThird = false;        // en tercera persona: la cámara se queda y se ve la caída
+	bool bSceneHero = false;         // ConductorGASP hace la escena (GaspHeroTick no lo toca)
+	bool bScenePlaying = false;      // ya suenan las dos animaciones
+	bool bSceneRagdoll = false;
+	bool bSceneGuardFree = false;    // el guardia ya soltó su parte
+	bool bSceneCrouched = false;
+	bool bSceneCuffed = false;
+	bool bSceneBlack = false;
+	bool bScenePunched = false;
+	bool bSceneImpact = false;
+	float SceneRagdollAt = 0.0f, ScenePunchAt = 0.0f, SceneFreeAt = 0.0f, SceneCrouchAt = 0.0f, SceneBlackAt = 1e9f, SceneEndAt = 1e9f;
+	FVector ScenePelvisPrev = FVector::ZeroVector, ScenePelvisVel = FVector::ZeroVector;
+	float SceneHeadZ0 = 0.0f, SceneGroundZ = 0.0f, SceneShake = 0.0f, SceneBlurW = 0.0f, WakeBlurT = 0.0f;
+	FTransform SceneComp;            // el espacio común de la pareja en el mundo (componente de las dos mallas)
+	FTransform SceneGuardRel;        // la malla del guardia respecto a su actor, para devolverla
+	FVector SceneGuardFrom = FVector::ZeroVector, SceneGuardTo = FVector::ZeroVector;
+	FRotator SceneGuardFromRot = FRotator::ZeroRotator, SceneGuardToRot = FRotator::ZeroRotator;
+	UPROPERTY()
+	TObjectPtr<class ACameraActor> SceneCam;
+	UPROPERTY()
+	TObjectPtr<class UPostProcessComponent> ScenePP;
+	bool SceneBegin(class ATarsisGuard* G, APawn* P);
+	void SceneTick(float DeltaSeconds);
+	void SceneCameraTick(float DeltaSeconds, class ACharacter* C);
+	void SceneBlurTick(float DeltaSeconds);
+	void SceneRagdoll(class ACharacter* C);
+	void SceneRestore(class ACharacter* C);
+	void CaptureFinish(APawn* P);
 	bool bCaptureLocker = false;
 	bool bCaptureHit = false;
 	bool bCaptureDone = false;

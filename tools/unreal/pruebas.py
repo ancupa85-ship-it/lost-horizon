@@ -371,7 +371,7 @@ def prueba_escondites():
     check('te ha visto meterte', d.get_editor_property('hiding'))
     yield ('hasta', lambda: director().get_editor_property('capturing'), 15.0)
     check('al abrirla, la escena de captura', d.get_editor_property('capturing') and not d.get_editor_property('hiding'), d.get_editor_property('capturing'))
-    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 5.0)
+    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 10.0)   # tanda A, novena: la detención dura unos 5 s
     check('te saca de la taquilla', d.get_editor_property('captures') > c0 and 'TAQUILLA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:45])
     check('ya fuera de la taquilla', not d.get_editor_property('hiding') and not jugador().get_editor_property('hidden'))
     aparte()
@@ -699,12 +699,26 @@ def prueba_captura():
     check('sin control durante la escena', pc.is_move_input_ignored() and pc.is_look_input_ignored())
     check('aún no te ha llevado (primero la escena)', d.get_editor_property('captures') == c0)
     yield 0.6
-    cam = jugador().get_component_by_class(unreal.CameraComponent).get_world_location()
+    # lo que se ve: la cámara de la escena (tanda A, novena: una cámara suelta que sigue a tu cabeza) o la tuya
+    cm = pc.get_editor_property('player_camera_manager')
+    cam = cm.get_camera_location()
     gl = g.get_actor_location()
     quiere = math.degrees(math.atan2(gl.y - cam.y, gl.x - cam.x))
-    err = abs((quiere - pc.get_control_rotation().yaw + 540) % 360 - 180)
+    err = abs((quiere - cm.get_camera_rotation().yaw + 540) % 360 - 180)
     check('la cámara se vuelve hacia él', err < 30, '%.0f grados' % err)
-    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 4.0)
+    # tanda A, novena: rendido (te coge de cerca, sin huir): empujón del GASP, caes con física, se agacha sobre ti,
+    # esposas y negro. Sin el GASP en el guardia o en Cuttlas, la escena de antes (CaptureSceneKind 0)
+    nueva = d.capture_scene_kind() != 0
+    vistos = {'tipo': d.capture_scene_kind(), 'pareja': d.capture_scene_pair(), 'cae': False, 'esposas': False, 'agachado': False}
+    def mira():
+        vistos['cae'] = vistos['cae'] or d.capture_scene_ragdoll()
+        vistos['esposas'] = vistos['esposas'] or d.capture_scene_cuffed()
+        vistos['agachado'] = vistos['agachado'] or g.get_editor_property('is_crouched')
+        return director().get_editor_property('captures') > c0
+    yield ('hasta', mira, 10.0)
+    if nueva:
+        check('detención de rendido: empujón del GASP según de dónde viene', vistos['tipo'] == 1 and vistos['pareja'].startswith('shove_'), '%s %s' % (vistos['tipo'], vistos['pareja']))
+        check('caes con física, se agacha sobre ti y suenan las esposas antes del negro', vistos['cae'] and vistos['agachado'] and vistos['esposas'], vistos)
     check('golpe, negro y al calabozo', d.get_editor_property('captures') == c0 + 1 and 'CALABOZO' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:30])
     yield ('hasta', lambda: not director().get_editor_property('capturing'), 4.0)
     check('vuelves a tener el control', not pc.is_move_input_ignored() and not pc.is_look_input_ignored())
@@ -2204,7 +2218,7 @@ def prueba_viaje():
           '%s, %s' % (d.get_editor_property('capturing'), d.get_editor_property('riding')))
     gl = [str(x) for x in guardia('Sanz').get_editor_property('gesture_log')] if guardia('Sanz') else []
     check('y lo hace con el brazo (gesto «lona»)', 'lona' in gl, gl[-4:])
-    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 5.0)
+    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 10.0)   # tanda A, novena: la detención dura unos 5 s
     check('el aviso dice de dónde te sacan', d.get_editor_property('captures') == c0 + 1 and 'LEVANTA LA LONA' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
     yield ('hasta', lambda: not director().get_editor_property('capturing'), 5.0)
     aparte()
@@ -3068,8 +3082,16 @@ def prueba_armados():
     d.set_editor_property('armed_aim', 100.0)
     yield ('hasta', lambda: director().get_editor_property('wounds') > 0 or director().get_editor_property('capturing'), 10.0)
     check('un impacto es una herida', P('hits') >= 1 and (P('wounds') >= 1 or P('capturing')) , '%s impactos, %s heridas' % (P('hits'), P('wounds')))
-    yield ('hasta', lambda: director().get_editor_property('captures') > c0, 30.0)
+    golpe = {'tipo': 0, 'borroso': 0.0}
+    def mira_golpe():
+        if director().capture_scene_kind() != 0:
+            golpe['tipo'] = director().capture_scene_kind()
+        golpe['borroso'] = max(golpe['borroso'], director().capture_blur())
+        return director().get_editor_property('captures') > c0
+    yield ('hasta', mira_golpe, 30.0)
     check('a la tercera herida caes y te llevan', P('captures') == c0 + 1 and P('hits') >= P('max_wounds'), '%s impactos' % P('hits'))
+    # tanda A, novena: herido, la escena del golpe (derribo del GASP) con la vista borrosa
+    check('herido: detención a golpes, con la vista borrosa', golpe['tipo'] in (0, 2) and (golpe['tipo'] == 0 or golpe['borroso'] > 0.5), golpe)
     yield ('hasta', lambda: not director().get_editor_property('capturing'), 6.0)
     d.set_editor_property('player_speed_override', -1.0)
     check('tras la captura no queda alto ni heridas', P('wounds') == 0 and not P('fleeing'))

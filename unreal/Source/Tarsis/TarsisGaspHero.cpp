@@ -237,6 +237,7 @@ void ATarsisDirector::GaspHeroTick(ACharacter* C, bool bOut)
 	}
 	// si algo vuelve a poner el IMC del GASP (otra posesion), se quita otra vez
 	HeroDropImc(Cast<APlayerController>(C->GetController()), HeroGaspImc);
+	if (bSceneHero) return;   // tanda A, novena: la detencion mueve el maniqui (animacion suelta y luego fisica)
 	// pies en el suelo: la capsula cambia de altura al agacharse
 	const float HalfH = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	const float UZ = -HalfH - HeroDriverBallZ + 2.0f;

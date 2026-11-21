@@ -4217,12 +4217,18 @@ void ATarsisDirector::BeginCapture(ATarsisGuard* G)
 		CaptureFrom = PC->GetControlRotation();
 	}
 	if (G) GuardSay(G, TEXT("tengo"));
+	// tanda A, novena: la escena con las parejas del GASP (si falta algo, la de antes)
+	SceneKind = ETarsisSceneKind::None;
+	if (!SceneBegin(G, P)) SceneKind = ETarsisSceneKind::None;
+	bCaptureWounded = false;
 }
 
 void ATarsisDirector::CaptureTick(float DeltaSeconds)
 {
+	SceneBlurTick(DeltaSeconds);   // la vista borrosa del golpe y del despertar
 	if (!bCapturing) return;
 	CaptureT += DeltaSeconds;
+	if (SceneKind != ETarsisSceneKind::None) { SceneTick(DeltaSeconds); return; }
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!bCaptureHit)
@@ -4246,6 +4252,17 @@ void ATarsisDirector::CaptureTick(float DeltaSeconds)
 	if (!bCaptureDone)
 	{
 		if (CaptureT < 1.15f) return;
+		CaptureFinish(P);
+		return;
+	}
+	if (CaptureT >= 2.1f) { bCapturing = false; Captor = nullptr; }
+}
+
+// en negro: adónde vas (Captured), el aviso de la taquilla o del camión, y vuelve la imagen
+void ATarsisDirector::CaptureFinish(APawn* P)
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	{
 		bCaptureDone = true;
 		const FString Who = Captor ? Captor->GuardName.ToUpper() : FString();
 		const bool bLocker = bCaptureLocker;
@@ -4267,9 +4284,7 @@ void ATarsisDirector::CaptureTick(float DeltaSeconds)
 			PC->SetIgnoreLookInput(false);
 			if (PC->PlayerCameraManager) PC->PlayerCameraManager->StartCameraFade(1.0f, 0.0f, 0.9f, FLinearColor::Black, false, false);
 		}
-		return;
 	}
-	if (CaptureT >= 2.1f) { bCapturing = false; Captor = nullptr; }
 }
 
 

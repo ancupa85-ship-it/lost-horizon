@@ -299,6 +299,7 @@ void ATarsisDirector::ShotFired(ATarsisGuard* G, bool bHit)
 		bHalt = false;
 		ArrestGuard = nullptr;
 		ShowMessage(Tx(TEXT("herido_cae"), TEXT("CAES\nEl tercer tiro te tumba. Vienen a por ti.")), 3.0f);
+		bCaptureWounded = true;   // tanda A, novena: la escena del golpe, no la de las esposas
 		BeginCapture(G);
 		return;
 	}
