@@ -505,17 +505,35 @@ def prueba_guardias():
         l = m.get_actor_location()
         quiere = math.degrees(math.atan2(ruido.y - l.y, ruido.x - l.x))
         return abs((quiere - m.get_actor_rotation().yaw + 540) % 360 - 180)
+    # tanda A: con el ABP del GASP el giro en el sitio es una animación de giro (Motion Matching) y no los pasos sueltos de
+    # antes (bTurnStepping queda a falso): se mide que el cuerpo gira y que los pies de la persona se mueven al girar
+    gasp = m.uses_gasp()
+    cuerpo = ([c for c in m.get_components_by_class(unreal.SkeletalMeshComponent) if c.get_name().startswith('CuerpoPersona')] or [None])[0]
+    def pies():
+        if not cuerpo:
+            return None
+        l = m.get_actor_location()
+        return [cuerpo.get_socket_location(b) - l for b in ('ball_l', 'ball_r')]
+    yaw0, pies0, giro, paso = m.get_actor_rotation().yaw, pies(), 0.0, 0.0
     cabeza, pasos_giro, vmin, error = 0.0, False, 1e9, 180.0
     for _ in range(12):
         yield 0.1
         error = min(error, error_giro())
         cabeza = max(cabeza, abs(m.get_editor_property('look_yaw')))
         pasos_giro = pasos_giro or m.get_editor_property('turn_stepping')
+        giro = max(giro, abs((m.get_actor_rotation().yaw - yaw0 + 540) % 360 - 180))
+        p = pies()
+        if p and pies0:
+            # el pie se mueve respecto al cuerpo más de lo que lo movería el giro rígido de la pose
+            paso = max(paso, max((p[i] - pies0[i]).length() for i in range(2)))
         if estado(m) == 'SUSPICIOUS': vmin = min(vmin, m.get_velocity().length())
     check('se para al oír el ruido', vmin < 40, round(vmin))
     check('se gira hacia el ruido', error < 30, '%.0f grados de error' % error)
     check('la cabeza se adelanta al cuerpo', cabeza > 6, '%.0f grados' % cabeza)
-    check('gira en el sitio dando pasos', pasos_giro)
+    if gasp:
+        check('gira en el sitio dando pasos (GASP: gira y mueve los pies)', giro > 30 and paso > 8, 'giro %.0f grados, pie %.0f cm' % (giro, paso))
+    else:
+        check('gira en el sitio dando pasos', pasos_giro)
     check('dice "¿qué ha sido eso?"', d.get_editor_property('last_voice') == 'moya_ruido', d.get_editor_property('last_voice'))
     check('con subtítulo', any('Que ha sido eso' in str(x) for x in d.get_editor_property('subtitle_log')), list(d.get_editor_property('subtitle_log'))[-3:])
     v = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and x != m][0]
@@ -3020,7 +3038,10 @@ def prueba_armados():
     check('rendirse contó una sola vez', P('surrenders') == 1, P('surrenders'))
     check('el tiro pone la base en guardia', P('tension_t') > 60.0, P('tension_t'))
     check('tanda 39: cada tiro, su fogonazo', P('shot_flashes') == P('shots'), '%s de %s' % (P('shot_flashes'), P('shots')))
-    # los refuerzos: había pedido apoyo al dar el alto, pero estaban todos quietos (hold); ahora uno libre
+    # los refuerzos: había pedido apoyo al dar el alto, pero estaban todos quietos (hold); ahora uno libre.
+    # La central contesta BackupDelay (5 s) después del alto; si te disparan antes (el primer tiro puede llegar a los ~4 s
+    # del alto) la comprobación llegaba antes que la radio y fallaba a veces: se espera a que pase ese plazo
+    yield ('hasta', lambda: 'central_refuerzos' in [str(x) for x in director().get_editor_property('voice_log')], P('backup_delay') + 2.0)
     check('pidió refuerzos por radio', 'central_refuerzos' in vl(), vl()[-4:])
     # con puntería: heridas, y a la tercera caes
     d.set_editor_property('armed_aim', 100.0)

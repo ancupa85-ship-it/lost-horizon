@@ -93,6 +93,35 @@ def pasos():
         usado, total = vram()
         vp = unreal.WidgetLayoutLibrary.get_viewport_size(w)
         M['res'].append((nombre, round(media, 1), round(1.0 / peor, 1), usado, total, '%dx%d' % (vp.x, vp.y), len(dts)))
+    # tanda A: una pasada con los guardias andando su ronda (en las demás están quietos): el coste real de animarlos con
+    # el GASP (Motion Matching). No ven al jugador (vista a 1 cm) para que nadie corte la ronda; el camión, fuera
+    try:
+        d.set_editor_property('truck', False)
+    except Exception:
+        pass
+    gs = unreal.GameplayStatics.get_all_actors_of_class(w, gcls)
+    for g in gs:
+        g.set_editor_property('view_distance', 1.0)
+        g.hold(0.0)
+    nombre, pos, mira = SITIOS[1]
+    p = unreal.GameplayStatics.get_player_pawn(w, 0)
+    p.set_actor_location(pos, False, True)
+    unreal.GameplayStatics.get_player_controller(w, 0).set_control_rotation(unreal.MathLibrary.find_look_at_rotation(pos, mira))
+    yield ESPERA + 2.0
+    andan = 0
+    M['dts'] = []
+    for _ in range(int(MIDE / 0.5)):
+        yield 0.5
+        andan = max(andan, sum(1 for g in gs if g.get_velocity().length() > 30.0))
+    dts = sorted(M['dts'])
+    M['dts'] = None
+    if dts:
+        media = len(dts) / sum(dts)
+        peor = dts[max(0, int(len(dts) * 0.99) - 1)]
+        usado, total = vram()
+        vp = unreal.WidgetLayoutLibrary.get_viewport_size(w)
+        M['res'].append(('%s con guardias andando (%d de %d)' % (nombre, andan, len(gs)), round(media, 1), round(1.0 / peor, 1),
+                         usado, total, '%dx%d' % (vp.x, vp.y), len(dts)))
 
 
 def _tick(dt):
