@@ -100,19 +100,36 @@ bool ATarsisGuard::SetupGasp()
 	GaspBody->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, (-HalfH - PBall + 3.0f) - UZ), FRotator(0.0f, PYaw - UYaw + GaspBodyYaw, 0.0f));
 	GaspBody->RegisterComponent();
 	GaspBody->AddTickPrerequisiteComponent(M);   // primero la pose de Epic, luego la copia
+	GaspFindRetargeter();
 	GaspRestore();
+	// BP_GuardiaGASP es la copia entera de SandboxCharacter_CMC (quitarle componentes deja nodos huérfanos y no compila).
+	// Lo que no queremos se apaga aquí: AC_PreCMCTick recalcularía velocidad, giro instantáneo (RotationRate -1) y
+	// Gait en cada fotograma, pisando al guardia; el traversal, los smart objects y las cámaras no hacen nada en un guardia
+	TArray<UActorComponent*> Comps;
+	GetComponents(Comps);
+	for (UActorComponent* C : Comps)
+	{
+		const FString N = C->GetClass()->GetName();
+		if (N.Contains(TEXT("PreCMCTick")) || N.Contains(TEXT("TraversalLogic")) || N.Contains(TEXT("SmartObjectAnimation"))
+			|| N.Contains(TEXT("Camera")) || N.Contains(TEXT("SpringArm")) || N.Contains(TEXT("VisualOverride")))
+		{
+			C->SetComponentTickEnabled(false);
+			C->Deactivate();
+		}
+	}
 	// el CMC con los valores con que se grabaron las bases de Motion Matching: aceleración y frenada suaves, sin girar
 	// de golpe (lo demás, velocidades y giros, lo sigue poniendo el guardia)
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->MaxAcceleration = GaspMaxAcceleration;
 		Move->BrakingDecelerationWalking = GaspBrakingDeceleration;
+		Move->GroundFriction = 5.0f;   // lo que pone UpdateMovement_PreCMC andando y corriendo
 	}
 	UE_LOG(LogTemp, Log, TEXT("Tarsis: %s anima con el GASP (retarget %s)"), *GetName(), GaspRetargeter ? *GaspRetargeter->GetName() : TEXT("NINGUNO"));
 	return true;
 }
 
-void ATarsisGuard::GaspPointRetargeter()
+void ATarsisGuard::GaspFindRetargeter()
 {
 	if (!GaspBody || !BodyMesh) return;
 	if (!GaspRetargeter)
@@ -134,6 +151,18 @@ void ATarsisGuard::GaspPointRetargeter()
 			}
 		}
 	}
+	// ABP_GenericRetarget, al iniciarse, busca su IK Retargeter en IKRetargeter_Map con la primera etiqueta del
+	// componente; sin entrada no pisa nada y vale la variable que se pone desde aquí (GaspPointRetargeter)
+	if (GaspRetargeter)
+	{
+		GaspBody->ComponentTags.Reset();
+		GaspBody->ComponentTags.Add(GaspRetargeter->GetFName());
+	}
+}
+
+void ATarsisGuard::GaspPointRetargeter()
+{
+	if (!GaspBody) return;
 	UAnimInstance* AI = GaspBody->GetAnimInstance();
 	if (!AI || !GaspRetargeter) return;
 	if (FObjectProperty* P = CastField<FObjectProperty>(AI->GetClass()->FindPropertyByName(TEXT("IKRetargeter"))))
@@ -190,7 +219,9 @@ bool ATarsisGuard::GaspTick()
 	// apuntar (en alerta y parado) y caer siguen siendo animaciones sueltas de la persona
 	if (State == ETarsisGuardState::Alert && Speed <= 15.0f && AimAnim) { GaspSingle(AimAnim, true); return true; }
 	if (bGaspSingle) GaspRestore();
-	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	// como UpdateMovement_PreCMC: frenada suave mientras se quiere andar, fuerte al pararse
+	if (Move) Move->BrakingDecelerationWalking = Move->GetCurrentAcceleration().IsNearlyZero() ? GaspStopDeceleration : GaspBrakingDeceleration;
 	const FString Gait = (Move && Move->MaxWalkSpeed >= GaspRunFrom) ? TEXT("Run") : TEXT("Walk");
 	if (Gait != GaspGaitNow && GaspSetEnum(TEXT("Gait"), Gait)) GaspGaitNow = Gait;
 	return true;

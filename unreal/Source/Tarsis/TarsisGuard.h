@@ -355,7 +355,11 @@ public:
 	float GaspMaxAcceleration = 800.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
-	float GaspBrakingDeceleration = 800.0f;
+	float GaspBrakingDeceleration = 500.0f;
+
+	/** Frenada al pararse (sin aceleración pedida), como el personaje del GASP. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspStopDeceleration = 2000.0f;
 
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
 	bool UsesGasp() const { return GaspBody != nullptr; }
@@ -652,6 +656,7 @@ private:
 	bool bGaspSingle = false;      // el cuerpo hace una animación suelta (caer, apuntar) en vez del retarget
 	FString GaspGaitNow;
 	bool SetupGasp();
+	void GaspFindRetargeter();
 	void GaspPointRetargeter();
 	void GaspSingle(UAnimationAsset* A, bool bLoop);
 	void GaspRestore();
