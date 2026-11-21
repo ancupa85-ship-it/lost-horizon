@@ -65,6 +65,9 @@ void ATarsisDirector::SetupHero(ACharacter* C)
 		UE_LOG(LogTemp, Warning, TEXT("Tarsis: no hay cuerpo de Cuttlas en /Game/Tarsis/Personas (tools/unreal/personas.py)"));
 		return;
 	}
+	// tanda A: con el peón del GASP, la persona copia la pose del maniquí que conduce (TarsisGaspHero.cpp); si falta algo,
+	// sigue el cuerpo de siempre con sus animaciones sueltas
+	if (bHeroGaspPawn && bHeroGaspRule && SetupGaspHero(C, SK)) return;
 	HeroBody = NewObject<USkeletalMeshComponent>(C, TEXT("CuerpoCuttlas"));
 	HeroBody->SetSkeletalMesh(SK);
 	HeroBody->SetupAttachment(C->GetCapsuleComponent());
@@ -135,6 +138,7 @@ void ATarsisDirector::ThirdTick(float DeltaSeconds)
 		C->GetComponents<USkeletalMeshComponent>(Ms);
 		for (USkeletalMeshComponent* M : Ms) { if (M != HeroBody.Get() && M != Arms.Get() && M->bOnlyOwnerSee) M->SetVisibility(!bOut, true); }
 	}
+	if (HeroDriver) { GaspHeroTick(C, bOut); return; }   // tanda A: anima el GASP
 	if (!HeroBody || !bOut) return;
 	const float HalfH = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	HeroBody->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, -HalfH - HeroFootZ + 2.0f), FRotator(0.0f, HeroYaw, 0.0f));

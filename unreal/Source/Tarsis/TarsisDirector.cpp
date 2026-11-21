@@ -118,6 +118,9 @@ void ATarsisDirector::SetupPlayer()
 	C->GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
 	C->GetCharacterMovement()->MaxWalkSpeedCrouched = 200.0f;
 	BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
+	// tanda A: si el peón es BP_CuttlasGASP, fuera sus cámaras, su IMC y sus componentes de juego antes de que SetupArms
+	// busque la cámara (TarsisGaspHero.cpp)
+	SetupGaspPlayer(C);
 	SetupArms(C);
 	// ajuste 26e: tu sombra en tu propia vista. El cuerpo de la plantilla va como «representación en el mundo» de la
 	// primera persona, y así el motor no dibuja su sombra para su dueño (medido en el PC: ni con CastHiddenShadow). Con

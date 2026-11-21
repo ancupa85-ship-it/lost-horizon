@@ -45,3 +45,22 @@ que lee el CharacterMovementComponent, sigue valiendo. guardias.py coloca esa cl
 Desde C++ se escriben por reflexión `Gait` y `CharacterInputState` (andar, correr, agacharse, apuntar) según el
 estado del guardia. La malla UEFN queda oculta y conduce; la malla MakeHuman visible lleva `ABP_GenericRetarget` con
 su RTG. Se empieza con `MMDatabaseLOD` = 1 (Sparse) y se mide; Dense solo si sobra CPU y RAM.
+
+## Cuttlas en tercera persona (2026-11-21)
+- **Peón**: `BP_CuttlasGASP` = copia entera de `SandboxCharacter_CMC` reparentada a **`BP_FirstPersonCharacter`** (no a la
+  clase C++): hereda sus acciones de entrada, su malla y su cámara de primera persona. `gasp_cuttlas.py` (modo `montar`)
+  le copia del peón de antes malla, cápsula, CMC y giro con el control; tras compilar no queda ninguna diferencia.
+  Motivo: en la plantilla la cámara cuelga de la cabeza de la malla de primera persona, que cuelga de `GetMesh()` y copia
+  su pose (`ABP_FP_Copy`); si el GASP fuera en `GetMesh()`, la primera persona se movería con el Motion Matching.
+- **GameMode**: `BP_TarsisGameModeGASP` (copia de `BP_FirstPersonGameMode` con ese peón) y el nivel Tarsis apuntando a
+  él en WorldSettings. El GameMode global no cambia; para volver, `DefaultGameMode` del nivel a ninguno.
+- **C++** (`TarsisGaspHero.cpp`): `SetupGaspPlayer` (antes de `SetupArms`) apaga PreCMCTick, traversal, smart objects,
+  foley y VisualOverride, destruye las cámaras, el brazo de muelle y el actor hijo del GASP, quita `IMC_Sandbox` (sus
+  acciones duplicaban la vista con el ratón y la C) y sus eventos de rueda y cruceta, y devuelve la vista al peón.
+  `SetupGaspHero` crea `ConductorGASP` (maniquí UEFN oculto con el ABP) y cuelga de él `CuerpoCuttlas` con
+  `ABP_GenericRetarget` y `RTG_UEFN_cuttlas`. `GaspHeroTick` pone el Gait por `MaxWalkSpeed` (menos de 320 Walk, hasta
+  650 Run, más Sprint) y baja el maniquí con la cápsula al agacharse. Sin el peón del GASP, el HeroBody de antes.
+- **Giro parado**: con el ABP del GASP en vista estrafe, al girar la cámara sin andar giran el torso y la cabeza (aim
+  offset, hasta 115°) y las piernas esperan al primer paso: el giro en el sitio solo salta apuntando o justo al pararse
+  (`ShouldTurnInPlace`). Si se quiere que gire las piernas parado, se puede activar `WantsToAim` un momento cuando el
+  desfase pase de unos 100°.

@@ -1223,6 +1223,41 @@ public:
 	TObjectPtr<class UAnimationAsset> HeroAnims[4];
 	bool bHeroTried = false;
 	bool bThirdShown = false;
+
+	// ---- tanda A (TarsisGaspHero.cpp): Cuttlas con el ABP del Game Animation Sample. Si el peón del jugador implementa
+	// BPI_SandboxCharacter_Pawn (BP_CuttlasGASP, copia de SandboxCharacter_CMC sobre BP_FirstPersonCharacter), HeroBody
+	// copia la pose de un maniquí UEFN oculto que corre SandboxCharacter_CMC_ABP; si no, el HeroBody de siempre.
+	/** Apagado, Cuttlas en tercera usa las animaciones sueltas de antes aunque el peón sea BP_CuttlasGASP. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	bool bHeroGaspRule = true;
+	/** Gait del GASP según MaxWalkSpeed: por debajo, Walk; hasta HeroGaspSprintFrom, Run; por encima, Sprint. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroGaspRunFrom = 320.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroGaspSprintFrom = 650.0f;
+	/** Giro extra del cuerpo respecto al maniquí que conduce (si la persona saliera torcida). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroGaspYaw = 0.0f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	bool HeroUsesGasp() const { return HeroDriver != nullptr; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	FString HeroGait() const { return HeroGaitNow; }
+	bool bHeroGaspPawn = false;     // el peón implementa la interfaz del GASP (lo limpia SetupGaspPlayer)
+	UPROPERTY()
+	TObjectPtr<class USkeletalMeshComponent> HeroDriver;
+	UPROPERTY()
+	TObjectPtr<UObject> HeroRetargeter;
+	UPROPERTY()
+	TObjectPtr<class UInputMappingContext> HeroGaspImc;
+	float HeroDriverBallZ = 0.0f;
+	float HeroDriverYaw = 0.0f;
+	float HeroBodyBallZ = 0.0f;
+	float HeroBodyYawGasp = 0.0f;
+	bool bHeroRetargetSet = false;
+	FString HeroGaitNow;
+	void SetupGaspPlayer(class ACharacter* C);
+	bool SetupGaspHero(class ACharacter* C, class USkeletalMesh* SK);
+	void GaspHeroTick(class ACharacter* C, bool bOut);
 	float HeroYaw = 0.0f;
 	float HeroFootZ = 0.0f;
 	int32 HeroAnimNow = -1;
