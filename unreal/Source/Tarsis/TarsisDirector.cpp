@@ -290,16 +290,18 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	if (!C) return;
 
 	// agachado: la cámara de la plantilla cuelga del brazo en primera persona, que el motor mantiene a la misma altura
-	// al encoger la cápsula, así que se baja a mano. La etiqueta de la cámara recuerda si ya está bajada.
+	// al encoger la cápsula, así que se baja a mano. Antes bajaba de golpe (un corte en tercera persona); ahora con una
+	// curva suave (smoothstep) en CrouchCamSeconds, reversible a medias. Lo sumado se guarda para la cámara de este peón.
 	if (UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>())
 	{
-		static const FName Tag(TEXT("LH_agachado"));
-		const bool bLowered = Cam->ComponentHasTag(Tag);
-		if (C->bIsCrouched != bLowered)
+		if (CrouchCam.Get() != Cam) { CrouchCam = Cam; CrouchCamApplied = 0.0f; CrouchCamAlpha = 0.0f; }
+		const float Rate = DeltaSeconds / FMath::Max(CrouchCamSeconds, 0.01f);
+		CrouchCamAlpha = FMath::Clamp(CrouchCamAlpha + (C->bIsCrouched ? Rate : -Rate), 0.0f, 1.0f);
+		const float Want = -CrouchCamDrop * FMath::SmoothStep(0.0f, 1.0f, CrouchCamAlpha);
+		if (!FMath::IsNearlyEqual(Want, CrouchCamApplied))
 		{
-			const float Drop = 55.0f;
-			Cam->AddWorldOffset(FVector(0.0f, 0.0f, C->bIsCrouched ? -Drop : Drop));
-			if (C->bIsCrouched) Cam->ComponentTags.Add(Tag); else Cam->ComponentTags.Remove(Tag);
+			Cam->AddWorldOffset(FVector(0.0f, 0.0f, Want - CrouchCamApplied));
+			CrouchCamApplied = Want;
 		}
 	}
 

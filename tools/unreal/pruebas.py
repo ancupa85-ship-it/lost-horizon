@@ -3197,9 +3197,28 @@ def prueba_tercera():
         yield 1.0
         check('el giro no deja puesto WantsToAim', not d.hero_gasp_turn_aiming(), d.hero_gasp_turn_aiming())
         pc.set_control_rotation(unreal.Rotator(0.0, 0.0, 0.0)); yield 1.5
-    jugador().crouch(); yield 0.5
+    # tanda A, octava: al agacharse y levantarse en tercera, ni la cámara ni el cuerpo dan un salto de un fotograma (antes la
+    # cámara bajaba 55 cm de golpe y el cuerpo salía 54 cm más alto el primer fotograma agachado)
+    cm = unreal.GameplayStatics.get_player_camera_manager(mundo(), 0)
+    cuerpo = ([c for c in jugador().get_components_by_class(unreal.SkeletalMeshComponent) if c.get_name().startswith('CuerpoCuttlas')] or [None])[0]
+    def saltos(accion):
+        prev, cam_max, pel_max = None, 0.0, 0.0
+        t0 = time.time()
+        accion()
+        while time.time() - t0 < 0.7:
+            yield 0.0
+            z = (cm.get_camera_location().z, cuerpo.get_socket_location('pelvis').z if cuerpo else 0.0)
+            if prev:
+                cam_max = max(cam_max, abs(z[0] - prev[0])); pel_max = max(pel_max, abs(z[1] - prev[1]))
+            prev = z
+        res.append((cam_max, pel_max))
+    res = []
+    yield from saltos(lambda: jugador().crouch())
     check('agachado, la animación es la de ir agachado', not d.hero_ready() or d.hero_anim_index() == 2, d.hero_anim_index())
-    jugador().un_crouch(); yield 0.4
+    yield from saltos(lambda: jugador().un_crouch())
+    check('agacharse y levantarse en tercera, sin saltos de un fotograma', all(c < 20 and p < 20 for c, p in res),
+          'máximo por fotograma: cámara %.1f / %.1f cm, pelvis %.1f / %.1f cm' % (res[0][0], res[1][0], res[0][1], res[1][1]))
+    yield 0.4
     d.toggle_binoculars(); yield 0.6
     check('con los prismáticos, la vista de siempre', not d.third_now() and P('third_alpha') < 0.05, P('third_alpha'))
     d.toggle_binoculars(); yield 0.6

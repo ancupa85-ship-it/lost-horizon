@@ -80,3 +80,16 @@ su RTG. Se empieza con `MMDatabaseLOD` = 1 (Sparse) y se mide; Dense solo si sob
   las capturas no se levantan los brazos.
 - **Resultado** (`capturas-gaspA/giro_medidas.txt`): Cuttlas parado gira 90° y 160° y las piernas quedan alineadas en
   0,6 s; el guardia que se vuelve hacia un ruido a 90° y 160°, en 0,4-0,6 s, antes de echar a andar.
+
+## Agacharse en tercera persona (2026-11-21)
+- **Medido fotograma a fotograma** (`tools/unreal/visual_agachar.py`, `capturas-gaspA/agachar*`): dos cortes. La cámara
+  bajaba 55 cm de golpe (`Tick` del director: `AddWorldOffset(-55)` en el fotograma del cambio) y, al agacharse parado, el
+  cuerpo salía 54 cm más alto un fotograma. El cuerpo en sí baja suave con el ABP del GASP (pelvis de 87 a 40 cm en unos
+  0,6 s); las bases de agachado del GASP no saltan de pose.
+- **Cámara**: baja y sube con una curva suave (smoothstep) en `CrouchCamSeconds` (0,3 s), reversible a medias;
+  `CrouchCamDrop` 55 cm. Vale para primera y tercera persona.
+- **Cuerpo**: `ConductorGASP` no tenía al CMC como requisito de tick (`ACharacter` se lo pone a `GetMesh()`): el ABP podía
+  actualizarse antes que el movimiento y el fotograma en que la cápsula encoge leía el sitio de antes. Ahora
+  `AddTickPrerequisiteComponent(CMC)`.
+- **Resultado**: por cada 1/30 s, la cámara se mueve 9-11 cm como mucho y la pelvis 2,5-6,5 cm; el pie no pasa de 6 cm
+  sobre el suelo. Prueba nueva en `prueba_tercera`: «agacharse y levantarse en tercera, sin saltos de un fotograma».

@@ -1258,6 +1258,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
 	float HeroGaspTurnDelta() const { return HeroGaspTurn.Delta; }
 	FTarsisGaspTurn HeroGaspTurn;
+	/** Agacharse: la cápsula baja de golpe y la cámara bajaba CrouchCamDrop cm en un fotograma (un corte en tercera
+	 *  persona). Ahora baja y sube con una curva suave en CrouchCamSeconds, como el cuerpo con el ABP del GASP. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float CrouchCamDrop = 55.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float CrouchCamSeconds = 0.3f;
+	/** Lo que la cámara está bajada ahora por agacharse (cm, negativo). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	float CrouchCamOffset() const { return CrouchCamApplied; }
+	float CrouchCamApplied = 0.0f;   // desplazamiento sumado a la cámara
+	float CrouchCamAlpha = 0.0f;     // 0 de pie, 1 agachado (avanza a 1/CrouchCamSeconds por segundo)
+	TWeakObjectPtr<class UCameraComponent> CrouchCam;
 	bool bHeroGaspPawn = false;    // el peón implementa la interfaz del GASP (lo limpia SetupGaspPlayer)
 	UPROPERTY()
 	TObjectPtr<class USkeletalMeshComponent> HeroDriver;

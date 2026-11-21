@@ -197,6 +197,9 @@ bool ATarsisDirector::SetupGaspHero(ACharacter* C, USkeletalMesh* SK)
 	HeroDriver->SetAnimationMode(EAnimationMode::AnimationBlueprint);
 	HeroDriver->SetAnimInstanceClass(Abp);
 	HeroDriver->RegisterComponent();
+	// despues del movimiento, como GetMesh() (ACharacter se lo pone a su malla): si el ABP se actualiza antes que el CMC,
+	// el fotograma en que la capsula encoge al agacharse lee el sitio de antes y el cuerpo sale 55 cm mas alto un fotograma
+	if (UCharacterMovementComponent* Move = C->GetCharacterMovement()) HeroDriver->AddTickPrerequisiteComponent(Move);
 	// la persona, pegada al que conduce (ABP_GenericRetarget toma la pose del padre)
 	HeroBody = NewObject<USkeletalMeshComponent>(C, TEXT("CuerpoCuttlas"));
 	HeroBody->SetSkeletalMesh(SK);
