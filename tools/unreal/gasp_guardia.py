@@ -45,8 +45,10 @@ QUITAR = ['SpringArm', 'GameplayCamera', 'Camera', 'VisualOverride', 'BP_VisualO
 # Desde 401919f BP_GuardiaGASP es la copia ENTERA (los componentes que no queremos los apaga el C++ en BeginPlay,
 # TarsisGasp.cpp): quitarlos dejaba 8 nodos huérfanos y el BP en BS_ERROR. LH_GASP_QUITAR=1 vuelve a quitarlos.
 QUITAR_COMPONENTES = os.environ.get('LH_GASP_QUITAR') == '1'
-# LH_GASP_GUARDIA_SOLO=b6 rehace solo BP_GuardiaGASP (sin la parte A ni los RTG)
-SOLO = os.environ.get('LH_GASP_GUARDIA_SOLO', '')
+# LH_GASP_GUARDIA_SOLO=b6 rehace solo BP_GuardiaGASP; =b7, solo los RTG (sin la parte A). En el editor abierto, como
+# el entorno no se puede poner desde fuera, vale también builtins._gasp_solo = 'b7'
+import builtins
+SOLO = os.environ.get('LH_GASP_GUARDIA_SOLO', '') or getattr(builtins, '_gasp_solo', '')
 
 reg = unreal.AssetRegistryHelpers.get_asset_registry()
 eal = unreal.EditorAssetLibrary
@@ -538,6 +540,34 @@ def ik_rig(nom, malla):
     return rig, DEST + '/IK_' + nom, True
 
 
+# Pila de ops de los RTG del GASP (RTG_UEFN_to_UE5_Mannequin), con los mismos nombres: ABP_GenericRetarget busca las ops
+# «Blend to Source» y «Offset Goals» por su nombre (UpdateRetargetProfile, en cada actualización) y, si no están, cada
+# guardia suelta dos errores «Accessed None» por fotograma: con 16 guardias el PIE bajaba a un fotograma cada 3 s.
+# add_default_ops no las trae.
+OPS_PLANTILLA = [('Pelvis Motion', 'IKRetargetPelvisMotionOp'), ('Retarget FK Chains', 'IKRetargetFKChainsOp'),
+                 ('Blend to Source', 'IKRetargetBlendToSourceOp'), ('Offset Goals', 'IKRetargetOffsetGoalsOp'),
+                 ('Speed Plant IK Goals', 'IKRetargetSpeedPlantingOp'), ('Run IK Rig', 'IKRetargetRunIKRigOp'),
+                 ('Pole Vector Alignment', 'IKRetargetAlignPoleVectorOp'), ('Remap Curves', 'IKRetargetCurveRemapOp')]
+
+
+def ops_como_plantilla(rc):
+    for nombre_op, tipo in OPS_PLANTILLA:
+        antes = rc.get_num_retarget_ops()
+        # el tipo va como texto: la ruta del struct (o, si no, su nombre)
+        i = rc.add_retarget_op(getattr(unreal, tipo).static_struct().get_path_name())
+        if rc.get_num_retarget_ops() == antes:
+            i = rc.add_retarget_op(tipo)
+        try:
+            idx = i if isinstance(i, int) and i >= 0 else rc.get_num_retarget_ops() - 1
+            rc.set_op_name(nombre_op, idx)
+        except Exception:
+            try:
+                rc.set_op_name(rc.get_op_name(rc.get_num_retarget_ops() - 1), nombre_op)
+            except Exception:
+                pass
+    return [str(rc.get_op_name(i)) for i in range(rc.get_num_retarget_ops())]
+
+
 def cadenas(rig):
     try:
         return [str(x.get_editor_property('chain_name')) for x in unreal.IKRigController.get_controller(rig).get_retarget_chains()]
@@ -572,7 +602,7 @@ def parte_b7():
         rc.set_ik_rig(S, src_rig)
         rc.set_ik_rig(T, rig)
         rc.remove_all_ops()
-        rc.add_default_ops()
+        ops = ops_como_plantilla(rc)
         rc.assign_ik_rig_to_all_ops(S, src_rig)
         rc.assign_ik_rig_to_all_ops(T, rig)
         rc.set_preview_mesh(S, src_malla)
@@ -589,7 +619,7 @@ def parte_b7():
                     mapa.append('%s<-%s' % (ch, rc.get_source_chain(unreal.Name(ch), '')))
                 except Exception:
                     mapa.append(ch + '<-?')
-        w('  %s: rig %s%s; cadenas %s' % (nombre_rtg, ruta_rig, ' (NUEVO)' if nuevo else '', ', '.join(mapa)))
+        w('  %s: rig %s%s; ops %s; cadenas %s' % (nombre_rtg, ruta_rig, ' (NUEVO)' if nuevo else '', ops, ', '.join(mapa)))
         if not anim:
             w('    (no encuentro %s para la prueba)' % PRUEBA_ANIM)
             continue
@@ -625,14 +655,14 @@ def parte_b7():
 w('GASP -> guardia de Tarsis (gasp_guardia.py)')
 w('Proyecto: %s' % unreal.Paths.get_project_file_path())
 w('')
-if SOLO != 'b6':
+if SOLO not in ('b6', 'b7'):
     try:
         parte_a()
     except Exception as e:
         import traceback
         w('ERROR en la parte A: %s' % traceback.format_exc())
 if MONTAR:
-    for paso in ((parte_b6,) if SOLO == 'b6' else (parte_b6, parte_b7)):
+    for paso in {'b6': (parte_b6,), 'b7': (parte_b7,)}.get(SOLO, (parte_b6, parte_b7)):
         try:
             paso()
         except Exception:
