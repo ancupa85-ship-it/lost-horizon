@@ -36,6 +36,15 @@ def prop(obj, nombre):
         return None
 
 
+def etiqueta(a, nombre):
+    # en 5.8 ParentClass está protegida: se lee de las etiquetas del registro de assets
+    try:
+        v = str(a.get_tag_value(nombre) or '')
+        return v or None
+    except Exception:
+        return None
+
+
 def nombre_obj(o):
     try:
         return o.get_path_name() if o else None
@@ -44,7 +53,7 @@ def nombre_obj(o):
 
 
 inv = {'esqueletos': [], 'mallas': [], 'abp': [], 'pose_search': [], 'choosers': [], 'ik': [], 'control_rig': [],
-       'secuencias': {}, 'cuentas': {}}
+       'personajes': [], 'secuencias': {}, 'cuentas': {}}
 
 for a in todo:
     c = clase(a)
@@ -64,15 +73,18 @@ for a in todo:
         except Exception:
             pass
         inv['abp'].append({'ruta': p, 'esqueleto': nombre_obj(prop(b, 'target_skeleton')),
-                           'padre': nombre_obj(prop(b, 'parent_class')), 'clase': nombre_obj(gen),
+                           'padre': etiqueta(a, 'ParentClass'), 'clase': nombre_obj(gen),
                            'plantilla': bool(prop(b, 'is_template'))})
+    elif c == 'Blueprint' and 'Character' in str(a.asset_name) and '/Blueprints/' in p:
+        inv['personajes'].append({'ruta': p, 'padre': etiqueta(a, 'ParentClass'),
+                                  'clase_nativa': etiqueta(a, 'NativeParentClass')})
     elif c in ('PoseSearchDatabase', 'PoseSearchSchema', 'PoseSearchNormalizationSet'):
         o = a.get_asset()
         d = {'ruta': p, 'tipo': c}
         if c == 'PoseSearchDatabase':
             d['esquema'] = nombre_obj(prop(o, 'schema'))
             try:
-                d['animaciones'] = len(prop(o, 'animation_assets') or [])
+                d['animaciones'] = o.get_num_animation_assets()   # animation_assets no está expuesta en 5.8
             except Exception:
                 d['animaciones'] = None
         inv['pose_search'].append(d)
