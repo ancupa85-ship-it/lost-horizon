@@ -13,8 +13,8 @@ A. Información (solo lee):
   4. ABP_GenericRetarget: grafo de eventos y nodo Retarget Pose From Mesh (malla fuente, IKRetargeter).
   5. Pose de referencia de foot_l / ball_l en SKM_UEFN_Mannequin y en cada persona.
 B. Montaje en /Game/Tarsis/Anim (solo assets nuevos; los existentes no se tocan):
-  6. BP_GuardiaGASP = copia de SandboxCharacter_CMC reparentada a ATarsisGuard, sin cámara, traversal, smart objects,
-     foley, PreCMCTick ni visual override; compilada, con sus errores y avisos.
+  6. BP_GuardiaGASP = copia ENTERA de SandboxCharacter_CMC reparentada a ATarsisGuard (los componentes que sobran los
+     apaga el C++ en BeginPlay); compilada, con sus errores y avisos. LH_GASP_GUARDIA_SOLO=b6 hace solo este paso.
   7. RTG_UEFN_<persona> (IK_UEFN_Mannequin -> IK_<persona>) y un retarget de prueba de M_Neutral_Walk_Loop_F para ver
      que sale de pie (altura de ball_l en el primer fotograma); la prueba se borra.
 
@@ -42,6 +42,11 @@ GUARDIA = DEST + '/BP_GuardiaGASP'
 PADRE = '/Script/PruebaLumen.TarsisGuard'
 QUITAR = ['SpringArm', 'GameplayCamera', 'Camera', 'VisualOverride', 'BP_VisualOverrideManager', 'AC_TraversalLogic',
           'AC_SmartObjectAnimation', 'AC_PreCMCTick', 'AC_FoleyEvents']
+# Desde 401919f BP_GuardiaGASP es la copia ENTERA (los componentes que no queremos los apaga el C++ en BeginPlay,
+# TarsisGasp.cpp): quitarlos dejaba 8 nodos huérfanos y el BP en BS_ERROR. LH_GASP_QUITAR=1 vuelve a quitarlos.
+QUITAR_COMPONENTES = os.environ.get('LH_GASP_QUITAR') == '1'
+# LH_GASP_GUARDIA_SOLO=b6 rehace solo BP_GuardiaGASP (sin la parte A ni los RTG)
+SOLO = os.environ.get('LH_GASP_GUARDIA_SOLO', '')
 
 reg = unreal.AssetRegistryHelpers.get_asset_registry()
 eal = unreal.EditorAssetLibrary
@@ -454,7 +459,7 @@ def parte_b6():
         if not o:
             continue
         n = o.get_name().replace('_GEN_VARIABLE', '')
-        if any(n == q or (q == 'Camera' and n.startswith('Camera')) for q in QUITAR):
+        if QUITAR_COMPONENTES and any(n == q or (q == 'Camera' and n.startswith('Camera')) for q in QUITAR):
             quitar.append((n, h))
         elif not n.startswith('Default__'):
             quedan.append('%s (%s)' % (n, o.get_class().get_name()))
@@ -471,8 +476,11 @@ def parte_b6():
                 except Exception as e:
                     w('  no pude quitar %s: %s' % (n_q, e))
                 break
-    w('  componentes quitados (%s): %s' % (hecho, ', '.join(n for n, _ in quitar)))
-    w('  quedan: %s' % ', '.join(quedan))
+    if QUITAR_COMPONENTES:
+        w('  componentes quitados (%s): %s' % (hecho, ', '.join(n for n, _ in quitar)))
+    else:
+        w('  copia entera: no se quita ningún componente (los apaga el C++ en BeginPlay)')
+    w('  componentes: %s' % ', '.join(quedan))
     marca = 'GASP_GUARDIA_COMPILA %d' % id(bp)
     unreal.log(marca)
     BEL.compile_blueprint(bp)
@@ -489,6 +497,8 @@ def parte_b6():
         if m not in vistos:
             vistos.add(m)
             w('    ' + corta(m, 400))
+    if not QUITAR_COMPONENTES:
+        return bp
     # qué nodos se han quedado sin destino: llamadas a funciones de los componentes quitados con el pin self suelto,
     # y lecturas de esas variables
     w('  nodos que apuntaban a lo quitado (grafo: nodo):')
@@ -615,13 +625,14 @@ def parte_b7():
 w('GASP -> guardia de Tarsis (gasp_guardia.py)')
 w('Proyecto: %s' % unreal.Paths.get_project_file_path())
 w('')
-try:
-    parte_a()
-except Exception as e:
-    import traceback
-    w('ERROR en la parte A: %s' % traceback.format_exc())
+if SOLO != 'b6':
+    try:
+        parte_a()
+    except Exception as e:
+        import traceback
+        w('ERROR en la parte A: %s' % traceback.format_exc())
 if MONTAR:
-    for paso in (parte_b6, parte_b7):
+    for paso in ((parte_b6,) if SOLO == 'b6' else (parte_b6, parte_b7)):
         try:
             paso()
         except Exception:
