@@ -516,8 +516,20 @@ def prueba_guardias():
         return [cuerpo.get_socket_location(b) - l for b in ('ball_l', 'ball_r')]
     yaw0, pies0, giro, paso = m.get_actor_rotation().yaw, pies(), 0.0, 0.0
     cabeza, pasos_giro, vmin, error = 0.0, False, 1e9, 180.0
+    # tanda A, séptima: parado, el ABP del GASP solo gira las piernas si quiere apuntar; el guardia pone WantsToAim un
+    # momento cuando las piernas se quedan GaspTurnFrom grados por detrás (TarsisGaspTurn.h)
+    apunto, desfase, alineado = False, 0.0, False
+    def mira_giro():
+        nonlocal apunto, desfase, alineado
+        if not gasp:
+            return
+        apunto = apunto or m.gasp_turn_aiming()
+        desfase = max(desfase, abs(m.gasp_turn_delta()))
+        if apunto and m.get_velocity().length() < 10 and abs(m.gasp_turn_delta()) < 20:
+            alineado = True
     for _ in range(12):
         yield 0.1
+        mira_giro()
         error = min(error, error_giro())
         cabeza = max(cabeza, abs(m.get_editor_property('look_yaw')))
         pasos_giro = pasos_giro or m.get_editor_property('turn_stepping')
@@ -532,6 +544,15 @@ def prueba_guardias():
     check('la cabeza se adelanta al cuerpo', cabeza > 6, '%.0f grados' % cabeza)
     if gasp:
         check('gira en el sitio dando pasos (GASP: gira y mueve los pies)', giro > 30 and paso > 8, 'giro %.0f grados, pie %.0f cm' % (giro, paso))
+        for _ in range(15):
+            if alineado or m.get_velocity().length() >= 10:
+                break
+            yield 0.1
+            mira_giro()
+        check('parado, las piernas siguen al cuerpo (giro en el sitio del GASP)', apunto and (alineado or m.get_velocity().length() >= 10),
+              'desfase máximo %.0f grados, WantsToAim %s, alineado parado %s' % (desfase, apunto, alineado))
+        yield 2.0
+        check('el giro no deja puesto WantsToAim', not m.gasp_turn_aiming(), m.gasp_turn_aiming())
     else:
         check('gira en el sitio dando pasos', pasos_giro)
     check('dice "¿qué ha sido eso?"', d.get_editor_property('last_voice') == 'moya_ruido', d.get_editor_property('last_voice'))
@@ -3159,6 +3180,23 @@ def prueba_tercera():
     for k in range(8):
         pc.set_control_rotation(unreal.Rotator(0.0, 0.0, 45.0 * k)); yield 0.15
     pc.set_control_rotation(unreal.Rotator(0.0, 0.0, 0.0)); yield 0.3
+    if d.hero_uses_gasp():
+        # tanda A, séptima: parado, girar la cámara 160 grados; las piernas lo siguen girando en el sitio (WantsToAim un
+        # momento, TarsisGaspTurn.h) y no se quedan atrás hasta el primer paso
+        yield 1.5
+        pc.set_control_rotation(unreal.Rotator(0.0, 0.0, 160.0))
+        apunto, alineado = False, False
+        for _ in range(30):
+            yield 0.1
+            apunto = apunto or d.hero_gasp_turn_aiming()
+            if apunto and abs(d.hero_gasp_turn_delta()) < 20:
+                alineado = True
+                break
+        check('parado, al girar 160 grados las piernas siguen a la cámara', apunto and alineado and jugador().get_velocity().length() < 10,
+              'WantsToAim %s, desfase %.0f grados' % (apunto, d.hero_gasp_turn_delta()))
+        yield 1.0
+        check('el giro no deja puesto WantsToAim', not d.hero_gasp_turn_aiming(), d.hero_gasp_turn_aiming())
+        pc.set_control_rotation(unreal.Rotator(0.0, 0.0, 0.0)); yield 1.5
     jugador().crouch(); yield 0.5
     check('agachado, la animación es la de ir agachado', not d.hero_ready() or d.hero_anim_index() == 2, d.hero_anim_index())
     jugador().un_crouch(); yield 0.4

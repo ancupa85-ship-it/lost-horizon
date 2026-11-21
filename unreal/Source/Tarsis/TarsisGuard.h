@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "TarsisGaspTurn.h"
 #include "TarsisGuard.generated.h"
 
 class UStaticMeshComponent;
@@ -364,6 +365,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
 	bool UsesGasp() const { return GaspBody != nullptr; }
 
+	/** Giro en el sitio parado (TarsisGaspTurn.h): con las piernas a GaspTurnFrom grados o más de donde mira, WantsToAim
+	 *  un momento para que el ABP gire en el sitio. Más bajo que en Cuttlas: el guardia va en modo «orientar al
+	 *  movimiento», sin aim offset, y parado no gira ni el torso; solo la cabeza se adelanta. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspTurnFrom = 60.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspTurnRelease = 15.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float GaspTurnMaxSeconds = 1.5f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	bool GaspTurnAiming() const { return GaspTurn.bAim; }
+	/** Grados que las piernas van por detrás de hacia dónde mira el actor (del hueso raíz del maniquí que conduce). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	float GaspTurnDelta() const { return GaspTurn.Delta; }
+
 	/** La malla con el esqueleto de la persona que se anima (de ella copian el cuerpo visible, los pasos y los gestos). */
 	USkeletalMeshComponent* AnimBody() const;
 
@@ -655,6 +671,7 @@ private:
 	UPROPERTY() TObjectPtr<UClass> GaspRetargetClass;
 	bool bGaspSingle = false;      // el cuerpo hace una animación suelta (caer, apuntar) en vez del retarget
 	FString GaspGaitNow;
+	FTarsisGaspTurn GaspTurn;
 	bool SetupGasp();
 	void GaspFindRetargeter();
 	void GaspPointRetargeter();

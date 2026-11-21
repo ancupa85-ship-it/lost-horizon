@@ -244,5 +244,8 @@ void ATarsisDirector::GaspHeroTick(ACharacter* C, bool bOut)
 	const float Max = C->GetCharacterMovement() ? C->GetCharacterMovement()->MaxWalkSpeed : 0.0f;
 	const FString Gait = Max >= HeroGaspSprintFrom ? TEXT("Sprint") : (Max >= HeroGaspRunFrom ? TEXT("Run") : TEXT("Walk"));
 	if (Gait != HeroGaitNow && HeroSetEnum(C, TEXT("Gait"), Gait)) HeroGaitNow = Gait;
+	// parado y girando la camara: el ABP solo gira en el sitio si quiere apuntar (TarsisGaspTurn.h)
+	HeroGaspTurn.Tick(C, HeroDriver, C->GetVelocity().Size2D(), C->GetWorld() ? C->GetWorld()->GetDeltaSeconds() : 0.0f,
+		HeroGaspTurnFrom, HeroGaspTurnRelease, HeroGaspTurnMaxSeconds);
 	HeroAnimNow = C->bIsCrouched ? 2 : (C->GetVelocity().Size2D() > 20.0f ? 1 : 0);
 }

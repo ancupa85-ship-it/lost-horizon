@@ -175,6 +175,7 @@ void ATarsisGuard::GaspSingle(UAnimationAsset* A, bool bLoop)
 {
 	if (!GaspBody || !A) return;
 	if (bGaspSingle && CurrentAnim == A) return;
+	GaspTurn.Stop(this);
 	GaspBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	GaspBody->PlayAnimation(A, bLoop);
 	GaspBody->SetPlayRate(1.0f);
@@ -224,5 +225,7 @@ bool ATarsisGuard::GaspTick()
 	if (Move) Move->BrakingDecelerationWalking = Move->GetCurrentAcceleration().IsNearlyZero() ? GaspStopDeceleration : GaspBrakingDeceleration;
 	const FString Gait = (Move && Move->MaxWalkSpeed >= GaspRunFrom) ? TEXT("Run") : TEXT("Walk");
 	if (Gait != GaspGaitNow && GaspSetEnum(TEXT("Gait"), Gait)) GaspGaitNow = Gait;
+	// parado y volviéndose (un ruido, la ronda): el ABP solo gira en el sitio si quiere apuntar (TarsisGaspTurn.h)
+	GaspTurn.Tick(this, GetMesh(), Speed, GetWorld()->GetDeltaSeconds(), GaspTurnFrom, GaspTurnRelease, GaspTurnMaxSeconds);
 	return true;
 }

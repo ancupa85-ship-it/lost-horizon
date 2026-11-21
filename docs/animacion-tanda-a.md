@@ -62,5 +62,21 @@ su RTG. Se empieza con `MMDatabaseLOD` = 1 (Sparse) y se mide; Dense solo si sob
   650 Run, más Sprint) y baja el maniquí con la cápsula al agacharse. Sin el peón del GASP, el HeroBody de antes.
 - **Giro parado**: con el ABP del GASP en vista estrafe, al girar la cámara sin andar giran el torso y la cabeza (aim
   offset, hasta 115°) y las piernas esperan al primer paso: el giro en el sitio solo salta apuntando o justo al pararse
-  (`ShouldTurnInPlace`). Si se quiere que gire las piernas parado, se puede activar `WantsToAim` un momento cuando el
-  desfase pase de unos 100°.
+  (`ShouldTurnInPlace`). Arreglado en la sección siguiente.
+
+## Giro en el sitio estando quieto (2026-11-21, Cuttlas y guardias)
+- **Causa**: `ShouldTurnInPlace` = |desfase| ≥ 50° **y** (`CharacterInputState.WantsToAim` o recién parado). El 50 es un
+  literal del grafo y no hay variable expuesta. Parado y sin apuntar, el ABP acumula el giro del actor en el hueso raíz
+  (Offset Root Bone) y las piernas se quedan. Los guardias van en «orientar al movimiento», sin aim offset: parados se
+  quedaba quieto el cuerpo entero (hasta 89° de desfase) hasta echar a andar.
+- **Arreglo** (`TarsisGaspTurn.h/.cpp`, `FTarsisGaspTurn`): el desfase se lee del hueso raíz del maniquí que conduce
+  (giro en espacio de la malla; en reposo es la identidad). Parado (menos de 10 cm/s) y con el desfase por encima de
+  `From`, se pone `WantsToAim` en el `CharacterInputState` del peón; se quita al quedar por debajo de `Release` (15°),
+  al andar o a `MaxSeconds` (1,5 s). Umbrales: Cuttlas `HeroGaspTurnFrom` 95° (por debajo, el aim offset ya lleva el
+  torso con la cámara); guardias `GaspTurnFrom` 60° (no tienen aim offset). Al pasar a una animación suelta (apuntar, caer)
+  el guardia lo suelta.
+- **Sin pose de apuntar**: ninguna tabla de chooser ni nodo del ABP de pose mira `WantsToAim`; en el peón solo lo leen la
+  cámara del GASP y `UpdateRotation_PreCMC`, apagados aquí. Medido: las manos siguen a la altura de la pelvis (±6 cm) y en
+  las capturas no se levantan los brazos.
+- **Resultado** (`capturas-gaspA/giro_medidas.txt`): Cuttlas parado gira 90° y 160° y las piernas quedan alineadas en
+  0,6 s; el guardia que se vuelve hacia un ruido a 90° y 160°, en 0,4-0,6 s, antes de echar a andar.

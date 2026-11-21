@@ -10,6 +10,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "InputCoreTypes.h"
+#include "TarsisGaspTurn.h"
 #include "TarsisDirector.generated.h"
 
 /** Punto de interacción sencillo de la misión (assets/unreal/mision1.json, tools/unreal/mision.py): con la E, si tienes la
@@ -1242,7 +1243,22 @@ public:
 	bool HeroUsesGasp() const { return HeroDriver != nullptr; }
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
 	FString HeroGait() const { return HeroGaitNow; }
-	bool bHeroGaspPawn = false;     // el peón implementa la interfaz del GASP (lo limpia SetupGaspPlayer)
+	/** Giro en el sitio estando quieto (TarsisGaspTurn.h): con las piernas a HeroGaspTurnFrom grados o más de donde mira,
+	 *  WantsToAim un momento para que el ABP gire en el sitio; se quita al quedar a HeroGaspTurnRelease, al andar o a los
+	 *  HeroGaspTurnMaxSeconds. Por debajo de unos 115 grados el torso ya sigue a la cámara (aim offset del GASP). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroGaspTurnFrom = 95.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroGaspTurnRelease = 15.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Tercera")
+	float HeroGaspTurnMaxSeconds = 1.5f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	bool HeroGaspTurnAiming() const { return HeroGaspTurn.bAim; }
+	/** Grados que las piernas van por detrás de hacia dónde mira el actor (del hueso raíz del maniquí que conduce). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Tercera")
+	float HeroGaspTurnDelta() const { return HeroGaspTurn.Delta; }
+	FTarsisGaspTurn HeroGaspTurn;
+	bool bHeroGaspPawn = false;    // el peón implementa la interfaz del GASP (lo limpia SetupGaspPlayer)
 	UPROPERTY()
 	TObjectPtr<class USkeletalMeshComponent> HeroDriver;
 	UPROPERTY()
