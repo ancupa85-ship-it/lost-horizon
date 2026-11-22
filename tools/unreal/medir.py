@@ -19,6 +19,10 @@ SITIOS = [
     # tanda 20: los portones del muro nuevo, con el camino y el anillo exterior a la vista
     ('porton de entrada', V(-600, 5850, 120), V(-1900, 5700, 150)),
     ('porton de salida', V(7600, 5860, 120), V(9100, 5700, 150)),
+    # tanda E1: el relleno (hangar con taller, plaza de armas y enfermería)
+    ('hangar', V(5560, 6420, 120), V(4300, 7000, 100)),
+    ('plaza de armas', V(6950, 3700, 120), V(8000, 4300, 200)),
+    ('enfermeria', V(7520, 3420, 120), V(7700, 2850, 80)),
 ]
 # tanda 21: el camión entrando por el portón con los faros (una luz con sombra que se mueve) hacia la cámara
 CAMION = ('camino con el camion', V(1500, 6150, 120), V(-600, 5700, 120))

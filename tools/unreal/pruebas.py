@@ -190,7 +190,7 @@ def prueba_zona():
     """El barracón oeste vestido (tanda 18): atrezo, taquillas de verdad, el fluorescente que titila y sus sonidos."""
     d = director()
     z = d.zone_counts()
-    check('fluorescente que titila, zumbido eléctrico y gotera', (z.x, z.y, z.z) == (1, 1, 1), (z.x, z.y, z.z))
+    check('fluorescente que titila, zumbido eléctrico y gotera (tanda E1: más el de la enfermería)', z.x >= 1 and (z.y, z.z) == (1, 1), (z.x, z.y, z.z))
     piezas = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'atrezo.json'), encoding='utf-8'))['piezas']
     puestas = [a for a in unreal.GameplayStatics.get_all_actors_of_class(mundo(), unreal.StaticMeshActor) if a.get_actor_label().startswith('Atrezo_')]
     check('atrezo colocado (%d piezas)' % len(piezas), len(puestas) == len(piezas), len(puestas))
@@ -3686,6 +3686,84 @@ def prueba_huellas():
         x.hold(0.0)
     d.set_day(False)
 
+def prueba_relleno():
+    """Tanda E1. Relleno visual del hangar (taller, Santana bajo lona, cajas LH), la enfermería con su cámara fría y la
+    plaza de armas (mástil, sacos, tejadillo): todo con colisión, sin cortar rondas, el paso del lobo, el camino a la
+    trampilla ni a la caja de cartón; el tablón y las fichas se leen y el candado responde."""
+    w = mundo()
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.5
+    piezas = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'atrezo.json'), encoding='utf-8'))['piezas']
+    e1 = {'Atrezo_' + p['nombre']: p for p in piezas if p.get('nombre', '').startswith('e1')}
+    act = {a.get_actor_label(): a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor)}
+    rel = {n: a for n, a in act.items() if n.startswith('Relleno_')}
+    falta = [n for n in e1 if n not in act]
+    check('el atrezo nuevo está puesto (%d piezas)' % len(e1), len(e1) >= 40 and not falta, falta)
+    check('y lo hecho a mano (enfermería, mástil, sacos, tejadillo, puerta fría)', all(('Relleno_' + n) in rel for n in
+          ('Enfermeria_muros', 'Mastil', 'Bandera', 'Sacos_0', 'Tejadillo_postes', 'Puerta_fria', 'Candado')), sorted(rel)[:8])
+    def bloquea(a):
+        c = a.static_mesh_component
+        return c.get_collision_enabled() in (unreal.CollisionEnabled.QUERY_AND_PHYSICS, unreal.CollisionEnabled.QUERY_ONLY) and c.get_collision_response_to_channel(unreal.CollisionChannel.ECC_PAWN) == unreal.CollisionResponseType.ECR_BLOCK
+    sin = [n for n, p in e1.items() if not p.get('pequeno') and n in act and not bloquea(act[n])]
+    sin += [n for n in ('Relleno_Enfermeria_muros', 'Relleno_Puerta_fria', 'Relleno_Mastil', 'Relleno_Sacos_0', 'Relleno_Sacos_3', 'Relleno_Tejadillo_postes') if n in rel and not bloquea(rel[n])]
+    check('todo lo grande tiene colisión (y lo pequeño no estorba)', not sin, sin)
+    nuevos = set(list(e1) + list(rel))
+    def barrido(a, b, radio=38.0, z=60.0):
+        """Lo que hay entre a y b para alguien de 38 cm de radio (lo nuevo de la tanda, nada más)."""
+        hs = unreal.SystemLibrary.sphere_trace_multi(w, V(a[0], a[1], z), V(b[0], b[1], z), radio, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False,
+                                                     [jugador()] + list(guardias()), unreal.DrawDebugTrace.NONE, True)
+        out = set()
+        for h in hs or []:
+            ac = h.to_tuple()[9]
+            if ac and ac.get_actor_label() in nuevos:
+                out.add(ac.get_actor_label())
+        return sorted(out)
+    # rondas de los guardias de tierra
+    corta = []
+    for g in guardias():
+        if g.get_editor_property('tower_sentry'):
+            continue
+        pts = [(p.x, p.y) for p in g.get_editor_property('patrol_points')]
+        for a, b in zip(pts, pts[1:] + pts[:1]):
+            for n in barrido(a, b):
+                corta.append('%s: %s' % (g.get_editor_property('guard_name'), n))
+    check('ninguna ronda choca con lo nuevo', not corta, corta)
+    check('el lobo sigue cruzando el hangar de punta a punta', not barrido((4350, 6600), (5550, 6600), 30), barrido((4350, 6600), (5550, 6600), 30))
+    camino = barrido((4900, 6250), (4900, 6500)) + barrido((4900, 6500), (4520, 6800))
+    check('del portón a la trampilla, libre', not camino, camino)
+    caja = barrido((4900, 6500), (5500, 6520)) + barrido((5500, 6520), (5500, 6960))   # rodeando el Santana por el este
+    check('y hasta la caja de cartón', not caja, caja)
+    entrar = barrido((7560, 3800), (7560, 3350), 34) + barrido((7560, 3350), (8020, 3105), 34)
+    check('a la enfermería se entra por la puerta y se llega a la cámara fría', not entrar, entrar)
+    pared = barrido((7900, 3800), (7900, 3300), 34)
+    check('y no se atraviesa el muro', 'Relleno_Enfermeria_muros' in pared, pared)
+    plaza = barrido((6800, 4100), (8450, 4100)) + barrido((6800, 4250), (7800, 4250))   # entre las filas de sacos
+    check('la plaza de armas se cruza (pasillos entre los sacos)', not plaza, plaza)
+    # luces: fluorescente frío que titila
+    luces = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.PointLight) if a.get_actor_label().startswith('Relleno_')]
+    check('dos fluorescentes fríos en la enfermería y uno titila', len([a for a in luces if 'Fluorescente' in a.get_actor_label()]) == 2 and any('parpadeo' in [str(t) for t in a.tags] for a in luces),
+          [(a.get_actor_label(), [str(t) for t in a.tags]) for a in luces])
+    # se leen: tablón del taller, fichas médicas y la puerta con candado
+    for pid, aviso, clave, que in (('tablon_hangar', 'TABLON', 'NO SE TOCAN', 'el tablón de turnos del taller se lee'),
+                                    ('fichas_medicas', 'FICHAS', 'LH-04 - VIDAL, J.', 'las fichas: LH-04 Vidal, traslado a nivel -2, y LH-08 en blanco'),
+                                    ('camara_fria', 'PUERTA METALICA', 'Cerrada con candado', 'la puerta de la cámara fría: candado y frío')):
+        pt = next((p for p in d.get_editor_property('points') if str(p.id) == pid), None)
+        if not pt:
+            check(que, False, 'falta el punto ' + pid)
+            continue
+        tp(pt.pos.x - 70 if pid != "tablon_hangar" else pt.pos.x + 40, pt.pos.y + (60 if pid == "fichas_medicas" else 0)); yield 0.3
+        ok_aviso = aviso in str(d.interact_prompt())
+        d.interact(); yield 0.3
+        msg = str(P('message'))
+        extra = ('nivel -2' in msg and 'LH-08' in msg) if pid == 'fichas_medicas' else True
+        check(que, ok_aviso and clave in msg and extra, '%s | %s' % (d.interact_prompt(), msg[:70]))
+    aparte()
+    for g in guardias():
+        g.hold(0.0)
+
 def prueba_relevo():
     """Tanda D. Relevo de las torres: cada puesto, escalonado; el relevo sale del barracon, se dicen el santo y sena al pie
     de la escalera (de cerca se oye y se apunta) y sube; el puesto queda vacio unos 20-40 s. Si el centinela no esta, el
@@ -3847,7 +3925,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno]]
 PRUEBAS = []
 
 

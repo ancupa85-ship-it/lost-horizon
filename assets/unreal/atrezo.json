@@ -34,7 +34,29 @@
   "cement_bag",
   "cardboard_box_01",
   "Camera_01",
-  "wooden_picnic_table"
+  "wooden_picnic_table",
+  "overhead_crane",
+  "metal_tool_chest",
+  "tool_cart",
+  "old_military_compressor",
+  "old_drill_press",
+  "portable_welding_cart",
+  "pipe_wrench",
+  "combination_wrench",
+  "cross_pein_hammer",
+  "crowbar_01",
+  "oil_tin",
+  "small_oil_can_01",
+  "covered_car",
+  "Barrel_01",
+  "wooden_crate_02",
+  "old_military_crate",
+  "medical_box",
+  "vintage_cabinet_01",
+  "wheelchair_01",
+  "vintage_crutches_01",
+  "hanging_industrial_lamp",
+  "painted_wooden_bench"
  ],
  "piezas": [
   {
@@ -3341,6 +3363,477 @@
     60
    ],
    "giro": 30
+  },
+  {
+   "nombre": "e1han_santana",
+   "modelo": "covered_car",
+   "pos": [
+    5150,
+    7000,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1han_rueda_fuera",
+   "modelo": "old_tyre",
+   "pos": [
+    5285,
+    6830,
+    34
+   ],
+   "giro": 90,
+   "colgar": true
+  },
+  {
+   "nombre": "e1han_rueda_suelo",
+   "modelo": "old_tyre",
+   "pos": [
+    5300,
+    6760,
+    34
+   ],
+   "giro": 15,
+   "colgar": true
+  },
+  {
+   "nombre": "e1han_banco",
+   "modelo": "metal_office_desk",
+   "pos": [
+    4083,
+    6950,
+    150
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "e1han_lampara_banco",
+   "modelo": "desk_lamp_arm_01",
+   "pos": [
+    4075,
+    7025,
+    150
+   ],
+   "giro": 200,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1han_aceitera",
+   "modelo": "small_oil_can_01",
+   "pos": [
+    4090,
+    6890,
+    150
+   ],
+   "giro": 30,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1han_lata_aceite",
+   "modelo": "oil_tin",
+   "pos": [
+    4070,
+    6865,
+    150
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1han_llave_grifa",
+   "modelo": "pipe_wrench",
+   "pos": [
+    4030,
+    6905,
+    160
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1han_llave_fija",
+   "modelo": "combination_wrench",
+   "pos": [
+    4030,
+    6935,
+    165
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1han_martillo",
+   "modelo": "cross_pein_hammer",
+   "pos": [
+    4030,
+    6965,
+    160
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1han_palanqueta",
+   "modelo": "crowbar_01",
+   "pos": [
+    4030,
+    7000,
+    160
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1han_lampara_colgada",
+   "modelo": "hanging_industrial_lamp",
+   "pos": [
+    4150,
+    6950,
+    400
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true,
+   "sin_sombra": true
+  },
+  {
+   "nombre": "e1han_carro_herramientas",
+   "modelo": "tool_cart",
+   "pos": [
+    4210,
+    6800,
+    150
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "e1han_cofre",
+   "modelo": "metal_tool_chest",
+   "pos": [
+    5050,
+    7290,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1han_bidon_aceite",
+   "modelo": "Barrel_01",
+   "pos": [
+    5330,
+    7270,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1han_soldadura",
+   "modelo": "portable_welding_cart",
+   "pos": [
+    5360,
+    6880,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1han_taladro",
+   "modelo": "old_drill_press",
+   "pos": [
+    4700,
+    7290,
+    150
+   ],
+   "giro": 180
+  },
+  {
+   "nombre": "e1han_grua",
+   "modelo": "overhead_crane",
+   "pos": [
+    4900,
+    7000,
+    330
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true,
+   "escala": 0.65
+  },
+  {
+   "nombre": "e1han_caja_lh_0",
+   "modelo": "wooden_crate_02",
+   "pos": [
+    4300,
+    6930,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1han_caja_lh_1",
+   "modelo": "wooden_crate_02",
+   "pos": [
+    4300,
+    7060,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1han_caja_lh_2",
+   "modelo": "wooden_crate_02",
+   "pos": [
+    4300,
+    6930,
+    120
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1han_caja_lh_larga",
+   "modelo": "old_military_crate",
+   "pos": [
+    4560,
+    7140,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1enf_camilla_0",
+   "modelo": "old_bed_frame",
+   "pos": [
+    7380,
+    2830,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1enf_camilla_1",
+   "modelo": "old_bed_frame",
+   "pos": [
+    7530,
+    2830,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1enf_camilla_2",
+   "modelo": "old_bed_frame",
+   "pos": [
+    7680,
+    2830,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1enf_vitrina",
+   "modelo": "vintage_cabinet_01",
+   "pos": [
+    7360,
+    3250,
+    150
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "e1enf_mesa",
+   "modelo": "metal_office_desk",
+   "pos": [
+    7800,
+    3420,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1enf_fichas",
+   "modelo": "papeles",
+   "pos": [
+    7760,
+    3415,
+    150
+   ],
+   "giro": 8,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1enf_carpeta",
+   "modelo": "clipboard",
+   "pos": [
+    7860,
+    3400,
+    150
+   ],
+   "giro": -12,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1enf_botiquin",
+   "modelo": "medical_box",
+   "pos": [
+    7720,
+    3440,
+    150
+   ],
+   "giro": 5,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1enf_flexo",
+   "modelo": "desk_lamp_arm_01",
+   "pos": [
+    7885,
+    3455,
+    150
+   ],
+   "giro": 160,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1enf_taburete",
+   "modelo": "metal_stool_01",
+   "pos": [
+    7800,
+    3330,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1enf_archivador",
+   "modelo": "drawer_cabinet",
+   "pos": [
+    8115,
+    3400,
+    150
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "e1enf_silla_ruedas",
+   "modelo": "wheelchair_01",
+   "pos": [
+    7990,
+    2810,
+    150
+   ],
+   "giro": 200
+  },
+  {
+   "nombre": "e1enf_muletas",
+   "modelo": "vintage_crutches_01",
+   "pos": [
+    8120,
+    2760,
+    150
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1enf_fluor_1",
+   "modelo": "mounted_fluorescent_lights",
+   "pos": [
+    7560,
+    3120,
+    304
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true,
+   "sin_sombra": true
+  },
+  {
+   "nombre": "e1enf_fluor_2",
+   "modelo": "mounted_fluorescent_lights",
+   "pos": [
+    7900,
+    2950,
+    304
+   ],
+   "giro": 0,
+   "colgar": true,
+   "pequeno": true,
+   "sin_sombra": true
+  },
+  {
+   "nombre": "e1enf_cubo",
+   "modelo": "wooden_bucket_02",
+   "pos": [
+    7355,
+    2890,
+    150
+   ],
+   "giro": 0,
+   "pequeno": true
+  },
+  {
+   "nombre": "e1pla_vehiculo_0",
+   "modelo": "covered_car",
+   "pos": [
+    7150,
+    4520,
+    150
+   ],
+   "giro": 90
+  },
+  {
+   "nombre": "e1pla_banco_0",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    7350,
+    3720,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1pla_banco_1",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    8450,
+    3720,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1pla_banco_tejadillo",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    8750,
+    3820,
+    150
+   ],
+   "giro": 180
+  },
+  {
+   "nombre": "e1pla_bidon_0",
+   "modelo": "barrel_03",
+   "pos": [
+    8920,
+    4560,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e1pla_bidon_1",
+   "modelo": "Barrel_01",
+   "pos": [
+    8860,
+    4590,
+    150
+   ],
+   "giro": 40
   }
  ],
  "vaciar": {

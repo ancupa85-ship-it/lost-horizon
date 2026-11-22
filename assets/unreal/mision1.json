@@ -501,6 +501,54 @@
    "sonido": "candado",
    "texto": "trampilla",
    "segundos": 9.0
+  },
+  {
+   "id": "tablon_hangar",
+   "nota": "tablon de turnos del taller, muro oeste del hangar (tanda E1)",
+   "pos": [
+    4100,
+    6640,
+    0
+   ],
+   "radio": 150,
+   "aviso": "p_tablon",
+   "pone": "vio_tablon",
+   "repetible": true,
+   "sonido": "recoger",
+   "texto": "tablon_hangar",
+   "segundos": 9.0
+  },
+  {
+   "id": "fichas_medicas",
+   "nota": "fichas de la mesa de la enfermeria (tanda E1): LH-04 Vidal y LH-08 en blanco",
+   "pos": [
+    7790,
+    3360,
+    0
+   ],
+   "radio": 150,
+   "aviso": "p_fichas",
+   "pone": "vio_fichas",
+   "repetible": true,
+   "sonido": "recoger",
+   "texto": "fichas_medicas",
+   "segundos": 10.0
+  },
+  {
+   "id": "camara_fria",
+   "nota": "puerta de la camara frigorifica de la enfermeria (tanda E1): candado, no se abre",
+   "pos": [
+    8080,
+    3105,
+    0
+   ],
+   "radio": 140,
+   "aviso": "p_camara_fria",
+   "pone": "vio_camara_fria",
+   "repetible": true,
+   "sonido": "candado",
+   "texto": "camara_fria",
+   "segundos": 6.0
   }
  ],
  "textos": {
@@ -851,7 +899,13 @@
   "ensena_escucha": "A LA ESCUCHA\nCon la base tranquila, la emisora deja oir lo que hablan los soldados cuando se cruzan en sus rondas.\nQuedate junto a ella y espera.",
   "escucha_quien": "EMISORA - {0}",
   "escucha_nada": "(Emisora: solo estatica. Nadie habla ahora. Espera.)",
-  "intro_rotulo": "BASE DE TARSIS. MURO NORTE\n29 DE NOVIEMBRE DE 1983. 23:10"
+  "intro_rotulo": "BASE DE TARSIS. MURO NORTE\n29 DE NOVIEMBRE DE 1983. 23:10",
+  "p_tablon": "E   LEER EL TABLON DE TURNOS",
+  "tablon_hangar": "TURNOS - TALLER\n\"Santana: junta de culata, pendiente de pieza. NO SE SACA.\nCamion de suministros: para ante el hangar. Se descarga y no se mira.\nTrampilla y cajas LH: NO SE TOCAN sin orden de Control.\"\nEn la lista de mecanicos hay un nombre tachado a boligrafo.",
+  "p_fichas": "E   LEER LAS FICHAS MEDICAS",
+  "fichas_medicas": "FICHAS MEDICAS\nLH-04 - VIDAL, J. Varon. Apto. Un sello de octubre: \"Traslado a nivel -2\". Sin firma del medico.\nLH-08 - Sin nombre ni datos. Solo el numero y otro sello: RESERVADO.",
+  "p_camara_fria": "E   PUERTA METALICA",
+  "camara_fria": "CAMARA FRIA\nCerrada con candado. Hace frio al lado de la puerta."
  },
  "datos": [
   {
