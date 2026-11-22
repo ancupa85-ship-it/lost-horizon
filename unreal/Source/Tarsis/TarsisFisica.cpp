@@ -21,9 +21,11 @@
 #include "Components/PoseableMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
 #include "PhysicsEngine/PhysicsAsset.h"
+#include "TimerManager.h"
 
 namespace
 {
@@ -90,8 +92,30 @@ void ATarsisGuard::PhysicsBodies(bool bOn)
 	}
 	else
 	{
-		M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		// tanda D: precalentado, los cuerpos se quedan creados (cinematicos, solo fisica): asi el siguiente arranque no
+		// los tiene que crear de golpe
+		M->SetCollisionEnabled(bPhysWarm ? ECollisionEnabled::PhysicsOnly : ECollisionEnabled::NoCollision);
 	}
+}
+
+void ATarsisGuard::PhysicsWarm()
+{
+	// tanda D: el tiron al arrancar la fisica era crear los cuerpos del PA y el componente de animacion fisica la primera
+	// vez. Se hace al entrar en el radio de la fisica (PhysicsNear), un guardia por fotograma como mucho
+	USkeletalMeshComponent* M = GetMesh();
+	if (bPhysWarm || !M || !GaspBody || !M->GetPhysicsAsset() || M->IsRunningParallelEvaluation()) return;
+	const double T0 = FPlatformTime::Seconds();
+	bPhysWarm = true;
+	PhysicsBodies(true);
+	M->SetAllBodiesSimulatePhysics(false);
+	M->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+	if (!PhysAnim)
+	{
+		PhysAnim = NewObject<UPhysicalAnimationComponent>(this, TEXT("AnimacionFisica"));
+		PhysAnim->RegisterComponent();
+		PhysAnim->SetSkeletalMeshComponent(M);
+	}
+	PhysWarmMs = (FPlatformTime::Seconds() - T0) * 1000.0;
 }
 
 void ATarsisGuard::HitReact(FVector Dir, bool bHeavy)
@@ -171,6 +195,8 @@ void ATarsisGuard::StartRagdoll()
 	M->WakeAllRigidBodies();
 	// sigue cayendo como iba (andando, o empujado por el dardo)
 	M->SetAllPhysicsLinearVelocity((GetVelocity() * 0.7f + PendingFallDir * RagdollPush).GetClampedToMaxSize(500.0f));
+	// tanda D: de que lado queda el pecho, medido de pie (para saber luego si cae boca arriba o boca abajo)
+	FrontSign = FVector::DotProduct(BodyFront(), GetActorForwardVector()) >= 0.0f ? 1.0f : -1.0f;
 	PendingFallDir = FVector::ZeroVector;
 	bRagdoll = true;
 	bRagdollSlept = false;
@@ -192,7 +218,9 @@ void ATarsisGuard::StopRagdoll(bool bBlend)
 	}
 	const FVector P = PelvisLocation();
 	const FVector H = M->GetBoneIndex(TEXT("head")) != INDEX_NONE ? M->GetBoneLocation(TEXT("head")) : P + GetActorForwardVector();
-	FVector Face = H - P;
+	// tanda D: boca arriba se incorpora y se levanta mirando hacia los pies; boca abajo, hacia donde tiene la cabeza
+	bLastFaceUp = (BodyFront() * FrontSign).Z > 0.0f;
+	FVector Face = bLastFaceUp ? P - H : H - P;
 	Face.Z = 0.0f;
 	M->SetAllBodiesSimulatePhysics(false);
 	PhysicsBodies(false);
@@ -205,12 +233,51 @@ void ATarsisGuard::StopRagdoll(bool bBlend)
 	bRagdollSlept = false;
 	bPhysDragged = false;
 	WakeT = WakeFrom.Num() > 0 ? WakeBlendSeconds : 0.0f;
+	// tanda D: no hay animaciones de levantarse en el GASP: de la pose del suelo a agachado (la mezcla de WakeBlendTick)
+	// y de agachado a de pie (el GASP), quieto mientras tanto
+	if (bBlend && GaspBody)
+	{
+		if (UCharacterMovementComponent* CM = GetCharacterMovement()) CM->GetNavAgentPropertiesRef().bCanCrouch = true;
+		Crouch();
+		GetUpT = GetUpKneelSeconds;
+		HoldT = FMath::Max(HoldT, GetUpKneelSeconds + 0.5f);
+	}
+}
+
+FVector ATarsisGuard::BodyFront() const
+{
+	// el pecho: de la columna (pelvis a cabeza) por la linea de los hombros
+	const USkeletalMeshComponent* M = GetMesh();
+	if (!M || M->GetBoneIndex(TEXT("clavicle_l")) == INDEX_NONE || M->GetBoneIndex(TEXT("clavicle_r")) == INDEX_NONE || M->GetBoneIndex(TEXT("head")) == INDEX_NONE) return GetActorForwardVector();
+	const FVector Sp = M->GetBoneLocation(TEXT("head")) - M->GetBoneLocation(GPelvis);
+	const FVector Sh = M->GetBoneLocation(TEXT("clavicle_l")) - M->GetBoneLocation(TEXT("clavicle_r"));
+	return FVector::CrossProduct(Sp, Sh).GetSafeNormal();
 }
 
 void ATarsisGuard::PhysicsTick(float DeltaSeconds)
 {
 	USkeletalMeshComponent* M = GetMesh();
 	if (!M) return;
+	// tanda D: precalentar al entrar en el radio de la fisica (uno por fotograma en toda la base)
+	if (!bPhysWarm && bPhysicsRule && bPhysWarmRule && GaspBody)
+	{
+		static uint64 GWarmFrame = 0;
+		// fuera del tick: en mitad del tick la animacion de la malla puede estar evaluandose en otro hilo, y crear los
+		// cuerpos entonces espera a esa tarea (al relevo, creado en partida, lo colgaba). El temporizador del siguiente
+		// fotograma corre cuando ya han acabado todos los grupos de tick
+		if (GWarmFrame != GFrameCounter && PhysicsCanRun())
+		{
+			GWarmFrame = GFrameCounter;
+			TWeakObjectPtr<ATarsisGuard> Self(this);
+			GetWorldTimerManager().SetTimerForNextTick([Self]() { if (Self.IsValid()) Self->PhysicsWarm(); });
+		}
+	}
+	// tanda D: levantandose: agachado un momento (el GASP pasa de agachado a de pie con su transicion)
+	if (GetUpT > 0.0f)
+	{
+		GetUpT -= DeltaSeconds;
+		if (GetUpT <= 0.0f && bIsCrouched && !bPetting) UnCrouch();
+	}
 	// la reaccion de Lyra: al acabar, el ABP del GASP otra vez (si sigue de pie)
 	if (HitAnimT > 0.0f)
 	{

@@ -87,6 +87,54 @@ struct FTarsisObjective
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis") FName Text;
 };
 
+// tanda D: una huella en el suelo (TarsisHuellas.cpp). Seq: orden en que se dejaron (el rastro se sigue por el).
+struct FTarsisPrint
+{
+	FVector Loc = FVector::ZeroVector;
+	float Yaw = 0.0f;
+	float Age = 1e9f;
+	float Strength = 0.0f;
+	int32 Seq = 0;
+	bool bWet = false;
+	bool bWolf = false;
+	bool bSeen = false;
+	bool bLeft = false;
+};
+
+// tanda D: un puesto fijo (torre) y su relevo (TarsisRelevo.cpp). Phase: 0 esperando su hora, 1 el relevo va al pie de
+// la escalera, 2 charla con el santo y sena, 3 el saliente se va y el relevo sube, 4 el saliente entra en el barracon,
+// 10 el puesto estaba vacio (busca y avisa)
+struct FTarsisPost
+{
+	FString Name;
+	TWeakObjectPtr<class ATarsisGuard> Sentry;
+	TWeakObjectPtr<class ATarsisGuard> Relief;
+	TWeakObjectPtr<class ATarsisGuard> Leaving;
+	TWeakObjectPtr<class AActor> Light;
+	FVector Loc = FVector::ZeroVector;
+	FRotator Rot = FRotator::ZeroRotator;
+	FVector Ladder = FVector::ZeroVector;
+	float NextAt = 0.0f;
+	float T = 0.0f;
+	float Wait = 0.0f;
+	float EmptySince = 0.0f;
+	int32 Phase = 0;
+	int32 Line = 0;
+	bool bHeard = false;
+	bool bMurmur = false;
+	bool bGone = false;
+	bool bRadioed = false;
+	bool bMissing = false;
+};
+
+// tanda D: una mancha de suelo blando (barro o agua) donde quedan huellas
+struct FTarsisSoft
+{
+	TWeakObjectPtr<class UDecalComponent> Decal;
+	bool bWater = false;
+	bool bRain = false;
+};
+
 // tanda A, novena: que escena de detencion se esta viendo (TarsisCapturaEscena.cpp)
 enum class ETarsisSceneKind : uint8 { None, Rendido, Golpe };
 
@@ -1496,6 +1544,11 @@ public:
 	float DogPetLieT = 0.0f;
 	FVector DogPrevLoc = FVector::ZeroVector;
 	void DogPoseTick();
+	/** Tanda D: en las esquinas del camino, el lobo se aparta del muro hasta esto (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogWallClear = 70.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogCornerPushes = 0;
 	void DogWagTick(float Dt);
 	TArray<FName> DogTailBones;
 	float DogWagW = 0.0f;
@@ -1519,6 +1572,193 @@ public:
 	int32 DogBarkN = 0;
 	int32 DogAnimNow = -1;
 	FVector FlareDrift = FVector::ZeroVector;
+
+	// ---- tanda D: huellas (TarsisHuellas.cpp). En lo blando (barro, charcos, hierba con lluvia) y, al salir de un
+	// charco, unas pisadas mojadas en lo duro. Los guardias que las ven siguen el rastro; las del lobo, no
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	bool bPrintRule = true;
+	/** Cuantas calcomanias de huella hay como mucho (la mas vieja se reutiliza). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	int32 PrintPool = 64;
+	/** Segundos que tarda en borrarse una huella (con lluvia, PrintRainMul veces antes). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	float PrintLife = 180.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	float PrintRainMul = 2.5f;
+	/** Agachado, la huella queda asi de fuerte (0-1). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	float PrintCrouch = 0.45f;
+	/** Pisadas mojadas al salir de un charco. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	int32 PrintWetSteps = 20;
+	/** Un guardia ve una huella a menos de esto (cm), de frente, con luz suficiente (o con la linterna), tras mirarla
+	 *  PrintNoticeSeconds; sigue el rastro dando un recado de PrintStepSeconds por huella. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	float PrintSeeDist = 800.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	float PrintMinLight = 0.18f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	float PrintNoticeSeconds = 0.8f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Huellas")
+	float PrintStepSeconds = 9.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 PrintsMade = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 WolfPrintsMade = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 PrintsSeen = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 WolfPrintsSeen = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 TracksStarted = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 TracksFinished = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 TrackSteps = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	int32 WetStepsLeft = 0;
+	/** Lo que paso con la ultima pisada: blando, mojada, agua o duro. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	FString LastPrintKind;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	FString LastTrackGuard;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	int32 PrintsActive() const;
+	/** La huella Back pisadas atras (0 la ultima): donde esta y lo fuerte que se ve ahora (0 borrada). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	FVector PrintLocation(int32 Back) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	float PrintFade(int32 Back) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	int32 SoftPatchCount() const { return SoftPatches.Num(); }
+	/** Calcomanias de huella creadas (el anillo: nunca mas de PrintPool). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	int32 PrintDecalCount() const { return PrintDecals.Num(); }
+	/** Para las pruebas: el centro de la mancha blanda i, si es agua y si solo sale con lluvia. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	FVector SoftPatchCenter(int32 i) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	bool SoftPatchWater(int32 i) const { return SoftPatches.IsValidIndex(i) && SoftPatches[i].bWater; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	bool SoftPatchRain(int32 i) const { return SoftPatches.IsValidIndex(i) && SoftPatches[i].bRain; }
+	/** Para las pruebas: una pisada de Cuttlas en Where, como si anduviera hacia Yaw. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Huellas")
+	void TestFootstep(FVector Where, float Yaw, bool bCrouched);
+	/** Para las pruebas: el lobo pisa en Where. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Huellas")
+	void TestWolfstep(FVector Where, float Yaw) { LeavePrint(Where, Yaw, false, true, true); }
+	/** Para las pruebas: envejece todas las huellas Seconds segundos. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Huellas")
+	void TestAgePrints(float Seconds) { for (FTarsisPrint& P : Prints) { P.Age += Seconds; } PrintFadeT = 0.0f; }
+	/** Si Where es suelo blando (y si es agua). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Huellas")
+	bool IsSoftGround(FVector Where) const { bool bW = false; return SoftGroundAt(Where, bW); }
+	/** Para las pruebas: por que ese guardia no ve ahora ninguna huella ("" si ve una). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Huellas")
+	FString PrintSightWhy(ATarsisGuard* G);
+	/** La huella que G puede ver ahora (la de mas puntuacion) o INDEX_NONE; Why dice por que no. */
+	int32 PrintBestFor(ATarsisGuard* G, float& BestScore, FString* Why);
+	void ScanSoftGround();
+	bool SoftGroundAt(const FVector& Foot, bool& bWater) const;
+	void PlayerFootprint(class ACharacter* C);
+	void LeavePrint(const FVector& Foot, float Yaw, bool bCrouched, bool bWolf, bool bLeft);
+	void PrintTick(float DeltaSeconds);
+	void PrintSightTick(float DeltaSeconds);
+	void PrintsNoticed(class ATarsisGuard* G, int32 Index);
+	bool StartTrack(class ATarsisGuard* G, int32 Index);
+	void TrackTick(float DeltaSeconds);
+	void WolfFootprint();
+	TArray<FTarsisPrint> Prints;
+	UPROPERTY()
+	TArray<TObjectPtr<class UDecalComponent>> PrintDecals;
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> PrintMids;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInterface> PrintMat;
+	TArray<FTarsisSoft> SoftPatches;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, float> PrintNotice;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, int32> Tracks;
+	int32 PrintNext = 0;
+	int32 PrintSeq = 0;
+	bool bPrintLeft = false;
+	bool bSoftScanned = false;
+	float PrintFadeT = 0.0f;
+	float PrintSightT = 0.0f;
+	float WolfStride = 0.0f;
+	FVector WolfPrintPrev = FVector::ZeroVector;
+	bool bWolfPrintLeft = false;
+
+	// ---- tanda D: relevo de los puestos fijos (TarsisRelevo.cpp)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	bool bReliefRule = true;
+	/** Cada cuanto se releva cada torre (s) y cuando el primero (los demas, escalonados). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	float ReliefEvery = 480.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	float ReliefFirst = 90.0f;
+	/** De donde sale el relevo y adonde vuelve el saliente (dentro del barracon oeste); el cuadrante, en su pared. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	FVector BarracksLoc = FVector(1500.0f, 2500.0f, 0.0f);
+	/** Tras la charla el relevo espera (fuma) entre ReliefWaitMin y ReliefWaitMax s y tarda ReliefClimbSeconds en subir:
+	 *  con la charla, la ventana del puesto vacio queda en 20-40 s. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	float ReliefWaitMin = 4.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	float ReliefWaitMax = 16.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	float ReliefClimbSeconds = 4.0f;
+	/** Puesto vacio: si el centinela no aparece en estos segundos, la base se pone en tension. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	float ReliefMissingSeconds = 60.0f;
+	/** La hora a la que empieza la mision (para el cuadrante), y que noche es (cambia el santo y sena). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	float ClockStartHour = 1.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Relevo")
+	int32 ReliefNight = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	FString PasswordA;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	FString PasswordB;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	int32 ReliefsSpawned = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	int32 ReliefsDone = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	int32 ReliefRadioCalls = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	int32 ReliefMissingAlerts = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	int32 ReliefLinesHeard = 0;
+	/** Segundos que estuvo vacio el puesto en el ultimo relevo. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	float LastReliefWindow = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Relevo")
+	FVector RosterLoc = FVector::ZeroVector;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Relevo")
+	int32 ReliefPostCount() const { return ReliefPosts.Num(); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Relevo")
+	int32 ReliefPhase(int32 Index) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Relevo")
+	bool ReliefPostEmpty(int32 Index) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Relevo")
+	float ReliefNextIn(int32 Index) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Relevo")
+	class ATarsisGuard* ReliefSentry(int32 Index) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Relevo")
+	class ATarsisGuard* ReliefGuard(int32 Index) const;
+	/** Para las pruebas: que el relevo de ese puesto salga ya. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Relevo")
+	void ForceRelief(int32 Index);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Relevo")
+	FString ClockText(float Seconds) const;
+	void SetupRelief();
+	void ReliefTick(float DeltaSeconds);
+	void ReliefTexts();
+	void ReliefSay(FTarsisPost& P, class ATarsisGuard* G, const FString& Line);
+	class ATarsisGuard* SpawnRelief(class ATarsisGuard* Src, const FVector& At);
+	TArray<FTarsisPost> ReliefPosts;
+	bool bReliefReady = false;
+	float ReliefTextT = 0.0f;
 
 	/** Dia (true) o noche. La mision 1 es de noche; la de los inspectores sera de dia. Se cambia en Pausa. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Dia")

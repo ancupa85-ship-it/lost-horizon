@@ -473,6 +473,23 @@ public:
 	FTransform RifleCSNow = FTransform::Identity;   // el fusil, en el espacio de la malla visible, tras el IK
 	bool bRifleAim = false;
 	bool RifleHoldTransform(FTransform& Out) const;
+	/** Tanda D: el fusil a la espalda acariciando al lobo; la altura de la persona para escalar los sitios del fusil; y el
+	 *  brazo que no se estira de mas (RifleMaxReach del largo del brazo). */
+	bool RifleSlungTick(float DeltaSeconds);
+	bool bRifleSlung = false;
+	float RiflePersonaScale = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleRefShoulder = 145.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleMaxReach = 0.94f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleSlingBack = 16.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armas")
+	int32 RifleReachClamps = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	bool RifleOnBack() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	float PersonaScale() const { return RiflePersonaScale; }
 	void RifleArmIK(int32 Side, const FVector& Target, const FTransform* HandCS, float W);
 	void SetupRifle();
 	void RifleTick(float DeltaSeconds);
@@ -504,6 +521,12 @@ public:
 	float PetSeconds = 6.0f;
 	FVector PetDog = FVector::ZeroVector;
 	void PetTick(float DeltaSeconds);
+	/** Tanda D: relevo. Baja de la torre (queda como guardia de suelo al pie, Ground) o sube a tomar el puesto de From. */
+	void LeaveTowerPost(const FVector& Ground);
+	void TakeTowerPost(ATarsisGuard* From, const FVector& Post, const FRotator& Rot, AActor* Light);
+	/** Tanda D: va siguiendo un rastro de huellas (lo lleva el director). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Huellas")
+	bool bTrackingPrints = false;
 	/** Tanda C: adónde va la mano izquierda al acariciar (el lomo del lobo con un vaivén; lo pone el director). */
 	FVector PetHandWorld = FVector::ZeroVector;
 	float PetHandW = 0.0f;
@@ -590,6 +613,26 @@ public:
 	bool PhysicsCanRun() const;
 	void LoadHitAnims();
 	void PhysicsBodies(bool bOn);
+	// tanda D: precalentar los cuerpos, levantarse por agachado, y de que lado quedo
+	void PhysicsWarm();
+	FVector BodyFront() const;
+	bool bPhysWarm = false;
+	float FrontSign = 1.0f;
+	float GetUpT = 0.0f;
+	bool bLastFaceUp = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	bool bPhysWarmRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float GetUpKneelSeconds = 0.9f;
+	/** Lo que tardo en precalentar sus cuerpos (ms). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Fisica")
+	float PhysWarmMs = 0.0f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool PhysicsWarmed() const { return bPhysWarm; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool LastFaceUp() const { return bLastFaceUp; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool GettingUp() const { return GetUpT > 0.0f || WakeT > 0.0f; }
 
 	/** Giro en el sitio parado (TarsisGaspTurn.h): con las piernas a GaspTurnFrom grados o más de donde mira, WantsToAim
 	 *  un momento para que el ABP gire en el sitio. Más bajo que en Cuttlas: el guardia va en modo «orientar al

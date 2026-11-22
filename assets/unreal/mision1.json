@@ -656,6 +656,21 @@
   "voz_pase": "Todo en orden. Tira.",
   "voz_registro": "Hay orden de mirar la carga. Abre atras.",
   "voz_lobo": "Que haces suelto, chucho? Ven aqui... ven.",
+  "voz_huellas": "Huellas... de bota. Frescas. Alguien ha pasado por aqui.",
+  "voz_huellas_perro": "Bah. Las del perro, otra vez suelto.",
+  "voz_rastro_fin": "Aqui se pierden. Tiene que estar cerca.",
+  "voz_relevo_alto": "Alto. Santo y sena.",
+  "voz_relevo_vacio": "Y el de la torre? ... Eh! Donde te has metido?",
+  "voz_relevo_control": "Control, aqui el relevo. El puesto esta vacio. Busco por la zona.",
+  "relevo_l0": "Alto. Santo y sena.",
+  "relevo_l3": "Todo tranquilo. El foco tira a la izquierda. Ahi lo tienes.",
+  "relevo_murmullo": "(Al pie de la torre hablan en voz baja: el relevo.)",
+  "radio_relevo": "Recibido, relevo. Busca a {0} por la zona. Si no aparece, avisa.",
+  "radio_falta": "A todas las unidades: falta {0}. Puede haber alguien dentro. Ojos abiertos.",
+  "p_cuadrante": "E   LEER EL CUADRANTE DE RELEVOS",
+  "nota_cuadrante": "CUADRANTE DE RELEVOS\nCada torre se releva cada ocho minutos.",
+  "dt_relevo_santo": "Santo y sena de esta noche: se oye en el relevo de las torres.",
+  "dt_relevo_cuadrante": "El cuadrante del barracon dice cuando se releva cada torre.",
   "ensena_sombra": "TU SOMBRA TE DELATA\nBajo una luz, tu sombra llega antes que tu. Agachate, quedate quieto o rodea la luz.",
   "codec_menu": "RADIO - ELIGE FRECUENCIA",
   "codec_colgar": "{0}    colgar",
@@ -942,6 +957,18 @@
    "ficha": "Vega",
    "texto": "dt_bengala_torres",
    "clase": "costumbre"
+  },
+  {
+   "id": "relevo_santo",
+   "ficha": "Relevos",
+   "texto": "dt_relevo_santo",
+   "clase": "costumbre"
+  },
+  {
+   "id": "relevo_cuadrante",
+   "ficha": "Relevos",
+   "texto": "dt_relevo_cuadrante",
+   "clase": "horario"
   }
  ],
  "charlas": [

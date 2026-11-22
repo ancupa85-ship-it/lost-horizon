@@ -154,6 +154,7 @@ void ATarsisDirector::DogPoseTick()
 	USkeletalMeshComponent* Cur = DogCur == 0 ? DogMesh.Get() : DogMeshB.Get();
 	USkeletalMeshComponent* Prev = DogCur == 0 ? DogMeshB.Get() : DogMesh.Get();
 	if (!DogVis || !Cur) return;
+	WolfFootprint();   // tanda D: en el barro tambien deja huellas (las del perro: no alarman)
 	// tanda C: al paso de la animacion (la velocidad de verdad entre la de la animacion) para que no patine
 	const float Dt = FMath::Max(DogDt, 1e-4f);
 	DogSpeedNow = FMath::FInterpTo(DogSpeedNow, FVector::Dist2D(DogLoc, DogPrevLoc) / Dt, Dt, 10.0f);
@@ -288,6 +289,22 @@ bool ATarsisDirector::DogPathTo(const FVector& Goal)
 		DogPathLen += FVector::Dist2D(Prev, P);
 		Prev = P;
 		DogPath.Add(P);
+	}
+	// tanda D: el navmesh es el de los guardias y el lobo es largo: en las esquinas rozaba el muro. Cada punto de en medio
+	// se aparta de lo que tenga cerca (ocho rayos de DogWallClear a media altura)
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLoboEsquina), false, this);
+	if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
+	for (int32 k = 1; k + 1 < DogPath.Num(); ++k)
+	{
+		FVector Push = FVector::ZeroVector;
+		const FVector At = DogPath[k] + FVector(0.0f, 0.0f, 40.0f);
+		for (int32 a = 0; a < 8; ++a)
+		{
+			const FVector Dir = FRotator(0.0f, a * 45.0f, 0.0f).Vector();
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, At, At + Dir * DogWallClear, ECC_Visibility, Q)) Push -= Dir * (DogWallClear - Hit.Distance);
+		}
+		if (!Push.IsNearlyZero()) { DogPath[k] += Push.GetClampedToMaxSize(DogWallClear); ++DogCornerPushes; }
 	}
 	return true;
 }

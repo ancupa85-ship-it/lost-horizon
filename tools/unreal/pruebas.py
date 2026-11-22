@@ -3423,6 +3423,7 @@ def prueba_fisica():
     # 4. despertar: de la fisica a la animacion, mezclando
     h.wake_now(); yield 0.1
     check('al despertar, de la pose tumbada a la animada mezclando', not h.is_ragdoll() and h.wake_blending(), '%s %s' % (h.is_ragdoll(), h.wake_blending()))
+    check('tanda D: se levanta pasando por agachado (boca arriba o abajo)', h.getting_up() and h.get_editor_property('is_crouched'), 'boca %s, agachado %s' % ('arriba' if h.last_face_up() else 'abajo', h.get_editor_property('is_crouched')))
     yield 1.5
     check('y de pie', estado(h) != 'DOWN' and not h.wake_blending() and h.pelvis_location().z - suelo(h) > 70, '%s, pelvis a %.0f cm' % (estado(h), h.pelvis_location().z - suelo(h)))
     # 5. lejos del jugador, sin fisica (la animacion de siempre)
@@ -3430,6 +3431,9 @@ def prueba_fisica():
     k.set_editor_property('knock_out_time', 100.0)
     k.knock_out(); yield 0.5
     check('lejos del jugador, cae sin fisica (ahorro)', estado(k) == 'DOWN' and not k.is_ragdoll(), '%s %s' % (estado(k), k.is_ragdoll()))
+    # tanda D: los cuerpos de los de cerca, ya creados antes de hacer falta (sin tiron al arrancar la fisica)
+    calientes = [x for x in guardias() if x.uses_gasp() and x.physics_warmed()]
+    check('tanda D: fisica precalentada en los de cerca', len(calientes) >= 2, ['%s %.1f ms' % (x.get_actor_label(), x.get_editor_property('phys_warm_ms')) for x in calientes][:4])
     k.wake_now()
     for x in guardias():
         x.hold(0.0)
@@ -3562,6 +3566,7 @@ def prueba_lobo_caricia():
     check('el lobo se queda quieto mientras (tanda C: de pie, dejandose)', math.hypot(l1.x - l0.x, l1.y - l0.y) < 5 and d.dog_anim_index() in (0, 2, 3), '%.0f cm, anim %s' % (math.hypot(l1.x - l0.x, l1.y - l0.y), d.dog_anim_index()))
     mano = (p.left_hand_location() - d.dog_back_location()).length()
     check('tanda C: con la mano sobre el lomo', p.pet_hand_weight() > 0.9 and mano < 30, 'mano a %.0f cm del lomo, peso %.2f' % (mano, p.pet_hand_weight()))
+    check('tanda D: con el fusil a la espalda (no vertical en la mano)', p.rifle_on_back(), p.rifle_on_back())
     check('tanda C: y el lobo mueve la cola', d.dog_wagging() > 0.5, '%.2f' % d.dog_wagging())
     yield ('hasta', lambda: not p.is_petting(), 8.0)
     yield 0.3
@@ -3571,6 +3576,175 @@ def prueba_lobo_caricia():
     p.set_actor_location(V(l.x - 250, l.y, p.get_actor_location().z), False, True)
     yield 2.0
     check('no repite enseguida (DogPetCooldown)', d.dog_petter() != p, d.dog_petter().get_actor_label() if d.dog_petter() else None)
+
+def prueba_huellas():
+    """Tanda D. Huellas: en el barro y los charcos (y la hierba con lluvia) Cuttlas deja huellas que se borran solas;
+    agachado, mas tenues; en suelo duro, ninguna, salvo las pisadas mojadas al salir de un charco. Un guardia tranquilo
+    que ve una huella fresca con luz sigue el rastro en orden y, en la ultima, busca. Las del lobo no alarman."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.5
+    d.set_day(True)
+    yield 0.5
+    n = d.soft_patch_count()
+    check('hay suelo blando (barro y charcos de las tandas 22 y 23)', n > 10, n)
+    barro = [d.soft_patch_center(i) for i in range(n) if not d.soft_patch_water(i) and not d.soft_patch_rain(i)]
+    agua = [d.soft_patch_center(i) for i in range(n) if d.soft_patch_water(i) and not d.soft_patch_rain(i)]
+    check('barro y agua sin lluvia', len(barro) > 0 and len(agua) > 0, '%d barro, %d agua' % (len(barro), len(agua)))
+    if not barro or not agua:
+        return
+    m0 = P('prints_made')
+    b = barro[0]
+    d.test_footstep(V(b.x, b.y, b.z), 0.0, False)
+    check('en el barro queda una huella', P('prints_made') == m0 + 1 and str(P('last_print_kind')) == 'blando' and d.print_fade(0) > 0.9, '%s %s %.2f' % (P('prints_made') - m0, P('last_print_kind'), d.print_fade(0)))
+    d.test_footstep(V(b.x + 10, b.y, b.z), 0.0, True)
+    check('agachado, mas tenue', 0.2 < d.print_fade(0) < 0.6, '%.2f' % d.print_fade(0))
+    # suelo duro (la losa del patio central)
+    m1 = P('prints_made')
+    d.test_footstep(V(4300, 3500, 2), 0.0, False)
+    check('en suelo duro (y seco), ninguna', P('prints_made') == m1 and str(P('last_print_kind')) == 'duro', '%s %s' % (P('prints_made') - m1, P('last_print_kind')))
+    # el charco: al salir, pisadas mojadas que se van secando
+    a = agua[0]
+    d.test_footstep(V(a.x, a.y, a.z), 0.0, False)
+    check('en el agua no queda huella, pero sales mojado', str(P('last_print_kind')) == 'agua' and P('wet_steps_left') == P('print_wet_steps'), '%s %s' % (P('last_print_kind'), P('wet_steps_left')))
+    d.test_footstep(V(4300, 3500, 2), 0.0, False)
+    f1 = d.print_fade(0)
+    for k in range(8):
+        d.test_footstep(V(4300 + 70 * (k + 1), 3500, 2), 0.0, False)
+    f9 = d.print_fade(0)
+    check('al salir del charco, pisadas mojadas en lo duro que se van secando', str(P('last_print_kind')) == 'mojada' and f1 > f9 > 0.0, '%.2f > %.2f' % (f1, f9))
+    for k in range(20):
+        d.test_footstep(V(5000 + 70 * k, 3500, 2), 0.0, False)
+    check('a las veinte pisadas ya no deja agua', str(P('last_print_kind')) == 'duro' and P('wet_steps_left') == 0, P('last_print_kind'))
+    # se borran
+    d.test_age_prints(P('print_life'))
+    yield 0.8
+    check('se borran a los tres minutos', d.prints_active() == 0 and d.print_fade(0) == 0.0, '%d activas' % d.prints_active())
+    check('un anillo fijo de calcomanias (no crece)', 0 < d.print_decal_count() <= P('print_pool'), '%d de %d' % (d.print_decal_count(), P('print_pool')))
+    # el rastro: sale de un charco y cruza el patio; un guardia de ronda delante lo ve y lo sigue
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) == 'PATROL']
+    g = ronda[0]
+    s0, t0 = P('tracks_started'), P('tracks_finished')
+    # un sitio despejado: desde el barro, la primera direccion sin nada en 4,5 m por detras (el guardia) ni 10 m por
+    # delante (el rastro). Tanda D: en (4300, 3800) el rastro caia dentro de la caja de colision de un contenedor
+    def _libre(p0, p1):
+        return unreal.SystemLibrary.line_trace_single(mundo(), p0, p1, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [g, jugador()], unreal.DrawDebugTrace.NONE, True) is None
+    rumbo = None
+    for c in barro:
+        for yaw in range(0, 360, 30):
+            f = unreal.MathLibrary.get_forward_vector(unreal.Rotator(0, 0, yaw))
+            if _libre(V(c.x - f.x * 420, c.y - f.y * 420, c.z + 60), V(c.x + f.x * 950, c.y + f.y * 950, c.z + 60)):
+                rumbo = (c, yaw, f)
+                break
+        if rumbo:
+            break
+    check('hay un sitio despejado para el rastro', rumbo is not None, '(%.0f, %.0f) rumbo %d' % (rumbo[0].x, rumbo[0].y, rumbo[1]) if rumbo else None)
+    if rumbo is None:
+        return
+    b0 = b
+    b, yaw, f = rumbo
+    # sale de un charco (botas mojadas), pisa el barro y sigue por lo duro: las primeras de barro, luego mojadas
+    d.test_footstep(V(a.x, a.y, a.z), 0.0, False)
+    for k in range(14):
+        lado = 12 if k % 2 else -12
+        d.test_footstep(V(b.x + f.x * 65 * k - f.y * lado, b.y + f.y * 65 * k + f.x * lado, b.z + 2), yaw, False)
+    # de ronda: su recorrido le lleva por encima del rastro (si se le gira a mano, la ronda lo vuelve a girar)
+    pts0 = list(g.get_editor_property('patrol_points'))
+    gz = b.z + 88.0
+    g.set_editor_property('patrol_points', [V(b.x + f.x * 1500, b.y + f.y * 1500, gz), V(b.x + f.x * 1500 + 20, b.y + f.y * 1500, gz)])
+    g.set_actor_location(V(b.x - f.x * 380, b.y - f.y * 380, b.z + 95), False, True)
+    g.set_actor_rotation(unreal.Rotator(0, 0, yaw), False)
+    g.hold(0.0)
+    for k in range(12):
+        yield 1.0
+        if P('tracks_started') > s0:
+            break
+        unreal.log('[Pruebas] traza huellas %d: %s' % (k, d.print_sight_why(g)))
+    check('un guardia ve las huellas y sigue el rastro', P('tracks_started') == s0 + 1 and g.get_editor_property('tracking_prints'), '%s, %s' % (P('tracks_started') - s0, P('last_track_guard')))
+    check('lo dice', 'huellas' in str(P('last_voice')), P('last_voice'))
+    yield ('hasta', lambda: director().get_editor_property('tracks_finished') > t0, 90.0)
+    check('las sigue en orden hasta la ultima y se pone a buscar', P('tracks_finished') == t0 + 1 and P('track_steps') >= 3 and estado(g) in ('SUSPICIOUS', 'SEARCH'), '%d pasos, %s' % (P('track_steps'), estado(g)))
+    g.set_editor_property('patrol_points', pts0)
+    # las del lobo: el perro, no alarman
+    for x in guardias():
+        x.hold(3600.0)
+    d.test_age_prints(P('print_life'))   # las del rastro, borradas: que solo queden las del lobo
+    b = b0
+    yield 0.6
+    w0, s1 = P('wolf_prints_seen'), P('tracks_started')
+    h = ronda[1]
+    for k in range(6):
+        d.test_wolfstep(V(b.x + 40 * k, b.y, b.z), 0.0)
+    h.set_actor_location(V(b.x - 350, b.y, h.get_actor_location().z), False, True)
+    h.set_actor_rotation(unreal.Rotator(0, 0, 0), False)
+    h.hold(0.0)
+    yield ('hasta', lambda: director().get_editor_property('wolf_prints_seen') > w0, 10.0)
+    check('las huellas del lobo: el perro, no las sigue', P('wolf_prints_seen') > w0 and P('tracks_started') == s1, '%d vistas, %d rastros' % (P('wolf_prints_seen') - w0, P('tracks_started') - s1))
+    for x in guardias():
+        x.hold(0.0)
+    d.set_day(False)
+
+def prueba_relevo():
+    """Tanda D. Relevo de las torres: cada puesto, escalonado; el relevo sale del barracon, se dicen el santo y sena al pie
+    de la escalera (de cerca se oye y se apunta) y sube; el puesto queda vacio unos 20-40 s. Si el centinela no esta, el
+    relevo avisa por radio y, al minuto, la base se pone en tension. El cuadrante del barracon apunta los relevos."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    d.set_editor_property('relief_rule', True)
+    aparte(); yield 3.0
+    n = d.relief_post_count()
+    check('un relevo por cada puesto de torre', n >= 4, n)
+    if n < 4:
+        return
+    nxt = [round(d.relief_next_in(i)) for i in range(n)]
+    check('escalonados (cada puesto a su hora)', len(set(nxt)) == n and max(nxt) - min(nxt) > 60, nxt)
+    check('santo y sena de la noche', str(P('password_a')) != '' and str(P('password_b')) != '', '%s / %s' % (P('password_a'), P('password_b')))
+    for g in guardias():
+        if not g.get_editor_property('tower_sentry'):
+            g.set_editor_property('view_distance', 1.0)
+    d.set_editor_property('relief_wait_min', 6.0); d.set_editor_property('relief_wait_max', 8.0)
+    s0 = d.relief_sentry(0)
+    d.force_relief(0); yield 0.5
+    r = d.relief_guard(0)
+    check('sale el relevo del barracon (copia del centinela)', d.relief_phase(0) == 1 and r is not None and r.has_rifle(), '%s %s' % (d.relief_phase(0), r))
+    yield ('hasta', lambda: director().relief_phase(0) >= 2, 240.0)
+    check('llega y el centinela baja: el puesto queda vacio', d.relief_phase(0) == 2 and d.relief_post_empty(0), '%s %s' % (d.relief_phase(0), d.relief_post_empty(0)))
+    # de cerca: la charla y el santo y sena
+    if r:
+        l = r.get_actor_location()
+        tp(l.x + 120, l.y)
+    yield ('hasta', lambda: director().relief_phase(0) >= 3, 30.0)
+    check('se oye la charla y el santo y sena se apunta en el mapa mental', P('relief_lines_heard') >= 2 and d.fact_known('relevo_santo'), '%d frases' % P('relief_lines_heard'))
+    yield ('hasta', lambda: director().relief_phase(0) in (0, 4), 60.0)
+    s1 = d.relief_sentry(0)
+    check('el relevo sube y queda de centinela', s1 is not None and s1 != s0 and s1.get_editor_property('tower_sentry') and not d.relief_post_empty(0), s1)
+    check('la ventana del puesto vacio, de 20 a 40 s', 18.0 <= P('last_relief_window') <= 42.0, '%.1f s' % P('last_relief_window'))
+    check('el proximo relevo, a su hora', d.relief_next_in(0) > P('relief_every') - 30.0 or d.relief_phase(0) == 4, '%.0f s' % d.relief_next_in(0))
+    aparte()
+    # el puesto vacio: el centinela dormido en la torre
+    d.set_editor_property('relief_missing_seconds', 10.0)
+    c = d.relief_sentry(1)
+    c.set_editor_property('knock_out_time', 300.0)
+    c.knock_out()
+    r0, a0 = P('relief_radio_calls'), P('relief_missing_alerts')
+    d.force_relief(1)
+    yield ('hasta', lambda: director().relief_phase(1) == 10, 240.0)
+    check('el relevo encuentra el puesto vacio', d.relief_phase(1) == 10, d.relief_phase(1))
+    yield ('hasta', lambda: director().get_editor_property('relief_radio_calls') > r0, 10.0)
+    check('busca y avisa por radio a Control', P('relief_radio_calls') == r0 + 1, P('relief_radio_calls'))
+    yield ('hasta', lambda: director().get_editor_property('relief_missing_alerts') > a0, 20.0)
+    check('si no aparece: alerta de nivel 1 (la base lo echa de menos)', P('relief_missing_alerts') == a0 + 1 and d.base_state() >= 1, 'base %s' % d.base_state())
+    # el cuadrante del barracon
+    q = P('roster_loc')
+    tp(q.x, q.y); yield 0.3
+    check('el cuadrante de relevos se lee en el barracon', 'CUADRANTE' in str(d.interact_prompt()), d.interact_prompt())
+    d.interact(); yield 0.3
+    check('y apunta los relevos en el mapa mental', d.fact_known('relevo_cuadrante') and ':' in str(P('message')), str(P('message'))[:60])
+    d.set_editor_property('relief_rule', False)
+    for g in guardias():
+        g.set_editor_property('view_distance', 2000.0)
 
 def prueba_tactica():
     """Tanda 43. Interrogar por la espalda (T) da un dato que le toca a ese guardia y lo deja quieto unos segundos;
@@ -3673,7 +3847,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo]]
 PRUEBAS = []
 
 
@@ -3745,7 +3919,10 @@ def _limpieza(siguiente):
         d.set_editor_property('talk_cross', siguiente is prueba_cruce)   # tanda 47: en las demás, las charlas no salen solas al cruzarse
         d.set_editor_property('aim_held', False)
         d.set_editor_property('third', False)
-        d.set_editor_property('dog', siguiente in (prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia, prueba_lobo_paso))   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
+        d.set_editor_property('dog', siguiente in (prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia, prueba_lobo_paso))
+        # tanda D: las huellas y el relevo, solo en sus pruebas (sacan a los guardias de su sitio y cambian las torres)
+        d.set_editor_property('print_rule', siguiente is prueba_huellas)
+        d.set_editor_property('relief_rule', siguiente is prueba_relevo)   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
         d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
         # tanda 44: la caja que se nota de cerca, solo en su prueba (las de la caja se escribieron pegadas al guardia)
         d.set_editor_property('box_notice_dist', 150.0 if siguiente is prueba_tactica else 0.0)

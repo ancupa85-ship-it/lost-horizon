@@ -249,6 +249,7 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 		if (BodyCheckT > 0.0f) WantLean = 30.0f;   // agachado sobre el cuerpo
 	}
 	if (bPetting && bErrandThere) { Want = Toward(PetDog); WantLean = 30.0f; }   // tanda B: acariciando al lobo, lo mira
+	if (bTrackingPrints) WantLean = 22.0f;   // tanda D: siguiendo huellas, mira al suelo (y la linterna con el)
 	if (State == ETarsisGuardState::Down) { Want = 0.0f; LookYaw = 0.0f; Lean = 0.0f; }
 	LookTarget = FMath::Clamp(Want, -75.0f, 75.0f);
 	LookYaw = FMath::FInterpTo(LookYaw, LookTarget, DeltaSeconds, 4.0f);

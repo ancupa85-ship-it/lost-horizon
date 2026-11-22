@@ -401,6 +401,8 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	FlareTick(DeltaSeconds);
 	TacticsTick(DeltaSeconds);
 	DogTick(DeltaSeconds);
+	PrintTick(DeltaSeconds);   // tanda D: huellas que se borran y guardias que las ven y las siguen
+	ReliefTick(DeltaSeconds);   // tanda D: relevo de las torres
 	AimTick(DeltaSeconds);
 	ThirdTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
@@ -1854,6 +1856,12 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("emisora")) T = TEXT("Quien ha tocado esto? Una valvula floja... Ya casi.");
 	else if (Key == TEXT("registro")) T = TEXT("Hay orden de mirar la carga. Abre atras.");
 	else if (Key == TEXT("lobo")) T = TEXT("Que haces suelto, chucho? Ven aqui... ven.");
+	else if (Key == TEXT("huellas")) T = TEXT("Huellas... de bota. Frescas. Alguien ha pasado por aqui.");
+	else if (Key == TEXT("huellas_perro")) T = TEXT("Bah. Las del perro, otra vez suelto.");
+	else if (Key == TEXT("rastro_fin")) T = TEXT("Aqui se pierden. Tiene que estar cerca.");
+	else if (Key == TEXT("relevo_alto")) T = TEXT("Alto. Santo y sena.");
+	else if (Key == TEXT("relevo_vacio")) T = TEXT("Y el de la torre? ... Eh! Donde te has metido?");
+	else if (Key == TEXT("relevo_control")) T = TEXT("Control, aqui el relevo. El puesto esta vacio. Busco por la zona.");
 	else T = Key;
 	T = Tx(FName(*(TEXT("voz_") + Key)), *T);
 	const FString Name = G->bTowerSentry ? Tx(TEXT("nombre_centinela"), TEXT("CENTINELA")) : G->GuardName.ToUpper();
@@ -1881,6 +1889,7 @@ void ATarsisDirector::SoundTick(ACharacter* C, float DeltaSeconds)
 			PlayerStride = 0.0f;
 			++PlayerSteps;
 			LastStepSurface = SurfaceNames[FMath::Clamp(PlayerSurface, 0, 4)];
+			PlayerFootprint(C);   // tanda D: en lo blando (o con las botas mojadas), una huella
 			StepSound(C->GetActorLocation(), PlayerSurface, C->bIsCrouched ? 0.15f : (bSprint ? 0.8f : 0.45f), false);
 		}
 	}
