@@ -372,6 +372,81 @@ public:
 	bool ScenePlay(class UAnimSequenceBase* A);
 	void SceneEnd();
 
+	// ---- tanda B (TarsisArmas.cpp): el fusil. Un M14 (/Game/Tarsis/Armas/M14/SM_M14, CC0 de Stein Games) en la mano
+	// derecha del cuerpo visible; de cintura para arriba, la pose de fusil de Lyra retargeteada a la persona
+	// (MM_Rifle_Idle_Hipfire_<persona> de ronda, MM_Rifle_Idle_ADS_<persona> en alerta) encima de la locomoción del GASP.
+	/** Apagado, sin fusil (como antes: el fogonazo sale de delante del pecho). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	bool bRifleRule = true;
+	/** Dónde va el fusil respecto al hueso de la mano derecha (cm y grados, en el espacio del hueso). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FVector RifleGripLoc = FVector(-3.0f, 2.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FRotator RifleGripRot = FRotator(2.2f, 130.8f, -64.8f);   // medido en el PC: canon hacia delante y un poco abajo, a la cadera
+	/** El agarre apuntando (pose ADS de Lyra): la mano gira distinto, el canon recto. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FRotator RifleAimGripRot = FRotator(2.6f, 127.9f, -56.1f);
+	/** Mano izquierda al guardamanos con IK de dos huesos (en el espacio del fusil: X lado, Y a lo largo del canon, Z arriba). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	bool bRifleLeftIK = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FVector RifleLeftHand = FVector(-4.0f, 40.0f, -3.0f);
+	/** Cuánto manda la pose de fusil en el torso (los brazos van enteros con ella). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleSpineWeight = 0.6f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	bool HasRifle() const { return Rifle != nullptr; }
+	/** Peso actual de la pose de fusil (0 suelta, 1 entera). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	float RiflePoseWeight() const { return RifleW; }
+	/** La boca del cañón (socket Muzzle del M14); sin fusil, delante del pecho como antes. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	FVector RifleMuzzle() const;
+	/** Apunta con la pose de alerta (la de apuntar con el fusil). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	bool RifleAiming() const { return bRifleAim; }
+	UPROPERTY()
+	TObjectPtr<class UStaticMeshComponent> Rifle;
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> RifleRef;   // la persona oculta que hace la pose de fusil
+	UPROPERTY()
+	TObjectPtr<class UAnimSequenceBase> RifleIdleAnim;
+	UPROPERTY()
+	TObjectPtr<class UAnimSequenceBase> RifleAimAnim;
+	TArray<FName> RifleBones;    // de spine_02 hacia arriba, sin cuello ni cabeza, padres antes que hijos
+	TArray<bool> RifleBoneIsSpine;
+	FName RifleRootBone;         // spine_01: la pose se pone relativa a él
+	float RifleW = 0.0f;
+	float RifleAimW = 0.0f;
+	bool bRifleAim = false;
+	void RifleLeftHandIK(float W);
+	void SetupRifle();
+	void RifleTick(float DeltaSeconds);
+
+	// ---- tanda B (TarsisPerro.cpp): acariciar al lobo amigo. Lo decide el director; el guardia va con un recado (Errand)
+	// hasta el lobo, se agacha mirandolo PetSeconds y vuelve a su ronda. Mientras, mira al suelo: ve mucho menos.
+	/** Lo que ve (fraccion de su vista normal) mientras lo acaricia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Lobo")
+	float PetViewMul = 0.35f;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Lobo")
+	bool StartPet(const FVector& DogAt, float Seconds);
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Lobo")
+	void StopPet();
+	/** Va a acariciarlo o lo esta acariciando. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Lobo")
+	bool IsPetting() const { return bPetting; }
+	/** Ya esta agachado junto al lobo. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Lobo")
+	bool PetCrouched() const { return bPetting && PetT > 0.0f; }
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Lobo")
+	float PetT = 0.0f;
+	/** Cuando acabo de acariciarlo por ultima vez (segundos de mundo). */
+	float PetDoneAt = -1e9f;
+	bool bPetting = false;
+	float PetSeconds = 6.0f;
+	FVector PetDog = FVector::ZeroVector;
+	void PetTick(float DeltaSeconds);
+
 	/** Giro en el sitio parado (TarsisGaspTurn.h): con las piernas a GaspTurnFrom grados o más de donde mira, WantsToAim
 	 *  un momento para que el ABP gire en el sitio. Más bajo que en Cuttlas: el guardia va en modo «orientar al
 	 *  movimiento», sin aim offset, y parado no gira ni el torso; solo la cabeza se adelanta. */

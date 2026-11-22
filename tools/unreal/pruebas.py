@@ -3086,12 +3086,16 @@ def prueba_armados():
     def mira_golpe():
         if director().capture_scene_kind() != 0:
             golpe['tipo'] = director().capture_scene_kind()
+            golpe['pareja'] = str(director().capture_scene_pair())
         golpe['borroso'] = max(golpe['borroso'], director().capture_blur())
         return director().get_editor_property('captures') > c0
     yield ('hasta', mira_golpe, 30.0)
     check('a la tercera herida caes y te llevan', P('captures') == c0 + 1 and P('hits') >= P('max_wounds'), '%s impactos' % P('hits'))
     # tanda A, novena: herido, la escena del golpe (derribo del GASP) con la vista borrosa
     check('herido: detención a golpes, con la vista borrosa', golpe['tipo'] in (0, 2) and (golpe['tipo'] == 0 or golpe['borroso'] > 0.5), golpe)
+    # tanda B: con fusil, el golpe es el culatazo de Lyra; y los tiros suenan según la distancia (7,62 cerca/media/lejos)
+    check('tanda B: con fusil, el golpe es un culatazo', golpe['tipo'] != 2 or golpe.get('pareja') == 'culatazo', golpe)
+    check('tanda B: el último tiro sonó con un 7,62 por distancia', str(P('last_shot_sound')) in ('cerca', 'media', 'lejos'), P('last_shot_sound'))
     yield ('hasta', lambda: not director().get_editor_property('capturing'), 6.0)
     d.set_editor_property('player_speed_override', -1.0)
     check('tras la captura no queda alto ni heridas', P('wounds') == 0 and not P('fleeing'))
@@ -3258,7 +3262,8 @@ def prueba_perro():
     for g in guardias():
         g.hold(3600.0)
     aparte(); yield 1.0
-    check('el perro está en el hangar (modelo importado con sus cuatro animaciones)', d.dog_ready() and d.dog_anim_count() == 4, '%s %s' % (d.dog_ready(), d.dog_anim_count()))
+    # tanda B: es un lobo (Animal Variety Pack) con nueve animaciones; sin el pack, el perro de antes con cuatro
+    check('el lobo está en el hangar (con sus nueve animaciones; o el perro de antes con cuatro)', d.dog_ready() and d.dog_anim_count() == (9 if P('dog_wolf') else 4), '%s lobo %s, %s animaciones, giro %.0f' % (d.dog_ready(), P('dog_wolf'), d.dog_anim_count(), P('dog_mesh_yaw')))
     if not d.dog_ready():
         return
     l0 = d.dog_location()
@@ -3295,6 +3300,136 @@ def prueba_perro():
     cerca(100); yield 5.0
     check('amigo: ni gruñe ni ladra aunque lo pises', P('dog_barks') == b1 and P('dog_state') == 3, '%s %s' % (P('dog_barks'), P('dog_state')))
     jugador().un_crouch()
+
+def prueba_fusil():
+    """Tanda B. Los guardias llevan un M14 en la mano derecha, con la pose de fusil de Lyra de cintura para arriba, y
+    los tiros salen de la boca del cañón (socket Muzzle)."""
+    yield ('hasta', lambda: all(estado(x) == 'PATROL' for x in guardias() if not x.get_editor_property('tower_sentry')), 30.0)
+    yield 2.0
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry')]
+    con = [g for g in ronda if g.has_rifle()]
+    check('los guardias de ronda llevan fusil', len(con) == len(ronda) and len(ronda) > 0, '%d de %d' % (len(con), len(ronda)))
+    pose = [g for g in con if g.rifle_pose_weight() > 0.9]
+    check('y lo sujetan con la pose de fusil', len(pose) == len(con), ['%s %.2f' % (g.get_actor_label(), g.rifle_pose_weight()) for g in con if g.rifle_pose_weight() <= 0.9][:4])
+    mal = []
+    for g in con:
+        m, l, f = g.rifle_muzzle(), g.get_actor_location(), g.get_actor_forward_vector()
+        dl = math.hypot(m.x - l.x, m.y - l.y)
+        delante = (m.x - l.x) * f.x + (m.y - l.y) * f.y
+        if dl > 150 or delante < -10 or not (l.z - 60 < m.z < l.z + 120):
+            mal.append('%s %.0f cm, delante %.0f, z %+.0f' % (g.get_actor_label(), dl, delante, m.z - l.z))
+    check('la boca del cañón, delante del guardia y a la altura de la cadera o el pecho', not mal, mal[:4])
+
+def prueba_lobo_piedra():
+    """Tanda B. El lobo amigo va a por la piedra que tiras (Q) si cae a menos de DogFetchRadius, la coge con la boca, te la
+    trae y la suelta a tus pies. Los guardias siguen yendo a mirar el ruido de la piedra."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    if not d.dog_ready():
+        yield 1.0
+    check('el lobo está', d.dog_ready())
+    if not d.dog_ready():
+        return
+    d.set_flag('perro_amigo'); yield 0.5
+    check('amigo', P('dog_state') == 3, P('dog_state'))
+    hg = json.load(open(os.path.join(ROOT, 'assets', 'unreal', 'base.json'), encoding='utf-8'))['ext']['hangar']
+    cx, cy = (hg['x0'] + hg['x1']) * 50, (hg['y0'] + hg['y1']) * 50
+    l = d.dog_location()
+    # a tu lado, tiras hacia el centro del hangar, un poco hacia abajo (cae a unos 5 m)
+    px, py = l.x + (cx - l.x) * 0.15, l.y + (cy - l.y) * 0.15 - 250
+    tp(px, py)
+    yaw = math.degrees(math.atan2(cy - py, cx - px))
+    unreal.GameplayStatics.get_player_controller(mundo(), 0).set_control_rotation(unreal.Rotator(0.0, -20.0, yaw))
+    yield 0.3
+    f0 = P('dog_fetches')
+    for x in guardias():
+        x.hold(3600.0)   # que nadie venga a por ti por el ruido de la piedra mientras el lobo la trae
+    d.throw_stone(); yield 0.3
+    caida = d.get_editor_property('last_stone')
+    check('la piedra cae a su alcance', math.hypot(caida.x - l.x, caida.y - l.y) < P('dog_fetch_radius'), '%.0f cm' % math.hypot(caida.x - l.x, caida.y - l.y))
+    check('sale corriendo a por ella', P('dog_fetch') == 1 and d.dog_anim_index() == 4, '%s anim %s' % (P('dog_fetch'), d.dog_anim_index()))
+    vistos = {'boca': False, 'lejos_boca': 999.0}
+    def mira():
+        if d.dog_carrying():
+            vistos['boca'] = True
+            dl = d.dog_location(); s = d.dog_stone_location()
+            vistos['lejos_boca'] = min(vistos['lejos_boca'], math.hypot(s.x - dl.x, s.y - dl.y))
+        return director().get_editor_property('dog_fetches') > f0
+    yield ('hasta', mira, 20.0)
+    check('la coge con la boca y te la trae', vistos['boca'] and P('dog_fetches') == f0 + 1, '%s, %s traidas' % (vistos, P('dog_fetches')))
+    pl = jugador().get_actor_location()
+    dl = d.dog_location()
+    check('la suelta a tus pies (y él se queda a tu lado)', math.hypot(dl.x - pl.x, dl.y - pl.y) < 260, '%.0f cm' % math.hypot(dl.x - pl.x, dl.y - pl.y))
+    check('y ya no la lleva', not d.dog_carrying() and P('dog_fetch') == 0, P('dog_fetch'))
+    for x in guardias():
+        x.hold(0.0)
+    # lejos de él no va
+    lejos = d.dog_location()
+    tp(lejos.x, lejos.y - 200)
+    unreal.GameplayStatics.get_player_controller(mundo(), 0).set_control_rotation(unreal.Rotator(0.0, 25.0, -90.0))
+    d.set_editor_property('dog_fetch_radius', 100.0)
+    yield 1.6
+    d.throw_stone(); yield 0.5
+    check('si cae lejos (más que DogFetchRadius) no va', P('dog_fetch') == 0, P('dog_fetch'))
+    d.set_editor_property('dog_fetch_radius', 2500.0)
+
+def prueba_lobo_caricia():
+    """Tanda B. Un guardia tranquilo que ve al lobo amigo cerca cree que es un perro suelto: le habla, va, se agacha y lo
+    acaricia unos segundos (mirando al suelo: ve mucho menos) y vuelve a su ronda; no repite hasta DogPetCooldown. El
+    lobo se queda quieto mientras. Uno en alerta no lo acaricia."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    d.set_flag('perro_amigo')
+    aparte()
+    yield 1.0
+    check('el lobo amigo está', d.dog_ready() and P('dog_state') == 3, P('dog_state'))
+    if not d.dog_ready():
+        return
+    d.set_editor_property('dog_pet_seconds', 6.0)
+    d.dog_forget_pets()
+    yield ('hasta', lambda: any(estado(x) == 'PATROL' and not x.get_editor_property('tower_sentry') for x in guardias()), 20.0)
+    # uno en alerta, al lado del lobo: no lo acaricia
+    l = d.dog_location()
+    libres = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.is_petting()]
+    a = libres[0]
+    a.alarm(V(l.x + 3000, l.y, l.z))
+    yield 0.3
+    a.set_actor_location(V(l.x + 200, l.y, a.get_actor_location().z), False, True)
+    yield 2.0
+    check('uno en alerta no lo acaricia', not a.is_petting() and d.dog_petter() != a, '%s %s' % (estado(a), a.is_petting()))
+    # uno tranquilo, a 2,5 m
+    g = None
+    for x in guardias():
+        if x != a and not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.is_on_errand():
+            g = x
+            break
+    check('hay un guardia tranquilo', g is not None)
+    if g is None:
+        return
+    l = d.dog_location()
+    g.set_actor_location(V(l.x - 250, l.y, g.get_actor_location().z), False, True)
+    yield ('hasta', lambda: d.dog_petter() is not None, 3.0)
+    p = d.dog_petter()
+    check('un guardia tranquilo que lo ve va a acariciarlo', p is not None and p.is_petting(), p.get_actor_label() if p else None)
+    if p is None:
+        return
+    check('y le dice algo al «chucho»', str(P('last_voice')).endswith('_lobo'), P('last_voice'))
+    yield ('hasta', lambda: p.pet_crouched(), 12.0)
+    yield 0.3   # el agachado del CharacterMovement llega un fotograma después
+    l0 = d.dog_location()
+    check('llega, se agacha y lo acaricia', p.pet_crouched() and p.get_editor_property('is_crouched'), '%s %s' % (p.pet_crouched(), p.get_editor_property('is_crouched')))
+    check('al lado del lobo', math.hypot(p.get_actor_location().x - l0.x, p.get_actor_location().y - l0.y) < 180, '%.0f cm' % math.hypot(p.get_actor_location().x - l0.x, p.get_actor_location().y - l0.y))
+    yield 2.0
+    l1 = d.dog_location()
+    check('el lobo se queda quieto mientras', math.hypot(l1.x - l0.x, l1.y - l0.y) < 5 and d.dog_anim_index() == 0, '%.0f cm, anim %s' % (math.hypot(l1.x - l0.x, l1.y - l0.y), d.dog_anim_index()))
+    yield ('hasta', lambda: not p.is_petting(), 8.0)
+    yield 0.3
+    check('a los seis segundos se levanta y vuelve a su ronda', not p.is_petting() and not p.get_editor_property('is_crouched') and not p.is_on_errand() and estado(p) in ('PATROL', 'RETURN'), 'acaricia %s agachado %s recado %s %s' % (p.is_petting(), p.get_editor_property('is_crouched'), p.is_on_errand(), estado(p)))
+    n = P('dog_pets')
+    l = d.dog_location()
+    p.set_actor_location(V(l.x - 250, l.y, p.get_actor_location().z), False, True)
+    yield 2.0
+    check('no repite enseguida (DogPetCooldown)', d.dog_petter() != p, d.dog_petter().get_actor_label() if d.dog_petter() else None)
 
 def prueba_tactica():
     """Tanda 43. Interrogar por la espalda (T) da un dato que le toca a ese guardia y lo deja quieto unos segundos;
@@ -3397,7 +3532,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_fusil]]
 PRUEBAS = []
 
 
@@ -3469,7 +3604,7 @@ def _limpieza(siguiente):
         d.set_editor_property('talk_cross', siguiente is prueba_cruce)   # tanda 47: en las demás, las charlas no salen solas al cruzarse
         d.set_editor_property('aim_held', False)
         d.set_editor_property('third', False)
-        d.set_editor_property('dog', siguiente is prueba_perro)   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
+        d.set_editor_property('dog', siguiente in (prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia))   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
         d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
         # tanda 44: la caja que se nota de cerca, solo en su prueba (las de la caja se escribieron pegadas al guardia)
         d.set_editor_property('box_notice_dist', 150.0 if siguiente is prueba_tactica else 0.0)

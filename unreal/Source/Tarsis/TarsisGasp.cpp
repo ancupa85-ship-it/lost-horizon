@@ -238,7 +238,8 @@ bool ATarsisGuard::GaspTick()
 	const float Speed = GetVelocity().Size2D();
 	bTurnStepping = false;   // los giros en el sitio los pone el ABP
 	// apuntar (en alerta y parado) y caer siguen siendo animaciones sueltas de la persona
-	if (State == ETarsisGuardState::Alert && Speed <= 15.0f && AimAnim) { GaspSingle(AimAnim, true); return true; }
+	// con fusil apunta con la pose de fusil de cintura arriba (RifleTick), andando o parado; sin el, la animacion suelta
+	if (State == ETarsisGuardState::Alert && Speed <= 15.0f && AimAnim && !(Rifle && RifleAimAnim)) { GaspSingle(AimAnim, true); return true; }
 	if (bGaspSingle) GaspRestore();
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	// como UpdateMovement_PreCMC: frenada suave mientras se quiere andar, fuerte al pararse

@@ -213,6 +213,7 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 	PrevYaw = Yaw;
 	if (!Pose) return;
 	Pose->CopyPoseFromSkeletalComponent(AnimBody());
+	RifleTick(DeltaSeconds);   // tanda B: de cintura para arriba, la pose de fusil
 	// adónde mira la cabeza, respecto al cuerpo: el cuerpo gira despacio y la cabeza se adelanta
 	auto Toward = [this](const FVector& P) -> float
 	{
@@ -246,6 +247,7 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 		Want = Toward(BodyTarget->GetActorLocation());
 		if (BodyCheckT > 0.0f) WantLean = 30.0f;   // agachado sobre el cuerpo
 	}
+	if (bPetting && bErrandThere) { Want = Toward(PetDog); WantLean = 30.0f; }   // tanda B: acariciando al lobo, lo mira
 	if (State == ETarsisGuardState::Down) { Want = 0.0f; LookYaw = 0.0f; Lean = 0.0f; }
 	LookTarget = FMath::Clamp(Want, -75.0f, 75.0f);
 	LookYaw = FMath::FInterpTo(LookYaw, LookTarget, DeltaSeconds, 4.0f);
@@ -537,6 +539,7 @@ void ATarsisGuard::BeginPlay()
 	Super::BeginPlay();
 	SetupBody();
 	SetupPose();
+	SetupRifle();   // tanda B: el fusil (TarsisArmas.cpp)
 	PrevYaw = GetActorRotation().Yaw;
 	Home = GetActorLocation();
 	if (PatrolPoints.Num() == 0)
@@ -1508,7 +1511,7 @@ float ATarsisGuard::Visibility(const AActor* Target) const
 		}
 	}
 	const bool bBeam = BeamV > 0.0f;
-	const float ViewD = ViewDistance * (bTowerSentry ? GDayTower : GDayGround);
+	const float ViewD = ViewDistance * (bTowerSentry ? GDayTower : GDayGround) * (PetCrouched() ? PetViewMul : 1.0f);   // acariciando al lobo, mira al suelo
 	if (D > ViewD && !bTorch && !bBeam) return 0.0f;
 	const float CosA = FVector::DotProduct(GetActorForwardVector(), (Aim - Eye).GetSafeNormal2D());
 	const bool bInCone = bBeam || CosA >= FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle));
@@ -1584,6 +1587,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	{
 		LookTick(DeltaSeconds);   // el cuerpo visible sigue copiando la caída
 		if (GestureW > 0.0f || GestureLeft > 0.0f) StopGesture();   // en el suelo no hay gesto que valga, ni al levantarse
+		if (bPetting) StopPet();
 		BatonTick(DeltaSeconds);   // y el bastón se apaga
 		DownT -= DeltaSeconds;
 		if (DownT <= 0.0f) WakeUp();
@@ -1595,6 +1599,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	GestureTick(DeltaSeconds);
 	BatonTick(DeltaSeconds);
 	FootTick(DeltaSeconds);
+	PetTick(DeltaSeconds);
 	// aturdido por un empujón: tambaleándose, no ve ni anda; al rehacerse va a por ti
 	if (StunT > 0.0f)
 	{

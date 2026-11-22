@@ -260,8 +260,19 @@ void ATarsisDirector::ShotFired(ATarsisGuard* G, bool bHit)
 {
 	if (!G || bCapturing || bDone) return;
 	++Shots;
-	const FVector Muzzle = G->GetActorLocation() + G->GetActorForwardVector() * 60.0f + FVector(0.0f, 0.0f, 50.0f);
-	PlaySfx(TEXT("disparo"), Muzzle, 1.0f);
+	// tanda B: de la boca del M14 (socket Muzzle); sin fusil, delante del pecho como antes
+	const FVector Muzzle = G->RifleMuzzle();
+	{
+		// 7,62 de verdad (Stein Games, CC0): cerca, a media distancia o lejos segun lo lejos que estes; si faltan, el de antes
+		APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);
+		const float D = Me ? FVector::Dist(Me->GetActorLocation(), Muzzle) : 0.0f;
+		const TCHAR* Kind = D < ShotNear ? TEXT("cerca") : (D < ShotMid ? TEXT("media") : TEXT("lejos"));
+		USoundBase* S = Sfx(FString::Printf(TEXT("disparo_%s_%d"), Kind, FMath::RandRange(1, 4)));
+		if (!S) PlaySfx(TEXT("disparo"), Muzzle, 1.0f);
+		else if (D < ShotMid) UGameplayStatics::PlaySoundAtLocation(this, S, Muzzle, 1.0f, FMath::FRandRange(0.96f, 1.04f), 0.0f, Atten);
+		else UGameplayStatics::PlaySound2D(this, S, FMath::GetMappedRangeValueClamped(FVector2D(ShotMid, ShotHeard), FVector2D(0.8f, 0.35f), D));   // lejos: el eco, sin atenuar a cero
+		LastShotSound = Kind;
+	}
 	ShotFlashT = 0.08f;
 	ShotFlashAt = Muzzle;
 	// fogonazo: una luz de un instante en la boca del fusil (sin sombras; se apaga en ArmedTick)

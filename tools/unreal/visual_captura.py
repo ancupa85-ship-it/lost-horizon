@@ -7,7 +7,7 @@ Capturas en D:\\LostHorizon\\capturas-gaspA\\captura\\<caso>_NN_t<s>.png y la se
 import builtins, glob, math, os, shutil, time
 import unreal
 
-OUT = r'D:\LostHorizon\capturas-gaspA\captura'
+OUT = getattr(builtins, '_captura_out', r'D:\LostHorizon\capturas-gaspA\captura')
 SHOTS = os.path.join(unreal.Paths.project_saved_dir(), 'Screenshots')
 V = unreal.Vector
 FOTOS = getattr(builtins, '_captura_fotos', True)

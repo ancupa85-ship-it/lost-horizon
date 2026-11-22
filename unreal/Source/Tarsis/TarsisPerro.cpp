@@ -3,6 +3,11 @@
 // sombra, ir agachado o la caja de carton) se planta y grune unos segundos: es el aviso. Si no te apartas, ladra, y los
 // guardias mas cercanos vienen a ver que le pasa. Con el hueso de la olla de la cocina se le puede callar para siempre:
 // se sienta, y desde entonces es amigo.
+//
+// Tanda B (2026-11-21): el perro es un lobo (Animal Variety Pack de Protofactor, /Game/AnimalVarietyPack/Wolf; si no esta,
+// el perro de antes). Amigo, va a por la piedra que tiras (Q) si cae a menos de DogFetchRadius, la coge con la boca y te
+// la trae; y el guardia tranquilo que lo ve cerca cree que es un perro suelto: va, se agacha y lo acaricia un rato (y
+// mientras mira al suelo).
 #include "TarsisDirector.h"
 #include "TarsisGuard.h"
 
@@ -10,11 +15,15 @@
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/IAssetRegistry.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "NavigationPath.h"
+#include "NavigationSystem.h"
 
 // Textos solo en ASCII: MSVC lee los .cpp sin BOM como si no fueran UTF-8.
 
@@ -22,20 +31,40 @@ void ATarsisDirector::SpawnDog()
 {
 	bDogTried = true;
 	// lo importa tools/unreal/perro.py en /Game/Tarsis/Perro: una malla con esqueleto y cuatro animaciones
-	TArray<FAssetData> List;
-	IAssetRegistry::GetChecked().GetAssetsByPath(FName(TEXT("/Game/Tarsis/Perro")), List, true);
 	USkeletalMesh* SK = nullptr;
-	static const TCHAR* Names[4] = { TEXT("quieto"), TEXT("andar"), TEXT("sentarse"), TEXT("sentado") };
-	for (const FAssetData& A : List)
+	// tanda B: el lobo, si esta el pack (nombres del pack: ANIM_Wolf_<x>)
+	bDogWolf = false;
+	if (!WolfDir.IsEmpty())
 	{
-		const FString Cls = A.AssetClassPath.GetAssetName().ToString();
-		const FString Nm = A.AssetName.ToString().ToLower();
-		if (Cls == TEXT("SkeletalMesh")) { if (!SK) SK = Cast<USkeletalMesh>(A.GetAsset()); }
-		else if (Cls == TEXT("AnimSequence"))
+		SK = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("%s/Meshes/SK_Wolf.SK_Wolf"), *WolfDir));
+		if (SK)
 		{
-			for (int32 i = 0; i < 4; ++i)
+			static const TCHAR* Wolf[DogAnimSlots] = { TEXT("IdleBreathe"), TEXT("Walk"), TEXT("GoToRest"), TEXT("Rest"), TEXT("Run"), TEXT("IdleAggressive"), TEXT("Howl"), TEXT("RestToGoBackUp"), TEXT("Bite") };
+			for (int32 i = 0; i < DogAnimSlots; ++i)
 			{
-				if (!DogAnims[i] && Nm.EndsWith(Names[i])) DogAnims[i] = Cast<UAnimationAsset>(A.GetAsset());
+				DogAnims[i] = LoadObject<UAnimationAsset>(nullptr, *FString::Printf(TEXT("%s/Animations/ANIM_Wolf_%s.ANIM_Wolf_%s"), *WolfDir, Wolf[i], Wolf[i]));
+			}
+			bDogWolf = DogAnims[0] && DogAnims[1] && DogAnims[3];
+			if (!bDogWolf) { SK = nullptr; for (int32 i = 0; i < DogAnimSlots; ++i) DogAnims[i] = nullptr; }
+		}
+	}
+	if (!SK)
+	{
+		// el perro de antes: lo importa tools/unreal/perro.py en /Game/Tarsis/Perro, una malla y cuatro animaciones
+		TArray<FAssetData> List;
+		IAssetRegistry::GetChecked().GetAssetsByPath(FName(TEXT("/Game/Tarsis/Perro")), List, true);
+		static const TCHAR* Names[4] = { TEXT("quieto"), TEXT("andar"), TEXT("sentarse"), TEXT("sentado") };
+		for (const FAssetData& A : List)
+		{
+			const FString Cls = A.AssetClassPath.GetAssetName().ToString();
+			const FString Nm = A.AssetName.ToString().ToLower();
+			if (Cls == TEXT("SkeletalMesh")) { if (!SK) SK = Cast<USkeletalMesh>(A.GetAsset()); }
+			else if (Cls == TEXT("AnimSequence"))
+			{
+				for (int32 i = 0; i < 4; ++i)
+				{
+					if (!DogAnims[i] && Nm.EndsWith(Names[i])) DogAnims[i] = Cast<UAnimationAsset>(A.GetAsset());
+				}
 			}
 		}
 	}
@@ -49,8 +78,32 @@ void ATarsisDirector::SpawnDog()
 	DogMesh->SetMobility(EComponentMobility::Movable);
 	DogMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	DogMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-	DogMesh->SetWorldScale3D(FVector(DogScale));
+	DogMesh->SetWorldScale3D(FVector(bDogWolf ? WolfScale : DogScale));
+	DogMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	DogMesh->RegisterComponent();
+	// el lobo: hacia donde mira la malla (de la pelvis a la cabeza, en la pose de referencia) y el hueso de la boca
+	DogHeadBone = NAME_None;
+	if (bDogWolf)
+	{
+		const FReferenceSkeleton& Ref = SK->GetRefSkeleton();
+		FName Pelvis = NAME_None;
+		for (int32 i = 0; i < Ref.GetNum(); ++i)
+		{
+			const FString N = Ref.GetBoneName(i).ToString().ToLower();
+			if (DogHeadBone.IsNone() && N.EndsWith(TEXT("head"))) DogHeadBone = Ref.GetBoneName(i);
+			if (Pelvis.IsNone() && N.EndsWith(TEXT("pelvis"))) Pelvis = Ref.GetBoneName(i);
+		}
+		if (bDogAutoYaw && !DogHeadBone.IsNone() && !Pelvis.IsNone())
+		{
+			auto CS = [&Ref](FName B) { FTransform T = FTransform::Identity; for (int32 i = Ref.FindBoneIndex(B); i != INDEX_NONE; i = Ref.GetParentIndex(i)) T = T * Ref.GetRefBonePose()[i]; return T.GetLocation(); };
+			const FVector F = CS(DogHeadBone) - CS(Pelvis);
+			if (F.SizeSquared2D() > 1.0f) DogMeshYaw = -F.Rotation().Yaw;
+		}
+		UE_LOG(LogTemp, Log, TEXT("Tarsis: lobo (%s), giro de la malla %.0f, cabeza %s"), *WolfDir, DogMeshYaw, *DogHeadBone.ToString());
+	}
+	DogFetch = 0;
+	DogStone = nullptr;
+	DogPetG = nullptr;
 	// el suelo del hangar, medido una vez
 	FHitResult Hit;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisPerro), false, this);
@@ -74,7 +127,10 @@ void ATarsisDirector::DogAnim(int32 Which, bool bLoop)
 {
 	if (!DogMesh || DogAnimNow == Which) return;
 	DogAnimNow = Which;
-	if (Which >= 0 && Which < 4 && DogAnims[Which]) DogMesh->PlayAnimation(DogAnims[Which], bLoop);
+	// sin esa animacion (el perro de antes solo tiene cuatro): correr = andar, grunir = quieto, levantarse = quieto
+	int32 A = Which;
+	if (A >= 0 && A < DogAnimSlots && !DogAnims[A]) A = (A == 4) ? 1 : 0;
+	if (A >= 0 && A < DogAnimSlots && DogAnims[A]) DogMesh->PlayAnimation(DogAnims[A], bLoop);
 }
 
 void ATarsisDirector::DogFace(const FVector& To, float DeltaSeconds)
@@ -89,6 +145,188 @@ void ATarsisDirector::DogReset()
 {
 	if (DogState == 1 || DogState == 2) DogState = 0;
 	DogGrowlT = DogCalmT = DogBarkT = 0.0f;
+}
+
+void ATarsisDirector::DogForgetPets()
+{
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) It->PetDoneAt = -1e9f;
+	DogPetScanT = 0.0f;
+}
+
+FVector ATarsisDirector::DogMouth() const
+{
+	if (!DogMesh) return DogLoc;
+	const FVector Fwd = FRotator(0.0f, DogYaw, 0.0f).Vector();
+	if (!DogHeadBone.IsNone()) return DogMesh->GetBoneLocation(DogHeadBone) + Fwd * DogMouthFwd - FVector(0.0f, 0.0f, DogMouthDown);
+	return DogLoc + Fwd * 45.0f + FVector(0.0f, 0.0f, 35.0f);
+}
+
+FVector ATarsisDirector::DogStoneLocation() const
+{
+	return DogStone.IsValid() ? DogStone->GetComponentLocation() : FVector::ZeroVector;
+}
+
+void ATarsisDirector::DogStoneThrown(const FVector& Where, UStaticMeshComponent* Stone)
+{
+	// solo el lobo amigo, tranquilo (ni trayendo otra ni con un guardia encima), y si la piedra cae a su alcance y a su altura
+	if (!bDog || !DogMesh || DogState != 3 || DogFetch != 0 || !Stone) return;
+	if (DogPetG.IsValid() && DogPetG->PetCrouched()) return;
+	if (FVector::Dist2D(Where, DogLoc) > DogFetchRadius || FMath::Abs(Where.Z - DogZ) > 150.0f) return;
+	// por el suelo de verdad (navmesh), no a traves de las paredes; si no hay camino o es mucho mas largo, no va
+	if (!DogPathTo(Where) || DogPathLen > DogFetchRadius * 1.6f) return;
+	DogStone = Stone;
+	DogFetchAt = Where;
+	DogFetch = 1;
+	DogFetchT = 0.0f;
+	if (DogPetG.IsValid()) { DogPetG->StopPet(); DogPetG->EndErrand(); DogPetG = nullptr; }   // se le escapa al que venia a acariciarlo
+}
+
+bool ATarsisDirector::DogPathTo(const FVector& Goal)
+{
+	DogPath.Reset();
+	DogPathI = 0;
+	DogPathLen = 0.0f;
+	DogPathGoal = Goal;
+	UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(), FVector(DogLoc.X, DogLoc.Y, DogZ + 20.0f), Goal, this);
+	if (!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num() < 1)
+	{
+		// sin navmesh (o el sitio no esta en ella): solo si se ve en linea recta y sin nada en medio
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLoboCamino), false, this);
+		if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, FVector(DogLoc.X, DogLoc.Y, DogZ + 40.0f), FVector(Goal.X, Goal.Y, Goal.Z + 25.0f), ECC_Visibility, Q)) return false;
+		DogPath.Add(Goal);
+		DogPathLen = FVector::Dist2D(DogLoc, Goal);
+		return true;
+	}
+	FVector Prev = DogLoc;
+	for (const FVector& P : Path->PathPoints)
+	{
+		DogPathLen += FVector::Dist2D(Prev, P);
+		Prev = P;
+		DogPath.Add(P);
+	}
+	return true;
+}
+
+float ATarsisDirector::DogSteer(const FVector& Goal, float Speed, float StopAt, float DeltaSeconds)
+{
+	// rehace el camino si el destino se ha movido (vuelves a por ti: le sigues moviendote)
+	DogRepathT -= DeltaSeconds;
+	if (DogPath.Num() == 0 || (DogRepathT <= 0.0f && FVector::DistSquared2D(Goal, DogPathGoal) > 80.0f * 80.0f))
+	{
+		DogRepathT = 0.8f;
+		if (!DogPathTo(Goal)) { DogPath.Reset(); DogPath.Add(Goal); }
+	}
+	// el siguiente punto del camino (el ultimo es el destino)
+	while (DogPathI < DogPath.Num() - 1 && FVector::Dist2D(DogLoc, DogPath[DogPathI]) < 40.0f) ++DogPathI;
+	const FVector To = DogPathI < DogPath.Num() - 1 ? DogPath[DogPathI] : Goal;
+	const float Left = FVector::Dist2D(DogLoc, Goal);
+	const FVector Dir(To.X - DogLoc.X, To.Y - DogLoc.Y, 0.0f);
+	if (Left <= StopAt || Dir.IsNearlyZero()) return Left;
+	DogFace(To, DeltaSeconds * 2.5f);
+	const float Ahead = FVector::DotProduct(FRotator(0.0f, DogYaw, 0.0f).Vector(), Dir.GetSafeNormal());
+	const float Step = FMath::Min(FMath::Min(Dir.Size(), Left - StopAt), Speed * FMath::Clamp(Ahead, 0.25f, 1.0f) * DeltaSeconds);
+	DogLoc += Dir.GetSafeNormal() * FMath::Max(Step, 0.0f);
+	return Left;
+}
+
+void ATarsisDirector::DogFetchTick(const FVector& PlayerLoc, bool bReach, float DeltaSeconds)
+{
+	DogFetchT += DeltaSeconds;
+	UStaticMeshComponent* St = DogStone.Get();
+	auto Drop = [this, St]()
+	{
+		if (St)
+		{
+			// la deja en el suelo, delante del hocico
+			const FVector At = DogLoc + FRotator(0.0f, DogYaw, 0.0f).Vector() * 55.0f;
+			St->SetWorldLocationAndRotation(FVector(At.X, At.Y, DogZ + 3.0f), FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f));
+		}
+		DogFetch = 0;
+		DogSitT = -0.8f;   // un momento de pie antes de volver a tumbarse
+		DogStone = nullptr;
+	};
+	if (!St && DogFetch != 4) { DogFetch = 0; DogSitT = 0.0f; return; }   // la piedra ya no esta (se limpian las viejas)
+	if (DogFetch == 1)
+	{
+		// arranca a correr (si estaba tumbado, se levanta de un salto: la de levantarse dura 1,5 s y no queda bien)
+		if (DogSteer(DogFetchAt, DogRunSpeed, 40.0f, DeltaSeconds) <= 45.0f || DogFetchT > 15.0f) { DogFetch = 2; DogFetchT = 0.0f; DogAnim(8, false); DogPath.Reset(); }
+		else DogAnim(4, true);
+	}
+	else if (DogFetch == 2)
+	{
+		// baja el hocico (morder) y a los 0,3 s la piedra ya esta en la boca
+		if (DogFetchT > 0.3f) St->SetWorldLocation(DogMouth());
+		if (DogFetchT > 0.65f) { DogFetch = 3; DogFetchT = 0.0f; }
+	}
+	else if (DogFetch == 3)
+	{
+		St->SetWorldLocation(DogMouth());
+		// no le llegas (en el camion, preso, en otra planta) o tarda demasiado: la suelta donde este
+		if (!bReach || DogFetchT > 25.0f) { Drop(); return; }
+		const float Far = FVector::Dist2D(PlayerLoc, DogLoc);
+		const float Sp = Far > 500.0f ? DogRunSpeed : FMath::Max(bDogWolf ? WolfWalkSpeed : DogSpeed, DogRunSpeed * 0.45f);
+		if (DogSteer(PlayerLoc, Sp, 140.0f, DeltaSeconds) < 150.0f) { DogFetch = 4; DogFetchT = 0.0f; DogAnim(0, true); DogPath.Reset(); }
+		else DogAnim(Far > 500.0f ? 4 : 1, true);
+	}
+	else if (DogFetch == 4)
+	{
+		// de cara a ti, la suelta a tus pies
+		DogFace(PlayerLoc, DeltaSeconds * 2.0f);
+		if (St) St->SetWorldLocation(DogMouth());
+		if (DogFetchT > 0.45f)
+		{
+			Drop();
+			++DogFetches;
+			PlaySfx(TEXT("piedra"), DogLoc + FVector(0.0f, 0.0f, 10.0f), 0.35f);
+		}
+	}
+}
+
+void ATarsisDirector::DogPetTick(float DeltaSeconds)
+{
+	// el que ya va o ya lo acaricia: el lobo se queda quieto, de cara a el
+	if (ATarsisGuard* G = DogPetG.Get())
+	{
+		if (!G->IsPetting()) { DogPetG = nullptr; DogSitT = 0.0f; return; }
+		return;
+	}
+	if (DogFetch != 0 || bCine || bDone || bCapturing) return;
+	DogPetScanT -= DeltaSeconds;
+	if (DogPetScanT > 0.0f) return;
+	DogPetScanT = 0.5f;
+	const float Now = GetWorld()->GetTimeSeconds();
+	ATarsisGuard* Best = nullptr;
+	float BestD = DogPetRadius;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisLoboVisto), false, this);
+	if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) Q.AddIgnoredActor(Pl);
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		ATarsisGuard* G = *It;
+		// tranquilo: de ronda, sin recado, sin sospecha ni nada entre manos
+		if (G->bTowerSentry || G->bAlly || G->bSceneLock || G->IsOnErrand() || G->IsStunned() || G->IsCheckingBody() || G->IsInvestigating()) continue;
+		if (G->State != ETarsisGuardState::Patrol || G->Meter > 0.05f) continue;
+		if (Now - G->PetDoneAt < DogPetCooldown) continue;
+		const FVector E = G->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+		const FVector W = DogLoc + FVector(0.0f, 0.0f, 40.0f);
+		const float D = FVector::Dist2D(E, W);
+		if (D > BestD || FMath::Abs(E.Z - W.Z) > 300.0f) continue;
+		// lo ve: delante (o muy cerca) y sin nada en medio
+		if (D > 300.0f && FVector::DotProduct(G->GetActorForwardVector(), (W - E).GetSafeNormal2D()) < 0.4f) continue;
+		Q.ClearIgnoredSourceObjects();
+		Q.AddIgnoredActor(this);
+		Q.AddIgnoredActor(G);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, E, W, ECC_Visibility, Q)) continue;
+		Best = G;
+		BestD = D;
+	}
+	if (!Best) return;
+	if (!Best->StartPet(DogLoc, DogPetSeconds)) return;
+	DogPetG = Best;
+	++DogPets;
+	GuardSay(Best, TEXT("lobo"));
 }
 
 FString ATarsisDirector::DogPrompt() const
@@ -140,9 +378,27 @@ void ATarsisDirector::DogTick(float DeltaSeconds)
 	const bool bSense = bReach && (D < DogSmell || (bRun && D < DogHear));
 	if (DogState == 3)
 	{
-		// amigo: sentado donde le diste el hueso; te sigue con la cabeza (con todo el cuerpo, que no tiene mas)
+		// tanda B: a por la piedra
+		if (DogFetch != 0)
+		{
+			DogFetchTick(P, bReach, DeltaSeconds);
+			DogPlace();
+			return;
+		}
+		DogPetTick(DeltaSeconds);
+		if (ATarsisGuard* G = DogPetG.Get())
+		{
+			// un guardia viene a acariciarlo: de pie, quieto, de cara a el
+			DogSitT = 0.0f;
+			DogAnim(0, true);
+			DogFace(G->GetActorLocation(), DeltaSeconds * 0.6f);
+			DogPlace();
+			return;
+		}
+		// amigo: tumbado donde le diste el hueso (o donde te dejo la piedra); te sigue con la cabeza (con todo el cuerpo)
 		DogSitT += DeltaSeconds;
-		if (DogSitT < 0.6f) DogAnim(2, false); else DogAnim(3, true);
+		if (DogSitT < 0.0f) DogAnim(0, true);
+		else if (DogSitT < 0.6f) DogAnim(2, false); else DogAnim(3, true);
 		if (bReach && D < 900.0f) DogFace(P, DeltaSeconds * 0.4f);
 		DogPlace();
 		return;
@@ -171,16 +427,16 @@ void ATarsisDirector::DogTick(float DeltaSeconds)
 			else
 			{
 				DogFace(To, DeltaSeconds);
-				DogLoc += Dir.GetSafeNormal() * DogSpeed * DeltaSeconds;
+				DogLoc += Dir.GetSafeNormal() * (bDogWolf ? WolfWalkSpeed : DogSpeed) * DeltaSeconds;
 				DogAnim(1, true);
 			}
 		}
 		DogPlace();
 		return;
 	}
-	// grune (1) o ladra (2): plantado, de cara a ti
+	// grune (1) o ladra (2): plantado, de cara a ti (el lobo, con la de grunir)
 	DogSitT = 0.0f;
-	DogAnim(0, true);
+	DogAnim(5, true);
 	if (bReach) DogFace(P, DeltaSeconds);
 	const bool bGone = !bReach || D > (DogState == 2 ? DogHear : DogSmell * 1.25f);
 	DogCalmT = bGone ? DogCalmT + DeltaSeconds : 0.0f;
@@ -217,4 +473,49 @@ void ATarsisDirector::DogTick(float DeltaSeconds)
 		}
 	}
 	DogPlace();
+}
+
+// ---- el guardia que acaricia al lobo (tanda B)
+
+bool ATarsisGuard::StartPet(const FVector& DogAt, float Seconds)
+{
+	// se pone al lado del lobo, por la parte de donde viene, y lo mira
+	FVector Side = (GetActorLocation() - DogAt).GetSafeNormal2D();
+	if (Side.IsNearlyZero()) Side = -GetActorForwardVector();
+	const FVector Where = DogAt + Side * 85.0f;
+	const float Travel = FVector::Dist2D(GetActorLocation(), Where) / FMath::Max(WalkSpeed, 50.0f);
+	if (!Errand(Where, DogAt, Travel * 1.6f + Seconds + 3.0f)) return false;
+	bPetting = true;
+	PetT = 0.0f;
+	PetSeconds = Seconds;
+	PetDog = DogAt;
+	return true;
+}
+
+void ATarsisGuard::StopPet()
+{
+	if (!bPetting) return;
+	bPetting = false;
+	PetT = 0.0f;
+	if (bIsCrouched) UnCrouch();
+	PetDoneAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+}
+
+void ATarsisGuard::PetTick(float DeltaSeconds)
+{
+	if (!bPetting) return;
+	// en cuanto ve u oye algo (o le cae un recado mas urgente), se acabo el perro
+	if (!bErrand || State != ETarsisGuardState::Patrol || StunT > 0.0f || bSceneLock) { StopPet(); return; }
+	if (!bErrandThere) return;
+	if (PetT <= 0.0f)
+	{
+		if (UCharacterMovementComponent* M = GetCharacterMovement()) M->GetNavAgentPropertiesRef().bCanCrouch = true;
+		Crouch();
+	}
+	PetT += DeltaSeconds;
+	if (PetT >= PetSeconds)
+	{
+		StopPet();
+		EndErrand();   // vuelve a su ronda
+	}
 }

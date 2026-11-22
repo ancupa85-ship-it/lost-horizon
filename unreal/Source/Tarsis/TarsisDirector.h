@@ -1370,7 +1370,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
 	int32 DogAnimIndex() const { return DogAnimNow; }
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
-	int32 DogAnimCount() const { int32 N = 0; for (int32 i = 0; i < 4; ++i) if (DogAnims[i]) ++N; return N; }
+	int32 DogAnimCount() const { int32 N = 0; for (int32 i = 0; i < DogAnimSlots; ++i) if (DogAnims[i]) ++N; return N; }
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
 	FString DogPrompt() const;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Perro")
@@ -1385,8 +1385,79 @@ public:
 	void DogTick(float DeltaSeconds);
 	UPROPERTY()
 	TObjectPtr<class USkeletalMeshComponent> DogMesh;
+	// ---- tanda B: el perro es ahora un lobo (Animal Variety Pack de Protofactor, en /Game/AnimalVarietyPack/Wolf). Si
+	// esta, se usa; si no, el perro de /Game/Tarsis/Perro como antes. Animaciones: 0 quieto, 1 andar, 2 tumbarse,
+	// 3 tumbado, 4 correr, 5 grunir, 6 aullar, 7 levantarse, 8 morder (coger la piedra).
+	/** Carpeta del lobo; vacia = el perro de siempre. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	FString WolfDir = TEXT("/Game/AnimalVarietyPack/Wolf");
+	/** Escala del lobo (la malla del pack mide ~1,95 m de hocico a cola y ~1 m de alto). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float WolfScale = 0.8f;
+	/** Con el lobo, el giro de la malla se calcula al nacer (de la pelvis a la cabeza) en vez de usar DogMeshYaw. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	bool bDogAutoYaw = true;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	bool bDogWolf = false;
+	/** El lobo andando (ronda) y corriendo (a por la piedra), cm/s. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float WolfWalkSpeed = 125.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogRunSpeed = 480.0f;
+	/** Amigo: va a por la piedra si cae a menos de esto (cm) de el. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogFetchRadius = 2500.0f;
+	/** La piedra en la boca: desde el hueso de la cabeza, hacia delante y hacia abajo (cm, ya con la escala). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogMouthFwd = 20.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogMouthDown = 8.0f;
+	/** Un guardia tranquilo que ve al lobo amigo a menos de esto (cm) va a acariciarlo DogPetSeconds; luego DogPetCooldown
+	 *  segundos sin repetir. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogPetRadius = 1500.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogPetSeconds = 6.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogPetCooldown = 60.0f;
+	/** 0 nada, 1 va a por la piedra, 2 la coge, 3 te la trae, 4 la suelta. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogFetch = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogFetches = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogPets = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	bool DogCarrying() const { return DogFetch == 3 || (DogFetch == 2 && DogFetchT > 0.3f); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	FVector DogStoneLocation() const;
+	/** El guardia que lo esta acariciando (o va a hacerlo), o nadie. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	class ATarsisGuard* DogPetter() const { return DogPetG.Get(); }
+	/** Para las pruebas: olvida quien lo ha acariciado ya (sin esperar DogPetCooldown). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Perro")
+	void DogForgetPets();
+	void DogStoneThrown(const FVector& Where, class UStaticMeshComponent* Stone);
+	void DogFetchTick(const FVector& PlayerLoc, bool bReach, float DeltaSeconds);
+	void DogPetTick(float DeltaSeconds);
+	FVector DogMouth() const;
+	// por el navmesh (no a traves de las paredes): el camino y el punto por el que va
+	bool DogPathTo(const FVector& Goal);
+	float DogSteer(const FVector& Goal, float Speed, float StopAt, float DeltaSeconds);
+	TArray<FVector> DogPath;
+	int32 DogPathI = 0;
+	float DogPathLen = 0.0f;
+	float DogRepathT = 0.0f;
+	FVector DogPathGoal = FVector::ZeroVector;
+	static constexpr int32 DogAnimSlots = 9;
 	UPROPERTY()
-	TObjectPtr<class UAnimationAsset> DogAnims[4];
+	TObjectPtr<class UAnimationAsset> DogAnims[9];
+	TWeakObjectPtr<class UStaticMeshComponent> DogStone;
+	TWeakObjectPtr<class ATarsisGuard> DogPetG;
+	FVector DogFetchAt = FVector::ZeroVector;
+	float DogFetchT = 0.0f;
+	float DogPetScanT = 0.0f;
+	FName DogHeadBone = NAME_None;
 	bool bDogTried = false;
 	bool DogToB = true;
 	FVector DogLoc = FVector::ZeroVector;
@@ -1595,6 +1666,14 @@ public:
 	/** A que distancia se oye un disparo (cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
 	float ShotHeard = 4000.0f;
+	/** Tanda B: hasta aquí suena el disparo «cerca» (7,62 de cerca) y hasta ShotMid «a media distancia»; más lejos, «lejos». */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ShotNear = 1500.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float ShotMid = 3500.0f;
+	/** El último disparo que sonó: cerca, media, lejos (para las pruebas). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	FString LastShotSound;
 	/** Para las pruebas: velocidad del jugador que se da por buena (menor que 0: la real). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
 	float PlayerSpeedOverride = -1.0f;
@@ -1988,6 +2067,28 @@ public:
 	/** El guardia ya está agachado sobre ti / ya sonaron las esposas. */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Captura")
 	bool CaptureSceneCuffed() const { return bSceneCuffed; }
+	// tanda B: a golpes y con fusil, el culatazo de Lyra (MM_Rifle_Melee, en /Game/Tarsis/Armas/Anims)
+	/** Apagado, a golpes vuelve a ser el derribo del GASP. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	bool bCaptureMeleeRule = true;
+	/** A qué distancia de Cuttlas se pone el guardia para el culatazo (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureMeleeDistance = 95.0f;
+	/** Giro extra del guardia al dar el culatazo (si la animación pega torcida). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureMeleeYaw = 0.0f;
+	/** Segundo de la animación en que la culata llega a la cara (AN_Melee de Lyra). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureMeleeHit = 0.38f;
+	/** Con qué velocidad sale despedido hacia atrás (cm/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureMeleePush = 380.0f;
+	/** En tercera, cuánto gira la cámara respecto a la línea guardia-Cuttlas para verlos de lado (grados). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureThirdSideYaw = 70.0f;
+	/** En primera, la cámara de la escena no se acerca al guardia más de esto (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureCamMinDist = 75.0f;
 	bool bCaptureWounded = false;   // la captura viene del tercer tiro (golpe)
 	/** Para las pruebas y las capturas: te coge G ya, como rendido o como huyendo (bHit). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Captura")
@@ -2205,6 +2306,12 @@ private:
 	TObjectPtr<class ACameraActor> SceneCam;
 	UPROPERTY()
 	TObjectPtr<class UPostProcessComponent> ScenePP;
+	UPROPERTY()
+	TObjectPtr<class UAnimSequenceBase> SceneMeleeAnim;
+	FVector SceneMeleeDir = FVector::ZeroVector;
+	bool bScenePreloaded = false;
+	void ScenePreload();
+	void SceneCameraBegin(class APlayerController* PC);
 	bool SceneBegin(class ATarsisGuard* G, APawn* P);
 	void SceneTick(float DeltaSeconds);
 	void SceneCameraTick(float DeltaSeconds, class ACharacter* C);

@@ -811,6 +811,7 @@ void ATarsisDirector::ThrowStone()
 	{
 		Stones.Add(S);
 		if (Stones.Num() > 6) { if (Stones[0]) Stones[0]->DestroyComponent(); Stones.RemoveAt(0); }
+		DogStoneThrown(P, S);   // tanda B: el lobo amigo va a por ella (los guardias, a mirar el ruido, igual que siempre)
 	}
 	int32 Heard = 0;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
@@ -1545,7 +1546,11 @@ void ATarsisDirector::SetupSound()
 	static const TCHAR* Pre[] = { TEXT("codec_abrir"), TEXT("codec_cerrar"), TEXT("codec_llamada"), TEXT("codec_tecla"), TEXT("codec_tecla_grave"), TEXT("reja"),
 		TEXT("candado"), TEXT("recoger"), TEXT("empujon"), TEXT("bengala"), TEXT("disparo"), TEXT("llaves"), TEXT("clave_ok"), TEXT("clave_mal"), TEXT("barrera"),
 		TEXT("claxon"), TEXT("taquilla"), TEXT("puerta_madera"), TEXT("puerta_blindada"), TEXT("camion_subir"), TEXT("camion_caja"), TEXT("camion_junta"),
-		TEXT("ladrido"), TEXT("grunido") };
+		TEXT("ladrido"), TEXT("grunido"), TEXT("esposas"),
+		// tanda B: los disparos de 7,62 (cerca, media y lejos)
+		TEXT("disparo_cerca_1"), TEXT("disparo_cerca_2"), TEXT("disparo_cerca_3"), TEXT("disparo_cerca_4"),
+		TEXT("disparo_media_1"), TEXT("disparo_media_2"), TEXT("disparo_media_3"), TEXT("disparo_media_4"),
+		TEXT("disparo_lejos_1"), TEXT("disparo_lejos_2"), TEXT("disparo_lejos_3"), TEXT("disparo_lejos_4") };
 	for (const TCHAR* N : Pre) Sfx(N);
 	StoneSnd = LoadSnd(TEXT("piedra"));
 	DartSnd = LoadSnd(TEXT("dardo"));
@@ -1793,6 +1798,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("sinradio")) T = TEXT("Central? ... Central? Esto no da senal.");
 	else if (Key == TEXT("emisora")) T = TEXT("Quien ha tocado esto? Una valvula floja... Ya casi.");
 	else if (Key == TEXT("registro")) T = TEXT("Hay orden de mirar la carga. Abre atras.");
+	else if (Key == TEXT("lobo")) T = TEXT("Que haces suelto, chucho? Ven aqui... ven.");
 	else T = Key;
 	T = Tx(FName(*(TEXT("voz_") + Key)), *T);
 	const FString Name = G->bTowerSentry ? Tx(TEXT("nombre_centinela"), TEXT("CENTINELA")) : G->GuardName.ToUpper();
@@ -4226,6 +4232,7 @@ void ATarsisDirector::BeginCapture(ATarsisGuard* G)
 void ATarsisDirector::CaptureTick(float DeltaSeconds)
 {
 	SceneBlurTick(DeltaSeconds);   // la vista borrosa del golpe y del despertar
+	if (!bScenePreloaded && HeroDriver) ScenePreload();   // tanda B: sin tiron la primera vez
 	if (!bCapturing) return;
 	CaptureT += DeltaSeconds;
 	if (SceneKind != ETarsisSceneKind::None) { SceneTick(DeltaSeconds); return; }

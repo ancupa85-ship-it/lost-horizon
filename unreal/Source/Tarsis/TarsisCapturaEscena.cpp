@@ -74,6 +74,44 @@ bool ATarsisDirector::SceneBegin(ATarsisGuard* G, APawn* P)
 	SceneGroundZ = C->GetActorLocation().Z - HalfH;
 	const FTransform Here(FRotator(0.0f, C->GetActorRotation().Yaw + HeroDriverYaw, 0.0f),
 		FVector(C->GetActorLocation().X, C->GetActorLocation().Y, SceneGroundZ - HeroDriverBallZ + 2.0f));
+	// tanda B: a golpes y con fusil, el culatazo de Lyra (sin pareja: el guardia delante, Cuttlas cae de espaldas)
+	SceneMeleeAnim = nullptr;
+	if (bHit && bCaptureMeleeRule && G->HasRifle())
+	{
+		SceneMeleeAnim = LoadObject<UAnimSequenceBase>(nullptr, TEXT("/Game/Tarsis/Armas/Anims/MM_Rifle_Melee.MM_Rifle_Melee"));
+	}
+	if (SceneMeleeAnim)
+	{
+		if (C->bIsCrouched) C->UnCrouch();
+		FVector Dir = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
+		if (Dir.IsNearlyZero()) Dir = C->GetActorForwardVector().GetSafeNormal2D();
+		SceneMeleeDir = -Dir;   // hacia donde le empuja el golpe
+		SceneGuardRel = G->GetMesh()->GetRelativeTransform();
+		SceneGuardFrom = G->GetActorLocation();
+		SceneGuardFromRot = G->GetActorRotation();
+		const FVector At = C->GetActorLocation() + Dir * CaptureMeleeDistance;
+		SceneGuardTo = FVector(At.X, At.Y, G->GetActorLocation().Z);
+		SceneGuardToRot = FRotator(0.0f, (-Dir).Rotation().Yaw + CaptureMeleeYaw, 0.0f);
+		if (FVector::Dist2D(SceneGuardFrom, SceneGuardTo) > 300.0f) { SceneGuardFrom = SceneGuardTo; SceneGuardFromRot = SceneGuardToRot; }
+		G->Hold(60.0f);
+		G->bSceneLock = true;
+		ScenePair = INDEX_NONE;
+		ScenePairName = TEXT("culatazo");
+		SceneKind = ETarsisSceneKind::Golpe;
+		bScenePlaying = bSceneRagdoll = bSceneGuardFree = bSceneCrouched = bSceneCuffed = bSceneBlack = bScenePunched = bSceneImpact = false;
+		bSceneHero = false;
+		SceneShake = 0.0f;
+		const float Lead = FMath::Max(CaptureSceneLead, 0.05f);
+		SceneRagdollAt = Lead + CaptureMeleeHit;
+		ScenePunchAt = SceneRagdollAt;
+		SceneFreeAt = Lead + SceneMeleeAnim->GetPlayLength();
+		SceneCrouchAt = 1e9f;
+		SceneBlackAt = SceneRagdollAt + 0.9f;
+		SceneEndAt = 1e9f;
+		SceneCameraBegin(PC);
+		UE_LOG(LogTemp, Log, TEXT("Tarsis: detencion a golpes con culatazo (%s)"), *G->GuardName);
+		return true;
+	}
 	// la pareja cuyo guardia viene del lado en que esta
 	const FVector Local = Here.InverseTransformPosition(G->GetActorLocation()).GetSafeNormal2D();
 	int32 Best = INDEX_NONE;
@@ -116,6 +154,13 @@ bool ATarsisDirector::SceneBegin(ATarsisGuard* G, APawn* P)
 	SceneCrouchAt = SceneFreeAt + 0.9f;
 	SceneBlackAt = bHit ? SceneRagdollAt + 0.9f : 1e9f;
 	SceneEndAt = 1e9f;
+	SceneCameraBegin(PC);
+	UE_LOG(LogTemp, Log, TEXT("Tarsis: detencion %s con %s (%s)"), bHit ? TEXT("a golpes") : TEXT("rendido"), *ScenePairName, *G->GuardName);
+	return true;
+}
+
+void ATarsisDirector::SceneCameraBegin(APlayerController* PC)
+{
 	// camara: en tercera se queda; en primera, una camara suelta que empieza donde esta la tuya
 	bSceneThird = bThirdShown;
 	if (!bSceneThird)
@@ -135,8 +180,23 @@ bool ATarsisDirector::SceneBegin(ATarsisGuard* G, APawn* P)
 		}
 		if (Arms) Arms->SetVisibility(false, true);
 	}
-	UE_LOG(LogTemp, Log, TEXT("Tarsis: detencion %s con %s (%s)"), bHit ? TEXT("a golpes") : TEXT("rendido"), *ScenePairName, *G->GuardName);
-	return true;
+}
+
+void ATarsisDirector::ScenePreload()
+{
+	// tanda B: la primera detencion daba un tiron (cargar animaciones, la fisica del maniqui, la camara y el
+	// postproceso a la vez): se carga todo al empezar la partida
+	bScenePreloaded = true;
+	for (const FScenePair& Pr : ScenePairs) { LoadPairAnim(Pr, true); LoadPairAnim(Pr, false); }
+	LoadObject<UAnimSequenceBase>(nullptr, TEXT("/Game/Tarsis/Armas/Anims/MM_Rifle_Melee.MM_Rifle_Melee"));
+	if (!SceneCam && GetWorld())
+	{
+		FActorSpawnParameters Sp;
+		Sp.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SceneCam = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), FTransform::Identity, Sp);
+		if (SceneCam) SceneCam->GetCameraComponent()->SetConstraintAspectRatio(false);
+	}
+	Sfx(TEXT("golpe"));
 }
 
 void ATarsisDirector::SceneTick(float DeltaSeconds)
@@ -144,13 +204,25 @@ void ATarsisDirector::SceneTick(float DeltaSeconds)
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 	ATarsisGuard* G = Captor;
-	if (!C || !PC || ScenePair == INDEX_NONE)
+	if (!C || !PC || (ScenePair == INDEX_NONE && !SceneMeleeAnim))
 	{
 		SceneKind = ETarsisSceneKind::None; bCapturing = false; Captor = nullptr;
 		return;
 	}
-	const FScenePair& Pr = ScenePairs[ScenePair];
+	const bool bMelee = SceneMeleeAnim != nullptr;
+	const FScenePair& Pr = ScenePairs[bMelee ? 0 : ScenePair];
 	const bool bHit = SceneKind == ETarsisSceneKind::Golpe;
+	// tanda B: en tercera, la camara gira hacia un lado para que se vea a Cuttlas y al guardia (antes el guardia lo tapaba)
+	if (bSceneThird && G && !bCaptureDone)
+	{
+		const FVector Side = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
+		if (!Side.IsNearlyZero())
+		{
+			const FRotator Cur = PC->GetControlRotation();
+			const FRotator Want(-12.0f, Side.Rotation().Yaw + CaptureThirdSideYaw, 0.0f);
+			PC->SetControlRotation(FMath::RInterpTo(Cur, Want, DeltaSeconds, 2.5f));
+		}
+	}
 	// el guardia se pone en su sitio y empiezan las dos partes
 	if (!bScenePlaying && G)
 	{
@@ -160,12 +232,20 @@ void ATarsisDirector::SceneTick(float DeltaSeconds)
 		if (CaptureT >= Lead)
 		{
 			G->SetActorLocationAndRotation(SceneGuardTo, SceneGuardToRot);
-			G->ScenePlay(LoadPairAnim(Pr, true));
-			G->GetMesh()->SetWorldTransform(SceneComp);
 			bSceneHero = true;
-			HeroDriver->SetWorldTransform(SceneComp);
-			HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-			HeroDriver->PlayAnimation(LoadPairAnim(Pr, false), false);
+			if (bMelee)
+			{
+				// culatazo: el guardia en su sitio con la animacion de Lyra; Cuttlas sigue de pie con el ABP hasta el golpe
+				G->ScenePlay(SceneMeleeAnim);
+			}
+			else
+			{
+				G->ScenePlay(LoadPairAnim(Pr, true));
+				G->GetMesh()->SetWorldTransform(SceneComp);
+				HeroDriver->SetWorldTransform(SceneComp);
+				HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+				HeroDriver->PlayAnimation(LoadPairAnim(Pr, false), false);
+			}
 			SceneHeadZ0 = HeroDriver->GetSocketLocation(TEXT("head")).Z;
 			ScenePelvisPrev = HeroDriver->GetSocketLocation(TEXT("pelvis"));
 			bScenePlaying = true;
@@ -187,7 +267,12 @@ void ATarsisDirector::SceneTick(float DeltaSeconds)
 	if (bScenePlaying && !bSceneRagdoll && CaptureT >= SceneRagdollAt)
 	{
 		SceneRagdoll(C);
-		PlaySfx(bHit ? TEXT("golpe") : TEXT("empujon"), FVector::ZeroVector, 1.0f, false);
+		if (bMelee)
+		{
+			// el culatazo lo tira de espaldas: velocidad hacia atras y algo hacia arriba
+			HeroDriver->SetAllPhysicsLinearVelocity(SceneMeleeDir * CaptureMeleePush + FVector(0.0f, 0.0f, 120.0f));
+		}
+		else PlaySfx(bHit ? TEXT("golpe") : TEXT("empujon"), FVector::ZeroVector, 1.0f, false);
 		SceneShake = FMath::Max(SceneShake, bHit ? 1.2f : 0.6f);
 	}
 	// rendido: el guardia suelta su parte donde acabo su raiz, se acerca y se agacha sobre ti
@@ -299,6 +384,14 @@ void ATarsisDirector::SceneCameraTick(float DeltaSeconds, ACharacter* C)
 		const FVector Head = HeroDriver->GetSocketLocation(TEXT("head"));
 		WantLoc = Head + FVector(0.0f, 0.0f, 6.0f);
 		WantLoc.Z = FMath::Max(WantLoc.Z, SceneGroundZ + 14.0f);
+		// tanda B: nunca pegada al guardia (en el derribo su pierna tapaba la imagen)
+		if (G)
+		{
+			FVector Off = WantLoc - G->GetActorLocation();
+			Off.Z = 0.0f;
+			const float D = Off.Size();
+			if (D < CaptureCamMinDist) WantLoc += (D > 1.0f ? Off / D : -G->GetActorForwardVector()) * (CaptureCamMinDist - D);
+		}
 		Fall = FMath::Clamp((SceneHeadZ0 - Head.Z) / FMath::Max(SceneHeadZ0 - SceneGroundZ - 25.0f, 1.0f), 0.0f, 1.0f);
 	}
 	// mira al guardia: al pecho de pie y, segun cae, a sus botas
