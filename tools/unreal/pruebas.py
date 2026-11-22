@@ -3319,6 +3319,121 @@ def prueba_fusil():
         if dl > 150 or delante < -10 or not (l.z - 60 < m.z < l.z + 120):
             mal.append('%s %.0f cm, delante %.0f, z %+.0f' % (g.get_actor_label(), dl, delante, m.z - l.z))
     check('la boca del cañón, delante del guardia y a la altura de la cadera o el pecho', not mal, mal[:4])
+    # tanda C: andando, el fusil se mece con el paso (no un maniquí rígido)
+    yield ('hasta', lambda: any(g.rifle_sway() > 0.5 for g in con), 10.0)
+    check('tanda C: andando, el fusil se mece con el paso', any(g.rifle_sway() > 0.5 for g in con), [round(g.rifle_sway(), 2) for g in con][:6])
+    # tanda C: a la cadera, la culata bajo la axila (no el fusil al pecho con los brazos estirados)
+    cad = [g for g in con if not g.rifle_aiming()]
+    lejos = ['%s %.0f' % (g.get_actor_label(), (g.rifle_butt() - g.rifle_shoulder()).length()) for g in cad if (g.rifle_butt() - g.rifle_shoulder()).length() > 30]
+    check('tanda C: a la cadera, la culata pegada al cuerpo bajo el hombro', cad and not lejos, lejos[:4])
+    # tanda C: apuntando, la culata al hombro y el cañón recto a la altura de la cara
+    g = con[0]
+    l = g.get_actor_location(); f = g.get_actor_forward_vector()
+    g.alarm(V(l.x + f.x * 900, l.y + f.y * 900, l.z))
+    yield ('hasta', lambda: g.rifle_aiming() and g.rifle_pose_weight() > 0.95, 6.0)
+    yield 1.0
+    b, s, m, l = g.rifle_butt(), g.rifle_shoulder(), g.rifle_muzzle(), g.get_actor_location()
+    check('tanda C: apuntando, la culata al hombro', g.rifle_aiming() and (b - s).length() < 16, '%s a %.1f cm del hombro' % (g.get_actor_label(), (b - s).length()))
+    check('y el cañón recto, a la altura de la cara', abs(m.z - b.z) < 18 and m.z - l.z > 35, 'boca %+.0f sobre la culata, %+.0f sobre el actor' % (m.z - b.z, m.z - l.z))
+
+def prueba_centinela():
+    """Tanda C. Los centinelas de las torres llevan el M14 como los de ronda y, si huyes a tiro, te disparan desde la torre:
+    el fogonazo sale de la boca de su fusil."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    yield 1.0
+    ts = [g for g in guardias() if g.get_editor_property('tower_sentry')]
+    check('los centinelas de las torres llevan el M14', len(ts) > 0 and all(g.has_rifle() for g in ts), '%d de %d' % (len([g for g in ts if g.has_rifle()]), len(ts)))
+    mal = ['%s %.0f' % (g.get_actor_label(), (g.rifle_muzzle() - g.get_actor_location()).length()) for g in ts if (g.rifle_muzzle() - g.get_actor_location()).length() > 160]
+    check('con el fusil en las manos (la boca junto a ellos, arriba en la torre)', not mal, mal[:4])
+    vig = [g for g in ts if 'centinela' in g.get_actor_label().lower()] or ts
+    g = vig[0]
+    d.set_day(True)
+    d.set_editor_property('armed_rule', True)
+    d.set_editor_property('armed_aim', 0.0)   # que falle: aqui solo se mira que dispare y desde donde
+    d.test_tower_fire(True)
+    l = g.get_actor_location(); f = g.get_actor_forward_vector()
+    tp(l.x + f.x * 1100, l.y + f.y * 1100)
+    mirar(V(l.x, l.y, l.z)); yield 0.3
+    t0 = g.get_editor_property('tower_shots')
+    yield ('hasta', lambda: g.get_editor_property('tower_shots') > t0, 15.0)
+    check('si huyes a tiro, el centinela te dispara desde la torre', g.get_editor_property('tower_shots') > t0, '%s: %d tiros, estado %s' % (g.get_actor_label(), g.get_editor_property('tower_shots'), estado(g)))
+    check('el tiro sale de la boca de su fusil (sonido 7,62)', str(P('last_shot_sound')) in ('cerca', 'media', 'lejos'), P('last_shot_sound'))
+    d.test_tower_fire(False)
+    d.set_editor_property('armed_rule', False)
+    d.set_editor_property('armed_aim', 1.0)
+    d.set_day(False)
+    aparte()
+
+def prueba_fisica():
+    """Tanda C. Fisica de los guardias: un golpe se nota (reaccion de Lyra segun de donde viene y la cintura para arriba con
+    fisica que se apaga sola); el dardo, tras la reaccion, los tumba con ragdoll y se quedan en reposo; el cuerpo se
+    arrastra con fisica de los hombros; al despertar pasan de la fisica a la animacion mezclando; y solo cerca del
+    jugador (los de lejos caen con la animacion de siempre)."""
+    d = director()
+    yield ('hasta', lambda: len([x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL']) >= 3, 30.0)
+    ronda = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and x.uses_gasp()]
+    check('hay guardias del GASP de ronda', len(ronda) >= 3, len(ronda))
+    if len(ronda) < 3:
+        return
+    for x in guardias():
+        x.hold(3600.0)
+        x.set_editor_property('view_distance', 1.0)
+    g, h, k = ronda[0], ronda[1], ronda[2]
+    suelo = lambda x: x.get_actor_location().z - x.get_component_by_class(unreal.CapsuleComponent).get_scaled_capsule_half_height()
+    # 1. el golpe: viene de frente (el golpe viaja hacia atras)
+    detras_de(g, 260); yield 0.3
+    f = g.get_actor_forward_vector()
+    g.hit_react(V(-f.x, -f.y, 0.0), True); yield 0.12
+    check('un golpe: reaccion de Lyra segun de donde viene', g.hit_reacting() and 'HitReact_Front' in str(g.last_hit_anim()), g.last_hit_anim())
+    check('y de cintura para arriba, cuerpos con fisica (que se van apagando)', g.physics_active() and g.hit_physics_weight() > 0.05, '%.2f' % g.hit_physics_weight())
+    yield 2.0
+    check('se le pasa solo: vuelve a la animacion de siempre', not g.hit_reacting() and not g.physics_active() and estado(g) != 'DOWN', '%s %s %s' % (g.hit_reacting(), g.physics_active(), estado(g)))
+    # 2. el dardo: primero la reaccion, luego cae con ragdoll y se queda quieto
+    detras_de(h, 500); yield 0.3
+    f = h.get_actor_forward_vector()
+    h.set_editor_property('knock_out_time', 100.0)
+    h.dart_hit(V(f.x, f.y, 0.0)); h.knock_out(); yield 0.1
+    check('dardo: primero la reaccion', h.hit_reacting() and not h.is_ragdoll(), '%s %s' % (h.hit_reacting(), h.is_ragdoll()))
+    yield 0.6
+    check('y cae con ragdoll (no un corte a la pose tumbada)', h.is_ragdoll() and estado(h) == 'DOWN', '%s %s' % (h.is_ragdoll(), estado(h)))
+    yield 4.0
+    pz = h.pelvis_location().z - suelo(h)
+    check('en el suelo, en reposo', pz < 35, 'pelvis a %.0f cm del suelo' % pz)
+    check('la capsula le sigue (los demas lo encuentran donde cayo)', dist2d(h.get_actor_location(), h.pelvis_location()) < 15, '%.0f cm' % dist2d(h.get_actor_location(), h.pelvis_location()))
+    # 3. arrastrarlo: de los hombros, con fisica
+    junto_a(h); yield 0.3
+    check('se puede arrastrar', 'ARRASTRAR' in str(d.interact_prompt()), d.interact_prompt())
+    d.interact(); yield 0.3
+    check('se arrastra con fisica (de los hombros, no rigido)', d.drag_physics(), d.get_editor_property('dragged'))
+    p0 = h.pelvis_location()
+    pl = jugador(); s = pl.get_actor_location()
+    dx, dy = s.x - p0.x, s.y - p0.y
+    n = max(1.0, math.hypot(dx, dy)); dx, dy = dx / n, dy / n
+    for i in range(16):
+        pl.set_actor_location(V(s.x + dx * 22 * (i + 1), s.y + dy * 22 * (i + 1), s.z), True, False)
+        unreal.GameplayStatics.get_player_controller(mundo(), 0).set_control_rotation(unreal.Rotator(0.0, 0.0, math.degrees(math.atan2(dy, dx))))
+        yield 0.1
+    yield 0.8
+    p1 = h.pelvis_location()
+    check('el cuerpo te sigue', dist2d(p0, p1) > 150, '%.0f cm' % dist2d(p0, p1))
+    check('a rastras: la pelvis junto al suelo (las piernas arrastran)', p1.z - suelo(h) < 45, '%.0f cm' % (p1.z - suelo(h)))
+    d.interact(); yield 0.3
+    check('se suelta con la E', not d.drag_physics() and d.get_editor_property('dragged') is None, d.get_editor_property('dragged'))
+    # 4. despertar: de la fisica a la animacion, mezclando
+    h.wake_now(); yield 0.1
+    check('al despertar, de la pose tumbada a la animada mezclando', not h.is_ragdoll() and h.wake_blending(), '%s %s' % (h.is_ragdoll(), h.wake_blending()))
+    yield 1.5
+    check('y de pie', estado(h) != 'DOWN' and not h.wake_blending() and h.pelvis_location().z - suelo(h) > 70, '%s, pelvis a %.0f cm' % (estado(h), h.pelvis_location().z - suelo(h)))
+    # 5. lejos del jugador, sin fisica (la animacion de siempre)
+    aparte(); yield 0.3
+    k.set_editor_property('knock_out_time', 100.0)
+    k.knock_out(); yield 0.5
+    check('lejos del jugador, cae sin fisica (ahorro)', estado(k) == 'DOWN' and not k.is_ragdoll(), '%s %s' % (estado(k), k.is_ragdoll()))
+    k.wake_now()
+    for x in guardias():
+        x.hold(0.0)
+        x.set_editor_property('view_distance', 2000.0)
 
 def prueba_lobo_piedra():
     """Tanda B. El lobo amigo va a por la piedra que tiras (Q) si cae a menos de DogFetchRadius, la coge con la boca, te la
@@ -3346,6 +3461,9 @@ def prueba_lobo_piedra():
         x.hold(3600.0)   # que nadie venga a por ti por el ruido de la piedra mientras el lobo la trae
     d.throw_stone(); yield 0.3
     caida = d.get_editor_property('last_stone')
+    # tanda C: una piedra de verdad (SM_Piedra, unos 9 cm), que se vea en la boca del lobo
+    tam = d.last_stone_size()
+    check('tanda C: la piedra es una piedra de verdad, de unos 9 cm', str(d.last_stone_mesh()) == 'SM_Piedra' and 7.0 <= max(tam.x, tam.y, tam.z) <= 11.5, '%s %.1f x %.1f x %.1f cm' % (d.last_stone_mesh(), tam.x, tam.y, tam.z))
     check('la piedra cae a su alcance', math.hypot(caida.x - l.x, caida.y - l.y) < P('dog_fetch_radius'), '%.0f cm' % math.hypot(caida.x - l.x, caida.y - l.y))
     check('sale corriendo a por ella', P('dog_fetch') == 1 and d.dog_anim_index() == 4, '%s anim %s' % (P('dog_fetch'), d.dog_anim_index()))
     vistos = {'boca': False, 'lejos_boca': 999.0}
@@ -3372,6 +3490,26 @@ def prueba_lobo_piedra():
     d.throw_stone(); yield 0.5
     check('si cae lejos (más que DogFetchRadius) no va', P('dog_fetch') == 0, P('dog_fetch'))
     d.set_editor_property('dog_fetch_radius', 2500.0)
+
+def prueba_lobo_paso():
+    """Tanda C. El lobo pasa de una animacion a otra mezclando (sin saltos) y anda al paso de la animacion (sin patinar):
+    la velocidad de reproduccion sale de lo que avanza de verdad entre lo que avanza la animacion."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    aparte(); yield 1.0
+    if not d.dog_ready():
+        check('el lobo esta', False)
+        return
+    yield ('hasta', lambda: d.dog_anim_index() == 1 and d.dog_speed2d() > 40, 15.0)
+    yield 0.6
+    r = d.dog_play_rate()
+    check('andando, al paso de la animacion (velocidad de reproduccion cerca de 1)', P('dog_state') != 3 and 0.75 <= r <= 1.35, 'anim %s, %.0f cm/s, rate %.2f' % (d.dog_anim_index(), d.dog_speed2d(), r))
+    vio = {'mezcla': False}
+    def mira():
+        vio['mezcla'] = vio['mezcla'] or d.dog_blending()
+        return d.dog_anim_index() != 1
+    yield ('hasta', mira, 20.0)
+    check('al cambiar de animacion, mezcla (sin saltos)', vio['mezcla'], 'anim %s' % d.dog_anim_index())
 
 def prueba_lobo_caricia():
     """Tanda B. Un guardia tranquilo que ve al lobo amigo cerca cree que es un perro suelto: le habla, va, se agacha y lo
@@ -3421,7 +3559,10 @@ def prueba_lobo_caricia():
     check('al lado del lobo', math.hypot(p.get_actor_location().x - l0.x, p.get_actor_location().y - l0.y) < 180, '%.0f cm' % math.hypot(p.get_actor_location().x - l0.x, p.get_actor_location().y - l0.y))
     yield 2.0
     l1 = d.dog_location()
-    check('el lobo se queda quieto mientras', math.hypot(l1.x - l0.x, l1.y - l0.y) < 5 and d.dog_anim_index() == 0, '%.0f cm, anim %s' % (math.hypot(l1.x - l0.x, l1.y - l0.y), d.dog_anim_index()))
+    check('el lobo se queda quieto mientras (tanda C: de pie, dejandose)', math.hypot(l1.x - l0.x, l1.y - l0.y) < 5 and d.dog_anim_index() in (0, 2, 3), '%.0f cm, anim %s' % (math.hypot(l1.x - l0.x, l1.y - l0.y), d.dog_anim_index()))
+    mano = (p.left_hand_location() - d.dog_back_location()).length()
+    check('tanda C: con la mano sobre el lomo', p.pet_hand_weight() > 0.9 and mano < 30, 'mano a %.0f cm del lomo, peso %.2f' % (mano, p.pet_hand_weight()))
+    check('tanda C: y el lobo mueve la cola', d.dog_wagging() > 0.5, '%.2f' % d.dog_wagging())
     yield ('hasta', lambda: not p.is_petting(), 8.0)
     yield 0.3
     check('a los seis segundos se levanta y vuelve a su ronda', not p.is_petting() and not p.get_editor_property('is_crouched') and not p.is_on_errand() and estado(p) in ('PATROL', 'RETURN'), 'acaricia %s agachado %s recado %s %s' % (p.is_petting(), p.get_editor_property('is_crouched'), p.is_on_errand(), estado(p)))
@@ -3532,7 +3673,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_fusil]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica]]
 PRUEBAS = []
 
 
@@ -3604,7 +3745,7 @@ def _limpieza(siguiente):
         d.set_editor_property('talk_cross', siguiente is prueba_cruce)   # tanda 47: en las demás, las charlas no salen solas al cruzarse
         d.set_editor_property('aim_held', False)
         d.set_editor_property('third', False)
-        d.set_editor_property('dog', siguiente in (prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia))   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
+        d.set_editor_property('dog', siguiente in (prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia, prueba_lobo_paso))   # tanda 46: el perro solo ronda en su prueba (en las del hangar ladraria y traeria guardias)
         d.set_editor_property('lean_left', False); d.set_editor_property('lean_right', False)
         # tanda 44: la caja que se nota de cerca, solo en su prueba (las de la caja se escribieron pegadas al guardia)
         d.set_editor_property('box_notice_dist', 150.0 if siguiente is prueba_tactica else 0.0)

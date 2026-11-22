@@ -1401,9 +1401,34 @@ public:
 	bool bDogWolf = false;
 	/** El lobo andando (ronda) y corriendo (a por la piedra), cm/s. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
-	float WolfWalkSpeed = 125.0f;
+	float WolfWalkSpeed = 85.0f;   // tanda C: cerca de lo que anda la animacion a la escala del lobo (93 cm/s x 0,8)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
-	float DogRunSpeed = 480.0f;
+	float DogRunSpeed = 400.0f;   // y corriendo (444 x 0,8 = 355; un poco mas, con la animacion algo acelerada)
+	/** Tanda C: lo que avanzan las animaciones de andar y correr del lobo a escala 1 (cm/s, medido de sus versiones con
+	 *  root motion): la velocidad de reproduccion sale de la velocidad de verdad entre esta, y no patina. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float WolfWalkAnimSpeed = 92.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float WolfRunAnimSpeed = 443.7f;
+	/** Tanda C: segundos de mezcla al cambiar de animacion. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogBlendSeconds = 0.3f;
+	/** Tanda C: la mano del guardia sobre el lomo: altura sobre el hueso del lomo, recorrido de la caricia (cm) y ritmo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogPetHandUp = 6.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogPetStroke = 12.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogPetStrokeHz = 0.8f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	float DogPlayRate() const { return DogRate; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	bool DogBlending() const { return DogBlendT > 0.0f; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	float DogSpeed2D() const { return DogSpeedNow; }
+	/** Donde se ve el lomo del lobo (pruebas: la mano del guardia que lo acaricia). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	FVector DogBackLocation() const;
 	/** Amigo: va a por la piedra si cae a menos de esto (cm) de el. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
 	float DogFetchRadius = 2500.0f;
@@ -1458,6 +1483,30 @@ public:
 	float DogFetchT = 0.0f;
 	float DogPetScanT = 0.0f;
 	FName DogHeadBone = NAME_None;
+	FName DogBackBone = NAME_None;
+	UPROPERTY()
+	TObjectPtr<class USkeletalMeshComponent> DogMeshB;
+	UPROPERTY()
+	TObjectPtr<class UPoseableMeshComponent> DogVis;
+	int32 DogCur = 0;
+	float DogBlendT = 0.0f;
+	float DogDt = 0.0f;
+	float DogSpeedNow = 0.0f;
+	float DogRate = 1.0f;
+	float DogPetLieT = 0.0f;
+	FVector DogPrevLoc = FVector::ZeroVector;
+	void DogPoseTick();
+	void DogWagTick(float Dt);
+	TArray<FName> DogTailBones;
+	float DogWagW = 0.0f;
+	float DogWagPhase = 0.0f;
+	/** Tanda C: la cola mientras lo acarician (grados y vaivenes por segundo). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogWagDegrees = 28.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogWagHz = 2.2f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
+	float DogWagging() const { return DogWagW; }
 	bool bDogTried = false;
 	bool DogToB = true;
 	FVector DogLoc = FVector::ZeroVector;
@@ -1681,6 +1730,10 @@ public:
 	bool bHalt = false;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
 	bool bFleeing = false;
+	/** Tanda C, para las pruebas: los centinelas de la torre disparan como si huyeras (bFleeing lo recalcula el combate). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Armado")
+	void TestTowerFire(bool bOn) { bTestTowerFire = bOn; }
+	bool bTestTowerFire = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
 	int32 Wounds = 0;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
@@ -1893,6 +1946,27 @@ public:
 	/** Guardia caído que vas arrastrando (o nullptr). */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis")
 	TObjectPtr<class ATarsisGuard> Dragged;
+	/** Tanda C: con ragdoll, el cuerpo se arrastra de los hombros con un tirador físico: a cuánto detrás de ti y a qué
+	 *  altura del suelo van los hombros (cm), y lo duro que tira. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float DragBehind = 95.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float DragHeight = 55.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float DragStiffness = 900.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float DragDamping = 160.0f;
+	/** Arrastrando con física (no el cuerpo rígido de antes). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool DragPhysics() const;
+	UPROPERTY()
+	TObjectPtr<class UPhysicsHandleComponent> DragHandle;
+	FName DragBone = NAME_None;
+	/** La última piedra tirada: su malla y su tamaño (cm). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	FString LastStoneMesh() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis")
+	FVector LastStoneSize() const;
 
 	// ---- sonido del mundo: superficies, pasos de los guardias y voces
 
@@ -2089,6 +2163,9 @@ public:
 	/** En primera, la cámara de la escena no se acerca al guardia más de esto (cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
 	float CaptureCamMinDist = 75.0f;
+	/** Tanda C: y de su pecho, en 3D (cm): en el culatazo se echa encima. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Captura")
+	float CaptureCamMinChest = 110.0f;
 	bool bCaptureWounded = false;   // la captura viene del tercer tiro (golpe)
 	/** Para las pruebas y las capturas: te coge G ya, como rendido o como huyendo (bHit). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Captura")

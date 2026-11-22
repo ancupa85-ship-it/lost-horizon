@@ -39,6 +39,7 @@
 #include "GameFramework/InputSettings.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "AudioDevice.h"
+#include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Animation/AnimationAsset.h"
@@ -730,6 +731,30 @@ void ATarsisDirector::StartDrag(ATarsisGuard* G)
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (!C || !G) return;
 	Dragged = G;
+	// tanda C: si el cuerpo esta con ragdoll, se agarra de los hombros con un tirador fisico y las piernas arrastran
+	if (G->IsRagdoll())
+	{
+		USkeletalMeshComponent* Body = G->GetMesh();
+		DragBone = NAME_None;
+		for (const TCHAR* N : { TEXT("spine_05"), TEXT("spine_04"), TEXT("spine_03") })
+		{
+			if (Body && Body->GetBodyInstance(FName(N))) { DragBone = FName(N); break; }
+		}
+		if (!DragBone.IsNone())
+		{
+			if (!DragHandle)
+			{
+				DragHandle = NewObject<UPhysicsHandleComponent>(this, TEXT("Arrastre"));
+				DragHandle->RegisterComponent();
+			}
+			DragHandle->LinearStiffness = DragStiffness;
+			DragHandle->LinearDamping = DragDamping;
+			DragHandle->InterpolationSpeed = 8.0f;
+			Body->WakeAllRigidBodies();
+			DragHandle->GrabComponentAtLocation(Body, DragBone, Body->GetBoneLocation(DragBone));
+			G->bPhysDragged = true;
+		}
+	}
 	UCharacterMovementComponent* M = C->GetCharacterMovement();
 	SavedWalk = BaseWalk > 0.0f ? BaseWalk : M->MaxWalkSpeed;
 	SavedCrouch = M->MaxWalkSpeedCrouched;
@@ -742,6 +767,8 @@ void ATarsisDirector::StartDrag(ATarsisGuard* G)
 void ATarsisDirector::StopDrag()
 {
 	if (!Dragged) return;
+	if (DragHandle && DragHandle->GetGrabbedComponent()) DragHandle->ReleaseComponent();
+	Dragged->bPhysDragged = false;
 	Dragged = nullptr;
 	if (ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0)))
 	{
@@ -758,6 +785,18 @@ void ATarsisDirector::DragTick()
 	if (Dragged->State != ETarsisGuardState::Down) { StopDrag(); return; }
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (!C) return;
+	// tanda C: con fisica, el tirador lleva los hombros detras de ti, a media altura; el resto del cuerpo arrastra
+	if (DragHandle && DragHandle->GetGrabbedComponent() == Dragged->GetMesh())
+	{
+		const FVector Back = C->GetActorForwardVector().GetSafeNormal2D();
+		const float Feet = C->GetActorLocation().Z - C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		FVector Want = C->GetActorLocation() - Back * DragBehind;
+		Want.Z = Feet + DragHeight;
+		const FVector Now = Dragged->GetMesh()->GetBoneLocation(DragBone);
+		if (FVector::Dist2D(Want, Now) > 450.0f) { StopDrag(); return; }   // se ha quedado enganchado
+		DragHandle->SetTargetLocation(Want);
+		return;
+	}
 	// el cuerpo va detrás del jugador, a la altura a la que está (choca con muros y cajas, no con personas)
 	const FVector Back = C->GetActorForwardVector().GetSafeNormal2D();
 	FVector Want = C->GetActorLocation() - Back * 110.0f;
@@ -807,7 +846,20 @@ void ATarsisDirector::ThrowStone()
 	LastStone = P;
 	if (HintStep < 2) HintStep = 2;
 	if (StoneSnd) UGameplayStatics::PlaySoundAtLocation(this, StoneSnd, P, 1.0f, FMath::FRandRange(0.9f, 1.1f), 0.0f, Atten);
-	if (UStaticMeshComponent* S = AddBlock(P + FVector(0.0f, 0.0f, 3.0f), FVector(0.06f, 0.05f, 0.05f), FLinearColor(0.3f, 0.29f, 0.27f), false))
+	// tanda C: una piedra de verdad (SM_Piedra, ~9 cm, de armas.py); sin ella, el cubito de antes
+	UStaticMeshComponent* S = nullptr;
+	if (UStaticMesh* Rock = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Tarsis/Atrezo/SM_Piedra.SM_Piedra")))
+	{
+		S = NewObject<UStaticMeshComponent>(this);
+		S->SetStaticMesh(Rock);
+		S->SetMobility(EComponentMobility::Movable);
+		S->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		S->SetCanEverAffectNavigation(false);
+		S->SetWorldLocationAndRotation(P + FVector(0.0f, 0.0f, 2.5f), FRotator(FMath::FRandRange(-10.0f, 10.0f), FMath::FRandRange(0.0f, 360.0f), FMath::FRandRange(-10.0f, 10.0f)));
+		S->RegisterComponent();
+	}
+	else S = AddBlock(P + FVector(0.0f, 0.0f, 3.0f), FVector(0.06f, 0.05f, 0.05f), FLinearColor(0.3f, 0.29f, 0.27f), false);
+	if (S)
 	{
 		Stones.Add(S);
 		if (Stones.Num() > 6) { if (Stones[0]) Stones[0]->DestroyComponent(); Stones.RemoveAt(0); }
@@ -930,6 +982,7 @@ void ATarsisDirector::ShootDart()
 	ATarsisGuard* Best = DartLine(Loc, Fwd, BestT);
 	if (ShootLamp(Loc, Fwd, Best ? BestT : 3500.0f)) return;
 	if (!Best) return;   // fallado: el contador de dardos del HUD ya lo dice
+	Best->DartHit(Fwd);   // tanda C: la reaccion al dardo y, enseguida, cae con fisica
 	Best->KnockOut();
 	Best->bDarted = true;
 	++Takedowns;
@@ -1248,6 +1301,8 @@ void ATarsisDirector::Shove(ATarsisGuard* G)
 		It->HearNoise(G->GetActorLocation());
 		++Heard;
 	}
+	// tanda C: el golpe se nota en el cuerpo (reaccion de Lyra segun de donde viene y la cintura para arriba con fisica)
+	if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) G->HitReact(G->GetActorLocation() - Pl->GetActorLocation(), true);
 	Teach(TEXT("ensena_empujon"), TEXT("EMPUJAS A {0}\nAturdido 2 s: rodealo y derribalo (E) o vete. El golpe se oye: los que esten cerca vienen."), { G->GuardName.ToUpper() }, 3.5f);
 }
 

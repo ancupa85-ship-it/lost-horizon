@@ -14,9 +14,12 @@
 #include "Animation/AnimationAsset.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/IAssetRegistry.h"
+#include "Components/PoseableMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
+#include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -81,6 +84,26 @@ void ATarsisDirector::SpawnDog()
 	DogMesh->SetWorldScale3D(FVector(bDogWolf ? WolfScale : DogScale));
 	DogMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	DogMesh->RegisterComponent();
+	// tanda C: sin saltos entre animaciones. Dos copias ocultas (DogMesh y DogMeshB) tocan la animacion de antes y la
+	// nueva; la que se ve (DogVis) mezcla sus poses durante DogBlendSeconds
+	DogMesh->SetHiddenInGame(true);
+	DogMesh->SetCastShadow(false);
+	DogMeshB = NewObject<USkeletalMeshComponent>(this);
+	DogMeshB->SetSkeletalMesh(SK);
+	DogMeshB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	DogMeshB->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	DogMeshB->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	DogMeshB->SetHiddenInGame(true);
+	DogMeshB->SetCastShadow(false);
+	DogMeshB->SetupAttachment(DogMesh);
+	DogMeshB->RegisterComponent();
+	DogVis = NewObject<UPoseableMeshComponent>(this);
+	DogVis->SetSkinnedAssetAndUpdate(SK);
+	DogVis->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	DogVis->SetupAttachment(DogMesh);
+	DogVis->RegisterComponent();
+	DogCur = 0;
+	DogBlendT = 0.0f;
 	// el lobo: hacia donde mira la malla (de la pelvis a la cabeza, en la pose de referencia) y el hueso de la boca
 	DogHeadBone = NAME_None;
 	if (bDogWolf)
@@ -90,6 +113,8 @@ void ATarsisDirector::SpawnDog()
 		for (int32 i = 0; i < Ref.GetNum(); ++i)
 		{
 			const FString N = Ref.GetBoneName(i).ToString().ToLower();
+			if (DogBackBone.IsNone() && N.EndsWith(TEXT("spine1"))) DogBackBone = Ref.GetBoneName(i);
+			if (N.Contains(TEXT("tail")) && DogTailBones.Num() < 4) DogTailBones.Add(Ref.GetBoneName(i));
 			if (DogHeadBone.IsNone() && N.EndsWith(TEXT("head"))) DogHeadBone = Ref.GetBoneName(i);
 			if (Pelvis.IsNone() && N.EndsWith(TEXT("pelvis"))) Pelvis = Ref.GetBoneName(i);
 		}
@@ -121,16 +146,74 @@ void ATarsisDirector::DogPlace()
 {
 	if (!DogMesh) return;
 	DogMesh->SetWorldLocationAndRotation(DogLoc, FRotator(0.0f, DogYaw + DogMeshYaw, 0.0f));
+	DogPoseTick();
+}
+
+void ATarsisDirector::DogPoseTick()
+{
+	USkeletalMeshComponent* Cur = DogCur == 0 ? DogMesh.Get() : DogMeshB.Get();
+	USkeletalMeshComponent* Prev = DogCur == 0 ? DogMeshB.Get() : DogMesh.Get();
+	if (!DogVis || !Cur) return;
+	// tanda C: al paso de la animacion (la velocidad de verdad entre la de la animacion) para que no patine
+	const float Dt = FMath::Max(DogDt, 1e-4f);
+	DogSpeedNow = FMath::FInterpTo(DogSpeedNow, FVector::Dist2D(DogLoc, DogPrevLoc) / Dt, Dt, 10.0f);
+	DogPrevLoc = DogLoc;
+	const float Scale = bDogWolf ? WolfScale : DogScale;
+	if (bDogWolf && (DogAnimNow == 1 || DogAnimNow == 4))
+	{
+		const float Nat = (DogAnimNow == 1 ? WolfWalkAnimSpeed : WolfRunAnimSpeed) * Scale;
+		DogRate = FMath::Clamp(DogSpeedNow / FMath::Max(Nat, 1.0f), 0.45f, 1.8f);
+	}
+	else DogRate = 1.0f;
+	Cur->SetPlayRate(DogRate);
+	// la mezcla entre la animacion de antes y la nueva
+	if (DogBlendT > 0.0f) DogBlendT -= Dt;
+	const TArray<FTransform>& B = Cur->GetBoneSpaceTransforms();
+	if (DogBlendT <= 0.0f || !Prev || Prev->GetBoneSpaceTransforms().Num() != B.Num() || DogVis->BoneSpaceTransforms.Num() != B.Num())
+	{
+		DogVis->CopyPoseFromSkeletalComponent(Cur);
+		DogWagTick(Dt);
+		return;
+	}
+	const TArray<FTransform>& A = Prev->GetBoneSpaceTransforms();
+	const float Alpha = FMath::SmoothStep(0.0f, 1.0f, 1.0f - DogBlendT / FMath::Max(DogBlendSeconds, 0.01f));
+	for (int32 i = 0; i < B.Num(); ++i) DogVis->BoneSpaceTransforms[i].Blend(A[i], B[i], Alpha);
+	DogVis->MarkRefreshTransformDirty();
+	DogWagTick(Dt);
+}
+
+void ATarsisDirector::DogWagTick(float Dt)
+{
+	// tanda C: mueve la cola mientras lo acarician: una onda de lado a lado por los huesos de la cola, sobre la pose
+	const ATarsisGuard* G = DogPetG.Get();
+	DogWagW = FMath::FInterpConstantTo(DogWagW, (G && G->PetCrouched()) ? 1.0f : 0.0f, Dt, 2.0f);
+	if (DogWagW <= 0.0f || !DogVis || DogTailBones.Num() == 0) return;
+	DogWagPhase = FMath::Fmod(DogWagPhase + Dt * DogWagHz * 2.0f * PI, 2.0f * PI);
+	const FVector Up = DogVis->GetComponentTransform().InverseTransformVectorNoScale(FVector::UpVector).GetSafeNormal();
+	for (int32 i = 0; i < DogTailBones.Num(); ++i)
+	{
+		const float Ang = FMath::DegreesToRadians(DogWagDegrees * DogWagW * FMath::Sin(DogWagPhase - 0.6f * i) * (i == 0 ? 1.0f : 0.5f));
+		FTransform T = DogVis->GetBoneTransformByName(DogTailBones[i], EBoneSpaces::ComponentSpace);
+		T.SetRotation((FQuat(Up, Ang) * T.GetRotation()).GetNormalized());
+		DogVis->SetBoneTransformByName(DogTailBones[i], T, EBoneSpaces::ComponentSpace);
+	}
 }
 
 void ATarsisDirector::DogAnim(int32 Which, bool bLoop)
 {
 	if (!DogMesh || DogAnimNow == Which) return;
+	const bool bFirst = DogAnimNow < 0;
 	DogAnimNow = Which;
 	// sin esa animacion (el perro de antes solo tiene cuatro): correr = andar, grunir = quieto, levantarse = quieto
 	int32 A = Which;
 	if (A >= 0 && A < DogAnimSlots && !DogAnims[A]) A = (A == 4) ? 1 : 0;
-	if (A >= 0 && A < DogAnimSlots && DogAnims[A]) DogMesh->PlayAnimation(DogAnims[A], bLoop);
+	if (A < 0 || A >= DogAnimSlots || !DogAnims[A]) return;
+	// tanda C: la nueva en la otra copia, y la que se ve pasa de una a otra (la primera vez, sin mezcla)
+	if (!bFirst && DogMeshB) DogCur = 1 - DogCur;
+	USkeletalMeshComponent* Cur = DogCur == 0 ? DogMesh.Get() : DogMeshB.Get();
+	Cur->PlayAnimation(DogAnims[A], bLoop);
+	Cur->SetPlayRate(1.0f);
+	DogBlendT = bFirst ? 0.0f : DogBlendSeconds;
 }
 
 void ATarsisDirector::DogFace(const FVector& To, float DeltaSeconds)
@@ -157,7 +240,7 @@ FVector ATarsisDirector::DogMouth() const
 {
 	if (!DogMesh) return DogLoc;
 	const FVector Fwd = FRotator(0.0f, DogYaw, 0.0f).Vector();
-	if (!DogHeadBone.IsNone()) return DogMesh->GetBoneLocation(DogHeadBone) + Fwd * DogMouthFwd - FVector(0.0f, 0.0f, DogMouthDown);
+	if (!DogHeadBone.IsNone() && DogVis) return DogVis->GetBoneLocationByName(DogHeadBone, EBoneSpaces::WorldSpace) + Fwd * DogMouthFwd - FVector(0.0f, 0.0f, DogMouthDown);
 	return DogLoc + Fwd * 45.0f + FVector(0.0f, 0.0f, 35.0f);
 }
 
@@ -323,7 +406,7 @@ void ATarsisDirector::DogPetTick(float DeltaSeconds)
 		BestD = D;
 	}
 	if (!Best) return;
-	if (!Best->StartPet(DogLoc, DogPetSeconds)) return;
+	if (!Best->StartPet(DogBackLocation(), DogPetSeconds)) return;
 	DogPetG = Best;
 	++DogPets;
 	GuardSay(Best, TEXT("lobo"));
@@ -357,9 +440,10 @@ void ATarsisDirector::GiveBone()
 
 void ATarsisDirector::DogTick(float DeltaSeconds)
 {
+	DogDt = DeltaSeconds;
 	if (!bDog)
 	{
-		if (DogMesh && DogMesh->IsVisible()) DogMesh->SetVisibility(false);
+		if (DogVis && DogVis->IsVisible()) DogVis->SetVisibility(false);
 		return;
 	}
 	if (!DogMesh)
@@ -367,7 +451,7 @@ void ATarsisDirector::DogTick(float DeltaSeconds)
 		if (!bDogTried) SpawnDog();
 		if (!DogMesh) return;
 	}
-	if (!DogMesh->IsVisible()) DogMesh->SetVisibility(true);
+	if (DogVis && !DogVis->IsVisible()) DogVis->SetVisibility(true);
 	if (DogState != 3 && HasFlag(FName(TEXT("perro_amigo")))) DogState = 3;   // partida cargada
 	const APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
 	const FVector P = Pl ? Pl->GetActorLocation() : DogLoc;
@@ -388,13 +472,31 @@ void ATarsisDirector::DogTick(float DeltaSeconds)
 		DogPetTick(DeltaSeconds);
 		if (ATarsisGuard* G = DogPetG.Get())
 		{
-			// un guardia viene a acariciarlo: de pie, quieto, de cara a el
-			DogSitT = 0.0f;
-			DogAnim(0, true);
-			DogFace(G->GetActorLocation(), DeltaSeconds * 0.6f);
+			// un guardia viene a acariciarlo: de pie, quieto, de cara a el; cuando se agacha, se tumba y se deja (tanda C)
+			// y la mano del guardia va al lomo con un vaiven
+			if (G->PetCrouched())
+			{
+				// tanda C: de pie (tumbado, el lomo queda fuera del alcance del guardia agachado) y moviendo la cola (el pack
+				// no trae animacion de cola: la mueve DogPoseTick sobre la pose que se ve)
+				DogPetLieT += DeltaSeconds;
+				DogAnim(0, true);
+				FVector Back = DogLoc + FVector(0.0f, 0.0f, 45.0f);
+				if (DogVis && !DogBackBone.IsNone()) Back = DogVis->GetBoneLocationByName(DogBackBone, EBoneSpaces::WorldSpace);
+				const FVector Fwd = FRotator(0.0f, DogYaw, 0.0f).Vector();
+				G->PetHandWorld = Back + FVector(0.0f, 0.0f, DogPetHandUp) + Fwd * FMath::Sin(GetWorld()->GetTimeSeconds() * DogPetStrokeHz * 2.0f * PI) * DogPetStroke;
+			}
+			else
+			{
+				DogPetLieT = 0.0f;
+				DogSitT = 0.0f;
+				DogAnim(0, true);
+				DogFace(G->GetActorLocation(), DeltaSeconds * 0.6f);
+				G->PetHandWorld = FVector::ZeroVector;
+			}
 			DogPlace();
 			return;
 		}
+		DogPetLieT = 0.0f;
 		// amigo: tumbado donde le diste el hueso (o donde te dejo la piedra); te sigue con la cabeza (con todo el cuerpo)
 		DogSitT += DeltaSeconds;
 		if (DogSitT < 0.0f) DogAnim(0, true);
@@ -475,6 +577,29 @@ void ATarsisDirector::DogTick(float DeltaSeconds)
 	DogPlace();
 }
 
+FVector ATarsisDirector::DogBackLocation() const
+{
+	if (DogVis && !DogBackBone.IsNone()) return DogVis->GetBoneLocationByName(DogBackBone, EBoneSpaces::WorldSpace);
+	return DogLoc + FVector(0.0f, 0.0f, 45.0f);
+}
+
+bool ATarsisDirector::DragPhysics() const
+{
+	return Dragged && DragHandle && DragHandle->GetGrabbedComponent() != nullptr;
+}
+
+FString ATarsisDirector::LastStoneMesh() const
+{
+	const UStaticMeshComponent* S = Stones.Num() > 0 ? Stones.Last().Get() : nullptr;
+	return S && S->GetStaticMesh() ? S->GetStaticMesh()->GetName() : FString();
+}
+
+FVector ATarsisDirector::LastStoneSize() const
+{
+	const UStaticMeshComponent* S = Stones.Num() > 0 ? Stones.Last().Get() : nullptr;
+	return S ? S->Bounds.BoxExtent * 2.0f : FVector::ZeroVector;
+}
+
 // ---- el guardia que acaricia al lobo (tanda B)
 
 bool ATarsisGuard::StartPet(const FVector& DogAt, float Seconds)
@@ -482,7 +607,9 @@ bool ATarsisGuard::StartPet(const FVector& DogAt, float Seconds)
 	// se pone al lado del lobo, por la parte de donde viene, y lo mira
 	FVector Side = (GetActorLocation() - DogAt).GetSafeNormal2D();
 	if (Side.IsNearlyZero()) Side = -GetActorForwardVector();
-	const FVector Where = DogAt + Side * 85.0f;
+	// tanda C: el recado se da por llegado a 70 cm del punto, y la mano tiene que llegar al lomo agachado: el punto va
+	// algo mas alla del lomo (PetStandOff negativo) para que se pare pegado al lobo
+	const FVector Where = DogAt + Side * PetStandOff;
 	const float Travel = FVector::Dist2D(GetActorLocation(), Where) / FMath::Max(WalkSpeed, 50.0f);
 	if (!Errand(Where, DogAt, Travel * 1.6f + Seconds + 3.0f)) return false;
 	bPetting = true;
@@ -497,6 +624,7 @@ void ATarsisGuard::StopPet()
 	if (!bPetting) return;
 	bPetting = false;
 	PetT = 0.0f;
+	PetHandWorld = FVector::ZeroVector;
 	if (bIsCrouched) UnCrouch();
 	PetDoneAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 }

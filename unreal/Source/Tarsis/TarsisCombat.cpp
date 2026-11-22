@@ -156,6 +156,21 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	return true;
 }
 
+// Tanda C: el centinela de la torre lleva el M14 como los demas; si huyes y te ve a tiro, te encara y dispara desde la
+// boca del canon (ShotFired usa RifleMuzzle). Lo demas de la torre (el foco, dar la voz) sigue en TowerTick.
+void ATarsisGuard::TowerShootTick(float DeltaSeconds, APawn* Player, float V)
+{
+	ATarsisDirector* D = CombatDirector(this);
+	if (!bTowerShoots || !Player || bAlly || State == ETarsisGuardState::Down || !D || !D->bArmedRule || D->bCapturing) { TowerAimT = 0.0f; return; }
+	if (ShotT > 0.0f) ShotT -= DeltaSeconds;
+	const float Dist = FVector::Dist(GetActorLocation(), Player->GetActorLocation());
+	if (!(D->bFleeing || D->bTestTowerFire) || V <= 0.0f || Dist > ArmedRange * TowerRangeMul) { TowerAimT = 0.0f; return; }
+	FaceTowards(Player->GetActorLocation(), DeltaSeconds);
+	TowerAimT += DeltaSeconds;
+	D->ReportAim(this, Dist);
+	if (TowerAimT > 0.8f && ShotT <= 0.0f) { FireAt(Player, Dist, V, D); ++TowerShots; }
+}
+
 void ATarsisGuard::FireAt(APawn* Player, float Dist, float V, ATarsisDirector* D)
 {
 	ShotT = D->ShotInterval * FMath::FRandRange(0.8f, 1.3f);

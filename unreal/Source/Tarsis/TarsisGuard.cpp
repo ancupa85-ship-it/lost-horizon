@@ -214,6 +214,7 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 	if (!Pose) return;
 	Pose->CopyPoseFromSkeletalComponent(AnimBody());
 	RifleTick(DeltaSeconds);   // tanda B: de cintura para arriba, la pose de fusil
+	WakeBlendTick(DeltaSeconds);   // tanda C: al despertar, de la pose tumbada (fisica) a la animada
 	// adónde mira la cabeza, respecto al cuerpo: el cuerpo gira despacio y la cabeza se adelanta
 	auto Toward = [this](const FVector& P) -> float
 	{
@@ -677,9 +678,15 @@ void ATarsisGuard::KnockOut()
 	bFound = false;
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);   // se le puede pasar por encima
 	USkeletalMeshComponent* M = GetMesh();
-	if (GaspBody)
+	if (GaspBody && (bRagdoll || RagdollPendingT >= 0.0f || PhysicsCanRun()))
 	{
-		GaspSingle(DownAnim, false);   // la caída sigue siendo la animación de la persona (tanda C: ragdoll)
+		// tanda C: cae con ragdoll (el dardo, tras su reaccion: DartHit dejo la caida pendiente)
+		if (bGaspSingle) GaspRestore();
+		if (RagdollPendingT < 0.0f) StartRagdoll();
+	}
+	else if (GaspBody)
+	{
+		GaspSingle(DownAnim, false);   // lejos del jugador: la animacion de caer de la persona, como antes
 	}
 	else if (BodyMesh && M)
 	{
@@ -695,6 +702,7 @@ void ATarsisGuard::KnockOut()
 
 void ATarsisGuard::WakeUp()
 {
+	StopRagdoll(true);   // tanda C: del suelo (fisica) a la animacion, mezclando
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 	Body->SetRelativeRotation(FRotator::ZeroRotator);
 	CurrentAnim = nullptr;   // UpdateAnim vuelve a poner la que toque
@@ -721,6 +729,7 @@ void ATarsisGuard::Recover()
 	Meter = 0.0f;
 	UnseenT = 0.0f;
 	BeamCallT = 0.0f;
+	StopRagdoll(false);   // tanda C
 	if (State == ETarsisGuardState::Down)
 	{
 		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
@@ -1581,6 +1590,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	StateT += DeltaSeconds;
+	PhysicsTick(DeltaSeconds);   // tanda C: reacciones a golpes, ragdoll y la capsula siguiendo al cuerpo caido
 	if (DazzleCoolT > 0.0f) DazzleCoolT -= DeltaSeconds;
 	if (StunT <= 0.0f) bDazzled = false;
 	if (State == ETarsisGuardState::Down)
@@ -1643,6 +1653,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	if (bTowerSentry)
 	{
 		TowerTick(DeltaSeconds, Player, V);
+		TowerShootTick(DeltaSeconds, Player, V);   // tanda C: con fusil, desde la torre tambien te disparan si huyes
 		return;
 	}
 

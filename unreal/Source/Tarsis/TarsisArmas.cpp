@@ -8,8 +8,9 @@
 //   al cuerpo visible, los huesos de spine_02 hacia arriba (sin cuello ni cabeza, que mira LookTick) toman la pose de
 //   RifleRef relativa a spine_01: el torso sigue a la cadera de la locomocion y los brazos sujetan el fusil. Sin grafo
 //   de animacion: Python no puede editar el ABP del GASP y asi no hace falta.
-// - La mano izquierda va al guardamanos con un IK de dos huesos hecho a mano (RifleLeftHandIK): la pose de Lyra, por las
-//   proporciones de las personas, la dejaba en el aire encima del canon.
+// - Tanda C: el fusil se coloca respecto al hombro derecho (a la cadera, o apuntando con la culata al hombro), se mece
+//   al andar, y las dos manos van a el con un IK de dos huesos hecho a mano (RifleArmIK). La pose de Lyra, por las
+//   proporciones de las personas, lo dejaba al pecho con los brazos estirados y la izquierda en el aire.
 // Textos solo en ASCII.
 #include "TarsisGuard.h"
 
@@ -90,8 +91,9 @@ FVector ATarsisGuard::RifleMuzzle() const
 void ATarsisGuard::RifleTick(float DeltaSeconds)
 {
 	if (!Pose || !Rifle) return;
-	// tumbado, con una animacion suelta de la persona (caer) o en la escena de la detencion (culatazo), sin pose de fusil
-	const bool bOn = RifleRef && RifleBones.Num() > 0 && State != ETarsisGuardState::Down && !bSceneLock && !bGaspSingle && StunT <= 0.0f;
+	// tumbado, con una animacion suelta de la persona (caer), en la escena de la detencion (culatazo) o en una reaccion
+	// a un golpe (tanda C), sin pose de fusil
+	const bool bOn = RifleRef && RifleBones.Num() > 0 && State != ETarsisGuardState::Down && !bSceneLock && !bGaspSingle && StunT <= 0.0f && HitAnimT <= 0.0f && !bRagdoll;
 	RifleW = FMath::FInterpConstantTo(RifleW, bOn ? 1.0f : 0.0f, DeltaSeconds, 3.0f);
 	if (!RifleRef || RifleW <= 0.001f) return;
 	// alerta: apunta; si no, el fusil a la cadera
@@ -101,6 +103,13 @@ void ATarsisGuard::RifleTick(float DeltaSeconds)
 		bRifleAim = bAim;
 		RifleRef->PlayAnimation(bAim ? RifleAimAnim.Get() : RifleIdleAnim.Get(), true);
 	}
+	RifleAimW = FMath::FInterpConstantTo(RifleAimW, bRifleAim ? 1.0f : 0.0f, DeltaSeconds, 4.0f);
+	// tanda C: andando, el torso deja pasar mas de la locomocion y el fusil se mece con el paso (sin maniqui rigido)
+	const float Speed = GetVelocity().Size2D();
+	const float Move = FMath::Clamp(Speed / 170.0f, 0.0f, 1.0f);
+	RifleMoveW = FMath::FInterpTo(RifleMoveW, Move, DeltaSeconds, 5.0f);
+	RiflePhase = FMath::Fmod(RiflePhase + Speed * DeltaSeconds / FMath::Max(RifleStepLength, 10.0f) * PI, 2.0f * PI);
+	const float SpineW = FMath::Lerp(RifleSpineWeight, RifleSpineWeightMoving, RifleMoveW);
 	// la pose de RifleRef relativa a spine_01, puesta sobre el spine_01 del cuerpo visible
 	const FTransform RefRoot = RifleRef->GetSocketTransform(RifleRootBone, RTS_Component);
 	const FTransform PoseRoot = Pose->GetBoneTransformByName(RifleRootBone, EBoneSpaces::ComponentSpace);
@@ -109,31 +118,74 @@ void ATarsisGuard::RifleTick(float DeltaSeconds)
 		const FName B = RifleBones[i];
 		const FTransform Want = RifleRef->GetSocketTransform(B, RTS_Component).GetRelativeTransform(RefRoot) * PoseRoot;
 		const FTransform Cur = Pose->GetBoneTransformByName(B, EBoneSpaces::ComponentSpace);
-		const float W = RifleW * (RifleBoneIsSpine[i] ? RifleSpineWeight : 1.0f);
+		const float W = RifleW * (RifleBoneIsSpine[i] ? SpineW : 1.0f);
 		FTransform T = Cur;
 		T.SetRotation(FQuat::Slerp(Cur.GetRotation(), Want.GetRotation(), W).GetNormalized());
 		T.SetLocation(FMath::Lerp(Cur.GetLocation(), Want.GetLocation(), W));
 		Pose->SetBoneTransformByName(B, T, EBoneSpaces::ComponentSpace);
 	}
-	// el agarre de la mano derecha cambia entre cadera y apuntar (medido en el PC con las dos poses)
-	RifleAimW = FMath::FInterpConstantTo(RifleAimW, bRifleAim ? 1.0f : 0.0f, DeltaSeconds, 4.0f);
-	const FQuat Grip = FQuat::Slerp(RifleGripRot.Quaternion(), RifleAimGripRot.Quaternion(), RifleAimW);
-	Rifle->SetRelativeRotation(Grip);
-	if (bRifleLeftIK) RifleLeftHandIK(RifleW);
+	// tanda C: el fusil ya no va donde lo deje la mano de Lyra (con las proporciones de las personas quedaba al pecho y
+	// con los brazos estirados): se coloca respecto al hombro derecho (a la cadera, culata bajo la axila; apuntando,
+	// culata al hombro y el canon a la altura de la mejilla) y las dos manos van a el con IK
+	const FTransform Grip(FQuat::Slerp(RifleGripRot.Quaternion(), RifleAimGripRot.Quaternion(), RifleAimW).GetNormalized(), RifleGripLoc);
+	FTransform RifleCS;
+	if (bRifleHold && RifleHoldTransform(RifleCS))
+	{
+		const FTransform HandCS = Grip.Inverse() * RifleCS;
+		RifleArmIK(0, HandCS.GetLocation(), &HandCS, RifleW);
+	}
+	// el fusil, donde ha quedado de verdad la mano derecha
+	RifleCS = Grip * Pose->GetBoneTransformByName(ArmBones[0][2], EBoneSpaces::ComponentSpace);
+	RifleCSNow = RifleCS;
+	Rifle->SetRelativeTransform(Grip);
+	if (!bRifleLeftIK) return;
+	// la izquierda: al guardamanos; o, acariciando al lobo (tanda C), al lomo del lobo con un vaiven
+	FVector LeftT = RifleCS.TransformPosition(RifleLeftHand);
+	PetHandW = FMath::FInterpConstantTo(PetHandW, (PetCrouched() && !PetHandWorld.IsNearlyZero()) ? 1.0f : 0.0f, DeltaSeconds, 2.0f);
+	if (PetHandW > 0.0f)
+	{
+		const FVector Pet = Pose->GetComponentTransform().InverseTransformPosition(PetHandWorld);
+		LeftT = FMath::Lerp(LeftT, Pet, FMath::SmoothStep(0.0f, 1.0f, PetHandW));
+	}
+	RifleArmIK(1, LeftT, nullptr, RifleW);
 }
 
-void ATarsisGuard::RifleLeftHandIK(float W)
+bool ATarsisGuard::RifleHoldTransform(FTransform& Out) const
+{
+	const FName Shoulder = ArmBones[0][0];
+	if (Shoulder.IsNone()) return false;
+	const FTransform CompXf = Pose->GetComponentTransform();
+	const FVector F = CompXf.InverseTransformVectorNoScale(GetActorForwardVector()).GetSafeNormal();
+	const FVector R = CompXf.InverseTransformVectorNoScale(GetActorRightVector()).GetSafeNormal();
+	const FVector U = CompXf.InverseTransformVectorNoScale(FVector::UpVector).GetSafeNormal();
+	const FVector Sh = Pose->GetBoneTransformByName(Shoulder, EBoneSpaces::ComponentSpace).GetLocation();
+	const float A = FMath::SmoothStep(0.0f, 1.0f, RifleAimW);
+	// el balanceo: sube y baja con cada paso, va de lado a lado con cada zancada y se ladea un poco
+	const float K = RifleMoveW * (1.0f - 0.6f * A);
+	const float Bob = FMath::Sin(RiflePhase * 2.0f) * RifleSwayBob * K;
+	const float Side = FMath::Sin(RiflePhase) * RifleSwaySide * K;
+	const float Roll = FMath::Sin(RiflePhase) * RifleSwayRoll * K;
+	const FVector Off = FMath::Lerp(RifleHipButt, RifleAimButt, A) + FVector(0.0f, Side, Bob);
+	const FVector Butt = Sh + F * Off.X + R * Off.Y + U * Off.Z;
+	const float P = FMath::DegreesToRadians(FMath::Lerp(RifleHipPitch, RifleAimPitch, A));
+	const float Y = FMath::DegreesToRadians(FMath::Lerp(RifleHipYaw, RifleAimYaw, A));
+	const FVector Barrel = (F * FMath::Cos(P) * FMath::Cos(Y) + R * FMath::Cos(P) * FMath::Sin(Y) + U * FMath::Sin(P)).GetSafeNormal();
+	const FVector Up = FQuat(Barrel, FMath::DegreesToRadians(Roll)).RotateVector(U);
+	const FQuat Q = FRotationMatrix::MakeFromYZ(Barrel, Up).ToQuat();   // el M14 tiene el canon hacia +Y y arriba +Z
+	Out = FTransform(Q, Butt + Barrel * RifleButtBack);
+	return true;
+}
+
+void ATarsisGuard::RifleArmIK(int32 Side, const FVector& Target, const FTransform* HandCS, float W)
 {
 	// IK de dos huesos a mano (ley del coseno), en el espacio de la malla visible: el codo se queda del lado en que estaba
-	const FName UpN = ArmBones[1][0], LoN = ArmBones[1][1], HaN = ArmBones[1][2], GripN = ArmBones[0][2];
-	if (UpN.IsNone() || LoN.IsNone() || HaN.IsNone() || GripN.IsNone() || W <= 0.01f) return;
+	const FName UpN = ArmBones[Side][0], LoN = ArmBones[Side][1], HaN = ArmBones[Side][2];
+	if (UpN.IsNone() || LoN.IsNone() || HaN.IsNone() || W <= 0.01f) return;
 	const FTransform Up = Pose->GetBoneTransformByName(UpN, EBoneSpaces::ComponentSpace);
 	const FTransform Lo = Pose->GetBoneTransformByName(LoN, EBoneSpaces::ComponentSpace);
 	const FTransform Ha = Pose->GetBoneTransformByName(HaN, EBoneSpaces::ComponentSpace);
-	// el fusil cuelga de la mano derecha: su transform en el espacio de la malla, sin esperar a que se refresque el adjunto
-	const FTransform GripCS = FTransform(Rifle->GetRelativeRotation(), Rifle->GetRelativeLocation()) * Pose->GetBoneTransformByName(GripN, EBoneSpaces::ComponentSpace);
 	const FVector A = Up.GetLocation(), B = Lo.GetLocation(), C = Ha.GetLocation();
-	const FVector T = FMath::Lerp(C, GripCS.TransformPosition(RifleLeftHand), W);
+	const FVector T = FMath::Lerp(C, Target, W);
 	const float L1 = FVector::Dist(A, B), L2 = FVector::Dist(B, C);
 	FVector Dir = T - A;
 	const float D = FMath::Clamp(Dir.Size(), 1.0f, (L1 + L2) * 0.999f);
@@ -150,9 +202,23 @@ void ATarsisGuard::RifleLeftHandIK(float W)
 	NUp.SetRotation((Q1 * Up.GetRotation()).GetNormalized());
 	NLo.SetRotation((Q2 * Q1 * Lo.GetRotation()).GetNormalized());
 	NLo.SetLocation(NB);
-	NHa.SetRotation((Q2 * Q1 * Ha.GetRotation()).GetNormalized());
+	const FQuat Follow = (Q2 * Q1 * Ha.GetRotation()).GetNormalized();
+	NHa.SetRotation(HandCS ? FQuat::Slerp(Follow, HandCS->GetRotation(), W).GetNormalized() : Follow);
 	NHa.SetLocation(NC);
 	Pose->SetBoneTransformByName(UpN, NUp, EBoneSpaces::ComponentSpace);
 	Pose->SetBoneTransformByName(LoN, NLo, EBoneSpaces::ComponentSpace);
 	Pose->SetBoneTransformByName(HaN, NHa, EBoneSpaces::ComponentSpace);
+}
+
+FVector ATarsisGuard::RifleButt() const
+{
+	// la culata, en el mundo (para las pruebas y las fotos: al hombro apuntando)
+	if (!Pose || !Rifle) return FVector::ZeroVector;
+	return Pose->GetComponentTransform().TransformPosition(RifleCSNow.TransformPosition(FVector(0.0f, -RifleButtBack, 0.0f)));
+}
+
+FVector ATarsisGuard::RifleShoulder() const
+{
+	if (!Pose || ArmBones[0][0].IsNone()) return FVector::ZeroVector;
+	return Pose->GetBoneLocationByName(ArmBones[0][0], EBoneSpaces::WorldSpace);
 }

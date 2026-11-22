@@ -122,6 +122,37 @@ def pasos():
         vp = unreal.WidgetLayoutLibrary.get_viewport_size(w)
         M['res'].append(('%s con guardias andando (%d de %d)' % (nombre, andan, len(gs)), round(media, 1), round(1.0 / peor, 1),
                          usado, total, '%dx%d' % (vp.x, vp.y), len(dts)))
+    # tanda C: la misma pasada con los tres guardias de ronda mas cercanos dormidos con ragdoll (la fisica solo cuesta cerca
+    # del jugador y, en reposo, se duerme): se mide recien caidos (los 8 s primeros) con los demas andando
+    p = unreal.GameplayStatics.get_player_pawn(w, 0)
+    ronda = [g for g in gs if not g.get_editor_property('tower_sentry')]
+    ronda.sort(key=lambda g: (g.get_actor_location() - pos).length())
+    dormidos = ronda[:3]
+    for g in dormidos:
+        g.set_editor_property('knock_out_time', 100.0)
+        # al lado del jugador (a la vista), para que caigan con fisica
+        g.set_actor_location(unreal.Vector(pos.x + 300 + 150 * dormidos.index(g), pos.y + 200, g.get_actor_location().z), False, True)
+    yield 0.3
+    for g in dormidos:
+        f = g.get_actor_forward_vector()
+        g.dart_hit(unreal.Vector(f.x, f.y, 0.0))
+        g.knock_out()
+    M['dts'] = []
+    fisica = 0
+    for _ in range(int(MIDE / 0.5)):
+        yield 0.5
+        fisica = max(fisica, sum(1 for g in gs if g.physics_active()))
+    dts = sorted(M['dts'])
+    M['dts'] = None
+    if dts:
+        media = len(dts) / sum(dts)
+        peor = dts[max(0, int(len(dts) * 0.99) - 1)]
+        usado, total = vram()
+        vp = unreal.WidgetLayoutLibrary.get_viewport_size(w)
+        M['res'].append(('%s con 3 dormidos con ragdoll (%d con fisica)' % (nombre, fisica), round(media, 1), round(1.0 / peor, 1),
+                         usado, total, '%dx%d' % (vp.x, vp.y), len(dts)))
+    for g in dormidos:
+        g.wake_now()
 
 
 def _tick(dt):

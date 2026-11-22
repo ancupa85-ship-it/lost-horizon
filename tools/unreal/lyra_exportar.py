@@ -10,6 +10,10 @@ OUT = r'D:\LostHorizon\descargas\lyra_fbx'
 ANIMS = ['/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Idle_Hipfire',
          '/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Idle_ADS',
          '/Game/Characters/Heroes/Mannequin/Animations/Actions/MM_Rifle_Melee']
+# tanda C: las reacciones a un golpe segun de donde viene (el empujon, y el dardo antes de caer con fisica)
+ANIMS += ['/Game/Characters/Heroes/Mannequin/Animations/Actions/MM_HitReact_%s' % n
+          for n in ('Front_Lgt_01', 'Back_Lgt_01', 'Left_Lgt_01', 'Right_Lgt_01', 'Front_Med_01', 'Back_Med_01', 'Left_Med_01', 'Right_Med_01')]
+ANIMS = [a for a in ANIMS if getattr(unreal, '_lyra_solo', None) is None or a.split('/')[-1] in unreal._lyra_solo]
 os.makedirs(OUT, exist_ok=True)
 for p in ANIMS:
     a = unreal.load_asset(p)

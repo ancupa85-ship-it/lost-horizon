@@ -391,6 +391,19 @@ void ATarsisDirector::SceneCameraTick(float DeltaSeconds, ACharacter* C)
 			Off.Z = 0.0f;
 			const float D = Off.Size();
 			if (D < CaptureCamMinDist) WantLoc += (D > 1.0f ? Off / D : -G->GetActorForwardVector()) * (CaptureCamMinDist - D);
+			// tanda C: ni pegada a su pecho (en el culatazo se echa encima hacia el segundo 1): distancia en 3D al pecho
+			if (USkeletalMeshComponent* GM = G->GetMesh())
+			{
+				const FName ChestBone = GM->GetBoneIndex(TEXT("spine_04")) != INDEX_NONE ? FName(TEXT("spine_04")) : FName(TEXT("spine_03"));
+				if (GM->GetBoneIndex(ChestBone) != INDEX_NONE)
+				{
+					const FVector Chest = GM->GetBoneLocation(ChestBone);
+					const float D3 = FVector::Dist(WantLoc, Chest);
+					FVector Away = WantLoc - Chest;
+					Away.Z = 0.0f;
+					if (D3 < CaptureCamMinChest) WantLoc += (Away.Normalize() ? Away : -G->GetActorForwardVector()) * (CaptureCamMinChest - D3);
+				}
+			}
 		}
 		Fall = FMath::Clamp((SceneHeadZ0 - Head.Z) / FMath::Max(SceneHeadZ0 - SceneGroundZ - 25.0f, 1.0f), 0.0f, 1.0f);
 	}

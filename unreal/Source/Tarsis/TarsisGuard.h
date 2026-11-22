@@ -178,6 +178,13 @@ public:
 	/** Tanda 37: a que distancia te tiene a tiro y en que radio busca donde cubrirse (cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
 	float ArmedRange = 1800.0f;
+	/** Tanda C: el centinela de la torre dispara (desde la boca de su M14) si huyes a menos de ArmedRange * TowerRangeMul. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	bool bTowerShoots = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
+	float TowerRangeMul = 1.4f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
+	int32 TowerShots = 0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armado")
 	float CoverRadius = 900.0f;
 	/** Segundos que aguanta en su sitio cuando te pierde de vista, antes de avanzar andando. */
@@ -279,6 +286,9 @@ public:
 	/** Derribado por la espalda: cae y duerme KnockOutTime segundos; si otro guardia lo ve, da la alarma. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void KnockOut();
+	/** Tanda C, para las pruebas: se despierta ya (como al acabar KnockOutTime). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void WakeNow() { if (State == ETarsisGuardState::Down) WakeUp(); }
 
 	/** Se le puede derribar ahora desde la posición de Who (cerca, por la espalda, sin ser centinela ni estar ya caído). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
@@ -394,6 +404,46 @@ public:
 	/** Cuánto manda la pose de fusil en el torso (los brazos van enteros con ella). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
 	float RifleSpineWeight = 0.6f;
+	/** Tanda C: andando manda menos (deja pasar el giro y el vaivén del torso de la locomoción). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleSpineWeightMoving = 0.3f;
+	/** Tanda C: el fusil se coloca respecto al hombro derecho y las dos manos van a él con IK (si no, donde lo deje la mano
+	 *  de la pose de Lyra). Culata: adelante (X), a la derecha (Y) y arriba (Z) del hombro, en cm; canon: cabeceo y giro
+	 *  (grados; negativo, hacia abajo y hacia la izquierda). A la cadera, culata bajo la axila; apuntando, al hombro. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	bool bRifleHold = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FVector RifleHipButt = FVector(4.0f, -4.0f, -15.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleHipPitch = -12.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleHipYaw = -10.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FVector RifleAimButt = FVector(2.0f, -6.0f, -2.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleAimPitch = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleAimYaw = -2.0f;
+	/** Del origen del M14 (la muñeca de la culata) al final de la culata, a lo largo del cañón (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleButtBack = 24.5f;
+	/** El vaivén al andar: arriba y abajo con cada paso, de lado con cada zancada (cm) y ladeo (grados); largo del paso. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleSwayBob = 1.4f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleSwaySide = 1.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleSwayRoll = 3.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleStepLength = 75.0f;
+	/** La culata y el hombro derecho, en el mundo (pruebas: apuntando, la culata al hombro). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	FVector RifleButt() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	FVector RifleShoulder() const;
+	/** Cuánto se mueve ahora el fusil por el vaivén del paso (0 parado, 1 andando del todo). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	float RifleSway() const { return RifleMoveW; }
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
 	bool HasRifle() const { return Rifle != nullptr; }
 	/** Peso actual de la pose de fusil (0 suelta, 1 entera). */
@@ -418,8 +468,12 @@ public:
 	FName RifleRootBone;         // spine_01: la pose se pone relativa a él
 	float RifleW = 0.0f;
 	float RifleAimW = 0.0f;
+	float RifleMoveW = 0.0f;
+	float RiflePhase = 0.0f;
+	FTransform RifleCSNow = FTransform::Identity;   // el fusil, en el espacio de la malla visible, tras el IK
 	bool bRifleAim = false;
-	void RifleLeftHandIK(float W);
+	bool RifleHoldTransform(FTransform& Out) const;
+	void RifleArmIK(int32 Side, const FVector& Target, const FTransform* HandCS, float W);
 	void SetupRifle();
 	void RifleTick(float DeltaSeconds);
 
@@ -428,6 +482,10 @@ public:
 	/** Lo que ve (fraccion de su vista normal) mientras lo acaricia. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Lobo")
 	float PetViewMul = 0.35f;
+	/** Tanda C: el punto al que va, respecto al lomo del lobo (cm por su lado; negativo, pasado el lomo): el recado
+	 *  acaba a 70 cm del punto y el guardia aún se pasa unos 40: con -12 se queda a ~50 cm y la mano llega al lomo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Lobo")
+	float PetStandOff = -12.0f;
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Lobo")
 	bool StartPet(const FVector& DogAt, float Seconds);
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Lobo")
@@ -446,6 +504,92 @@ public:
 	float PetSeconds = 6.0f;
 	FVector PetDog = FVector::ZeroVector;
 	void PetTick(float DeltaSeconds);
+	/** Tanda C: adónde va la mano izquierda al acariciar (el lomo del lobo con un vaivén; lo pone el director). */
+	FVector PetHandWorld = FVector::ZeroVector;
+	float PetHandW = 0.0f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Lobo")
+	float PetHandWeight() const { return PetHandW; }
+	/** La mano izquierda, en el mundo (pruebas: acariciando, sobre el lomo). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Lobo")
+	FVector LeftHandLocation() const;
+
+	// ---- tanda C (TarsisFisica.cpp): física del cuerpo. El maniquí del GASP que conduce (GetMesh, con PA_UEFN_Mannequin)
+	// hace la física y la persona la copia (retarget), como Cuttlas en la detención.
+	// - Un golpe (el empujón) o el dardo: reacción de Lyra según de dónde viene (MM_HitReact_*) y, de spine_01 hacia
+	//   arriba, cuerpos simulados con animación física (UPhysicalAnimationComponent) que se van apagando.
+	// - Dormido (dardo o derribo): cae con ragdoll y se queda en reposo; al despertar, la pose pasa de la física a la
+	//   animación en WakeBlendSeconds.
+	// - Solo cerca del jugador (PhysicsNear): los de lejos caen con la animación de siempre.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	bool bPhysicsRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float PhysicsNear = 3500.0f;
+	/** Cuánto manda la física en la reacción al golpe (0-1), cuánto dura (s) y el empujón (cm/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float HitBlend = 0.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float HitSeconds = 0.55f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float HitImpulse = 260.0f;
+	/** El dardo: lo que dura la reacción antes de caer con física (s), y el empujón de la caída (cm/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float DartFallDelay = 0.35f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float RagdollPush = 140.0f;
+	/** De la física a la animación al despertar (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float WakeBlendSeconds = 0.8f;
+	/** Reacción a un golpe que viaja en la dirección Dir (mundo). bHeavy: la variante «Med» de Lyra. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Fisica")
+	void HitReact(FVector Dir, bool bHeavy = false);
+	/** El dardo le alcanza viniendo en la dirección Dir: reacción y, tras DartFallDelay, ragdoll (lo llama el director
+	 *  antes de KnockOut). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Fisica")
+	void DartHit(FVector Dir);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool IsRagdoll() const { return bRagdoll; }
+	/** Reaccionando a un golpe (animación o cuerpos con física). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool HitReacting() const { return HitAnimT > 0.0f || HitPhysT > 0.0f; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	float HitPhysicsWeight() const { return HitPhysT > 0.0f ? HitBlend * HitPhysT / FMath::Max(HitSeconds, 0.01f) : 0.0f; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	FString LastHitAnim() const { return HitAnimName; }
+	/** La pelvis del cuerpo (con ragdoll, donde ha caído). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	FVector PelvisLocation() const;
+	/** Pasando de la física a la animación (al despertar). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool WakeBlending() const { return WakeT > 0.0f; }
+	/** Simula física ahora mismo (ragdoll o reacción): para medir cuántos cuerpos cuestan a la vez. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool PhysicsActive() const { return bRagdoll || HitPhysT > 0.0f; }
+	/** Lo están arrastrando con física (lo pone el director): no se duerme el ragdoll. */
+	bool bPhysDragged = false;
+	UPROPERTY()
+	TObjectPtr<class UPhysicalAnimationComponent> PhysAnim;
+	UPROPERTY()
+	TObjectPtr<class UAnimSequenceBase> HitAnims[8];   // Front/Back/Left/Right, Lgt y Med
+	bool bHitAnimsTried = false;
+	bool bRagdoll = false;
+	bool bRagdollSlept = false;
+	float RagdollT = 0.0f;
+	float RagdollPendingT = -1.0f;
+	FVector PendingFallDir = FVector::ZeroVector;
+	float HitAnimT = 0.0f;
+	float HitPhysT = 0.0f;
+	FString HitAnimName;
+	FTransform DriverRel = FTransform::Identity;   // dónde va el maniquí respecto a la cápsula
+	bool bDriverRelSaved = false;
+	TArray<FTransform> WakeFrom;                   // la pose tumbada (mundo) de la que se parte al despertar
+	float WakeT = 0.0f;
+	void PhysicsTick(float DeltaSeconds);
+	void StartRagdoll();
+	void StopRagdoll(bool bBlend);
+	void WakeBlendTick(float DeltaSeconds);
+	bool PhysicsCanRun() const;
+	void LoadHitAnims();
+	void PhysicsBodies(bool bOn);
 
 	/** Giro en el sitio parado (TarsisGaspTurn.h): con las piernas a GaspTurnFrom grados o más de donde mira, WantsToAim
 	 *  un momento para que el ABP gire en el sitio. Más bajo que en Cuttlas: el guardia va en modo «orientar al
@@ -719,6 +863,8 @@ private:
 	bool ArmedTick(float DeltaSeconds, APawn* Player, float V);
 	bool FindCover(const FVector& Threat, FVector& Out) const;
 	void FireAt(APawn* Player, float Dist, float V, class ATarsisDirector* D);
+	void TowerShootTick(float DeltaSeconds, APawn* Player, float V);
+	float TowerAimT = 0.0f;
 	FVector CoverThreat = FVector::ZeroVector;
 	float AimT = 0.0f;
 	float ShotT = 0.0f;

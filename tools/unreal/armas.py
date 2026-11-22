@@ -10,6 +10,11 @@
    locomocion del GASP (TarsisArmas.cpp).
 3. Los disparos de 7,62 del paquete (exterior: cerca, media distancia y lejos; 4 de cada) en /Game/Tarsis/Sonidos como
    disparo_cerca_1..4, disparo_media_1..4 y disparo_lejos_1..4.
+Tanda C (modos «golpes» y «piedra»):
+4. Las reacciones a golpes de Lyra (MM_HitReact_*, exportadas con lyra_exportar.py) sobre el esqueleto UEFN, sin
+   retarget: las pone el maniqui del GASP del guardia (TarsisFisica.cpp) y la persona las copia.
+5. Una piedra de verdad para la Q: malla irregular de ~9 cm (una icosfera con ruido, hecha aqui como .obj) con el
+   material de hormigon del nivel, en /Game/Tarsis/Atrezo/SM_Piedra.
 Escribe D:\\LostHorizon\\armas_info.txt."""
 import glob
 import os
@@ -182,6 +187,94 @@ def animaciones():
             w('%s: retarget fallo: %s' % (p, ex))
 
 
+def golpes():
+    uefn = unreal.load_asset(UEFN_MESH)
+    sk = uefn.skeleton
+    for f in sorted(glob.glob(os.path.join(FBX_ANIMS, 'MM_HitReact_*.fbx'))):
+        nombre = os.path.splitext(os.path.basename(f))[0]
+        ui = unreal.FbxImportUI()
+        ui.set_editor_property('import_mesh', False)
+        ui.set_editor_property('import_animations', True)
+        ui.set_editor_property('import_materials', False)
+        ui.set_editor_property('import_textures', False)
+        ui.set_editor_property('skeleton', sk)
+        ui.set_editor_property('mesh_type_to_import', unreal.FBXImportType.FBXIT_ANIMATION)
+        ui.anim_sequence_import_data.set_editor_property('import_bone_tracks', True)
+        o = importar(f, DEST + '/Anims', ui, nombre)
+        a = [x for x in o if isinstance(x, unreal.AnimSequence)]
+        if a:
+            a[0].set_editor_property('enable_root_motion', False)
+            EAL.save_loaded_asset(a[0], False)
+            w('%s -> %s (%.2f s)' % (nombre, a[0].get_path_name(), a[0].get_play_length()))
+        else:
+            w('%s: no se importo (%s)' % (nombre, o))
+
+
+def piedra():
+    # icosfera subdividida dos veces, deformada con ruido suave y aplastada: un canto rodado de unos 9 x 7 x 6 cm
+    import math, random
+    random.seed(7)
+    t = (1.0 + 5 ** 0.5) / 2.0
+    vs = [(-1, t, 0), (1, t, 0), (-1, -t, 0), (1, -t, 0), (0, -1, t), (0, 1, t), (0, -1, -t), (0, 1, -t),
+          (t, 0, -1), (t, 0, 1), (-t, 0, -1), (-t, 0, 1)]
+    fs = [(0, 11, 5), (0, 5, 1), (0, 1, 7), (0, 7, 10), (0, 10, 11), (1, 5, 9), (5, 11, 4), (11, 10, 2), (10, 7, 6), (7, 1, 8),
+          (3, 9, 4), (3, 4, 2), (3, 2, 6), (3, 6, 8), (3, 8, 9), (4, 9, 5), (2, 4, 11), (6, 2, 10), (8, 6, 7), (9, 8, 1)]
+    vs = [tuple(c / math.sqrt(sum(x * x for x in v)) for c in v) for v in vs]
+    for _ in range(2):
+        cache = {}
+        def mid(a, b):
+            k = (min(a, b), max(a, b))
+            if k not in cache:
+                m = [(vs[a][i] + vs[b][i]) / 2 for i in range(3)]
+                n = math.sqrt(sum(x * x for x in m))
+                vs.append(tuple(x / n for x in m))
+                cache[k] = len(vs) - 1
+            return cache[k]
+        nf = []
+        for a, b, c in fs:
+            ab, bc, ca = mid(a, b), mid(b, c), mid(c, a)
+            nf += [(a, ab, ca), (b, bc, ab), (c, ca, bc), (ab, bc, ca)]
+        fs = nf
+    bultos = [(tuple(random.uniform(-1, 1) for _ in range(3)), random.uniform(-0.18, 0.18)) for _ in range(9)]
+    pv = []
+    for v in vs:
+        r = 1.0
+        for d, h in bultos:
+            n = math.sqrt(sum(x * x for x in d))
+            dot = sum(v[i] * d[i] / n for i in range(3))
+            r += h * max(0.0, dot) ** 3
+        pv.append((v[0] * r * 4.6, v[1] * r * 3.6, v[2] * r * 2.9))
+    ruta = os.path.join(BASE, 'piedra.obj')
+    with open(ruta, 'w') as f:
+        for p in pv:
+            f.write('v %.4f %.4f %.4f\n' % p)
+        for p, v in zip(pv, vs):
+            u = 0.5 + math.atan2(v[1], v[0]) / (2 * math.pi)
+            f.write('vt %.4f %.4f\n' % (u, 0.5 + math.asin(max(-1, min(1, v[2]))) / math.pi))
+        for a, b, c in fs:
+            f.write('f %d/%d %d/%d %d/%d\n' % (a + 1, a + 1, b + 1, b + 1, c + 1, c + 1))
+    ui = unreal.FbxImportUI()
+    ui.set_editor_property('import_mesh', True)
+    ui.set_editor_property('import_animations', False)
+    ui.set_editor_property('import_materials', False)
+    ui.set_editor_property('import_textures', False)
+    ui.set_editor_property('mesh_type_to_import', unreal.FBXImportType.FBXIT_STATIC_MESH)
+    ui.static_mesh_import_data.set_editor_property('combine_meshes', True)
+    ui.static_mesh_import_data.set_editor_property('auto_generate_collision', False)
+    o = importar(ruta, '/Game/Tarsis/Atrezo', ui, 'SM_Piedra')
+    sm = [x for x in o if isinstance(x, unreal.StaticMesh)]
+    if not sm:
+        w('piedra: no se importo (%s)' % o)
+        return
+    sm = sm[0]
+    mat = unreal.load_asset('/Game/Tarsis/Materiales/MI_hormigon')
+    if mat:
+        sm.set_material(0, mat)
+    EAL.save_loaded_asset(sm, False)
+    b = sm.get_bounds()
+    w('piedra: %s, %d vertices, medio tamano %s, material %s' % (sm.get_path_name(), len(pv), b.box_extent, mat.get_name() if mat else None))
+
+
 def sonidos():
     for tipo, clave in (('Close', 'cerca'), ('Med', 'media'), ('Far', 'lejos')):
         for i in range(1, 5):
@@ -197,4 +290,8 @@ if MODO in ('todo', 'anims'):
     animaciones()
 if MODO in ('todo', 'sonidos'):
     sonidos()
+if MODO in ('todo', 'golpes'):
+    golpes()
+if MODO in ('todo', 'piedra'):
+    piedra()
 open(r'D:\LostHorizon\armas_info.txt', 'w', encoding='utf-8').write('\n'.join(L))
