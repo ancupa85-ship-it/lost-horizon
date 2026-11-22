@@ -39,6 +39,7 @@ void ATarsisGuard::LeaveTowerPost(const FVector& Ground)
 	TowerLight = nullptr;
 	SetActorLocation(Ground + FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 5.0f), false, nullptr, ETeleportType::TeleportPhysics);
 	if (UCharacterMovementComponent* M = GetCharacterMovement()) M->SetMovementMode(MOVE_Walking);
+	CrossSetup();   // tanda E2: ya es de tierra: RVO
 	PatrolPoints.Reset();
 	PatrolPoints.Add(Ground);
 	PointIndex = 0;
@@ -305,7 +306,13 @@ void ATarsisDirector::ReliefTick(float DeltaSeconds)
 				break;
 			}
 			// baja el saliente: desde ahora el puesto esta vacio
-			S->LeaveTowerPost(P.Ladder + FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f).Vector() * 110.0f);
+			// tanda E2: baja al otro lado de la escalera, lejos del relevo (al azar caía a veces encima de él; ahora las
+			// cápsulas chocan y quedaban hombro con hombro): la charla, a metro y medio
+			{
+				FVector Away = (P.Ladder - R->GetActorLocation()).GetSafeNormal2D();
+				if (Away.IsNearlyZero()) Away = FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f).Vector();
+				S->LeaveTowerPost(P.Ladder + Away * 130.0f);
+			}
 			S->Errand(S->GetActorLocation(), R->GetActorLocation(), 60.0f);
 			P.EmptySince = MissionTime;
 			P.Phase = 2;

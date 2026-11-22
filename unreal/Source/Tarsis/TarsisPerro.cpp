@@ -145,6 +145,29 @@ void ATarsisDirector::SpawnDog()
 void ATarsisDirector::DogPlace()
 {
 	if (!DogMesh) return;
+	// tanda E2: el lobo rodea a la gente (guardias de pie y tú) en vez de atravesarla; salvo el que lo acaricia
+	if (bDogAvoidRule)
+	{
+		TArray<FVector> Gente;
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+		{
+			if (It->State == ETarsisGuardState::Down || It->bTowerSentry || *It == DogPetG.Get()) continue;
+			Gente.Add(It->GetActorLocation());
+		}
+		if (APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0)) { if (!DogPetG.IsValid()) Gente.Add(Pl->GetActorLocation()); }
+		for (const FVector& P : Gente)
+		{
+			const FVector D(DogLoc.X - P.X, DogLoc.Y - P.Y, 0.0f);
+			const float Dist = D.Size();
+			if (Dist < DogPersonClear && FMath::Abs(DogLoc.Z - P.Z) < 200.0f)
+			{
+				// fuera del círculo, y un poco de lado para que lo rodee y no se quede empujando de frente
+				const FVector N = Dist > 1.0f ? D / Dist : FRotator(0.0f, DogYaw + 90.0f, 0.0f).Vector();
+				DogLoc += N * (DogPersonClear - Dist) + FVector(-N.Y, N.X, 0.0f) * 2.0f;
+				++DogPersonPushes;
+			}
+		}
+	}
 	DogMesh->SetWorldLocationAndRotation(DogLoc, FRotator(0.0f, DogYaw + DogMeshYaw, 0.0f));
 	DogPoseTick();
 }

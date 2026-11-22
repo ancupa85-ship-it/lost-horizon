@@ -285,6 +285,11 @@ def prueba_empezar():
     ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) == 'PATROL' and not g.get_actor_label().endswith('Ramos')]
     g = min(ronda, key=lambda x: dist2d(x.get_actor_location(), inicio))
     g.set_editor_property('knock_out_time', 4.0)   # que se levante pronto: lo usan otras pruebas
+    # tanda E2: no al llegar a una esquina de su ronda (ahí se para y echa un vistazo alrededor: te ve, y con razón)
+    def _lejos_de_esquina():
+        l = g.get_actor_location()
+        return min(dist2d(l, p) for p in g.get_editor_property('patrol_points')) > 350
+    yield ('hasta', _lejos_de_esquina, 25.0)
     d.simulate_key('C'); yield 0.3
     visto = False
     for _ in range(8):
@@ -1905,10 +1910,12 @@ def prueba_gestos():
     g.hold(3600.0); yield 1.0
     nombre = lambda: str(g.current_gesture())
     h0, i0 = g.hand_height(True), g.hand_height(False)
-    check('en reposo, las manos a los lados', 55 < h0 < 115 and 55 < i0 < 115 and nombre() == 'None', 'derecha %d cm, izquierda %d cm, %s' % (h0, i0, nombre()))
+    check('en reposo, las manos a los lados', 55 < h0 < 122 and 55 < i0 < 122 and nombre() == 'None', 'derecha %d cm, izquierda %d cm, %s' % (h0, i0, nombre()))
     g.play_gesture('alto', 2.0, V(0, 0, 0)); yield 0.9
     h1 = g.hand_height(True)
-    check('«alto»: la mano derecha por encima de la cabeza', h1 > 160 and h1 > h0 + 60 and nombre() == 'alto' and g.get_editor_property('gesture_w') > 0.95,
+    # tanda E2: desde la tanda D las manos van a la estatura de cada persona: con una alta la mano en reposo cuelga a
+    # 114 cm y la de «alto» a 169 (encima de su cabeza); +60 sobre el reposo fallaba sin que estuviera mal
+    check('«alto»: la mano derecha por encima de la cabeza', h1 > 160 and h1 > h0 + 50 and nombre() == 'alto' and g.get_editor_property('gesture_w') > 0.95,
           '%d cm (en reposo %d), %s, peso %.2f' % (h1, h0, nombre(), g.get_editor_property('gesture_w')))
     check('y la izquierda sigue en su sitio', abs(g.hand_height(False) - i0) < 10, '%d cm' % g.hand_height(False))
     yield 1.9
@@ -1916,7 +1923,7 @@ def prueba_gestos():
     check('al acabar el gesto, el brazo vuelve a su sitio', abs(h2 - h0) < 10 and nombre() == 'None' and g.get_editor_property('gesture_w') < 0.01, '%d cm, %s' % (h2, nombre()))
     g.play_gesture('leer', 1.6, V(0, 0, 0)); yield 0.9
     hd, hi = g.hand_height(True), g.hand_height(False)
-    check('«leer»: las dos manos delante del pecho', 95 < hd < 160 and 95 < hi < 160 and hd > h0 + 12 and hi > i0 + 12 and nombre() == 'leer', 'derecha %d cm, izquierda %d cm' % (hd, hi))
+    check('«leer»: las dos manos delante del pecho', 95 < hd < 160 and 95 < hi < 160 and hd > h0 + 5 and hi > i0 + 5 and nombre() == 'leer', 'derecha %d cm, izquierda %d cm' % (hd, hi))
     yield 1.3
     # dar paso hacia su derecha: el antebrazo derecho va y viene
     l, r = g.get_actor_location(), g.get_actor_right_vector()
@@ -3467,7 +3474,8 @@ def prueba_lobo_piedra():
     caida = d.get_editor_property('last_stone')
     # tanda C: una piedra de verdad (SM_Piedra, unos 9 cm), que se vea en la boca del lobo
     tam = d.last_stone_size()
-    check('tanda C: la piedra es una piedra de verdad, de unos 9 cm', str(d.last_stone_mesh()) == 'SM_Piedra' and 7.0 <= max(tam.x, tam.y, tam.z) <= 11.5, '%s %.1f x %.1f x %.1f cm' % (d.last_stone_mesh(), tam.x, tam.y, tam.z))
+    # tanda E2: es la caja del actor, alineada con el mundo: girada, una piedra de 10 cm da hasta unos 13
+    check('tanda C: la piedra es una piedra de verdad, de unos 9 cm', str(d.last_stone_mesh()) == 'SM_Piedra' and 7.0 <= max(tam.x, tam.y, tam.z) <= 13.5, '%s %.1f x %.1f x %.1f cm' % (d.last_stone_mesh(), tam.x, tam.y, tam.z))
     check('la piedra cae a su alcance', math.hypot(caida.x - l.x, caida.y - l.y) < P('dog_fetch_radius'), '%.0f cm' % math.hypot(caida.x - l.x, caida.y - l.y))
     check('sale corriendo a por ella', P('dog_fetch') == 1 and d.dog_anim_index() == 4, '%s anim %s' % (P('dog_fetch'), d.dog_anim_index()))
     vistos = {'boca': False, 'lejos_boca': 999.0}
@@ -3686,6 +3694,166 @@ def prueba_huellas():
         x.hold(0.0)
     d.set_day(False)
 
+def _pasillo(w, ancho_max=150.0, largo=700.0):
+    """Un pasillo de verdad del nivel: tramo recto de `largo` cm con pared a los dos lados (menos de ancho_max entre
+    ellas) y sin nada en medio. Devuelve (inicio, fin, ancho) o None."""
+    def h(a, b):
+        r = unreal.SystemLibrary.line_trace_single(w, a, b, unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [jugador()] + list(guardias()), unreal.DrawDebugTrace.NONE, True)
+        return r.to_tuple()[3] if r else None    # distancia
+    for eje in ((1, 0), (0, 1)):
+        lado = (-eje[1], eje[0])
+        for x in range(-1500, 9000, 100):
+            for y in range(-1500, 7400, 100):
+                p = V(x, y, 60)
+                d1, d2 = h(p, V(x + lado[0] * 100, y + lado[1] * 100, 60)), h(p, V(x - lado[0] * 100, y - lado[1] * 100, 60))
+                if d1 is None or d2 is None or d1 + d2 > ancho_max or d1 < 35 or d2 < 35:
+                    continue
+                fin = V(x + eje[0] * largo, y + eje[1] * largo, 60)
+                if h(p, fin) is not None:
+                    continue
+                ok = True
+                for k in range(1, int(largo / 100) + 1):
+                    q = V(x + eje[0] * k * 100, y + eje[1] * k * 100, 60)
+                    a, b = h(q, V(q.x + lado[0] * 100, q.y + lado[1] * 100, 60)), h(q, V(q.x - lado[0] * 100, q.y - lado[1] * 100, 60))
+                    if a is None or b is None or a + b > ancho_max or a < 35 or b < 35:
+                        ok = False
+                        break
+                if ok and abs(suelo_z(w, p) - suelo_z(w, fin)) < 30:
+                    return p, fin, d1 + d2
+    return None
+
+def suelo_z(w, p):
+    r = unreal.SystemLibrary.line_trace_single(w, V(p.x, p.y, p.z + 100), V(p.x, p.y, p.z - 300), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+    return r.to_tuple()[4].z if r else p.z
+
+def prueba_paso():
+    """Tanda E2. Al cruzarse no se atraviesan: la cápsula bloquea a las personas (salvo tumbado), en ancho se esquivan con
+    el RVO y en estrecho uno se arrima, espera y da paso con el brazo. El jugador choca con los de pie y no con los
+    tumbados; el lobo rodea a la gente; el relevo y el centinela se paran a su distancia."""
+    w = mundo()
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and not g.get_actor_label().endswith('Ramos')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.5
+    a, b = ronda[0], ronda[1]
+    check('las cápsulas de los de pie bloquean a las personas (y tienen RVO)', all(g.blocks_pawns() and g.avoidance_on() for g in ronda), [(g.get_actor_label()[8:], g.blocks_pawns(), g.avoidance_on()) for g in ronda if not (g.blocks_pawns() and g.avoidance_on())])
+    def cruce(pa, pb, segundos, nombre):
+        """a va de pa a pb y b de pb a pa; distancia mínima entre centros y atascos (más de 3 s sin avanzar)."""
+        za, zb = suelo_z(w, pa) + 95, suelo_z(w, pb) + 95
+        a.set_actor_location(V(pa.x, pa.y, za), False, True); b.set_actor_location(V(pb.x, pb.y, zb), False, True)
+        y0a, y0b = a.get_editor_property('yields'), b.get_editor_property('yields')
+        a.hold(0.0); b.hold(0.0)
+        a.errand(V(pb.x, pb.y, zb), V(pb.x * 2 - pa.x, pb.y * 2 - pa.y, zb), 40.0)
+        b.errand(V(pa.x, pa.y, za), V(pa.x * 2 - pb.x, pa.y * 2 - pb.y, za), 40.0)
+        dmin, quieto, atasco = 1e9, {a: [0.0, a.get_actor_location()], b: [0.0, b.get_actor_location()]}, 0.0
+        t = 0.0
+        while t < segundos:
+            yield 0.1
+            t += 0.1
+            la, lb = a.get_actor_location(), b.get_actor_location()
+            dmin = min(dmin, dist2d(la, lb))
+            for g, l in ((a, la), (b, lb)):
+                q = quieto[g]
+                if dist2d(l, q[1]) < 8 and not g.is_yielding() and dist2d(l, pb if g is a else pa) > 120:
+                    q[0] += 0.1
+                    atasco = max(atasco, q[0])
+                else:
+                    q[0], q[1] = 0.0, l
+            if dist2d(la, pb) < 120 and dist2d(lb, pa) < 120:
+                break
+        llegan = dist2d(a.get_actor_location(), pb) < 150 and dist2d(b.get_actor_location(), pa) < 150
+        R[nombre] = (dmin, atasco, llegan, a.get_editor_property('yields') - y0a + b.get_editor_property('yields') - y0b)
+        for g in (a, b):
+            g.hold(3600.0)
+    R = {}
+    # 1) en el patio, en ancho: se esquivan sin pararse
+    yield from cruce(V(4300, 3950, 0), V(6500, 3950, 0), 25.0, 'patio')
+    dmin, atasco, llegan, ced = R['patio']
+    check('en el patio se cruzan sin tocarse (centros a más de 60 cm)', dmin > 60, '%.0f cm' % dmin)
+    check('y ninguno se atasca más de 3 s, y llegan', atasco <= 3.0 and llegan, '%.1f s, llegan %s' % (atasco, llegan))
+    # 2) en un pasillo estrecho: uno cede el paso
+    # el pasillo de tablones de la pista de obstáculos (tools/unreal/relleno.py, PASILLO): 1,20 m entre las caras
+    px, py0, py1 = -1050, 600, 1200
+    pas = None
+    h0 = unreal.SystemLibrary.line_trace_single(w, V(px, (py0 + py1) / 2, 60), V(px + 100, (py0 + py1) / 2, 60), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+    h1 = unreal.SystemLibrary.line_trace_single(w, V(px, (py0 + py1) / 2, 60), V(px - 100, (py0 + py1) / 2, 60), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+    if h0 and h1:
+        pas = (V(px, py0 - 250, 60), V(px, py1 + 250, 60), abs(h0.to_tuple()[5].x - h1.to_tuple()[5].x))   # puntos de impacto
+    check('hay un pasillo estrecho de verdad en el nivel (el de la pista de obstáculos)', pas is not None and pas[2] < 130, pas and '%.0f cm de ancho' % pas[2])
+    if pas:
+        yield from cruce(pas[0], pas[1], 30.0, 'pasillo')
+        dmin, atasco, llegan, ced = R['pasillo']
+        check('en el pasillo tampoco se atraviesan', dmin > 55, '%.0f cm' % dmin)
+        check('uno se arrima y cede el paso (y nadie se atasca más de 3 s)', ced >= 1 and atasco <= 3.0, '%d cesiones, %.1f s parado' % (ced, atasco))
+        check('y los dos llegan a su sitio', llegan, R['pasillo'])
+    # 3) en pareja al mismo sitio (grupo de búsqueda): uno al lado del otro, no dentro
+    for g in (a, b):
+        g.hold(0.0)
+    a.set_actor_location(V(4400, 3900, a.get_actor_location().z), False, True); b.set_actor_location(V(4400, 4100, b.get_actor_location().z), False, True)
+    a.errand(V(5600, 4000, 95), V(6000, 4000, 95), 20.0); b.errand(V(5600, 4000, 95), V(6000, 4000, 95), 20.0)
+    dmin = 1e9
+    for _ in range(80):
+        yield 0.1
+        dmin = min(dmin, dist2d(a.get_actor_location(), b.get_actor_location()))
+    check('en pareja al mismo sitio, uno junto al otro (no dentro)', dmin > 55, '%.0f cm' % dmin)
+    for g in (a, b):
+        g.hold(3600.0)
+    # 4) el jugador choca con los de pie y no con los tumbados
+    p = jugador()
+    la = a.get_actor_location()
+    p.set_actor_location(V(la.x + 300, la.y, la.z), False, True); yield 0.2
+    p.set_actor_location(V(la.x, la.y, la.z), True, False); yield 0.1
+    d1 = dist2d(p.get_actor_location(), a.get_actor_location())
+    check('el jugador choca con un guardia de pie', d1 > 50, '%.0f cm' % d1)
+    b.set_actor_location(V(la.x, la.y + 900, la.z), False, True)   # el de la pareja, fuera del paso
+    a.set_editor_property('knock_out_time', 6.0)
+    a.knock_out(); yield 1.0
+    la = a.get_actor_location()
+    p.set_actor_location(V(la.x + 300, la.y, la.z + 40), False, True); yield 0.2
+    p.set_actor_location(V(la.x - 200, la.y, la.z + 40), True, False); yield 0.1
+    check('y pasa por encima de uno tumbado', p.get_actor_location().x < la.x - 100 and not a.blocks_pawns(), '%.0f' % (p.get_actor_location().x - la.x))
+    aparte()
+    yield 6.0
+    check('al levantarse vuelve a bloquear', a.blocks_pawns(), estado(a))
+    # 5) el lobo rodea a un guardia plantado en su paso
+    d.set_editor_property('dog', True)
+    yield 1.0
+    check('el lobo está para la prueba', d.get_editor_property('dog'))
+    if d.get_editor_property('dog'):
+        g = b
+        g.set_actor_location(V(4950, 6600, suelo_z(w, V(4950, 6600, 60)) + 95), False, True)
+        g.hold(3600.0)
+        p0 = P('dog_person_pushes')
+        dmin = 1e9
+        for _ in range(200):
+            yield 0.1
+            dmin = min(dmin, dist2d(d.dog_location(), g.get_actor_location()))
+        check('el lobo rodea al guardia que se le pone en medio (no lo atraviesa)', dmin > 60 and P('dog_person_pushes') > p0, '%.0f cm, %d empujones' % (dmin, P('dog_person_pushes') - p0))
+    # 6) coste: el fotograma con las rondas en marcha, con lo de cruzarse y sin ello (RVO y CrossTick apagados)
+    for g in guardias():
+        g.hold(0.0)
+    aparte()
+    def medio(seg):
+        t0 = unreal.GameplayStatics.get_real_time_seconds(w); n = 0
+        while unreal.GameplayStatics.get_real_time_seconds(w) - t0 < seg:
+            yield 0.0
+            n += 1
+        R['ms'] = (unreal.GameplayStatics.get_real_time_seconds(w) - t0) * 1000.0 / max(n, 1)
+    yield 2.0
+    yield from medio(6.0); con = R['ms']
+    for g in guardias():
+        g.set_editor_property('cross_rule', False)
+        g.character_movement.set_editor_property('use_rvo_avoidance', False)
+    yield 1.0
+    yield from medio(6.0); sin = R['ms']
+    for g in guardias():
+        g.set_editor_property('cross_rule', True)
+        if not g.get_editor_property('tower_sentry'):
+            g.character_movement.set_editor_property('use_rvo_avoidance', True)
+    check('coste de no atravesarse (fotograma medio, %d guardias)' % len(guardias()), con < sin * 1.15 + 1.0, 'con %.2f ms, sin %.2f ms' % (con, sin))
+
 def prueba_relleno():
     """Tanda E1. Relleno visual del hangar (taller, Santana bajo lona, cajas LH), la enfermería con su cámara fría y la
     plaza de armas (mástil, sacos, tejadillo): todo con colisión, sin cortar rondas, el paso del lobo, el camino a la
@@ -3793,7 +3961,16 @@ def prueba_relevo():
     if r:
         l = r.get_actor_location()
         tp(l.x + 120, l.y)
-    yield ('hasta', lambda: director().relief_phase(0) >= 3, 30.0)
+    # tanda E2: mientras charlan, cada uno en su sitio (no uno dentro del otro)
+    dmin = 1e9
+    for _ in range(300):
+        if director().relief_phase(0) >= 3:
+            break
+        sx, rx = d.relief_sentry(0), d.relief_guard(0)
+        if sx and rx:
+            dmin = min(dmin, dist2d(sx.get_actor_location(), rx.get_actor_location()))
+        yield 0.1
+    check('tanda E2: el relevo y el centinela charlan a su distancia (90 cm o más)', 90 <= dmin < 400, '%.0f cm' % dmin)
     check('se oye la charla y el santo y sena se apunta en el mapa mental', P('relief_lines_heard') >= 2 and d.fact_known('relevo_santo'), '%d frases' % P('relief_lines_heard'))
     yield ('hasta', lambda: director().relief_phase(0) in (0, 4), 60.0)
     s1 = d.relief_sentry(0)
@@ -3925,7 +4102,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso]]
 PRUEBAS = []
 
 

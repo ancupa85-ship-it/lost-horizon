@@ -549,6 +549,7 @@ void ATarsisGuard::BeginPlay()
 		PatrolPoints.Add(Home);
 	}
 	SetState(ETarsisGuardState::Patrol);
+	CrossSetup();   // tanda E2: RVO (la cápsula se pone a bloquear en CrossTick)
 	if (bTowerSentry)
 	{
 		GetCharacterMovement()->DisableMovement();   // se queda en la plataforma, sin caer ni andar
@@ -1095,6 +1096,7 @@ bool ATarsisGuard::Near2D(const FVector& Dest, float Radius) const
 
 void ATarsisGuard::Walk(const FVector& Dest, float Speed)
 {
+	if (YieldT > 0.0f) return;   // tanda E2: cediendo el paso (CrossTick)
 	GetCharacterMovement()->MaxWalkSpeed = Speed;
 	// con mapa de navegación (MapaNavegacion, lo pone tools/unreal/guardias.py) rodea paredes y vallas;
 	// si no hay camino, va en línea recta como antes
@@ -1592,6 +1594,7 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	StateT += DeltaSeconds;
 	PhysicsTick(DeltaSeconds);   // tanda C: reacciones a golpes, ragdoll y la capsula siguiendo al cuerpo caido
+	CrossTick(DeltaSeconds);     // tanda E2: no atravesar a nadie; en estrecho, ceder el paso
 	if (DazzleCoolT > 0.0f) DazzleCoolT -= DeltaSeconds;
 	if (StunT <= 0.0f) bDazzled = false;
 	if (State == ETarsisGuardState::Down)

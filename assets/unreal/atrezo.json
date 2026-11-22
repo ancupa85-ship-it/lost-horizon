@@ -3834,6 +3834,160 @@
     150
    ],
    "giro": 40
+  },
+  {
+   "nombre": "e1pla_vehiculo_1",
+   "modelo": "covered_car",
+   "pos": [
+    7700,
+    4520,
+    150
+   ],
+   "giro": 92
+  },
+  {
+   "nombre": "e2cap_banco_0",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    6220,
+    -1320,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e2cap_banco_1",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    6580,
+    -1320,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e2cap_banco_2",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    6220,
+    -1190,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e2cap_banco_3",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    6580,
+    -1190,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e2cap_banco_4",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    6220,
+    -1060,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e2cap_banco_5",
+   "modelo": "painted_wooden_bench",
+   "pos": [
+    6580,
+    -1060,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e2nid_municion",
+   "modelo": "ammo_box",
+   "pos": [
+    2800,
+    -1250,
+    150
+   ],
+   "giro": 20,
+   "pequeno": true
+  },
+  {
+   "nombre": "e2nid_casco",
+   "modelo": "old_gas_mask",
+   "pos": [
+    2760,
+    -1210,
+    150
+   ],
+   "giro": -30,
+   "pequeno": true
+  },
+  {
+   "nombre": "e2gas_bidon_0",
+   "modelo": "Barrel_01",
+   "pos": [
+    4600,
+    -850,
+    150
+   ],
+   "giro": 0
+  },
+  {
+   "nombre": "e2gas_bidon_1",
+   "modelo": "barrel_03",
+   "pos": [
+    4660,
+    -780,
+    150
+   ],
+   "giro": 40
+  },
+  {
+   "nombre": "e2gas_garrafa",
+   "modelo": "metal_jerrycan_green",
+   "pos": [
+    4560,
+    -700,
+    150
+   ],
+   "giro": 10,
+   "pequeno": true
+  },
+  {
+   "nombre": "e2des_coche",
+   "modelo": "covered_car",
+   "pos": [
+    8800,
+    2300,
+    150
+   ],
+   "giro": 95
+  },
+  {
+   "nombre": "e2des_bidon",
+   "modelo": "barrel_03",
+   "pos": [
+    8350,
+    1900,
+    150
+   ],
+   "giro": 15
+  },
+  {
+   "nombre": "e2gal_cubo",
+   "modelo": "wooden_bucket_02",
+   "pos": [
+    7450,
+    700,
+    150
+   ],
+   "giro": 0,
+   "pequeno": true
   }
  ],
  "vaciar": {

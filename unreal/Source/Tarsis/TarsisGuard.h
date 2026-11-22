@@ -246,6 +246,41 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Cuerpo")
 	void PlayGesture(FName Name, float Seconds, FVector Toward = FVector::ZeroVector);
 
+	// ---- tanda E2: al cruzarse no se atraviesan (TarsisCruce.cpp) ----
+	// La cápsula del GASP venía ignorando a las personas: ahora bloquea (salvo tumbado, en ragdoll o en una escena).
+	// En ancho se esquivan con el RVO del motor; en un sitio estrecho, de frente, uno se arrima a la pared, espera y da
+	// paso con el brazo («pase») mientras el otro pasa. Cede el que va de ronda frente al que tiene prisa; entre iguales,
+	// el de menor id.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cruce")
+	bool bCrossRule = true;
+	/** Radio en el que el RVO tiene en cuenta a los demás (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cruce")
+	float AvoidRadius = 200.0f;
+	/** A cuánto, de frente y en estrecho, uno cede el paso (cm, entre centros). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cruce")
+	float YieldDist = 190.0f;
+	/** Estrecho: pared a menos de esto a un lado (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cruce")
+	float NarrowDist = 140.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cruce")
+	int32 Yields = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cruce")
+	bool IsYielding() const { return YieldT > 0.0f; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cruce")
+	bool BlocksPawns() const { return bPawnBlock; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cruce")
+	bool AvoidanceOn() const;
+	void CrossSetup();
+	void CrossTick(float DeltaSeconds);
+	bool ShouldYieldTo(const ATarsisGuard* Other) const;
+	float YieldT = 0.0f;
+	float YieldSideT = 0.0f;
+	float YieldCoolT = 0.0f;
+	FVector YieldSide = FVector::ZeroVector;
+	FVector YieldToward = FVector::ZeroVector;
+	bool bPawnBlock = false;
+	bool bYieldGesture = false;
+
 	/** Gesto que se le ve ahora (None si ninguno). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
 	FName CurrentGesture() const { return GestureW > 0.05f ? Gesture : NAME_None; }

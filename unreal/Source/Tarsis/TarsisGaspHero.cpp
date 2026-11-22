@@ -187,6 +187,9 @@ bool ATarsisDirector::SetupGaspHero(ACharacter* C, USkeletalMesh* SK)
 	HeroFacing(Uefn, HeroDriverYaw, HeroDriverBallZ);
 	HeroFacing(SK, HeroBodyYawGasp, HeroBodyBallZ);
 	// el que conduce: maniqui UEFN oculto con el ABP de Epic (se evalua aunque no se dibuje)
+	// tanda E2: la cápsula del GASP ignoraba a las personas: te metías dentro de los guardias. Ahora chocas con los de
+	// pie (los tumbados y los de una escena ignoran ellos: TarsisCruce.cpp)
+	C->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 	HeroDriver = NewObject<USkeletalMeshComponent>(C, TEXT("ConductorGASP"));
 	HeroDriver->SetSkeletalMesh(Uefn);
 	HeroDriver->SetupAttachment(C->GetCapsuleComponent());

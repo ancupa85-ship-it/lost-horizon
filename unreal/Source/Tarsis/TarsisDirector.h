@@ -1507,6 +1507,13 @@ public:
 	/** El guardia que lo esta acariciando (o va a hacerlo), o nadie. */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Perro")
 	class ATarsisGuard* DogPetter() const { return DogPetG.Get(); }
+	/** Tanda E2: el lobo rodea a la gente (no la atraviesa); a cuánto se queda (cm, del centro del lobo al de la persona). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	bool bDogAvoidRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Perro")
+	float DogPersonClear = 75.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Perro")
+	int32 DogPersonPushes = 0;
 	/** Para las pruebas: olvida quien lo ha acariciado ya (sin esperar DogPetCooldown). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Perro")
 	void DogForgetPets();
