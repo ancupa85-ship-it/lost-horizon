@@ -286,8 +286,7 @@ void ATarsisDirector::KillAction()
 	{
 		// Ramos solo quiere irse: con el no hay cuchillo (se le agarra, o se le derriba con la E)
 		if (!bRamosTalked) { Interact(); return; }
-		ShowMessage(Tx(TEXT("matar_ramos"), TEXT("RAMOS NO
-El cuartelero solo quiere irse. Derribalo (E) si te estorba.")), 2.5f);
+		ShowMessage(Tx(TEXT("matar_ramos"), TEXT("RAMOS NO\nEl cuartelero solo quiere irse. Derribalo (E) si te estorba.")), 2.5f);
 		return;
 	}
 	G->Kill();
