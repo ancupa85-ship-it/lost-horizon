@@ -4335,6 +4335,78 @@ def prueba_emboscada():
     yield ('hasta', visto, 30.0)
     check('lo encuentra allí (lo ve y da el aviso)', visto(), '%s, el caído %s a %.0f cm' % (estado(b), estado(f), dist2d(b.get_actor_location(), f.get_actor_location())))
 
+
+def prueba_disparo():
+    """Arreglo del cierre al disparar (tras la tanda G): el dardo y el golpe en guardias sin cuerpos de física todavía
+    (recién aparecidos, como los relevos, o sin precalentar) no deben cerrar el motor, tampoco meter en una taquilla a uno
+    recién golpeado; y disparar apuntando funciona con el pulso: en calma, tras correr, herido y conteniendo la respiración."""
+    w = mundo()
+    d = director()
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.5
+    # 1) a un relevo nada más aparecer
+    d.set_editor_property('relief_rule', True)   # (en las pruebas va apagado)
+    yield ('hasta', lambda: director().relief_post_count() > 0, 30.0)
+    nuevo = None
+    if d.relief_post_count() > 0:
+        d.force_relief(0); yield 0.05
+        nuevo = d.relief_guard(0)
+    check('hay un relevo recién aparecido', nuevo is not None, d.relief_post_count())
+    if nuevo:
+        f = nuevo.get_actor_forward_vector()
+        nuevo.dart_hit(V(-f.x, -f.y, 0.0)); yield 0.05
+        nuevo.hit_react(V(f.x, f.y, 0.0), True); yield 2.5
+        check('dardo y golpe al relevo recién aparecido: el juego sigue', nuevo is not None and estado(nuevo) in ('DOWN', 'PATROL', 'SUSPICIOUS', 'SEARCH', 'RETURN', 'ALERT'), estado(nuevo))
+    # 2) golpe a uno lejos (sin precalentar): al apagarse la reacción se quedan sin cuerpos
+    lejos = [g for g in guardias() if not g.get_editor_property('tower_sentry') and dist2d(g.get_actor_location(), jugador().get_actor_location()) > 5000][:3]
+    for g in lejos:
+        f = g.get_actor_forward_vector()
+        g.hit_react(V(f.x, f.y, 0.0), True)
+    yield 3.0
+    check('golpes a guardias lejos (sin cuerpos precalentados): el juego sigue', len(lejos) > 0 and all(not g.hit_reacting() for g in lejos), len(lejos))
+    # 3) golpeado, derribado y a la taquilla enseguida
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and len(g.get_editor_property('patrol_points')) >= 2
+             and not g.get_actor_label().endswith('Ramos')]
+    v = ronda[0]
+    L = d.stash_slot_loc(0)
+    l = v.get_actor_location()
+    v.set_actor_location(V(L.x + 40, L.y + 40, l.z), False, True); yield 0.2
+    f = v.get_actor_forward_vector()
+    v.hit_react(V(f.x, f.y, 0.0), True); yield 0.05
+    yield from _esconder(d, v, 0)
+    if d.get_editor_property('dragged') is None:   # (el relevo de antes sale del barracón, junto a esta taquilla: la E pudo ser para él)
+        junto_a(v, 60.0); yield 0.3
+        if 'ARRASTRAR' in str(d.interact_prompt()):
+            d.interact(); yield 0.3
+        p = jugador().get_actor_location()
+        jugador().set_actor_location(V(L.x, L.y, p.z), False, True); yield 0.3
+    av = str(d.interact_prompt()); arr = d.get_editor_property('dragged')
+    d.interact(); yield d.get_editor_property('stash_seconds') + 1.5
+    check('recién golpeado, a la taquilla: el juego sigue', v.get_editor_property('stashed'), '%s | aviso %r | arrastrando %s | %s' % (v.get_editor_property('stashed'), av, arr, estado(v)))
+    aparte(); yield 0.3
+    # 4) apuntar y disparar con el pulso
+    blanco = [g for g in ronda if g != v and estado(g) != 'DOWN'][0]
+    bl = blanco.get_actor_location()
+    for nombre, ex, her, aire in (('en calma', 0.0, 0, False), ('tras correr', 1.0, 0, False), ('herido', 0.0, 2, False), ('conteniendo la respiración', 1.0, 2, True)):
+        blanco.wake_now() if estado(blanco) == 'DOWN' else None
+        yield 0.3
+        blanco.set_actor_location(V(bl.x, bl.y, bl.z), False, True)
+        blanco.hold(3600.0)
+        d.set_darts(3)
+        d.set_editor_property('exertion', ex); d.set_editor_property('wounds', her)
+        tp(bl.x + 600, bl.y, 180.0); yield 0.3
+        mirar(V(bl.x, bl.y, bl.z + 40)); yield 0.2
+        d.set_editor_property('aim_held', True); yield 0.8
+        if aire:
+            d.simulate_key('LeftShift'); yield 0.5
+        r = d.dart_aim()
+        d.shoot_dart(); yield 0.5
+        d.set_editor_property('aim_held', False); yield 0.3
+        check('dispara apuntando %s: gasta el dardo y el juego sigue' % nombre, d.get_editor_property('darts') == 2 and (not aire or d.breath_phase() != 0),
+              '%d dardos, a tiro %s, %s' % (d.get_editor_property('darts'), r.get_actor_label() if r else None, estado(blanco)))
+    d.set_editor_property('exertion', 0.0); d.set_editor_property('wounds', 0)
+
 def prueba_relleno():
     """Tanda E1. Relleno visual del hangar (taller, Santana bajo lona, cajas LH), la enfermería con su cámara fría y la
     plaza de armas (mástil, sacos, tejadillo): todo con colisión, sin cortar rondas, el paso del lobo, el camino a la
@@ -4583,7 +4655,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo]]
 PRUEBAS = []
 
 

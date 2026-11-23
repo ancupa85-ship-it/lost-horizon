@@ -79,10 +79,23 @@ FVector ATarsisGuard::LeftHandLocation() const
 	return Pose->GetBoneLocationByName(ArmBones[1][2], EBoneSpaces::WorldSpace);
 }
 
+void ATarsisGuard::PhysAnimRelease()
+{
+	if (PhysAnim && PhysAnim->GetSkeletalMesh()) PhysAnim->SetSkeletalMeshComponent(nullptr);
+}
+
+bool ATarsisGuard::HasPhysicsBodies() const
+{
+	const USkeletalMeshComponent* M = GetMesh();
+	return M && M->Bodies.Num() > 0 && M->GetPhysicsAsset() != nullptr;
+}
+
 void ATarsisGuard::PhysicsBodies(bool bOn)
 {
 	USkeletalMeshComponent* M = GetMesh();
 	if (!M) return;
+	// sin cuerpos (NoCollision los destruye) la animacion fisica no puede seguir enganchada a la malla
+	if (!bOn && !bPhysWarm) PhysAnimRelease();
 	if (bOn)
 	{
 		// cuerpos que chocan con el mundo pero no con personas (ni con su propia capsula) ni con la camara
@@ -142,6 +155,11 @@ void ATarsisGuard::HitReact(FVector Dir, bool bHeavy)
 	}
 	// de la cintura para arriba, cuerpos con fisica que tiran hacia la animacion, y el empujon
 	if (!PhysicsCanRun()) return;
+	PhysicsBodies(true);
+	// arreglo del cierre al disparar (tras la tanda G): un guardia recien aparecido (un relevo) o sin precalentar aun no
+	// tiene los cuerpos creados; sin ellos no hay reaccion fisica (solo la animacion), en vez de enganchar la animacion
+	// fisica a una malla vacia
+	if (!HasPhysicsBodies()) return;
 	if (!PhysAnim)
 	{
 		PhysAnim = NewObject<UPhysicalAnimationComponent>(this, TEXT("AnimacionFisica"));
@@ -155,7 +173,6 @@ void ATarsisGuard::HitReact(FVector Dir, bool bHeavy)
 	D.PositionStrength = 0.0f;
 	D.VelocityStrength = 0.0f;
 	PhysAnim->ApplyPhysicalAnimationSettingsBelow(GSpine1, D, true);
-	PhysicsBodies(true);
 	M->SetAllBodiesBelowSimulatePhysics(GSpine1, true, true);
 	M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, HitBlend, false, true);
 	const FName Chest = FirstBody(M, { TEXT("spine_04"), TEXT("spine_03"), TEXT("spine_05"), TEXT("spine_02") });
@@ -187,6 +204,7 @@ void ATarsisGuard::StartRagdoll()
 	if (bGaspSingle) GaspRestore();
 	HitPhysT = 0.0f;
 	RagdollPendingT = -1.0f;
+	PhysAnimRelease();   // en ragdoll nadie tira hacia la pose animada (y asi no queda enganchada si se destruyen los cuerpos)
 	PhysicsBodies(true);
 	// suelto de la capsula: la capsula le seguira a el (PhysicsTick), no al reves
 	M->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);

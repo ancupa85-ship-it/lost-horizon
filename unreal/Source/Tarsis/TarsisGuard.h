@@ -672,6 +672,11 @@ public:
 	bool PhysicsCanRun() const;
 	void LoadHitAnims();
 	void PhysicsBodies(bool bOn);
+	/** Suelta la animacion fisica de la malla (antes de que sus cuerpos dejen de existir: si no, el componente sigue
+	 *  pidiendo cuerpos que ya no hay y el motor se cierra con un assert de ArrayView). */
+	void PhysAnimRelease();
+	/** La malla tiene sus cuerpos de fisica creados ahora mismo. */
+	bool HasPhysicsBodies() const;
 	// tanda D: precalentar los cuerpos, levantarse por agachado, y de que lado quedo
 	void PhysicsWarm();
 	FVector BodyFront() const;

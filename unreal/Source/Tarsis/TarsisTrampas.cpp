@@ -101,6 +101,7 @@ void ATarsisDirector::StashBody(int32 Index)
 	if (StashBodies.Num() < StashSlotCount()) StashBodies.SetNum(StashSlotCount());
 	StopDrag();
 	G->bStashed = true;
+	G->PhysAnimRelease();   // sin colision la malla pierde sus cuerpos: antes, soltar la animacion fisica
 	G->SetActorHiddenInGame(true);
 	G->SetActorEnableCollision(false);
 	StashBodies[Index] = G;
