@@ -7,10 +7,12 @@
 #include "TarsisDirector.h"
 #include "TarsisGuard.h"
 
+#include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 
 // Textos solo en ASCII: MSVC lee los .cpp sin BOM como si no fueran UTF-8.
 
@@ -91,5 +93,37 @@ void ATarsisDirector::BoxTick(float DeltaSeconds)
 	ATarsisGuard::GSeenMul = BoxCloaked() ? 0.0f : 1.0f;
 	ATarsisGuard::GBoxNear = BoxNoticeDist;
 	ATarsisGuard::GPrisoner = InCell();
-	ATarsisGuard::GFarLimit = bUniformNow ? UniformDist : 0.0f;
+	// tanda H: con el santo y sena de esta noche (oido en el relevo de las torres) te dejan acercarte mucho mas
+	const bool bPass = bUniformNow && HasFlag(FName(TEXT("dato_relevo_santo"))) && !PasswordA.IsEmpty();
+	ATarsisGuard::GFarLimit = bUniformNow ? (bPass ? FMath::Min(UniformPassDist, UniformDist) : UniformDist) : 0.0f;
+	if (bPass) ChallengeTick();
+}
+
+void ATarsisDirector::ChallengeTick()
+{
+	// el primero que te tiene delante, a tiro de voz y sin nada en medio, te da el alto; Cuttlas contesta la sena.
+	// Una vez por guardia: luego ya te ha visto la cara de lejos y te toma por uno de los suyos.
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!P || bCodec || bCine) return;
+	const FVector PL = P->GetActorLocation();
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		ATarsisGuard* G = *It;
+		if (G->bAlly || G->bTowerSentry || G->State == ETarsisGuardState::Down || G->State == ETarsisGuardState::Alert || G->StunT > 0.0f) continue;
+		if (Challenged.Contains(G->GuardName)) continue;
+		const FVector D = PL - G->GetActorLocation();
+		if (D.Size() > ChallengeDist || FMath::Abs(D.Z) > 250.0f) continue;
+		if (FVector::DotProduct(G->GetActorForwardVector(), D.GetSafeNormal2D()) < 0.5f) continue;   // te tiene delante
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisSanto), false, G);
+		Q.AddIgnoredActor(P);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, G->GetActorLocation() + FVector(0.0f, 0.0f, 70.0f), PL + FVector(0.0f, 0.0f, 50.0f), ECC_Visibility, Q)) continue;
+		Challenged.Add(G->GuardName);
+		SaySubtitle(G->GuardName.ToUpper(), Tx(TEXT("santo_alto"), TEXT("Alto. {0}?"), { PasswordA }), 2.2f);
+		const FString Reply = Tx(TEXT("santo_respuesta"), TEXT("{0}."), { PasswordB });
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, Reply]() { SaySubtitle(TEXT("CUTTLAS"), Reply, 2.2f); }), 1.4f, false);
+		Teach(TEXT("ensena_santo"), TEXT("SANTO Y SENA\nCon el uniforme y la sena de esta noche, los guardias te dejan acercarte mucho mas. De muy cerca, o corriendo, siguen viendote la cara."), {}, 4.5f);
+		break;
+	}
 }

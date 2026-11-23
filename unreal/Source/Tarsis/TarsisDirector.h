@@ -225,6 +225,53 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Takedown();
 
+	// ---- tanda H (23-11-2026): la via letal, la llamada de Roig, el estado de cada uno y segundas vias a la jefatura
+	/** Regla de la via letal: con la tecla de MATAR (K), por la espalda, el cuchillo. Sin ella, solo derribos. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Letal")
+	bool bLethal = true;
+	/** Muertos esta noche, y sus nombres (el parte y la mision siguiente los leen). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Letal")
+	int32 Kills = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Letal")
+	TArray<FString> Killed;
+	/** Muertos que ya han encontrado: cada uno deja la base en guardia mas tiempo que el anterior. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Letal")
+	int32 DeadFound = 0;
+	/** Segundos en guardia al encontrar el primer muerto, y cuantos mas por cada uno de despues. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Letal")
+	float KillTension = 180.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Letal")
+	float KillTensionStep = 60.0f;
+	/** Puntos de sigilo que cuesta cada muerto (un derribo cuesta 30). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Letal")
+	float KillScore = 60.0f;
+	/** La tecla de MATAR: mata por la espalda al guardia a tiro (el mismo que derribaria la E). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Letal")
+	void KillAction();
+	/** Un guardia ha dado la voz por un cuerpo: la central dice «en el suelo» o, si esta muerto, que hay un asesino dentro. */
+	void BodyReported(class ATarsisGuard* Body);
+	/** Lo que se anade a «E DERRIBAR» cuando se puede matar. */
+	FString KillPromptSuffix(const class ATarsisGuard* G) const;
+
+	/** La llamada de Roig: este rato despues de oir la llamada del expediente, «Ricino se ha secado» (empalma con la mision 2). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Codec")
+	float RoigRicinoDelay = 30.0f;
+	float RoigRicinoT = 0.0f;
+
+	/** Santo y seña con uniforme: sabiendolo (dato relevo_santo), los guardias solo te distinguen a menos de esto (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
+	float UniformPassDist = 350.0f;
+	/** A cuantos cm te da el alto un guardia con el uniforme puesto (y tu contestas la seña). Una vez por guardia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Caja")
+	float ChallengeDist = 700.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Caja")
+	TArray<FString> Challenged;
+	void ChallengeTick();
+
+	/** El estado de cada uno al acabar (Nombre -> vivo, dormido, muerto, aliado): lo guarda el parte para la mision siguiente. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	TMap<FString, FString> PeopleState() const;
+
 	/** La tecla E: lo que toque según dónde estés (ver InteractPrompt). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void Interact();
@@ -2344,7 +2391,7 @@ public:
 	int32 WaitKeyFor = -1;
 
 	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
-	static constexpr int32 NumActions = 13;   // tanda 43: caja, mapa, interrogar y asomarse tambien se ven y se cambian en CONTROLES
+	static constexpr int32 NumActions = 14;   // tanda H: MATAR (K)   // tanda 43: caja, mapa, interrogar y asomarse tambien se ven y se cambian en CONTROLES
 	FKey ActionKeys[NumActions];
 	/** Nombre de la tecla de una accion, en mayusculas y sin tildes (ToUpper dejaba «MAYuS» con la u minuscula). */
 	FString KeyLabel(int32 I) const;

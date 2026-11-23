@@ -275,6 +275,62 @@ void ATarsisDirector::Takedown()
 	Teach(TEXT("ensena_derribo"), TEXT("{0} DERRIBADO\nDespertara en un rato. Si otro guardia lo ve en el suelo, dara la alarma."), { G->GuardName.ToUpper() }, 4.0f);
 }
 
+// ---------------------------------------------------------------- tanda H: la via letal
+
+void ATarsisDirector::KillAction()
+{
+	if (!bLethal || bCine || bDone || bMenu || bCodec || bChoice || bKeypad || Dragged || bRiding || bHiding || bBoxOn || bCapturing || bClimbing) return;
+	ATarsisGuard* G = TakedownTarget();
+	if (!G || G->bTowerSentry || G->bAlly) return;
+	if (G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase))
+	{
+		// Ramos solo quiere irse: con el no hay cuchillo (se le agarra, o se le derriba con la E)
+		if (!bRamosTalked) { Interact(); return; }
+		ShowMessage(Tx(TEXT("matar_ramos"), TEXT("RAMOS NO
+El cuartelero solo quiere irse. Derribalo (E) si te estorba.")), 2.5f);
+		return;
+	}
+	G->Kill();
+	++Kills;
+	Killed.AddUnique(G->GuardName);
+	HintStep = 3;
+	PlaySfx(TEXT("empujon"), G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 0.25f);
+	Teach(TEXT("ensena_matar"), TEXT("{0} HA MUERTO\nNo se levantara. Si lo encuentran, la base sabra que hay un asesino dentro y estara en guardia mucho mas tiempo."), { G->GuardName.ToUpper() }, 4.5f);
+}
+
+FString ATarsisDirector::KillPromptSuffix(const ATarsisGuard* G) const
+{
+	if (!bLethal || !G || G->bTowerSentry || G->bAlly || G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase)) return FString();
+	return Tx(TEXT("p_matar"), TEXT("        {0}   MATAR"), { KeyLabel(13) });
+}
+
+void ATarsisDirector::BodyReported(ATarsisGuard* Body)
+{
+	if (!Body) return;
+	if (!Body->bDead)
+	{
+		CentralSay(TEXT("todos"), Tx(TEXT("radio_todos"), TEXT("A todas las unidades: {0} esta en el suelo. Hay alguien dentro. Buscadlo."), { Body->GuardName }), 3.2f);
+		return;
+	}
+	++DeadFound;
+	TensionT = FMath::Max(TensionT, KillTension + KillTensionStep * (DeadFound - 1));
+	CentralSay(TEXT("muerto"), Tx(TEXT("radio_muerto"), TEXT("A todas las unidades: {0} esta muerto. Hay un asesino dentro. Nadie va solo."), { Body->GuardName }), 3.2f);
+}
+
+TMap<FString, FString> ATarsisDirector::PeopleState() const
+{
+	TMap<FString, FString> M;
+	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+	{
+		if (It->GuardName.IsEmpty()) continue;
+		const TCHAR* St = It->bDead ? TEXT("muerto") : It->bAlly ? TEXT("aliado") : It->State == ETarsisGuardState::Down ? TEXT("dormido") : TEXT("vivo");
+		M.Add(It->GuardName, St);
+	}
+	// Ramos aliado sale de la base por su cuenta: puede no estar ya en el mundo
+	if (bRamosAlly) M.Add(TEXT("Ramos"), TEXT("aliado"));
+	return M;
+}
+
 void ATarsisDirector::ToggleCrouch()
 {
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
@@ -518,7 +574,7 @@ FString ATarsisDirector::InteractPrompt() const
 	{ const FString L = LadderPrompt(); if (!L.IsEmpty()) return L; }
 	if (ATarsisGuard* T = TakedownTarget())
 	{
-		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? Tx(TEXT("p_ramos_agarrar"), TEXT("E   AGARRAR A RAMOS")) : (CanInterrogate(T) ? Tx(TEXT("p_derribar_int"), TEXT("E   DERRIBAR        {0}   INTERROGAR"), { KeyLabel(10) }) : Tx(TEXT("p_derribar"), TEXT("E   DERRIBAR")));
+		return (T->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosTalked) ? Tx(TEXT("p_ramos_agarrar"), TEXT("E   AGARRAR A RAMOS")) : (CanInterrogate(T) ? Tx(TEXT("p_derribar_int"), TEXT("E   DERRIBAR        {0}   INTERROGAR"), { KeyLabel(10) }) : Tx(TEXT("p_derribar"), TEXT("E   DERRIBAR"))) + KillPromptSuffix(T);
 	}
 	if (ShoveTarget()) return Tx(TEXT("p_empujar"), TEXT("E   EMPUJAR (queda aturdido 2 s; hace ruido)"));
 	if (FacingAlertGuard()) return Tx(TEXT("p_te_ve"), TEXT("TE VE: huye, rodealo o distraelo ({0})"), { KeyLabel(2) });
@@ -1100,13 +1156,15 @@ void ATarsisDirector::Finish(bool bByMarsh)
 	// puntuación de sigilo: te ven, te cogen y derribas, menos; tardar mucho, algo menos. En fácil cuenta menos y en difícil más
 	static const float DiffMul[] = { 0.8f, 1.0f, 1.2f };
 	static const TCHAR* Df[] = { TEXT("FACIL"), TEXT("NORMAL"), TEXT("DIFICIL") };
-	const float Raw = 1000.0f - 120.0f * Detections - 200.0f * Captures - 30.0f * Takedowns - FMath::Max(0.0f, MissionTime - 600.0f) * 0.5f;
+	const float Raw = 1000.0f - 120.0f * Detections - 200.0f * Captures - 30.0f * Takedowns - KillScore * Kills - FMath::Max(0.0f, MissionTime - 600.0f) * 0.5f;
 	Score = FMath::Clamp(FMath::RoundToInt(Raw * DiffMul[FMath::Clamp(Difficulty, 0, 2)]), 0, 1200);
-	Rank = (Detections == 0 && Captures == 0 && Takedowns == 0) ? TEXT("FANTASMA")
-		: (Detections == 0 && Captures == 0) ? TEXT("SOMBRA")
+	// tanda H: con muertos no hay FANTASMA ni SOMBRA (un fantasma no deja cuerpos que no se levantan)
+	Rank = (Detections == 0 && Captures == 0 && Takedowns == 0 && Kills == 0) ? TEXT("FANTASMA")
+		: (Detections == 0 && Captures == 0 && Kills == 0) ? TEXT("SOMBRA")
 		: Score >= 600 ? TEXT("INFILTRADO") : TEXT("RUIDOSO");
 	const FString Stats = Tx(TEXT("final_datos"), TEXT("Tiempo {0}:{1}   Te vieron {2}   Capturas {3}   Derribos {4}\nSIGILO: {5} puntos - {6} ({7})"),
-		{ Secs / 60, FString::Printf(TEXT("%02d"), Secs % 60), Detections, Captures, Takedowns, Score, Rank, FString(Df[FMath::Clamp(Difficulty, 0, 2)]) });
+		{ Secs / 60, FString::Printf(TEXT("%02d"), Secs % 60), Detections, Captures, Takedowns, Score, Rank, FString(Df[FMath::Clamp(Difficulty, 0, 2)]) })
+		+ (Kills > 0 ? Tx(TEXT("final_muertos"), TEXT("\nMuertos {0}: {1}"), { Kills, FString::Join(Killed, TEXT(", ")) }) : FString());
 	if (bByMarsh)
 	{
 		ShowMessage(Tx(TEXT("final_marisma"), TEXT("EL QUE NO ENTREGO\nRamos abre el portillo y rema sin encender la linterna. El expediente sigue en tu chaqueta.\nControl pierde tu rastro en la marisma.")) + TEXT("\n") + Stats, 20.0f);
@@ -2017,7 +2075,7 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 	{
 		if (It->State == ETarsisGuardState::Alert && !It->bTowerSentry) bAlarm = true;
 	}
-	if (bAlarm) TensionT = 90.0f;
+	if (bAlarm) TensionT = FMath::Max(TensionT, 90.0f);   // tanda H: sin bajar la de un muerto o la del relevo
 	else if (TensionT > 0.0f) TensionT -= DeltaSeconds;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
@@ -3849,7 +3907,8 @@ FString ATarsisDirector::KeyLabel(int32 I) const
 const TCHAR* ATarsisDirector::ActionName(int32 I)
 {
 	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA"), TEXT("LINTERNA"), TEXT("RADIO"),
-		TEXT("CAJA DE CARTON"), TEXT("MAPA MENTAL"), TEXT("INTERROGAR (por la espalda)"), TEXT("ASOMARSE A LA IZQUIERDA"), TEXT("ASOMARSE A LA DERECHA") };
+		TEXT("CAJA DE CARTON"), TEXT("MAPA MENTAL"), TEXT("INTERROGAR (por la espalda)"), TEXT("ASOMARSE A LA IZQUIERDA"), TEXT("ASOMARSE A LA DERECHA"),
+		TEXT("MATAR (por la espalda)") };
 	return (I >= 0 && I < NumActions) ? N[I] : TEXT("");
 }
 
@@ -3868,6 +3927,7 @@ void ATarsisDirector::DefaultKeys()
 	ActionKeys[10] = EKeys::T;
 	ActionKeys[11] = EKeys::Z;
 	ActionKeys[12] = EKeys::V;
+	ActionKeys[13] = EKeys::K;   // tanda H
 }
 
 void ATarsisDirector::BindAll()
@@ -3889,6 +3949,7 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[11], IE_Released, this, &ATarsisDirector::LeanLeftOff);
 	InputComponent->BindKey(ActionKeys[12], IE_Pressed, this, &ATarsisDirector::LeanRightOn);
 	InputComponent->BindKey(ActionKeys[12], IE_Released, this, &ATarsisDirector::LeanRightOff);
+	InputComponent->BindKey(ActionKeys[13], IE_Pressed, this, &ATarsisDirector::KillAction);   // tanda H: matar por la espalda
 	InputComponent->BindKey(EKeys::G, IE_Pressed, this, &ATarsisDirector::ToggleThird);   // tanda 47: tercera persona (fija)
 	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ATarsisDirector::AimOn);   // tanda 47: apuntar (fija)
 	InputComponent->BindKey(EKeys::RightMouseButton, IE_Released, this, &ATarsisDirector::AimOff);
@@ -4052,7 +4113,7 @@ void ATarsisDirector::BuildReport()
 	TArray<FString> Downed;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
-		if (It->State == ETarsisGuardState::Down) Downed.Add(It->GuardName);
+		if (It->State == ETarsisGuardState::Down && !It->bDead) Downed.Add(It->GuardName);   // tanda H: los muertos, aparte
 		if (It->State == ETarsisGuardState::Down && It->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bRamosAlly) bRamosDowned = true;
 	}
 	TArray<FString>& L = ReportLines;
@@ -4069,8 +4130,12 @@ void ATarsisDirector::BuildReport()
 	TArray<FString> DownedList = Downed;
 	if (bRamosDowned) DownedList.RemoveAll([](const FString& N) { return N.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase); });   // ya tiene su línea
 	if (DownedList.Num() > 0) L.Add(FString::Printf(TEXT("Amanecieron en el suelo, aturdidos o dormidos: %s."), *FString::Join(DownedList, TEXT(", "))));
+	if (Killed.Num() == 1) L.Add(FString::Printf(TEXT("El soldado %s aparecio muerto a cuchillo, por la espalda. Interviene la Guardia Civil de Rota."), *Killed[0]));
+	else if (Killed.Num() > 1) L.Add(FString::Printf(TEXT("Aparecieron muertos a cuchillo, por la espalda: %s. Interviene la Guardia Civil de Rota."), *FString::Join(Killed, TEXT(", "))));
 	if (bVetOpen) L.Add(TEXT("El botiquin del veterinario esta abierto y falta la pistola de dardos."));
-	if (bKey) L.Add(TEXT("Al sargento Ibarra le falta la llave de la jefatura. Se cambiara la cerradura."));
+	const bool bSpare = HasFlag(FName(TEXT("llave_repuesto")));
+	if (bSpare) L.Add(TEXT("Falta la llave de repuesto de la jefatura, que guardaba el cabo Peris en su mesa. Se le abre expediente."));
+	else if (bKey) L.Add(TEXT("Al sargento Ibarra le falta la llave de la jefatura. Se cambiara la cerradura."));
 	if (bLampBroken) L.Add(TEXT("El farol del control aparecio roto de un disparo. Se ha pedido otro a Sevilla."));
 	if (BrokenLights.Num() == 1) L.Add(TEXT("Una farola aparecio rota de un disparo. No hay repuesto hasta el lunes."));
 	else if (BrokenLights.Num() > 1) L.Add(FString::Printf(TEXT("%d farolas aparecieron rotas a tiros. No hay repuesto hasta el lunes."), BrokenLights.Num()));
@@ -4088,10 +4153,13 @@ void ATarsisDirector::BuildReport()
 	if (BrokenLights.Num() > 0) Cons.Add(TEXT("hay farolas sin reponer"));
 	if (bRamosAlly) Cons.Add(TEXT("Ramos te espera fuera"));
 	else if (bRamosDowned) Cons.Add(TEXT("Ramos desconfia de todos"));
-	if (bKey) Cons.Add(TEXT("cerradura nueva en la jefatura"));
+	if (bKey || bSpare) Cons.Add(TEXT("cerradura nueva en la jefatura"));
+	if (Killed.Num() > 0) Cons.Add(TEXT("nadie hace la ronda solo"));
 	if (bLeftByTruck) Cons.Add(TEXT("en el control registran todos los camiones"));
 	L.Add(Cons.Num() > 0 ? FString::Printf(TEXT("LA PROXIMA NOCHE: %s."), *FString::Join(Cons, TEXT(", "))) : FString(TEXT("LA PROXIMA NOCHE: todo sigue igual. Nadie sabe que estuviste.")));
 	L.Add(FString::Printf(TEXT("SIGILO: %d puntos - %s"), Score, *Rank));
+	const bool bRicino = CodecTaken.Contains(TEXT("roig_ricino"));
+	if (bRicino) { L.Add(TEXT("")); L.Add(TEXT("CONTINUARA: Ricino se ha secado (en preparacion).")); }
 	L.Add(TEXT(""));
 	L.Add(TEXT("P: menu (salir o cargar el ultimo punto de control)"));
 	// se guarda para la misión 2
@@ -4114,6 +4182,11 @@ void ATarsisDirector::BuildReport()
 	S->Score = Score;
 	S->Rank = Rank;
 	S->Downed = Downed;
+	S->Kills = Kills;
+	S->Killed = Killed;
+	S->People = PeopleState();
+	S->bRoigRicino = bRicino;
+	S->bSpareKey = bSpare;
 	S->Report = L;
 	S->Difficulty = Difficulty;
 	UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisParte"), 0);

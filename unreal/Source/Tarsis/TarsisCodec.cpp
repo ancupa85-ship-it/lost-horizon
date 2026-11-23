@@ -261,6 +261,17 @@ void ATarsisDirector::CodecTick(float DeltaSeconds)
 		else if (bVaultOpen && !bCodecPrevVault && !CodecTaken.Contains(TEXT("archivo"))) CodecRing(TEXT("archivo"));
 		else if (bPowerOff && !bCodecPrevPower && !CodecTaken.Contains(TEXT("fuente_luz"))) CodecRing(TEXT("fuente_luz"));
 		else if (bAlert && !bCodecPrevAlert && !CodecTaken.Contains(TEXT("alarma")) && CodecPending.IsNone()) CodecRing(TEXT("alarma"));
+		// tanda H: un rato despues de la llamada del expediente, Roig: «Ricino se ha secado» (empalma con la mision 2).
+		// Espera a que no haya otra llamada sonando ni conversacion abierta; si suena y no la coges, vuelve a sonar.
+		if (CodecTaken.Contains(TEXT("expediente")) && !CodecTaken.Contains(TEXT("roig_ricino")))
+		{
+			if (!bCodec && CodecPending.IsNone() && !bCapturing && !bKeypad && !bChoice) RoigRicinoT += DeltaSeconds;
+			if (RoigRicinoT >= RoigRicinoDelay && CodecPending.IsNone() && !bCodec)
+			{
+				RoigRicinoT = 0.0f;
+				CodecRing(TEXT("roig_ricino"));
+			}
+		}
 	}
 	bCodecPrevAlert = bAlert; bCodecPrevVault = bVaultOpen; bCodecPrevFile = bFile; bCodecPrevPower = bPowerOff;
 }
@@ -273,5 +284,6 @@ void ATarsisDirector::CodecReset()
 	bCodecMenu = false;
 	CodecTaken.Reset();
 	CodecControlCalls = CodecRoigCalls = CodecVoiceCalls = 0;
+	RoigRicinoT = 0.0f;
 	bCodecVoiceHeard = false;
 }

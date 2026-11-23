@@ -347,7 +347,14 @@ public:
 	void KnockOut();
 	/** Tanda C, para las pruebas: se despierta ya (como al acabar KnockOutTime). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
-	void WakeNow() { if (State == ETarsisGuardState::Down) WakeUp(); }
+	void WakeNow() { if (State == ETarsisGuardState::Down && !bDead) WakeUp(); }
+
+	/** Tanda H: la via letal. Muerto por la espalda con el cuchillo: cae como al derribarlo y ya no se levanta.
+	Quien lo encuentre no dice «en el suelo»: la central sabe que hay un asesino dentro y la base se pone en guardia mas tiempo. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis")
+	void Kill();
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
+	bool bDead = false;
 
 	/** Se le puede derribar ahora desde la posición de Who (cerca, por la espalda, sin ser centinela ni estar ya caído). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")

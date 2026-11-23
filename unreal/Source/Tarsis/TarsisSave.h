@@ -46,6 +46,11 @@ public:
 	UPROPERTY() int32 Score = 0;
 	UPROPERTY() FString Rank;
 	UPROPERTY() TArray<FString> Downed;
+	UPROPERTY(VisibleAnywhere, Category = "Tarsis") int32 Kills = 0;                      // tanda H: la via letal
+	UPROPERTY(VisibleAnywhere, Category = "Tarsis") TArray<FString> Killed;
+	UPROPERTY(VisibleAnywhere, Category = "Tarsis") TMap<FString, FString> People;        // tanda H: Nombre -> vivo, dormido, muerto, aliado
+	UPROPERTY(VisibleAnywhere, Category = "Tarsis") bool bRoigRicino = false;             // tanda H: oiste a Roig («Ricino se ha secado»)
+	UPROPERTY(VisibleAnywhere, Category = "Tarsis") bool bSpareKey = false;               // tanda H: entraste con la llave de repuesto de Peris
 	UPROPERTY() TArray<FString> Report;
 
 	// ---- opciones

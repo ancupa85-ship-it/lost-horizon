@@ -262,3 +262,20 @@ del eje de la puerta (`vidal_offset`): estaba metido en la pared del vestíbulo.
 - **Lomos**: `legajos_lomo` y `legajos_oscuros_lomo` (ambiente.py): cinta y tejuelo de geometría, sin texturas.
 - La batería cierra la partida al acabar.
 
+
+## Tanda H: vía letal, la llamada de Roig, el estado de cada uno y segundas vías a la jefatura
+
+- **Vía letal** (`bLethal`, acción 13 «MATAR», tecla K por defecto): por la espalda, al mismo guardia que derribaría la
+  E. `ATarsisGuard::Kill()` cae como `KnockOut()` y deja `bDead`: no despierta (`WakeUp`, `WakeNow` y `Recover` lo
+  respetan). Al encontrarlo, `BodyReported` dice `radio_muerto` y pone la base en guardia `KillTension` +
+  `KillTensionStep` por cada muerto ya encontrado. Cada muerto resta `KillScore` puntos y quita FANTASMA y SOMBRA.
+  A Ramos y a los centinelas no se les mata. Prueba: `prueba_letal`.
+- **Roig** (`RoigRicinoDelay`): tras oír la llamada del expediente, Roig llama con `codec_roig_ricino` («Ricino se ha
+  secado»). Si se oyó, el parte acaba con «CONTINUARA».
+- **El parte para la misión 2** (`TarsisParte`): ahora guarda también `Kills`, `Killed`, `People` (Nombre → vivo,
+  dormido, muerto, aliado; `PeopleState()`), `bRoigRicino` y `bSpareKey`. Los muertos van en su propia línea.
+- **Llave de repuesto**: punto `llave_repuesto` en la mesa de Peris (sitio sin medir). Solo existe sabiendo el dato
+  `peris_repuesto`, que da la frase `ch_medalla_5` o interrogar a Peris. Pone `llave_jefatura`.
+- **Santo y seña con uniforme**: sabiendo `relevo_santo`, `GFarLimit` baja a `UniformPassDist`. El primero que te
+  tiene delante a menos de `ChallengeDist` da el alto (`PasswordA`) y Cuttlas contesta (`PasswordB`); una vez por
+  guardia. Prueba: `prueba_vias`.

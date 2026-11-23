@@ -565,6 +565,23 @@
    "sonido": "recoger",
    "texto": "libro_difuntos",
    "segundos": 12.0
+  },
+  {
+   "id": "llave_repuesto",
+   "nota": "tanda H: llave de repuesto de la jefatura bajo el tabaco, en la mesa de Peris (sala de guardia, junto a cg_mesa; sitio sin medir). Solo existe si sabes el dato peris_repuesto",
+   "pos": [
+    5700,
+    1255,
+    0
+   ],
+   "radio": 120,
+   "aviso": "p_llave_repuesto",
+   "necesita": "dato_peris_repuesto",
+   "pone": "llave_repuesto",
+   "pone_tambien": "llave_jefatura",
+   "sonido": "recoger",
+   "texto": "llave_repuesto_cogida",
+   "segundos": 6.0
   }
  ],
  "textos": {
@@ -950,7 +967,20 @@
   "p_camara_fria": "E   PUERTA METALICA",
   "camara_fria": "CAMARA FRIA\nCerrada con candado. Hace frio al lado de la puerta.",
   "p_libro_difuntos": "E   LEER EL LIBRO DE DIFUNTOS",
-  "libro_difuntos": "LIBRO DE DIFUNTOS - CAPILLA DE TARSIS\nMarzo de 1981: soldado BUENO, A. Ahogado en la marisma. Misa de cuerpo presente.\nNoviembre de 1983: soldado VIDAL, J. Escrito \"trasladado\" y tachado. Debajo, a lapiz:\n\"Sin cuerpo. Misa sin cuerpo. Su hermano reza en la reja y yo no se que decirle.\"\nFirma: P. Anselmo."
+  "libro_difuntos": "LIBRO DE DIFUNTOS - CAPILLA DE TARSIS\nMarzo de 1981: soldado BUENO, A. Ahogado en la marisma. Misa de cuerpo presente.\nNoviembre de 1983: soldado VIDAL, J. Escrito \"trasladado\" y tachado. Debajo, a lapiz:\n\"Sin cuerpo. Misa sin cuerpo. Su hermano reza en la reja y yo no se que decirle.\"\nFirma: P. Anselmo.",
+  "ch_medalla_5": "En mi cajon no cabe ni un alfiler. Hasta la de repuesto de la jefatura la tengo en la mesa, debajo del tabaco, por si Ibarra la pierde otra vez.",
+  "dt_peris_repuesto": "Guarda en su mesa, bajo el tabaco, la llave de repuesto de la jefatura.",
+  "p_llave_repuesto": "E   COGER LA LLAVE DE REPUESTO",
+  "llave_repuesto_cogida": "LLAVE DE REPUESTO\nBajo el tabaco de Peris, la de la jefatura. Ibarra sigue con la suya: esta noche nadie la echara de menos.",
+  "p_matar": "        {0}   MATAR",
+  "matar_ramos": "RAMOS NO\nEl cuartelero solo quiere irse. Derribalo (E) si te estorba.",
+  "ensena_matar": "{0} HA MUERTO\nNo se levantara. Si lo encuentran, la base sabra que hay un asesino dentro y estara en guardia mucho mas tiempo.",
+  "radio_muerto": "A todas las unidades: {0} esta muerto. Hay un asesino dentro. Nadie va solo.",
+  "final_muertos": "\nMuertos {0}: {1}",
+  "santo_alto": "Alto. {0}?",
+  "santo_respuesta": "{0}.",
+  "ensena_santo": "SANTO Y SENA\nCon el uniforme y la sena de esta noche, los guardias te dejan acercarte mucho mas. De muy cerca, o corriendo, siguen viendote la cara.",
+  "codec_roig_ricino": "R|Cuttlas, escucha mientras andas. Me ha llegado un recado de Rota, para ti. Cuatro palabras: Ricino se ha secado.\nT|Que es Ricino?\nR|No lo se. Pero quien lo manda sabe que esta noche estas ahi dentro, y Control no me lo ha dicho.\nR|Sal de ahi. Manana lo hablamos."
  },
  "datos": [
   {
@@ -1031,6 +1061,12 @@
    "ficha": "Alarcon",
    "texto": "dt_alarcon_traslados",
    "clase": "historia"
+  },
+  {
+   "id": "peris_repuesto",
+   "ficha": "Peris",
+   "texto": "dt_peris_repuesto",
+   "clase": "objeto"
   },
   {
    "id": "peris_cajon",
@@ -1206,6 +1242,11 @@
      "Ramos",
      "ch_medalla_4",
      "peris_cajon"
+    ],
+    [
+     "Peris",
+     "ch_medalla_5",
+     "peris_repuesto"
     ]
    ]
   }

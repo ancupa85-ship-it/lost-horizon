@@ -702,8 +702,18 @@ void ATarsisGuard::KnockOut()
 	UpdateMark();
 }
 
+void ATarsisGuard::Kill()
+{
+	if (bDead) return;
+	KnockOut();   // la misma caida (ragdoll o animacion); lo que cambia es que no despierta
+	bDead = true;
+	DownT = 1e9f;
+	UpdateMark();
+}
+
 void ATarsisGuard::WakeUp()
 {
+	if (bDead) return;   // tanda H: un muerto no se levanta (ni por las trampas ni al encontrarlo)
 	StopRagdoll(true);   // tanda C: del suelo (fisica) a la animacion, mezclando
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
 	Body->SetRelativeRotation(FRotator::ZeroRotator);
@@ -722,6 +732,7 @@ void ATarsisGuard::WakeUp()
 
 void ATarsisGuard::Recover()
 {
+	if (bDead) { bFound = true; return; }   // tanda H: al muerto no lo levanta nadie; ya lo han visto, no vuelve a dar la alarma
 	StunT = 0.0f;
 	BodyTarget = nullptr;
 	BodyCheckT = 0.0f;
@@ -771,7 +782,7 @@ void ATarsisGuard::LookForBodies()
 			for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
 			{
 				Dt->GuardSay(this, TEXT("suelo"), true);
-				Dt->CentralSay(TEXT("todos"), Dt->Tx(TEXT("radio_todos"), TEXT("A todas las unidades: {0} esta en el suelo. Hay alguien dentro. Buscadlo."), { O->GuardName }), 3.2f);
+				Dt->BodyReported(O);   // tanda H: «esta en el suelo» o, si esta muerto, «hay un asesino dentro»
 				break;
 			}
 			break;
@@ -832,7 +843,7 @@ void ATarsisGuard::BodyTick(float DeltaSeconds, APawn* Player, float V)
 	for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt)
 	{
 		Dt->GuardSay(this, TEXT("suelo"), true);
-		Dt->CentralSay(TEXT("todos"), Dt->Tx(TEXT("radio_todos"), TEXT("A todas las unidades: {0} esta en el suelo. Hay alguien dentro. Buscadlo."), { O->GuardName }), 3.2f);
+		Dt->BodyReported(O);   // tanda H
 		break;
 	}
 	Alarm(P);
@@ -1603,8 +1614,11 @@ void ATarsisGuard::Tick(float DeltaSeconds)
 		if (GestureW > 0.0f || GestureLeft > 0.0f) StopGesture();   // en el suelo no hay gesto que valga, ni al levantarse
 		if (bPetting) StopPet();
 		BatonTick(DeltaSeconds);   // y el bastón se apaga
-		DownT -= DeltaSeconds;
-		if (DownT <= 0.0f) WakeUp();
+		if (!bDead)
+		{
+			DownT -= DeltaSeconds;
+			if (DownT <= 0.0f) WakeUp();
+		}
 		return;
 	}
 	UpdateAnim();

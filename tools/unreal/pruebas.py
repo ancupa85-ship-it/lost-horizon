@@ -2303,7 +2303,7 @@ def prueba_controles():
     d = director()
     yield from teclas(d, 'P', *(['Down'] * 9), 'Enter')
     ls = lineas(d)
-    check('CONTROLES abre la página de teclas', len(ls) == 15 and 'VOLVER' in ls[-1], ' / '.join(ls))
+    check('CONTROLES abre la página de teclas', len(ls) == 16 and 'VOLVER' in ls[-1], ' / '.join(ls))   # 14 acciones (tanda H: MATAR)
     tecla0 = ls[0]
     yield from teclas(d, 'Enter')
     check('Intro no se asigna a sí misma (espera tecla)', 'PULSA UNA TECLA' in lineas(d)[0], lineas(d)[0])
@@ -2314,7 +2314,7 @@ def prueba_controles():
     yield from teclas(d, 'Enter', 'E')
     ls = lineas(d)
     check('si la tecla choca, se intercambian', '[ E ]' in ls[0] and '[ X ]' in ls[1], '%s / %s' % (ls[0], ls[1]))
-    yield from teclas(d, *(['Down'] * 13), 'Enter')   # trece acciones desde la tanda 43
+    yield from teclas(d, *(['Down'] * 14), 'Enter')   # catorce acciones desde la tanda H
     ls = lineas(d)
     check('TECLAS POR DEFECTO lo deshace', ls[0] == tecla0 and ls[1] == interact, '%s / %s' % (ls[0], ls[1]))
     yield from teclas(d, 'Escape')
@@ -4651,11 +4651,136 @@ def prueba_tactica():
     check('la silueta se va con el tiempo', P('last_known_t') < t0, P('last_known_t'))
     jugador().set_actor_hidden_in_game(False)
 
+def prueba_letal():
+    """Tanda H, la vía letal. Por la espalda, la K mata con el cuchillo: cae como al derribarlo y no se levanta (ni al
+    acabar el tiempo, ni al encontrarlo, ni al calmarse la base). Quien lo encuentra no dice «en el suelo»: la central
+    avisa de que hay un asesino dentro y la base queda en guardia más tiempo. A Ramos no se le mata."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    nombre = lambda g: str(g.get_editor_property('guard_name'))
+    yield ('hasta', lambda: len([x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL']) >= 3, 40.0)
+    torres = [x for x in guardias() if x.get_editor_property('tower_sentry')]
+    for x in torres:
+        x.hold(60.0)
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) == 'PATROL' and nombre(g) != 'Ramos']
+    g = max(ronda, key=lambda x: dist2d(x.get_actor_location(), GEN))
+    g.hold(3600.0)
+    d.simulate_key('C'); yield 0.3
+    for _ in range(3):
+        detras_de(g, 90); yield 0.1
+    check('por la espalda, el aviso ofrece matar con la K', 'MATAR' in str(d.interact_prompt()) and 'DERRIBAR' in str(d.interact_prompt()), d.interact_prompt())
+    t0, k0 = P('takedowns'), P('kills')
+    d.simulate_key('K'); yield 0.4
+    check('la K lo mata: cae y queda muerto', estado(g) == 'DOWN' and g.get_editor_property('dead'), '%s dead=%s' % (estado(g), g.get_editor_property('dead')))
+    check('cuenta como muerto, no como derribo', P('kills') == k0 + 1 and P('takedowns') == t0 and nombre(g) in [str(x) for x in P('killed')], '%d / %d' % (P('kills'), P('takedowns')))
+    check('lo enseña una vez', 'HA MUERTO' in str(P('message')), str(P('message'))[:40])
+    g.wake_now(); yield 0.3
+    check('un muerto no se despierta', estado(g) == 'DOWN', estado(g))
+    check('el estado de cada uno lo dice', str(dict(d.people_state()).get(nombre(g), '')) == 'muerto', dict(d.people_state()))
+    d.simulate_key('C'); yield 0.3
+    aparte(); yield 0.2
+    # lo encuentra otro: va a mirarlo, se agacha y la central habla de un asesino
+    cl = g.get_actor_location()
+    obs = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and x != g and nombre(x) != 'Ramos'][0]
+    obs.set_actor_location(V(cl.x + 300, cl.y, obs.get_actor_location().z), False, True)
+    obs.set_actor_rotation(unreal.Rotator(0, 0, 180), True)
+    yield ('hasta', lambda: 'central_muerto' in list(director().get_editor_property('voice_log')), 14.0)
+    check('la central: «esta muerto, hay un asesino dentro»', 'central_muerto' in list(P('voice_log')) and any('muerto' in str(x) for x in P('subtitle_log')), list(P('subtitle_log'))[-3:])
+    check('y no «esta en el suelo»', 'central_todos' not in list(P('voice_log'))[-4:], list(P('voice_log'))[-4:])
+    check('la base queda en guardia mas tiempo que con un derribo', P('tension_t') > 120.0 and P('dead_found') == 1, '%.0f s, %d' % (P('tension_t'), P('dead_found')))
+    check('el muerto sigue en el suelo', estado(g) == 'DOWN', estado(g))
+    d.calm_base(); yield 0.5
+    check('al calmarse la base, al muerto no lo levanta nadie', estado(g) == 'DOWN' and g.get_editor_property('dead'), estado(g))
+    for x in torres:
+        x.hold(0.0)
+    # a Ramos no
+    r = guardia('Ramos')
+    if r and estado(r) != 'DOWN':
+        r.hold(3600.0)
+        for _ in range(3):
+            detras_de(r, 90); yield 0.1
+        check('a Ramos no se le ofrece matar', 'MATAR' not in str(d.interact_prompt()) and r.can_be_taken_down(jugador()), d.interact_prompt())
+        k1 = P('kills')
+        d.kill_action(); yield 0.3
+        check('y la K no lo mata (sin hablar con él, lo agarra)', P('kills') == k1 and not r.get_editor_property('dead'), P('kills'))
+        if P('choice'):
+            d.interact(); yield 0.2   # cierra la conversación sin elegir
+        aparte(); yield 0.2
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
+
+def prueba_vias():
+    """Tanda H, segundas vías y lo que sigue. La llave de repuesto de la jefatura en la mesa de Peris (solo si sabes el
+    dato); el santo y seña con uniforme deja acercarse más y el guardia da el alto una vez; Roig llama tras el
+    expediente («Ricino se ha secado»); y el parte lo recoge todo y guarda el estado de cada uno."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    nombre = lambda g: str(g.get_editor_property('guard_name'))
+    for g in guardias():
+        g.hold(3600.0)
+    # ---- la llave de repuesto
+    pt = [q for q in MISION['puntos'] if q['id'] == 'llave_repuesto'][0]
+    tp(pt['pos'][0], pt['pos'][1], 0); yield 0.3
+    check('sin el dato, la llave de repuesto no existe', 'REPUESTO' not in str(d.interact_prompt()), d.interact_prompt())
+    check('el dato sale en la charla de Peris y Ramos', any(f[2:] == ['peris_repuesto'] for c in MISION['charlas'] for f in c['frases']))
+    d.learn_fact('peris_repuesto'); yield 0.2
+    check('sabiéndolo, se ofrece cogerla', 'REPUESTO' in str(d.interact_prompt()), d.interact_prompt())
+    d.interact(); yield 0.3
+    check('cogida: abre la jefatura como la de Ibarra', d.has_flag('llave_jefatura') and d.has_flag('llave_repuesto') and P('key'), '%s %s' % (d.has_flag('llave_jefatura'), d.has_flag('llave_repuesto')))
+    check('y no se ofrece otra vez', 'REPUESTO' not in str(d.interact_prompt()), d.interact_prompt())
+    # ---- santo y seña con uniforme
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) != 'DOWN' and nombre(g) != 'Ramos']
+    o = ronda[0]
+    d.set_flag('uniforme')
+    if agachado():
+        d.simulate_key('C'); yield 0.3
+    jugador().set_actor_hidden_in_game(True)
+    a_la_vista_de(o, 500.0); yield 0.3
+    check('con uniforme y sin la seña, nadie da el alto', d.uniform_works() and len(P('challenged')) == 0, list(P('challenged')))
+    d.learn_fact('relevo_santo'); yield 0.3
+    # que te tenga delante: el guardia mira al jugador
+    pl = jugador().get_actor_location(); ol = o.get_actor_location()
+    o.set_actor_rotation(unreal.Rotator(0, 0, math.degrees(math.atan2(pl.y - ol.y, pl.x - ol.x))), True); yield 0.4
+    check('con la seña, el guardia da el alto', nombre(o) in [str(x) for x in P('challenged')] and any('Alto.' in str(x) for x in P('subtitle_log')), list(P('subtitle_log'))[-3:])
+    yield 1.6
+    check('y Cuttlas contesta la seña', any(str(x).startswith('CUTTLAS') for x in list(P('subtitle_log'))[-3:]), list(P('subtitle_log'))[-3:])
+    jugador().set_actor_hidden_in_game(False)
+    check('a 5 m, con la seña, no te ve', o.visibility(jugador()) == 0.0, o.visibility(jugador()))
+    aparte(); yield 0.2
+    # ---- Roig: «Ricino se ha secado»
+    d.set_editor_property('roig_ricino_delay', 1.0)
+    d.set_editor_property('codec_calls', True)
+    d.open_codec('expediente'); d.close_codec(); yield 0.2
+    yield ('hasta', lambda: str(director().get_editor_property('codec_pending')) == 'roig_ricino', 6.0)
+    check('tras el expediente, llama Roig', str(P('codec_pending')) == 'roig_ricino', str(P('codec_pending')))
+    d.codec_key(); yield 0.2
+    check('«Ricino se ha secado», por 140.85', str(d.codec_line()).startswith('ROIG|140.85|') and 'Ricino se ha secado' in str(d.codec_line()), str(d.codec_line())[:80])
+    d.close_codec(); yield 0.2
+    d.set_editor_property('codec_calls', False)
+    # ---- el parte
+    d.set_flag('expediente')
+    tp(SALIDA.x, SALIDA.y, 0)
+    yield ('hasta', lambda: director().get_editor_property('done'), 5.0)
+    yield ('hasta', lambda: director().get_editor_property('report'), 25.0)
+    rl = list(P('report_lines'))
+    check('el parte habla de la llave de repuesto de Peris', any('repuesto' in x and 'Peris' in x for x in rl) and not any('Ibarra le falta' in x for x in rl), ' | '.join(rl))
+    check('y acaba con CONTINUARA: Ricino se ha secado', any(x.startswith('CONTINUARA') and 'Ricino' in x for x in rl), ' | '.join(rl[-5:]))
+    check('el parte se guarda para la misión 2', unreal.GameplayStatics.does_save_game_exist('TarsisParte', 0))
+    sv = unreal.GameplayStatics.load_game_from_slot('TarsisParte', 0)
+    try:
+        gente = dict(sv.get_editor_property('people'))
+        check('con el estado de cada uno', len(gente) >= 5 and all(v in ('vivo', 'dormido', 'muerto', 'aliado') for v in gente.values()), gente)
+        check('y que entraste con la de repuesto y oíste a Roig', sv.get_editor_property('spare_key') and sv.get_editor_property('roig_ricino'))
+    except Exception as e:
+        check('el guardado del parte se lee desde Python', False, str(e))
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
+
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias]]
 PRUEBAS = []
 
 
