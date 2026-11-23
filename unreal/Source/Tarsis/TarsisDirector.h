@@ -101,6 +101,16 @@ struct FTarsisPrint
 	bool bLeft = false;
 };
 
+// tanda F: un caido al que su compañero sale a buscar por su ronda
+struct FTarsisMiss
+{
+	TWeakObjectPtr<class ATarsisGuard> Fallen;
+	TWeakObjectPtr<class ATarsisGuard> Searcher;
+	int32 Start = 0;
+	int32 Steps = 0;
+	bool bRadio = true;
+};
+
 // tanda D: un puesto fijo (torre) y su relevo (TarsisRelevo.cpp). Phase: 0 esperando su hora, 1 el relevo va al pie de
 // la escalera, 2 charla con el santo y sena, 3 el saliente se va y el relevo sube, 4 el saliente entra en el barracon,
 // 10 el puesto estaba vacio (busca y avisa)
@@ -985,6 +995,67 @@ public:
 	bool RadioDead() const;
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Radio")
 	class ATarsisGuard* EmisoraFixerNow() const { return EmisoraFixer.Get(); }
+
+	// ---- tanda F: cuerpos que se echan de menos y sabotaje (TarsisSabotaje.cpp)
+	/** Cada caido lo echa de menos su compañero (el de la ronda que se cruza con la suya, o el de la garita) entre MissMin y
+	 *  MissMax s despues de caer (fijo por guardia). Sin red, el compañero tarda MissNoRadioMul veces mas y no hay central.
+	 *  El que lo busca recorre la ronda del caido punto por punto: si lo ve, el aviso de siempre (alerta); si no, «ni rastro»
+	 *  por radio y la base queda en guardia MissTension s. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ausencias")
+	float MissMin = 60.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ausencias")
+	float MissMax = 120.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ausencias")
+	float MissNoRadioMul = 1.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ausencias")
+	float MissTension = 150.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ausencias")
+	int32 MissSearches = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Ausencias")
+	int32 MissNotFound = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Ausencias")
+	float MissDelayOf(const class ATarsisGuard* G) const;
+	/** El compañero que lo echa de menos (de los libres ahora), o nadie. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Ausencias")
+	class ATarsisGuard* BuddyOf(const class ATarsisGuard* G) const;
+	/** Quien busca ahora a G (o nadie) y por que punto de su ronda va (cuantos ha mirado). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Ausencias")
+	class ATarsisGuard* MissSearcherOf(const class ATarsisGuard* G) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Ausencias")
+	int32 MissStepsOf(const class ATarsisGuard* G) const;
+	/** Sabotaje: cortar el cable de la antena (sin red hasta que la arreglen) y abrir la llave del gasoil (ruido y charco).
+	 *  E empieza; hay que quedarse al lado SabotageReach el tiempo de cada uno; E otra vez o alejarse lo deja. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	FVector AntennaLoc = FVector(1500.0f, -1055.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	FVector ValveLoc = FVector(4565.0f, -700.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	float SabotageReach = 170.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	float AntennaCutSeconds = 4.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	float ValveOpenSeconds = 2.5f;
+	/** El chorro se oye hasta ValveNoiseRadius: van a mirar los dos mas cercanos (y otro cada ValveNoiseEvery s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	float ValveNoiseRadius = 2600.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	float ValveNoiseEvery = 25.0f;
+	/** Un guardia de ronda que pasa a menos de esto de la antena cortada (o del gasoil abierto) lo ve. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Sabotaje")
+	float SabotageSeeDist = 420.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Sabotaje")
+	int32 SabotageFound = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Sabotaje")
+	bool AntennaCut() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Sabotaje")
+	bool ValveOpen() const;
+	/** 0 nada, 1 cortando la antena, 2 abriendo la llave; y lo que lleva (0..1). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Sabotaje")
+	int32 SabotageWork() const { return SabWork; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Sabotaje")
+	float SabotageProgress() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Sabotaje")
+	bool SabotageTraceShown(FName Tag) const;
 
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
@@ -2690,6 +2761,29 @@ private:
 	float EmisoraFixT = 0.0f;
 	float EmisoraSendT = 0.0f;
 	TWeakObjectPtr<class ATarsisGuard> EmisoraFixer;
+	// tanda F (TarsisSabotaje.cpp)
+	TArray<FTarsisMiss> Misses;
+	TSet<TWeakObjectPtr<class ATarsisGuard>> Missed;
+	bool StartMissSearch(class ATarsisGuard* G, bool bRadio);
+	void MissTick(float DeltaSeconds);
+	FString SabotagePrompt() const;
+	bool SabotageInteract();
+	void SabotageTick(float DeltaSeconds);
+	void SabotageSetup();
+	void ShowTrace(FName Tag, bool bShow);
+	void SabotageDone(int32 Which);
+	void ValveFound(class ATarsisGuard* G);
+	int32 SabWork = 0;
+	float SabT = 0.0f;
+	bool bSabReady = false;
+	float ValveNoiseT = 0.0f;
+	float ValveCloseT = 0.0f;
+	bool bAntennaSeen = false;
+	bool bValveFirst = true;
+	TArray<TWeakObjectPtr<AActor>> SabTraces;
+	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
+	UPROPERTY()
+	TObjectPtr<class UAudioComponent> ValveAudio;
 	void StartRadioAsk(class ATarsisGuard* G);
 	UPROPERTY()
 	TObjectPtr<class ATarsisGuard> RadioAskGuard;

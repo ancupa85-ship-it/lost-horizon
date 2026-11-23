@@ -403,6 +403,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	DogTick(DeltaSeconds);
 	PrintTick(DeltaSeconds);   // tanda D: huellas que se borran y guardias que las ven y las siguen
 	ReliefTick(DeltaSeconds);   // tanda D: relevo de las torres
+	SabotageTick(DeltaSeconds);   // tanda F: antena y gasoil
 	AimTick(DeltaSeconds);
 	ThirdTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
@@ -528,6 +529,7 @@ FString ATarsisDirector::InteractPrompt() const
 	if (CanBoardTruck()) return Tx(TEXT("p_camion_subir"), TEXT("E   SUBIR A LA CAJA DEL CAMION"));
 	if (bCellPuzzle && InCell()) return CellPrompt();
 	{ const FString DP = DogPrompt(); if (!DP.IsEmpty()) return DP; }
+	{ const FString SP = SabotagePrompt(); if (!SP.IsEmpty()) return SP; }   // tanda F
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear())
 	{
@@ -621,6 +623,7 @@ void ATarsisDirector::Interact()
 	if (CanBoardTruck()) { BoardTruck(); return; }
 	if (CellInteract()) return;
 	if (DogInteract()) return;
+	if (SabotageInteract()) return;   // tanda F
 	// puertas, notas y objetos de la misión (mision1.json)
 	if (const FTarsisPoint* Pt = PointNear()) { UsePoint(*Pt); return; }
 	if (!bVaultOpen && NearPlayer(Cell(6, 17), 190.0f))
@@ -1814,7 +1817,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
 		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("farola") || Key == TEXT("apoyo") || Key == TEXT("voy") || Key == TEXT("perdido") || Key == TEXT("despierta")
-		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
+		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -1856,6 +1859,12 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("emisora")) T = TEXT("Quien ha tocado esto? Una valvula floja... Ya casi.");
 	else if (Key == TEXT("registro")) T = TEXT("Hay orden de mirar la carga. Abre atras.");
 	else if (Key == TEXT("lobo")) T = TEXT("Que haces suelto, chucho? Ven aqui... ven.");
+	else if (Key == TEXT("falta")) T = TEXT("Y este? Tenia que haber pasado por aqui hace rato. Voy a buscarlo.");
+	else if (Key == TEXT("nirastro")) T = TEXT("Central, he hecho toda su ronda: ni rastro. Aqui pasa algo.");
+	else if (Key == TEXT("nirastro_solo")) T = TEXT("Ni rastro... y sin radio. Esto no me gusta nada.");
+	else if (Key == TEXT("antena")) T = TEXT("El cable de la antena... cortado. Esto no es el viento: hay alguien dentro.");
+	else if (Key == TEXT("antena_ve")) T = TEXT("Eh, el cable de la antena cuelga. Por eso no hay red.");
+	else if (Key == TEXT("gasoil")) T = TEXT("La llave del gasoil abierta! Esto no se abre solo. Cierro y aviso.");
 	else if (Key == TEXT("huellas")) T = TEXT("Huellas... de bota. Frescas. Alguien ha pasado por aqui.");
 	else if (Key == TEXT("huellas_perro")) T = TEXT("Bah. Las del perro, otra vez suelto.");
 	else if (Key == TEXT("rastro_fin")) T = TEXT("Aqui se pierden. Tiene que estar cerca.");
@@ -2014,10 +2023,18 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 	{
 		ATarsisGuard* G = *It;
 		const TObjectPtr<ATarsisGuard> K(G);
-		if (G->State != ETarsisGuardState::Down) { Called.Remove(K); continue; }
-		if (G->bFound || G->bAlly || Called.Contains(K) || G->DownTime() < 40.0f) continue;
-		if (RadioDead()) continue;   // tanda 32: sin red nadie le echa de menos; cuando vuelva, llamaran
+		if (G->State != ETarsisGuardState::Down) { Called.Remove(K); Missed.Remove(G); continue; }
+		if (G->bFound || G->bAlly || Called.Contains(K)) continue;
+		// tanda F: entre 60 y 120 s (cada uno lo suyo) le echan de menos. Sin red (tanda 32) la central no se entera, pero
+		// su compañero, que tenia que cruzarselo, sale a buscarlo por su cuenta un rato despues
+		if (RadioDead())
+		{
+			if (!Missed.Contains(G) && G->DownTime() >= MissDelayOf(G) * MissNoRadioMul) StartMissSearch(G, false);
+			continue;
+		}
+		if (G->DownTime() < MissDelayOf(G)) continue;
 		Called.Add(K);
+		if (Missed.Contains(G)) continue;   // ya lo esta buscando (o lo ha buscado) su compañero
 		ATarsisGuard* Best = nullptr;
 		float BestD = TNumericLimits<float>::Max();
 		for (TActorIterator<ATarsisGuard> O(GetWorld()); O; ++O)
@@ -2036,8 +2053,9 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 			StartRadioAsk(G);
 			continue;
 		}
-		RadioSend(G, 1);
+		if (!StartMissSearch(G, true)) RadioSend(G, 1);
 	}
+	MissTick(DeltaSeconds);
 	// la pregunta de la central no espera: sin respuesta (o si te alejas del cuerpo), mandan a alguien como siempre
 	if (bRadioAsk)
 	{
@@ -2050,7 +2068,7 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 			bRadioAsk = false;
 			RadioAskGuard = nullptr;
 			MessageT = FMath::Min(MessageT, 0.3f);
-			if (G && G->State == ETarsisGuardState::Down) RadioSend(G, 1);
+			if (G && G->State == ETarsisGuardState::Down && !StartMissSearch(G, true)) RadioSend(G, 1);
 		}
 	}
 	EmisoraTick(DeltaSeconds);

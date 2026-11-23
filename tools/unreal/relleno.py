@@ -404,7 +404,7 @@ def plaza(M):
         for dy in (-90, 90):
             pt.caja(tx + dx, ty + dy, 125 + (8 if dy < 0 else 0), 8, 8, 250 + (16 if dy < 0 else 0))
     pt.caja(tx, ty - 90, 245, 300, 6, 10).caja(tx, ty + 90, 237, 300, 6, 10)
-    colocar_malla(pt.asset('SM_Tejadillo_postes', M['hierro'], 'caja'), 'Tejadillo_postes', V(0, 0, suelo(tx, ty)))
+    colocar_malla(pt.asset('SM_Tejadillo_postes', M['hierro'], 'compleja'), 'Tejadillo_postes', V(0, 0, suelo(tx, ty)))
     ch = Malla().caja(0, 0, 0, 330, 220, 3)            # en el origen: el actor se inclina sobre su sitio, no sobre el del mundo
     a = colocar_malla(ch.asset('SM_Tejadillo_chapa', M['tejado'], 'caja'), 'Tejadillo_chapa', V(tx, ty, suelo(tx, ty) + 252))
     a.set_actor_rotation(R(2.5, 0, 0), False)          # cae hacia el frente
@@ -541,7 +541,28 @@ def anillo_norte(M):
     tubo(de, V(gx + 210, gy - 30, 100), V(gx + 260, gy - 60, 20), 4, 6)   # manguera al suelo
     colocar_malla(de.asset('SM_Gasoil_deposito', M['oliva'], 'caja'), 'Gasoil_deposito', V(0, 0, z0))
     rotulo('Gasoil_rotulo', 'GASOIL - PROHIBIDO FUMAR', V(gx, gy + 72, z0 + 130), 90, 9, (215, 205, 175))
-    # antena de la emisora: mástil de 12 m de tramos, travesaños y tres vientos anclados al suelo
+    # tanda F: la llave de purga en la tapa del depósito (VALVULA, la abre el jugador con la E: TarsisSabotaje.cpp); el
+    # chorro (solo con la llave abierta) y el charco que deja (oculto hasta abrirla; es agua para las huellas: botas mojadas)
+    vx, vy, vz = VALVULA
+    ll = tubo(Malla(), V(gx + 205, vy, vz), V(vx - 4, vy, vz), 3.5, 8)
+    tubo(ll, V(vx - 6, vy, vz), V(vx - 2, vy, vz), 11, 12)                        # volante
+    tubo(ll, V(vx - 4, vy, vz - 11), V(vx - 4, vy, vz + 11), 1.2, 4)
+    tubo(ll, V(vx - 4, vy - 11, vz), V(vx - 4, vy + 11, vz), 1.2, 4)
+    colocar_malla(ll.asset('SM_Gasoil_llave', unreal.load_asset(DM + '/MI_hierro_oxidado'), 'ninguna'), 'Gasoil_llave', V(0, 0, z0), colision=False)
+    ch = tubo(Malla(), V(vx - 2, vy, vz - 4), V(vx + 22, vy, 2), 3.2, 8)
+    colocar_malla(ch.asset('SM_Gasoil_chorro', M['hierro'], 'ninguna'), 'Gasoil_chorro', V(0, 0, z0), colision=False, tags=('sabotaje_chorro',))
+    a = poner(unreal.DecalActor, 'Gasoil_charco', V(gx + 300, vy - 10, z0 + 6), R(0, -90, 20), tags=('sabotaje_gasoil',))
+    a.decal.set_decal_material(unreal.load_asset(DM + '/Manchas/MI_Per_AguaBarro'))
+    a.decal.set_editor_property('decal_size', V(20, 150, 105))
+    # el gasoil derramado, a la vista: una lámina negra y brillante (la calcomanía de agua turbia apenas se veía);
+    # la calcomanía sigue ahí para las huellas (botas mojadas)
+    ga = Malla()
+    for (dx, dy, rx, ry) in ((50, -5, 120, 80), (125, 30, 60, 45), (5, -40, 45, 35)):
+        ga.esfera(gx + 260 + dx, vy + dy, 0.4, 1.0, (rx, ry, 1.2))
+    negro = mi('MI_gasoil_derramado', 'MI_hierro', (0.008, 0.007, 0.006), Suciedad=0.0)
+    colocar_malla(ga.asset('SM_Gasoil_derramado', negro, 'ninguna'), 'Gasoil_derramado', V(0, 0, z0), colision=False, tags=('sabotaje_gasoil',))
+    # antena de la emisora: mástil de 12 m de tramos, travesaños y tres vientos anclados al suelo. Tanda F: la colisión,
+    # solo la del mástil (la caja de toda la malla con los vientos era un bloque invisible de 10 x 9 m)
     ax, ay = 1500, -1100
     z0 = suelo(ax, ay, 600)
     an = Malla().caja(ax, ay, 15, 70, 70, 30)
@@ -549,12 +570,29 @@ def anillo_norte(M):
     for h in (300, 600, 900, 1150):
         tubo(an, V(ax - 60, ay, h), V(ax + 60, ay, h), 2.5)
     tubo(an, V(ax, ay - 40, 1150), V(ax, ay + 40, 1150), 2.5)
+    colocar_malla(an.asset('SM_Antena', M['hierro'], 'caja'), 'Antena', V(0, 0, z0))
+    vi = Malla()
     for k in range(3):
         ang = math.radians(90 + k * 120)
         px, py = ax + math.cos(ang) * 600, ay + math.sin(ang) * 600
-        tubo(an, V(ax, ay, 1100), V(px, py, 15), 0.8, 4)
-        an.caja(px, py, 15, 40, 40, 30)                  # muerto de hormigón
-    colocar_malla(an.asset('SM_Antena', M['hierro'], 'caja'), 'Antena', V(0, 0, z0))
+        tubo(vi, V(ax, ay, 1100), V(px, py, 15), 0.8, 4)
+        vi.caja(px, py, 15, 40, 40, 30)                  # muerto de hormigón
+    colocar_malla(vi.asset('SM_Antena_vientos', M['hierro'], 'ninguna'), 'Antena_vientos', V(0, 0, z0), colision=False)
+    # tanda F: la caja de empalme al pie del mástil, de cara a la base, con el cable que baja de lo alto y se va por el
+    # suelo hacia transmisiones; cortado (ANTENA, la E del jugador) cuelgan los dos cabos
+    cx, cy = ANTENA
+    cj = Malla().caja(cx, cy - 4, 110, 26, 12, 34).caja(cx, cy + 3, 128, 6, 4, 6)
+    colocar_malla(cj.asset('SM_Antena_caja', unreal.load_asset(DM + '/MI_hierro_oxidado'), 'ninguna'), 'Antena_caja', V(0, 0, z0), colision=False)
+    sano = tubo(Malla(), V(cx + 4, cy + 2, 127), V(cx + 6, cy + 2, 1100), 1.3, 5)
+    tubo(sano, V(cx - 6, cy + 2, 93), V(cx - 8, cy + 6, 4), 1.3, 5)
+    tubo(sano, V(cx - 8, cy + 6, 4), V(cx - 8, cy + 400, 2), 1.3, 5)
+    colocar_malla(sano.asset('SM_Antena_cable', M['lona'], 'ninguna'), 'Antena_cable', V(0, 0, z0), colision=False, tags=('sabotaje_antena_sano',))
+    cor = tubo(Malla(), V(cx + 4, cy + 2, 127), V(cx + 6, cy + 2, 1100), 1.3, 5)
+    tubo(cor, V(cx - 6, cy + 2, 93), V(cx - 4, cy + 14, 40), 1.3, 5)             # el cabo de abajo, colgando
+    tubo(cor, V(cx - 4, cy + 14, 40), V(cx + 10, cy + 30, 3), 1.3, 5)
+    tubo(cor, V(cx - 8, cy + 60, 3), V(cx - 8, cy + 400, 2), 1.3, 5)
+    cor.caja(cx + 4, cy + 3, 133, 7, 7, 4)                                         # el cabo de arriba, pelado
+    colocar_malla(cor.asset('SM_Antena_cable_cortado', M['lona'], 'ninguna'), 'Antena_cable_cortado', V(0, 0, z0), colision=False, tags=('sabotaje_antena',))
     # nido de ametralladora abandonado: un anillo de sacos con la tronera hacia la brecha y una caja de munición vacía
     nx, ny = 2800, -1250
     z0 = suelo(nx, ny, 600)
@@ -565,6 +603,8 @@ def anillo_norte(M):
     log('anillo norte: gasoil (%d, %d), antena (%d, %d), nido (%d, %d)' % (gx, gy, ax, ay, nx, ny))
 
 
+ANTENA = (1500, -1055)           # tanda F: caja de empalme de la antena (AntennaLoc del director)
+VALVULA = (4545, -700, 55)        # tanda F: llave de purga del gasoil (ValveLoc del director es x + 20: donde te pones)
 PASILLO = (-1050, 600, 1200)     # x del centro, y de inicio y de fin: pasillo de 1,20 m de la pista (lo usa prueba_paso)
 
 
@@ -582,7 +622,7 @@ def anillo_oeste(M):
             t = unreal.Transform(V(x + 4 + z, y, 125), R(0, 90, 0), V(1, 1, 1))
             GS.GeometryScript_Primitives.append_cylinder((ne if r != 20 else di).dm, unreal.GeometryScriptPrimitiveOptions(), t, r, 0.4, 20, 0, True,
                                                          unreal.GeometryScriptPrimitiveOriginMode.CENTER)
-    colocar_malla(po.asset('SM_Dianas_postes', M['madera'], 'caja'), 'Dianas_postes', V(0, 0, z0))
+    colocar_malla(po.asset('SM_Dianas_postes', M['madera'], 'compleja'), 'Dianas_postes', V(0, 0, z0))
     colocar_malla(di.asset('SM_Dianas', M['blanco'], 'caja'), 'Dianas', V(0, 0, z0))
     colocar_malla(ne.asset('SM_Dianas_anillos', unreal.load_asset(DM + '/MI_hierro'), 'ninguna'), 'Dianas_anillos', V(0, 0, z0), colision=False)
     ta = fila_sacos('SM_Talud_tiro', M['saco'], 6, 5, 2, 11)
@@ -605,14 +645,14 @@ def anillo_oeste(M):
     for k in range(3):                                     # vallas de salto
         x = -1500 + k * 120
         ob.caja(x, 1600, 45, 6, 150, 6).cilindro(x, 1530, 0, 3, 45, 6).cilindro(x, 1670, 0, 3, 45, 6)
-    colocar_malla(ob.asset('SM_Pista_hierros', M['oxido'], 'caja'), 'Pista_hierros', V(0, 0, z0))
+    colocar_malla(ob.asset('SM_Pista_hierros', M['oxido'], 'compleja'), 'Pista_hierros', V(0, 0, z0))
     tu = Malla()
     for k in range(3):                                     # tubos de hormigón para arrastrarse
         tubo(tu, V(-1600, 300 + k * 160, 45), V(-1400, 300 + k * 160, 45), 45, 14)
     colocar_malla(tu.asset('SM_Pista_tubos', M['hormigon'], 'compleja'), 'Pista_tubos', V(0, 0, z0))
     px, py0, py1 = PASILLO                                 # pasillo de tablones: 1,20 m entre las caras de dentro
     pa = Malla().caja(px - 70, (py0 + py1) / 2, 100, 20, py1 - py0, 200).caja(px + 70, (py0 + py1) / 2, 100, 20, py1 - py0, 200)
-    colocar_malla(pa.asset('SM_Pista_pasillo', M['madera'], 'caja'), 'Pista_pasillo', V(0, 0, z0))
+    colocar_malla(pa.asset('SM_Pista_pasillo', M['madera'], 'compleja'), 'Pista_pasillo', V(0, 0, z0))   # tanda F: con 'caja' era un bloque macizo (los dos muros y el hueco): se rodeaba
     ty = del_pack('SM_Tyres_02')
     if ty:
         for i in range(8):
@@ -639,7 +679,7 @@ def anillo_este(M):
     for k in range(17):                                    # escalera
         de.caja(wx - 135, wy - 20, 30 + k * 30, 4, 40, 3)
     de.caja(wx - 135, wy - 40, 260, 4, 4, 520).caja(wx - 135, wy, 260, 4, 4, 520)
-    colocar_malla(de.asset('SM_Agua_patas', M['oxido'], 'caja'), 'Agua_patas', V(0, 0, z0))
+    colocar_malla(de.asset('SM_Agua_patas', M['oxido'], 'compleja'), 'Agua_patas', V(0, 0, z0))
     ta = Malla().cilindro(wx, wy, 530, 130, 230, 20).cilindro(wx, wy, 760, 60, 25, 12)
     colocar_malla(ta.asset('SM_Agua_deposito', M['oliva'], 'caja'), 'Agua_deposito', V(0, 0, z0))
     # gallinero: caseta de tablas con tejado de chapa y el corral de tela metálica
@@ -653,17 +693,9 @@ def anillo_este(M):
     co = Malla()
     for (x0, y0, x1, y1) in ((gx - 150, gy + 100, gx - 150, gy + 500), (gx - 150, gy + 500, gx + 150, gy + 500), (gx + 150, gy + 500, gx + 150, gy + 100)):
         co.caja((x0 + x1) / 2, (y0 + y1) / 2, 60, max(abs(x1 - x0), 2), max(abs(y1 - y0), 2), 120)
-    colocar_malla(co.asset('SM_Corral', unreal.load_asset(DM + '/M_TelaMalla_2f8d8634'), 'caja'), 'Corral', V(0, 0, z0))
+    colocar_malla(co.asset('SM_Corral', unreal.load_asset(DM + '/M_TelaMalla_2f8d8634'), 'compleja'), 'Corral', V(0, 0, z0))   # tanda F: la caja tapaba el corral entero
     rotulo('Gallinero_rotulo', 'GALLINERO - TROPA', V(gx, gy - 102, z0 + 150), -90, 8, (215, 205, 175))
-    # huerto: caballones de tierra con estacas
-    hu, es = Malla(), Malla()
-    for k in range(6):
-        y = 1250 + k * 110
-        hu.caja(7850, y, 8, 700, 60, 16)
-        for j in range(5):
-            es.cilindro(7550 + j * 150, y, 0, 1.5, 80, 4)
-    colocar_malla(hu.asset('SM_Huerto', M['tierra'], 'caja'), 'Huerto', V(0, 0, suelo(7850, 1500, 600)), colision=False)
-    colocar_malla(es.asset('SM_Huerto_estacas', M['madera'], 'ninguna'), 'Huerto_estacas', V(0, 0, suelo(7850, 1500, 600)), colision=False)
+    huerto(M)
     # desguace: el camión del pack abandonado, neumáticos, bidones y una bobina
     z0 = suelo(8600, 1900, 600)
     t = del_pack('SM_LightTruck_01')
@@ -679,6 +711,58 @@ def anillo_este(M):
     if bo:
         colocar_malla(bo, 'Desguace_bobina', V(8300, 1500, z0 + 87), 30.0)
     log('anillo este: agua (%d, %d), gallinero (%d, %d), huerto, desguace (8650, 1800)' % (wx, wy, gx, gy))
+
+
+def caballon_dm(largo, ancho, alto, semilla):
+    """Tanda F: un caballón de tierra labrada: un cilindro tumbado a lo largo, aplastado y medio enterrado (el lomo
+    redondo), con los extremos que bajan al surco: deja de parecer una losa."""
+    dm = unreal.DynamicMesh()
+    t = unreal.Transform(V(-largo / 2.0, 0, 0), R(0, 90, 0), V(ancho / 2.0, ancho / 2.0, 1))   # el eje del cilindro, a lo largo de X
+    GS.GeometryScript_Primitives.append_cylinder(dm, unreal.GeometryScriptPrimitiveOptions(), t, 1.0, largo, 18, 24, True,
+                                                 unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    # aplastado a la altura pedida (sobre el suelo, la mitad de arriba) y algo hundido
+    GS.GeometryScript_MeshTransforms.scale_mesh(dm, V(1, 1, (alto * 2.0) / ancho), V(0, 0, 0))
+    b = GS.GeometryScript_MeshQueries.get_mesh_bounding_box(dm)
+    GS.GeometryScript_MeshTransforms.translate_mesh(dm, V(-(b.max.x + b.min.x) / 2, -(b.max.y + b.min.y) / 2, -(b.max.z + b.min.z) / 2 - 2))
+    return dm
+
+
+def huerto(M):
+    """Tanda F: el huerto de la tropa, de tierra labrada (marrón, en lomos redondeados con su surco) y no de losas grises;
+    con coles y matas de hoja (esferas aplastadas y alisadas) y las estacas de las tomateras."""
+    tierra = mi('MI_tierra_huerto', 'MI_tierra', (0.07, 0.045, 0.028), Suciedad=1.0, Tamano=90.0)
+    hoja = mi('MI_hoja_huerto', 'MI_lona_camion', (0.05, 0.085, 0.03), Suciedad=0.6)
+    z0 = suelo(7850, 1500, 600)
+    hu, es, pl = unreal.DynamicMesh(), Malla(), unreal.DynamicMesh()
+    rs = random.Random(1983)
+    # la base: la tierra suelta bajo todo el huerto (asoma en los surcos)
+    GS.GeometryScript_Primitives.append_box(hu, unreal.GeometryScriptPrimitiveOptions(), unreal.Transform(V(7850, 1525, -2), R(0, 0, 0), V(1, 1, 1)),
+                                            740, 680, 6, 0, 0, 0, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    hoja_dm = unreal.DynamicMesh()
+    GS.GeometryScript_Primitives.append_sphere_lat_long(hoja_dm, unreal.GeometryScriptPrimitiveOptions(), unreal.Transform(), 1.0, 8, 10,
+                                                        unreal.GeometryScriptPrimitiveOriginMode.CENTER)
+    for k in range(6):
+        y = 1250 + k * 110
+        GS.GeometryScript_MeshEdits.append_mesh(hu, caballon_dm(700, 62, 20, k), unreal.Transform(V(7850, y + rs.uniform(-3, 3), 0), R(0, 0, rs.uniform(-0.6, 0.6)), V(1, 1, 1)))
+        if k % 3 == 2:
+            for j in range(5):
+                es.cilindro(7550 + j * 150, y, 0, 1.5, 80, 4)
+            continue
+        # coles en las filas de verdura; dejan claros (se han cogido)
+        x = 7530.0
+        while x < 8170:
+            x += rs.uniform(42, 70)
+            if rs.random() < 0.18:
+                continue
+            r = rs.uniform(9, 16) if k % 3 == 0 else rs.uniform(6, 10)
+            t = unreal.Transform(V(x, y + rs.uniform(-6, 6), 18 + r * 0.35), R(rs.uniform(-8, 8), rs.uniform(-8, 8), rs.uniform(0, 360)),
+                                 V(r * rs.uniform(0.9, 1.15), r * rs.uniform(0.9, 1.15), r * rs.uniform(0.5, 0.7)))
+            GS.GeometryScript_MeshEdits.append_mesh(pl, hoja_dm, t)
+    m = Malla(); m.dm = hu
+    colocar_malla(m.asset('SM_Huerto', tierra, 'ninguna'), 'Huerto', V(0, 0, z0), colision=False)
+    m = Malla(); m.dm = pl
+    colocar_malla(m.asset('SM_Huerto_matas', hoja, 'ninguna'), 'Huerto_matas', V(0, 0, z0), colision=False)
+    colocar_malla(es.asset('SM_Huerto_estacas', M['madera'], 'ninguna'), 'Huerto_estacas', V(0, 0, z0), colision=False)
 
 
 CAPILLA = (6000, 6800, -1550, -950)    # x0, x1, y0, y1: barracón pequeño en el anillo norte, la puerta al sur

@@ -923,6 +923,7 @@ def prueba_radio():
     la frase de coacción y trae a dos con la base en guardia."""
     d = director()
     c, v = guardia('Carmona'), guardia('Vega')
+    d.set_editor_property('miss_min', 40.0); d.set_editor_property('miss_max', 40.0)   # tanda F: 60-120 s; aquí, 40 como antes
     for g in guardias():
         g.hold(3600.0)
     check('cada uno tiene su parte', 'con frio' in str(d.parte_of('Carmona')) and str(d.parte_of('Carmona')) != str(d.parte_of('Vega')), '%s / %s' % (d.parte_of('Carmona'), d.parte_of('Vega')))
@@ -2558,6 +2559,7 @@ def prueba_emisora():
     entonces sí llaman al que no contesta."""
     d = director()
     vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    d.set_editor_property('miss_min', 40.0); d.set_editor_property('miss_max', 40.0)   # tanda F: 60-120 s; aquí, 40 como antes
     for g in guardias():
         g.hold(3600.0)
     aparte(); yield 0.1
@@ -3600,6 +3602,7 @@ def prueba_huellas():
     check('hay suelo blando (barro y charcos de las tandas 22 y 23)', n > 10, n)
     barro = [d.soft_patch_center(i) for i in range(n) if not d.soft_patch_water(i) and not d.soft_patch_rain(i)]
     agua = [d.soft_patch_center(i) for i in range(n) if d.soft_patch_water(i) and not d.soft_patch_rain(i)]
+    agua = [c for c in agua if dist2d(c, d.get_editor_property('valve_loc')) > 500]   # tanda F: el del gasoil, oculto hasta abrir la llave
     check('barro y agua sin lluvia', len(barro) > 0 and len(agua) > 0, '%d barro, %d agua' % (len(barro), len(agua)))
     if not barro or not agua:
         return
@@ -3748,12 +3751,19 @@ def prueba_paso():
         a.errand(V(pb.x, pb.y, zb), V(pb.x * 2 - pa.x, pb.y * 2 - pa.y, zb), 40.0)
         b.errand(V(pa.x, pa.y, za), V(pa.x * 2 - pb.x, pa.y * 2 - pb.y, za), 40.0)
         dmin, quieto, atasco = 1e9, {a: [0.0, a.get_actor_location()], b: [0.0, b.get_actor_location()]}, 0.0
-        t = 0.0
+        t, desvio, tuck = 0.0, 0.0, 0.0
+        bo0 = a.get_editor_property('back_outs') + b.get_editor_property('back_outs')
         while t < segundos:
             yield 0.1
             t += 0.1
             la, lb = a.get_actor_location(), b.get_actor_location()
             dmin = min(dmin, dist2d(la, lb))
+            # tanda F: cuánto se sale cada uno de la recta entre los dos extremos (rodear el pasillo por fuera) y el fusil
+            ab = V(pb.x - pa.x, pb.y - pa.y, 0); n_ = max(math.hypot(ab.x, ab.y), 1.0)
+            for l in (la, lb):
+                desvio = max(desvio, abs((l.x - pa.x) * ab.y - (l.y - pa.y) * ab.x) / n_)
+            if dist2d(la, lb) < 160:
+                tuck = max(tuck, min(a.rifle_tuck(), b.rifle_tuck()))
             for g, l in ((a, la), (b, lb)):
                 q = quieto[g]
                 if dist2d(l, q[1]) < 8 and not g.is_yielding() and dist2d(l, pb if g is a else pa) > 120:
@@ -3765,6 +3775,7 @@ def prueba_paso():
                 break
         llegan = dist2d(a.get_actor_location(), pb) < 150 and dist2d(b.get_actor_location(), pa) < 150
         R[nombre] = (dmin, atasco, llegan, a.get_editor_property('yields') - y0a + b.get_editor_property('yields') - y0b)
+        R[nombre + '_f'] = (desvio, tuck, a.get_editor_property('back_outs') + b.get_editor_property('back_outs') - bo0)
         for g in (a, b):
             g.hold(3600.0)
     R = {}
@@ -3788,6 +3799,9 @@ def prueba_paso():
         check('en el pasillo tampoco se atraviesan', dmin > 55, '%.0f cm' % dmin)
         check('uno se arrima y cede el paso (y nadie se atasca más de 3 s)', ced >= 1 and atasco <= 3.0, '%d cesiones, %.1f s parado' % (ced, atasco))
         check('y los dos llegan a su sitio', llegan, R['pasillo'])
+        desvio, tuck, bo = R['pasillo_f']
+        check('en el pasillo el que cede vuelve atrás y espera (no lo rodea por fuera)', bo >= 1 and desvio < 150, '%d vueltas atrás, se aparta %.0f cm de la recta' % (bo, desvio))
+        check('al cruzarse, los dos con el fusil bajado', tuck > 0.8, '%.2f' % tuck)
     # 3) en pareja al mismo sitio (grupo de búsqueda): uno al lado del otro, no dentro
     for g in (a, b):
         g.hold(0.0)
@@ -3853,6 +3867,176 @@ def prueba_paso():
         if not g.get_editor_property('tower_sentry'):
             g.character_movement.set_editor_property('use_rvo_avoidance', True)
     check('coste de no atravesarse (fotograma medio, %d guardias)' % len(guardias()), con < sin * 1.15 + 1.0, 'con %.2f ms, sin %.2f ms' % (con, sin))
+
+
+def _ronda_libre(solo):
+    """Todos quietos salvo `solo` (los que no se mueven no los elige nadie para nada)."""
+    for g in guardias():
+        g.hold(0.0 if g in solo else 3600.0)
+
+
+def _largo_ronda(g):
+    pts = list(g.get_editor_property('patrol_points'))
+    return sum(dist2d(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))) if len(pts) > 1 else 0.0
+
+
+def prueba_ausencias():
+    """Tanda F. Cuerpos que se echan de menos: entre 60 y 120 s (cada uno lo suyo) la central llama al caído y sale su
+    compañero (el de la ronda que se cruza con la suya) a recorrer su ronda punto por punto. Si el cuerpo no está en
+    ella, «ni rastro» y la base en guardia; si está, lo ve y da el aviso de siempre."""
+    d = director()
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and len(g.get_editor_property('patrol_points')) >= 2
+             and not g.get_actor_label().endswith('Ramos')]
+    check('hay rondas de varios puntos', len(ronda) >= 3, len(ronda))
+    ts = [d.miss_delay_of(g) for g in ronda]
+    check('a cada uno lo echan de menos entre 60 y 120 s, no a todos a la vez', all(60.0 <= t <= 120.0 for t in ts) and max(ts) - min(ts) > 5.0, ['%.0f' % t for t in ts])
+    # el compañero: con todos libres, el de la ronda que se cruza con la suya
+    ronda.sort(key=_largo_ronda)
+    v = ronda[0]
+    _ronda_libre(guardias()); yield 0.2
+    b = d.buddy_of(v)
+    cerca = min(dist2d(p, q) for p in v.get_editor_property('patrol_points') for q in (b.get_editor_property('patrol_points') or [b.get_actor_location()])) if b else 1e9
+    check('su compañero es uno cuya ronda se cruza con la suya', b is not None and b != v and cerca < 1500, '%s a %.0f cm' % (b and b.get_actor_label(), cerca))
+    _ronda_libre([b]); yield 0.2
+    # cae y lo escondes lejos de su ronda: el que lo busca no lo encuentra
+    d.set_editor_property('miss_min', 8.0); d.set_editor_property('miss_max', 8.0)
+    n0 = len(vl())
+    derribar(v); yield 0.3
+    l = v.get_actor_location()
+    v.set_actor_location(V(-33000, -33000, l.z), False, True)
+    yield 5.0
+    check('antes de su tiempo nadie lo echa de menos', d.miss_searcher_of(v) is None and 'central_responde' not in vl()[n0:])
+    yield ('hasta', lambda: director().miss_searcher_of(v) is not None, 8.0)
+    check('la central llama al que no contesta y sale su compañero', d.miss_searcher_of(v) == b and 'central_responde' in vl()[n0:], '%s %s' % (d.miss_searcher_of(v), vl()[-3:]))
+    pts = list(v.get_editor_property('patrol_points'))
+    vistos = set()
+    t = 0.0
+    while t < 200.0 and not any(x.endswith('_nirastro') for x in vl()[n0:]):
+        yield 0.5
+        t += 0.5
+        lb = b.get_actor_location()
+        for i, p in enumerate(pts):
+            if dist2d(lb, p) < 260:
+                vistos.add(i)
+    check('recorre su ronda punto por punto', len(vistos) >= min(len(pts), 3), '%d de %d puntos en %.0f s' % (len(vistos), len(pts), t))
+    check('ni rastro: lo dice por radio y la base queda en guardia', any(x.endswith('_nirastro') for x in vl()[n0:]) and d.get_editor_property('tension_t') > 100.0
+          and d.get_editor_property('miss_not_found') == 1, '%s %.0f' % (vl()[-3:], d.get_editor_property('tension_t')))
+    check('ya no lo busca nadie', d.miss_searcher_of(v) is None)
+    # otro cae en su ronda (sin esconderlo): el compañero lo encuentra y da el aviso de siempre
+    d.set_editor_property('tension_t', 0.0)
+    w = ronda[1] if ronda[1] != b else ronda[2]
+    _ronda_libre(guardias()); yield 0.2
+    b2 = d.buddy_of(w)
+    _ronda_libre([b2]); yield 0.2
+    n1 = len(vl())
+    derribar(w); yield 0.3
+    yield ('hasta', lambda: director().miss_searcher_of(w) is not None, 14.0)
+    check('a este lo busca el suyo', d.miss_searcher_of(w) == b2, '%s / %s' % (d.miss_searcher_of(w), b2 and b2.get_actor_label()))
+    yield ('hasta', lambda: w.get_editor_property('found'), 200.0)
+    check('lo encuentra en su ronda: el aviso de siempre (cuerpo)', w.get_editor_property('found') and any(x.endswith('_cuerpo') for x in vl()[n1:]), vl()[-3:])
+    yield 0.5
+    check('y deja de buscar', d.miss_searcher_of(w) is None and d.get_editor_property('miss_searches') == 2, '%s %d' % (d.miss_searcher_of(w), d.get_editor_property('miss_searches')))
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
+
+def prueba_sabotaje():
+    """Tanda F. Sabotaje con la E y tiempo de manipulación. La antena: sin red hasta que la empalmen (el compañero echa de
+    menos al caído más tarde y sin central); el que pasa junto a ella ve el cable y sale uno a arreglarla; arreglada, la
+    base en guardia. El gasoil: el chorro se oye y atrae, el charco moja las botas y el primero que llega cierra y avisa."""
+    w = mundo()
+    d = director()
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.5
+    tags = {}
+    for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Actor):
+        for t in a.tags:
+            if str(t).startswith('sabotaje_'):
+                tags[str(t)] = tags.get(str(t), 0) + 1
+    check('las piezas del rastro están en el nivel', all(tags.get(t) for t in ('sabotaje_antena', 'sabotaje_antena_sano', 'sabotaje_gasoil', 'sabotaje_chorro')), tags)
+    check('al empezar: cable sano, sin charco ni chorro', d.sabotage_trace_shown('sabotaje_antena_sano') and not d.sabotage_trace_shown('sabotaje_antena')
+          and not d.sabotage_trace_shown('sabotaje_gasoil') and not d.sabotage_trace_shown('sabotaje_chorro'))
+    # la antena
+    a = d.get_editor_property('antenna_loc')
+    tp(a.x, a.y + 110, -90.0); yield 0.4
+    check('junto a la caja de la antena, el aviso de la E', 'ANTENA' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 1.0
+    check('cortar lleva su tiempo', d.sabotage_work() == 1 and not d.antenna_cut() and 0.1 < d.sabotage_progress() < 0.5 and '%' in str(d.interact_prompt()),
+          '%d %.2f %s' % (d.sabotage_work(), d.sabotage_progress(), d.interact_prompt()))
+    tp(a.x, a.y + 700, -90.0); yield 0.3
+    check('si te alejas lo dejas a medias', d.sabotage_work() == 0 and not d.antenna_cut())
+    tp(a.x, a.y + 110, -90.0); yield 0.3
+    d.interact(); yield d.get_editor_property('antenna_cut_seconds') + 0.6
+    check('cortado: sin red y el cable cuelga', d.antenna_cut() and d.radio_dead() and d.sabotage_trace_shown('sabotaje_antena') and not d.sabotage_trace_shown('sabotaje_antena_sano'),
+          '%s %s' % (d.antenna_cut(), d.radio_dead()))
+    aparte()
+    # sin red: el compañero echa de menos al caído más tarde (x1,5) y sin central
+    ronda = sorted([g for g in guardias() if not g.get_editor_property('tower_sentry') and len(g.get_editor_property('patrol_points')) >= 2
+                    and not g.get_actor_label().endswith('Ramos')], key=_largo_ronda)
+    x = ronda[0]
+    _ronda_libre(guardias()); yield 0.2
+    b = d.buddy_of(x)
+    _ronda_libre([b]); yield 0.2
+    d.set_editor_property('miss_min', 6.0); d.set_editor_property('miss_max', 6.0)
+    n0 = len(vl())
+    derribar(x); yield 7.0
+    check('sin red tarda más en echarlo de menos', d.miss_searcher_of(x) is None)
+    yield ('hasta', lambda: director().miss_searcher_of(x) is not None, 6.0)
+    check('y sale su compañero por su cuenta: sin central', d.miss_searcher_of(x) == b and 'central_responde' not in vl()[n0:] and any(s.endswith('_falta') for s in vl()[n0:]), vl()[n0:])
+    b.hold(3600.0)
+    # el que pasa junto a la antena ve el cable colgando: ya no esperan, sale uno a empalmarlo
+    c = [g for g in ronda if g not in (x, b)][0]
+    lc = c.get_actor_location()
+    c.set_actor_location(V(a.x + 250, a.y + 200, suelo_z(w, V(a.x + 250, a.y + 200, 0)) + 95), False, True); yield 0.5
+    check('el que pasa junto a la antena ve el cable', any(s.endswith('_antena_ve') for s in vl()) and d.get_editor_property('radio_dead_t') >= d.get_editor_property('radio_dead_seconds') - 1.0,
+          '%s %.0f' % (vl()[-2:], d.get_editor_property('radio_dead_t')))
+    c.hold(0.0)
+    yield ('hasta', lambda: director().emisora_fixer_now() is not None, 8.0)
+    f = d.emisora_fixer_now()
+    check('sale uno a empalmarlo', f is not None and f.is_on_errand(), f)
+    if f:
+        lf = f.get_actor_location()
+        f.set_actor_location(V(a.x, a.y + d.get_editor_property('emisora_stand'), lf.z), False, True)
+    yield ('hasta', lambda: not director().radio_dead(), d.get_editor_property('radio_fix_seconds') + 25.0)
+    yield 1.0
+    check('empalmado: vuelve la red, el cable sano y la base en guardia', not d.radio_dead() and d.has_flag('antena_reparada') and d.sabotage_trace_shown('sabotaje_antena_sano')
+          and d.get_editor_property('tension_t') > 100.0 and any(s.endswith('_antena') for s in vl()), '%s %.0f' % (vl()[-3:], d.get_editor_property('tension_t')))
+    check('la central lo dice', 'central_red' in vl(), vl()[-3:])
+    # el gasoil (el caído de antes, lejos: que su hallazgo no ponga la base en alerta en medio de esto)
+    lx = x.get_actor_location()
+    x.set_actor_location(V(-33000, -33000, lx.z), False, True)
+    for g in guardias():
+        g.hold(3600.0)
+    d.set_editor_property('tension_t', 0.0)
+    yield 0.5
+    v = d.get_editor_property('valve_loc')
+    tp(v.x + 40, v.y, 180.0); yield 0.4
+    check('junto a la llave del gasoil, el aviso de la E', 'GASOIL' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield d.get_editor_property('valve_open_seconds') + 0.6
+    check('abierta: el chorro y el charco', d.valve_open() and d.sabotage_trace_shown('sabotaje_gasoil') and d.sabotage_trace_shown('sabotaje_chorro'))
+    ch = [a2 for a2 in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DecalActor) if a2.actor_has_tag('sabotaje_gasoil')][0].get_actor_location()
+    d.test_footstep(V(ch.x, ch.y, ch.z - 4), 0.0, False)
+    check('el charco moja las botas (huellas mojadas al salir)', str(d.get_editor_property('last_print_kind')) == 'agua', d.get_editor_property('last_print_kind'))
+    aparte()
+    libres = [g for g in guardias() if not g.get_editor_property('tower_sentry') and not g.get_actor_label().endswith('Ramos')]
+    _ronda_libre(libres)
+    yield ('hasta', lambda: any(estado(g) == 'SUSPICIOUS' for g in libres), 4.0)
+    oyen = [g.get_actor_label() for g in libres if estado(g) == 'SUSPICIOUS']
+    check('el chorro se oye: van a mirar (dos la primera vez)', 1 <= len(oyen) <= 2, oyen)
+    yield ('hasta', lambda: director().get_editor_property('sabotage_found') >= 1, 120.0)
+    check('el primero que llega lo ve y avisa: la base en guardia', d.get_editor_property('sabotage_found') == 1 and any(s.endswith('_gasoil') for s in vl())
+          and d.get_editor_property('tension_t') > 100.0, '%s %.0f' % (vl()[-2:], d.get_editor_property('tension_t')))
+    yield ('hasta', lambda: not director().valve_open(), 12.0)
+    yield 0.3
+    check('la cierra: sin chorro, pero el charco se queda', not d.valve_open() and d.has_flag('gasoil_cerrado') and d.sabotage_trace_shown('sabotaje_gasoil')
+          and not d.sabotage_trace_shown('sabotaje_chorro'), 'abierta %s, cerrado %s, charco %s, chorro %s, hallazgos %d' % (d.valve_open(), d.has_flag('gasoil_cerrado'),
+          d.sabotage_trace_shown('sabotaje_gasoil'), d.sabotage_trace_shown('sabotaje_chorro'), d.get_editor_property('sabotage_found')))
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
 
 def prueba_relleno():
     """Tanda E1. Relleno visual del hangar (taller, Santana bajo lona, cajas LH), la enfermería con su cámara fría y la
@@ -4102,7 +4286,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje]]
 PRUEBAS = []
 
 

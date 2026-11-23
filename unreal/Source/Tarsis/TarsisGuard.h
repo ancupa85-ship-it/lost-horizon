@@ -280,6 +280,26 @@ public:
 	FVector YieldToward = FVector::ZeroVector;
 	bool bPawnBlock = false;
 	bool bYieldGesture = false;
+	// tanda F: en un pasillo (pared a los dos lados) no hay a donde arrimarse: el que cede vuelve atras hasta salir, se
+	// aparta y espera a que el otro haya pasado (en vez de quedarse empotrado o rodear por fuera)
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cruce")
+	bool IsBackingOut() const { return YieldBackT > 0.0f; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cruce")
+	int32 BackOuts = 0;
+	float YieldBackT = 0.0f;
+	FVector YieldBackDir = FVector::ZeroVector;
+	TWeakObjectPtr<ATarsisGuard> YieldOther;
+	/** Tanda F: con otro de pie a menos de RifleTuckDist, el fusil con el canon abajo (RifleTuckPitch/Yaw), para que no se
+	 *  rocen al cruzarse. Apuntando, no. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleTuckDist = 170.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleTuckPitch = -58.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleTuckYaw = -22.0f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	float RifleTuck() const { return RifleTuckW; }
+	float RifleTuckW = 0.0f;
 
 	/** Gesto que se le ve ahora (None si ninguno). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")

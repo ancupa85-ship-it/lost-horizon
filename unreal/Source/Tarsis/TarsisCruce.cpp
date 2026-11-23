@@ -11,6 +11,7 @@
 #include "AIController.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 
 bool ATarsisGuard::AvoidanceOn() const
 {
@@ -54,7 +55,24 @@ void ATarsisGuard::CrossTick(float DeltaSeconds)
 		bPawnBlock = bWant;
 		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, bWant ? ECR_Block : ECR_Ignore);
 	}
-	if (!bCrossRule || bTowerSentry || State == ETarsisGuardState::Down) { YieldT = 0.0f; return; }
+	// tanda F: con alguien de pie al lado (otro guardia o tú), el fusil con el cañón abajo: no se rozan al cruzarse
+	{
+		float Want = 0.0f;
+		if (bCrossRule && State != ETarsisGuardState::Down && !bRifleAim && !bSceneLock)
+		{
+			const FVector Me = GetActorLocation();
+			for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
+			{
+				if (*It == this || It->State == ETarsisGuardState::Down) continue;
+				const FVector To = It->GetActorLocation() - Me;
+				if (To.Size2D() < RifleTuckDist && FMath::Abs(To.Z) < 150.0f) { Want = 1.0f; break; }
+			}
+			const APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
+			if (Want <= 0.0f && Pl && FVector::Dist2D(Pl->GetActorLocation(), Me) < RifleTuckDist && FMath::Abs(Pl->GetActorLocation().Z - Me.Z) < 150.0f) Want = 1.0f;
+		}
+		RifleTuckW = FMath::FInterpConstantTo(RifleTuckW, Want, DeltaSeconds, 3.0f);
+	}
+	if (!bCrossRule || bTowerSentry || State == ETarsisGuardState::Down) { YieldT = 0.0f; YieldBackT = 0.0f; return; }
 	UCharacterMovementComponent* M = GetCharacterMovement();
 	// el que corre o persigue pesa más en el RVO (los demás se apartan de él)
 	if (M && M->bUseRVOAvoidance)
@@ -67,6 +85,51 @@ void ATarsisGuard::CrossTick(float DeltaSeconds)
 	if (YieldT > 0.0f)
 	{
 		YieldT -= DeltaSeconds;
+		// tanda F: en un pasillo, primero atras hasta salir de entre las dos paredes
+		if (YieldBackT > 0.0f)
+		{
+			YieldBackT -= DeltaSeconds;
+			AddMovementInput(YieldBackDir, 1.0f);
+			const FVector Right = FVector::CrossProduct(FVector::UpVector, YieldBackDir);
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisCruceAtras), false, this);
+			if (ATarsisGuard* O = YieldOther.Get()) Q.AddIgnoredActor(O);
+			FHitResult HR, HL;
+			const FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
+			const bool bR = GetWorld()->LineTraceSingleByChannel(HR, Eye, Eye + Right * NarrowDist, ECC_Visibility, Q);
+			const bool bL = GetWorld()->LineTraceSingleByChannel(HL, Eye, Eye - Right * NarrowDist, ECC_Visibility, Q);
+			if (!(bR && bL) || YieldBackT <= 0.0f)
+			{
+				// fuera: un paso al lado con más sitio y a esperar
+				YieldBackT = 0.0f;
+				const FVector Eye2 = Eye + YieldBackDir * 60.0f;
+				const bool bR2 = GetWorld()->LineTraceSingleByChannel(HR, Eye2, Eye2 + Right * 200.0f, ECC_Visibility, Q);
+				const bool bL2 = GetWorld()->LineTraceSingleByChannel(HL, Eye2, Eye2 - Right * 200.0f, ECC_Visibility, Q);
+				const float dR = bR2 ? HR.Distance : 200.0f, dL = bL2 ? HL.Distance : 200.0f;
+				YieldSide = ((dR >= dL) ? Right : -Right) + YieldBackDir * 0.5f;
+				YieldSide.Normalize();
+				YieldSideT = 0.8f;
+			}
+			return;
+		}
+		// esperando a que pase el del pasillo: en cuanto ha salido y se aleja (o tarda demasiado), se sigue
+		if (ATarsisGuard* O = YieldOther.Get())
+		{
+			const FVector To = O->GetActorLocation() - GetActorLocation();
+			const bool bStill = O->GetVelocity().Size2D() < 20.0f;
+			const bool bAway = FVector::DotProduct(O->GetVelocity(), To) > 0.0f || bStill;
+			// o ya ha salido del pasillo y se ha parado (ha llegado a donde iba, al lado de la boca): el paso esta libre
+			bool bOut = false;
+			if (bStill)
+			{
+				const FVector R = FVector::CrossProduct(FVector::UpVector, YieldBackDir);
+				FCollisionQueryParams QO(SCENE_QUERY_STAT(TarsisCruceSale), false, O);
+				QO.AddIgnoredActor(this);
+				FHitResult H1, H2;
+				const FVector E = O->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
+				bOut = !(GetWorld()->LineTraceSingleByChannel(H1, E, E + R * NarrowDist, ECC_Visibility, QO) && GetWorld()->LineTraceSingleByChannel(H2, E, E - R * NarrowDist, ECC_Visibility, QO));
+			}
+			if (YieldSideT <= 0.0f && (O->State == ETarsisGuardState::Down || (To.Size2D() > YieldDist + 60.0f && bAway) || bOut)) YieldT = FMath::Min(YieldT, 0.3f);
+		}
 		if (YieldSideT > 0.0f)
 		{
 			YieldSideT -= DeltaSeconds;
@@ -75,9 +138,9 @@ void ATarsisGuard::CrossTick(float DeltaSeconds)
 		else if (!bYieldGesture)
 		{
 			bYieldGesture = true;
-			PlayGesture(TEXT("pase"), FMath::Max(0.4f, YieldT), YieldToward);
+			PlayGesture(TEXT("pase"), FMath::Clamp(YieldT, 0.4f, 2.5f), YieldToward);
 		}
-		if (YieldT <= 0.0f) MoveDest = FVector(1e9f);   // que vuelva a pedir el camino
+		if (YieldT <= 0.0f) { MoveDest = FVector(1e9f); YieldOther = nullptr; }   // que vuelva a pedir el camino
 		return;
 	}
 	if (YieldCoolT > 0.0f || !M || M->Velocity.Size2D() < 40.0f || bPetting || bSceneLock || bAlly) return;
@@ -112,6 +175,19 @@ void ATarsisGuard::CrossTick(float DeltaSeconds)
 		YieldCoolT = 4.0f;
 		YieldToward = O->GetActorLocation();
 		bYieldGesture = false;
+		YieldOther = nullptr;
+		YieldBackT = 0.0f;
+		if (bR && bL && dR + dL < 2.0f * NarrowDist * 0.85f)
+		{
+			// tanda F: pared a los dos lados (pasillo): no cabe arrimarse; atrás hasta salir y esperar
+			YieldBackDir = -Dir;
+			YieldBackT = 5.0f;
+			YieldSideT = 0.0f;
+			YieldT = 14.0f;
+			YieldOther = O;
+			YieldCoolT = 16.0f;
+			++BackOuts;
+		}
 		++Yields;
 		if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
 		break;

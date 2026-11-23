@@ -28,7 +28,8 @@ namespace
 
 bool ATarsisDirector::RadioDead() const
 {
-	return HasFlag(FName(TEXT("emisora_muda"))) && !HasFlag(FName(TEXT("emisora_reparada")));
+	// tanda F: o con el cable de la antena cortado
+	return (HasFlag(FName(TEXT("emisora_muda"))) && !HasFlag(FName(TEXT("emisora_reparada")))) || AntennaCut();
 }
 
 void ATarsisDirector::RadioChatTick()
@@ -123,7 +124,10 @@ void ATarsisDirector::EmisoraTick(float DeltaSeconds)
 		return;
 	}
 	EmisoraSendT -= DeltaSeconds;
-	const FVector Stand = EmisoraLoc + FVector(EmisoraStand, 0.0f, 0.0f);
+	// tanda F: si la emisora esta bien, lo que falla es la antena: el cable se empalma al pie del mastil
+	const bool bAntenna = !(HasFlag(FName(TEXT("emisora_muda"))) && !HasFlag(FName(TEXT("emisora_reparada"))));
+	const FVector Fix = bAntenna ? AntennaLoc : EmisoraLoc;
+	const FVector Stand = bAntenna ? AntennaLoc + FVector(0.0f, EmisoraStand, 0.0f) : EmisoraLoc + FVector(EmisoraStand, 0.0f, 0.0f);
 	if (!F)
 	{
 		if (EmisoraSendT > 0.0f) return;
@@ -133,10 +137,10 @@ void ATarsisDirector::EmisoraTick(float DeltaSeconds)
 		{
 			if (It->bTowerSentry || It->bAlly || It->IsHeld() || It->IsBusy() || It->IsOnErrand()) continue;
 			if (It->State != ETarsisGuardState::Patrol && It->State != ETarsisGuardState::Return) continue;
-			const float D = FVector::Dist(It->GetActorLocation(), EmisoraLoc);
+			const float D = FVector::Dist(It->GetActorLocation(), Fix);
 			if (D < BestD) { BestD = D; F = *It; }
 		}
-		if (!F || !F->Errand(Stand, EmisoraLoc, 600.0f)) return;
+		if (!F || !F->Errand(Stand, Fix, 600.0f)) return;
 		EmisoraFixer = F;
 		EmisoraFixT = 0.0f;
 		++RadioRepairsSent;
@@ -146,17 +150,26 @@ void ATarsisDirector::EmisoraTick(float DeltaSeconds)
 	{
 		// algo le ha distraido por el camino (un ruido, tu): cuando vuelva a su ronda, sigue hacia la emisora
 		EmisoraFixT = 0.0f;
-		if (EmisoraSendT <= 0.0f) { EmisoraSendT = 3.0f; F->Errand(Stand, EmisoraLoc, 600.0f); }
+		if (EmisoraSendT <= 0.0f) { EmisoraSendT = 3.0f; F->Errand(Stand, Fix, 600.0f); }
 		return;
 	}
 	if (!F->AtErrand()) return;
-	if (EmisoraFixT <= 0.0f) GuardSay(F, TEXT("emisora"));
+	if (EmisoraFixT <= 0.0f) GuardSay(F, bAntenna ? TEXT("antena") : TEXT("emisora"));
 	EmisoraFixT += DeltaSeconds;
 	if (EmisoraFixT < RadioFixSeconds) return;
 	F->EndErrand();
-	SetFlag(FName(TEXT("emisora_reparada")));
 	++RadioRepairs;
 	EmisoraFixer = nullptr;
+	EmisoraFixT = 0.0f;
+	if (bAntenna)
+	{
+		// un cable cortado no es una valvula floja: hay alguien dentro
+		SetFlag(FName(TEXT("antena_reparada")));
+		TensionT = FMath::Max(TensionT, MissTension);
+		CentralSay(TEXT("red"), Tx(TEXT("radio_red_antena"), TEXT("Vuelve la red. Han cortado el cable de la antena: hay alguien dentro. Todas las unidades, en guardia.")), 0.5f);
+		return;
+	}
+	SetFlag(FName(TEXT("emisora_reparada")));
 	TensionT = 90.0f;   // alguien la ha tocado: la base queda en guardia
 	CentralSay(TEXT("red"), Tx(TEXT("radio_red"), TEXT("Vuelve la red. Alguien ha tocado la emisora. Todas las unidades: ojo, y parte uno por uno.")), 0.5f);
 }

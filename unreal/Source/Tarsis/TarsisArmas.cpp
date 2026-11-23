@@ -187,10 +187,12 @@ bool ATarsisGuard::RifleHoldTransform(FTransform& Out) const
 	const float Bob = FMath::Sin(RiflePhase * 2.0f) * RifleSwayBob * K;
 	const float Side = FMath::Sin(RiflePhase) * RifleSwaySide * K;
 	const float Roll = FMath::Sin(RiflePhase) * RifleSwayRoll * K;
-	const FVector Off = (FMath::Lerp(RifleHipButt, RifleAimButt, A) + FVector(0.0f, Side, Bob)) * RiflePersonaScale;
+	// tanda F: con alguien al lado, el canon abajo y algo cruzado (sin apuntar)
+	const float Tk = FMath::SmoothStep(0.0f, 1.0f, RifleTuckW) * (1.0f - A);
+	const FVector Off = (FMath::Lerp(RifleHipButt, RifleAimButt, A) + FVector(4.0f, 0.0f, -2.0f) * Tk + FVector(0.0f, Side, Bob)) * RiflePersonaScale;
 	const FVector Butt = Sh + F * Off.X + R * Off.Y + U * Off.Z;
-	const float P = FMath::DegreesToRadians(FMath::Lerp(RifleHipPitch, RifleAimPitch, A));
-	const float Y = FMath::DegreesToRadians(FMath::Lerp(RifleHipYaw, RifleAimYaw, A));
+	const float P = FMath::DegreesToRadians(FMath::Lerp(FMath::Lerp(RifleHipPitch, RifleAimPitch, A), RifleTuckPitch, Tk));
+	const float Y = FMath::DegreesToRadians(FMath::Lerp(FMath::Lerp(RifleHipYaw, RifleAimYaw, A), RifleTuckYaw, Tk));
 	const FVector Barrel = (F * FMath::Cos(P) * FMath::Cos(Y) + R * FMath::Cos(P) * FMath::Sin(Y) + U * FMath::Sin(P)).GetSafeNormal();
 	const FVector Up = FQuat(Barrel, FMath::DegreesToRadians(Roll)).RotateVector(U);
 	const FQuat Q = FRotationMatrix::MakeFromYZ(Barrel, Up).ToQuat();   // el M14 tiene el canon hacia +Y y arriba +Z
