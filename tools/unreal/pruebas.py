@@ -2327,6 +2327,12 @@ def prueba_opciones():
     d = director()
     # la dificultad guardada de quien juega puede no ser NORMAL: se pone NORMAL por el menú y al final se le devuelve
     dif0 = d.get_editor_property('difficulty')
+    # el tamaño del texto guardado de quien juega puede no ser 100 %: se mira antes y se comprueba el cambio desde ahí
+    yield from teclas(d, 'P')
+    tam = [x for x in lineas(d) if 'TAMANO DEL TEXTO' in x]
+    tam0 = int(tam[0].split('<')[1].split('%')[0]) if tam else 100
+    yield from teclas(d, 'P')
+    tam1 = min(tam0 + 10, 140)
     if dif0 != 1:
         yield from teclas(d, 'P', *(['Down'] * 10), 'Right' if dif0 == 0 else 'Left', 'P')
     yield from teclas(d, 'P', *(['Down'] * 10), 'Right')
@@ -2334,7 +2340,7 @@ def prueba_opciones():
     check('la dificultad se guarda en el director', d.get_editor_property('difficulty') == 2, d.get_editor_property('difficulty'))
     yield from teclas(d, 'Left', 'Down', 'Right', 'Down', 'Enter', 'Down', 'Enter', 'P')
     ls = ' '.join(lineas(d))
-    check('tamaño del texto al 110 %', 'TAMANO DEL TEXTO   < 110 %' in ls, [x for x in lineas(d) if 'TAMANO' in x])
+    check('tamaño del texto un 10 %% más (de %d a %d %%)' % (tam0, tam1), 'TAMANO DEL TEXTO   < %d %%' % tam1 in ls, [x for x in lineas(d) if 'TAMANO' in x])
     check('daltonismo y subtítulos activados', 'DALTONISMO   < SI' in ls and 'SUBTITULOS DE SONIDOS   < SI' in ls)
     g = guardia('Moya')
     l = g.get_actor_location()
@@ -2346,7 +2352,8 @@ def prueba_opciones():
     aparte()
     # dejarlo todo como estaba
     yield from teclas(d, 'P', *(['Down'] * 11), 'Left', 'Down', 'Enter', 'Down', 'Enter', 'P')
-    check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < 100 %' in ' '.join(lineas(d)))
+    check('opciones restauradas', d.get_editor_property('difficulty') == 1 and 'TAMANO DEL TEXTO   < %d %%' % (tam1 - 10) in ' '.join(lineas(d)),
+          [x for x in lineas(d) if 'TAMANO' in x])
     if dif0 != 1:
         yield from teclas(d, 'P', *(['Down'] * 10), 'Left' if dif0 == 0 else 'Right', 'P')
         check('la dificultad de quien juega, como estaba', d.get_editor_property('difficulty') == dif0, d.get_editor_property('difficulty'))
@@ -4731,6 +4738,8 @@ def prueba_vias():
     # ---- santo y seña con uniforme
     ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and estado(g) != 'DOWN' and nombre(g) != 'Ramos']
     o = ronda[0]
+    d.set_editor_property('relief_rule', True)   # la seña de esta noche la pone el relevo de las torres (en las pruebas va apagado)
+    yield ('hasta', lambda: director().relief_post_count() > 0, 30.0)
     d.set_flag('uniforme')
     if agachado():
         d.simulate_key('C'); yield 0.3
