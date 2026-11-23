@@ -582,6 +582,81 @@
    "sonido": "recoger",
    "texto": "llave_repuesto_cogida",
    "segundos": 6.0
+  },
+  {
+   "id": "tabaco",
+   "nota": "tanda I: cajetillas de tabaco en la mesa del barracon oeste (junto a la mesa de atrezo «mesa»)",
+   "pos": [
+    350,
+    2560,
+    0
+   ],
+   "radio": 110,
+   "aviso": "p_tabaco",
+   "pone": "obj_tabaco",
+   "sonido": "recoger",
+   "texto": "tabaco_cogido",
+   "segundos": 5.0
+  },
+  {
+   "id": "somnifero",
+   "nota": "tanda I: frasco de somnifero en la vitrina de la enfermeria",
+   "pos": [
+    7430,
+    3250,
+    0
+   ],
+   "radio": 120,
+   "aviso": "p_somnifero",
+   "pone": "obj_somnifero",
+   "sonido": "recoger",
+   "texto": "somnifero_cogido",
+   "segundos": 5.0
+  },
+  {
+   "id": "espejo",
+   "nota": "tanda I: espejo de mano junto al lavabo de la enfermeria",
+   "pos": [
+    7400,
+    2950,
+    0
+   ],
+   "radio": 120,
+   "aviso": "p_espejo",
+   "pone": "obj_espejo",
+   "sonido": "recoger",
+   "texto": "espejo_cogido",
+   "segundos": 5.0
+  },
+  {
+   "id": "cizalla",
+   "nota": "tanda I: cizalla en el banco del taller del hangar",
+   "pos": [
+    4140,
+    6950,
+    0
+   ],
+   "radio": 120,
+   "aviso": "p_cizalla",
+   "pone": "obj_cizalla",
+   "sonido": "recoger",
+   "texto": "cizalla_cogida",
+   "segundos": 5.0
+  },
+  {
+   "id": "plano",
+   "nota": "tanda I: plano de la base con las rondas y los relevos, en la mesa de la jefatura",
+   "pos": [
+    440,
+    3420,
+    0
+   ],
+   "radio": 120,
+   "aviso": "p_plano",
+   "pone": "dato_plano_rondas",
+   "sonido": "recoger",
+   "texto": "plano_cogido",
+   "segundos": 6.0
   }
  ],
  "textos": {
@@ -980,7 +1055,48 @@
   "santo_alto": "Alto. {0}?",
   "santo_respuesta": "{0}.",
   "ensena_santo": "SANTO Y SENA\nCon el uniforme y la sena de esta noche, los guardias te dejan acercarte mucho mas. De muy cerca, o corriendo, siguen viendote la cara.",
-  "codec_roig_ricino": "R|Cuttlas, escucha mientras andas. Me ha llegado un recado de Rota, para ti. Cuatro palabras: Ricino se ha secado.\nT|Que es Ricino?\nR|No lo se. Pero quien lo manda sabe que esta noche estas ahi dentro, y Control no me lo ha dicho.\nR|Sal de ahi. Manana lo hablamos."
+  "codec_roig_ricino": "R|Cuttlas, escucha mientras andas. Me ha llegado un recado de Rota, para ti. Cuatro palabras: Ricino se ha secado.\nT|Que es Ricino?\nR|No lo se. Pero quien lo manda sabe que esta noche estas ahi dentro, y Control no me lo ha dicho.\nR|Sal de ahi. Manana lo hablamos.",
+  "p_tabaco": "E   COGER EL TABACO",
+  "p_somnifero": "E   COGER EL SOMNIFERO",
+  "p_espejo": "E   COGER EL ESPEJO DE MANO",
+  "p_cizalla": "E   COGER LA CIZALLA",
+  "p_plano": "E   MIRAR EL PLANO DE LA BASE",
+  "tabaco_cogido": "TABACO (3 cajetillas)\nElige el tabaco (rueda o 5) y dejalo en el suelo con el clic: el guardia que pase se parara a fumar.",
+  "somnifero_cogido": "SOMNIFERO (2 dosis)\nEn la olla de la cocina se duermen los que coman; en la cantimplora de un guardia (por la espalda), el.",
+  "espejo_cogido": "ESPEJO DE MANO\nElige el espejo y manten el clic: miras por la esquina hacia el lado al que te asomas (Z / V). Agachado, bajo una puerta.",
+  "cizalla_cogida": "CIZALLA\nElige la cizalla, mira la malla de una valla y haz clic: queda un paso. Si un guardia ve el corte con luz, dara la alarma.",
+  "plano_cogido": "PLANO DE LA BASE\nLas rondas y los relevos quedan apuntados en el mapa mental (M).",
+  "obj_nombre_0": "DARDOS",
+  "obj_nombre_1": "PIEDRAS",
+  "obj_nombre_2": "LATAS",
+  "obj_nombre_3": "CABLE",
+  "obj_nombre_4": "TABACO",
+  "obj_nombre_5": "SOMNIFERO",
+  "obj_nombre_6": "CIZALLA",
+  "obj_nombre_7": "WALKIE",
+  "obj_nombre_8": "ESPEJO",
+  "obj_ayuda": "rueda / 1-6   clic: usar",
+  "obj_cable_estrecho": "EL CABLE, EN UN PASO ESTRECHO\nTiene que ir de pared a pared.",
+  "obj_olla": "SOMNIFERO EN LA OLLA\nLos dos primeros que vengan a comer se dormiran al rato.",
+  "obj_cantimplora": "SOMNIFERO EN SU CANTIMPLORA\n{0} se dormira cuando beba, dentro de un rato.",
+  "obj_somnifero_donde": "AQUI NO\nEn la olla de la cocina, o en la cantimplora de un guardia (por la espalda, sin que te vea).",
+  "obj_cizalla_donde": "CIZALLA\nAcercate a la malla de una valla y mirala.",
+  "obj_corte": "MALLA CORTADA\nPor aqui se pasa. Si un guardia ve el corte con luz, dara la alarma.",
+  "obj_walkie": "WALKIE DE {0}\nOyes la red de la base desde cualquier sitio.\nUna vez, con el walkie en la mano (clic), puedes dar una orden falsa a la central.",
+  "obj_orden_usada": "WALKIE\nOtra orden falsa no colaria: la central ya sospecha.",
+  "obj_orden_sinred": "WALKIE\nNo hay red: nadie te oiria.",
+  "obj_orden": "Central a {0} y {1}: acudid a {2}, han visto a alguien. Corto.",
+  "radio_falsa": "Esa orden no salio de aqui: hay alguien en la red. Todas las unidades, en guardia.",
+  "p_arrastrar_walkie": "E   ARRASTRAR (escondelo en la sombra)      {0}   QUITARLE EL WALKIE",
+  "ensena_espejo": "EL ESPEJO\nCon el clic mantenido miras por la esquina hacia el lado al que te asomas (Z / V).\nAgachado, por debajo de una puerta.",
+  "ensena_tabaco": "TABACO EN EL SUELO\nEl primero que pase la vera, se parara a cogerla y se fumara un pitillo.\nDe noche se le ve el ascua.",
+  "ensena_orden": "ORDEN FALSA\nVan a mirar. Si te pillan despues, la central sabra que la orden era tuya y la base se pondra en guardia.",
+  "voz_tabaco": "Anda, tabaco... A alguien se le ha caido. Un pitillo y sigo.",
+  "voz_rancho": "A ver que hay en la olla... algo caliente, por fin.",
+  "voz_sueno": "Que sueno me ha entrado de golpe... solo un momento...",
+  "voz_valla": "La malla cortada! Por aqui ha entrado alguien. Aviso.",
+  "dt_plano_rondas": "(las rondas, al mirar el plano)",
+  "dt_plano_relevos": "(los relevos, al mirar el plano)"
  },
  "datos": [
   {
@@ -1104,6 +1220,18 @@
    "ficha": "Relevos",
    "texto": "dt_relevo_cuadrante",
    "clase": "horario"
+  },
+  {
+   "id": "plano_rondas",
+   "ficha": "Plano de la jefatura",
+   "texto": "dt_plano_rondas",
+   "clase": "objeto"
+  },
+  {
+   "id": "plano_relevos",
+   "ficha": "Plano de la jefatura",
+   "texto": "dt_plano_relevos",
+   "clase": "objeto"
   }
  ],
  "charlas": [

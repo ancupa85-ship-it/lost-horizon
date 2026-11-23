@@ -462,6 +462,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	StashTick(DeltaSeconds);      // tanda G: cuerpos escondidos
 	PulseTick(DeltaSeconds);      // tanda G: pulso y respiracion al apuntar
 	TrapTick(DeltaSeconds);       // tanda G: latas y cable
+	ItemsTick(DeltaSeconds);      // tanda I: la mira, el selector y los objetos
 	AimTick(DeltaSeconds);
 	ThirdTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
@@ -582,6 +583,7 @@ FString ATarsisDirector::InteractPrompt() const
 		if (IsIbarra(G) && !bKey) return Tx(TEXT("p_llave_ibarra"), TEXT("E   QUITARLE LA LLAVE"));
 		if (G->GuardName.Equals(TEXT("Ramos"), ESearchCase::IgnoreCase) && !bVetKey && !bVetOpen) return Tx(TEXT("p_llave_ramos"), TEXT("E   QUITARLE LA LLAVE DEL BOTIQUIN"));
 		if (G->bDarted) return Tx(TEXT("p_dardo"), TEXT("E   RECUPERAR EL DARDO"));
+		if (!HasWalkie() && !G->bAlly) return Tx(TEXT("p_arrastrar_walkie"), TEXT("E   ARRASTRAR (escondelo en la sombra)      {0}   QUITARLE EL WALKIE"), { KeyLabel(10) });   // tanda I
 		return Tx(TEXT("p_arrastrar"), TEXT("E   ARRASTRAR (escondelo en la sombra)"));
 	}
 	{ const FString GP = GearPrompt(); if (!GP.IsEmpty()) return GP; }
@@ -718,6 +720,12 @@ void ATarsisDirector::Interact()
 
 void ATarsisDirector::KeypadKey(FKey Key)
 {
+	// tanda I: sin ninguna eleccion abierta, las cifras 1-6 cambian el objeto en mano
+	if (ItemKeyAllowed())
+	{
+		const FKey Nums[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six };
+		for (int32 i = 0; i < 6; ++i) if (Key == Nums[i]) { SelectItem(i); return; }
+	}
 	if (bCellAsk)
 	{
 		if (Key == EKeys::One || Key == EKeys::NumPadOne) AnswerCell(1);
@@ -1624,7 +1632,7 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 	const FQuat Rel = FRotator(7.0f * RecoilT, 0.0f, 0.0f).Quaternion() * FRotator(0.0f, -90.0f, 0.0f).Quaternion();
 	// la cabeza del maniquí, en la cámara: así la pistola queda donde la llevaría alguien de tu altura
 	const FVector Head = Arms->GetBoneLocation(TEXT("head"), EBoneSpaces::ComponentSpace);
-	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + AimArmsShift * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT, 0.0f, -30.0f * (1.0f - ArmsShow));
+	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + (AimArmsShift + AimAutoShift) * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT, 0.0f, -30.0f * (1.0f - ArmsShow));
 	Arms->SetRelativeLocationAndRotation(Loc, Rel);
 }
 
@@ -1882,7 +1890,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
 		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("farola") || Key == TEXT("apoyo") || Key == TEXT("voy") || Key == TEXT("perdido") || Key == TEXT("despierta")
-		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("lata") || Key == TEXT("tropiezo") || Key == TEXT("trampa") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
+		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("lata") || Key == TEXT("tropiezo") || Key == TEXT("trampa") || Key == TEXT("tabaco") || Key == TEXT("sueno") || Key == TEXT("valla") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -1933,6 +1941,10 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("lata")) T = TEXT("Que demonios...? Latas en un alambre. Aqui ha estado alguien.");
 	else if (Key == TEXT("tropiezo")) T = TEXT("Agh! Un cable... Quien ha tendido esto?");
 	else if (Key == TEXT("trampa")) T = TEXT("Eh, mira esto: un alambre tendido. Lo quito y aviso.");
+	else if (Key == TEXT("tabaco")) T = TEXT("Anda, tabaco... A alguien se le ha caido. Un pitillo y sigo.");
+	else if (Key == TEXT("rancho")) T = TEXT("A ver que hay en la olla... algo caliente, por fin.");
+	else if (Key == TEXT("sueno")) T = TEXT("Que sueno me ha entrado de golpe... solo un momento...");
+	else if (Key == TEXT("valla")) T = TEXT("La malla cortada! Por aqui ha entrado alguien. Aviso.");
 	else if (Key == TEXT("huellas")) T = TEXT("Huellas... de bota. Frescas. Alguien ha pasado por aqui.");
 	else if (Key == TEXT("huellas_perro")) T = TEXT("Bah. Las del perro, otra vez suelto.");
 	else if (Key == TEXT("rastro_fin")) T = TEXT("Aqui se pierden. Tiene que estar cerca.");
@@ -2203,7 +2215,7 @@ void ATarsisDirector::PartesTick()
 void ATarsisDirector::SayParte(ATarsisGuard* G)
 {
 	APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
-	if (!G || !Pl || FVector::Dist(Pl->GetActorLocation(), G->GetActorLocation()) > ParteHearDist) return;
+	if (!G || !Pl || (FVector::Dist(Pl->GetActorLocation(), G->GetActorLocation()) > ParteHearDist && !HasWalkie())) return;   // tanda I: con el walkie, desde cualquier sitio
 	const FString Line = Tx(TEXT("parte_aqui"), TEXT("Aqui {0}. {1}"), { G->GuardName, ParteOf(G->GuardName) });
 	if (RadioSnd) UGameplayStatics::PlaySoundAtLocation(this, RadioSnd, G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 1.0f, 1.0f, 0.0f, Atten);
 	SaySubtitle(FString::Printf(TEXT("%s (%s)"), *G->GuardName.ToUpper(), *Direction(G->GetActorLocation())), Line);
@@ -3955,8 +3967,17 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[4], IE_Pressed, this, &ATarsisDirector::SprintOn);
 	InputComponent->BindKey(ActionKeys[4], IE_Released, this, &ATarsisDirector::SprintOff);
 	{
-		FInputKeyBinding& B = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATarsisDirector::ShootDart);
+		// tanda I: el clic izquierdo usa el objeto en mano (con el dardo, dispara como siempre)
+		FInputKeyBinding& B = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ATarsisDirector::UseItem);
 		B.bConsumeInput = false;
+		FInputKeyBinding& B2 = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Released, this, &ATarsisDirector::UseItemRelease);
+		B2.bConsumeInput = false;
+	}
+	{
+		FInputKeyBinding& B = InputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &ATarsisDirector::ItemPrev);
+		B.bConsumeInput = false;
+		FInputKeyBinding& B2 = InputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &ATarsisDirector::ItemNext);
+		B2.bConsumeInput = false;
 	}
 	// teclado del archivo: cifras de arriba y del teclado numérico, y Retroceso para borrar
 	const FKey Keys[] = { EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six,

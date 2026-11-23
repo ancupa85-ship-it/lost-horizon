@@ -26,6 +26,7 @@ private:
 	void DrawKeypad(class ATarsisDirector* D);
 	void DrawBinoculars(class ATarsisDirector* D);
 	void DrawAim(class ATarsisDirector* D);
+	void DrawItems(class ATarsisDirector* D);   // tanda I (TarsisHUDObjetos.cpp)
 	void DrawTalk(class ATarsisDirector* D);
 	void DrawMarked();
 	void DrawLastKnown(class ATarsisDirector* D);

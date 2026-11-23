@@ -23,6 +23,7 @@ bool ATarsisDirector::CanInterrogate(const ATarsisGuard* G) const
 
 void ATarsisDirector::Interrogate()
 {
+	if (!bCine && !bDone && !bMenu && !bCodec && !Dragged && WalkieLoot()) return;   // tanda I: junto a un caido, quitarle el walkie
 	if (!bInterrogation || bCine || bDone || bMenu || bCodec || bChoice || bKeypad || Dragged || bRiding || bHiding || bBoxOn || bCapturing) return;
 	ATarsisGuard* G = TakedownTarget();
 	if (!G || G->bTowerSentry) return;

@@ -82,6 +82,7 @@ void ATarsisHUD::DrawHUD()
 	DrawBox(D);
 	DrawBinoculars(D);
 	DrawAim(D);
+	DrawItems(D);   // tanda I: el objeto en mano y el espejo
 	DrawTalk(D);
 	DrawMarked();
 	DrawLastKnown(D);

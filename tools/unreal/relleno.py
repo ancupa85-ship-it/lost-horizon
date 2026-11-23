@@ -765,6 +765,39 @@ def huerto(M):
     colocar_malla(es.asset('SM_Huerto_estacas', M['madera'], 'ninguna'), 'Huerto_estacas', V(0, 0, z0), colision=False)
 
 
+def objetos_tandaI(M):
+    """Tanda I: los objetos que se recogen con la E (puntos de mision1.json), encima de su mueble. Cada uno lleva la
+    etiqueta «recoger_<bandera>»: el director lo oculta al cogerlo."""
+    def sobre(x, y):
+        return suelo(x, y, 300)
+    piezas = []
+    # tabaco: tres cajetillas en la mesa del barracon oeste
+    z = sobre(350, 2520)
+    ta = Malla()
+    for i, (dx, dy, g) in enumerate(((-8, -6, 10), (6, 4, -25), (0, 12, 40))):
+        ta.caja(350 + dx, 2520 + dy, 1.2 + i * 2.3, 8.5, 5.5, 2.2, g)
+    piezas.append((ta, 'SM_Obj_tabaco', mi('MI_obj_tabaco', 'MI_pared', (0.62, 0.55, 0.4), Suciedad=0.3), z, 'obj_tabaco'))
+    # somnifero: un frasco ambar en la vitrina de la enfermeria
+    z = sobre(7360, 3250)
+    so = Malla().cilindro(7385, 3245, 0, 3.0, 9, 10).cilindro(7385, 3245, 9, 1.4, 2.5, 8)
+    piezas.append((so, 'SM_Obj_somnifero', mi('MI_obj_frasco', 'MI_pared', (0.35, 0.16, 0.04), Suciedad=0.1), z, 'obj_somnifero'))
+    # espejo de mano: en la repisa del lavabo
+    z = sobre(7342, 2950)
+    es = Malla().cilindro(7345, 2975, 0.5, 6.5, 0.8, 16).caja(7345, 2986, 0.9, 2.2, 10, 1.4)
+    piezas.append((es, 'SM_Obj_espejo', M['hierro'], z, 'obj_espejo'))
+    # cizalla: en el banco del taller del hangar
+    z = sobre(4083, 6950)
+    ci = Malla().caja(4090, 6945, 1.5, 6, 40, 2.5, 8).caja(4096, 6968, 1.5, 3, 22, 2.5, 25).caja(4084, 6968, 1.5, 3, 22, 2.5, -10)
+    piezas.append((ci, 'SM_Obj_cizalla', M['oxido'], z, 'obj_cizalla'))
+    # plano: una hoja grande desplegada en la mesa de la jefatura
+    z = sobre(330, 3450)
+    pl = Malla().caja(345, 3445, 0.4, 60, 42, 0.6, 12)
+    piezas.append((pl, 'SM_Obj_plano', mi('MI_obj_plano', 'MI_pared', (0.72, 0.68, 0.55), Suciedad=0.4), z, 'dato_plano_rondas'))
+    for m, nombre, mat, z0, bandera in piezas:
+        colocar_malla(m.asset(nombre, mat, 'ninguna'), nombre[3:], V(0, 0, z0), colision=False, tags=('recoger_' + bandera,))
+    log('tanda I: %d objetos para recoger' % len(piezas))
+
+
 CAPILLA = (6000, 6800, -1550, -950)    # x0, x1, y0, y1: barracón pequeño en el anillo norte, la puerta al sur
 
 
@@ -823,6 +856,7 @@ def montar():
     anillo_oeste(M)
     anillo_este(M)
     capilla(M)
+    objetos_tandaI(M)
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
     log('relleno de las tandas E1 y E2 montado y guardado')
 

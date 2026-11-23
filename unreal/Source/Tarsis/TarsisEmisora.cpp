@@ -49,7 +49,7 @@ bool ATarsisDirector::StartRadioChat(bool bForce)
 		// los dos de ronda y tu cerca de uno: si no, la charla espera (no se pierde por estar lejos)
 		if (L->State != ETarsisGuardState::Patrol || C->State != ETarsisGuardState::Patrol || L->IsHeld() || C->IsHeld()) return false;
 		const float D = FMath::Min(FVector::Dist(Pl->GetActorLocation(), L->GetActorLocation()), FVector::Dist(Pl->GetActorLocation(), C->GetActorLocation()));
-		if (D > ParteHearDist) return false;
+		if (D > ParteHearDist && !HasWalkie()) return false;   // tanda I: con el walkie la oyes desde cualquier sitio
 	}
 	bRadioChatOn = true;
 	++RadioChats;

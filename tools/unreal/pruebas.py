@@ -4786,10 +4786,176 @@ def prueba_vias():
 
 
 # cada familia, en un PIE limpio; dentro de una familia las pruebas comparten partida (la llave, la jefatura, el farol...)
+
+def prueba_mira():
+    """Tanda I. La mira en primera persona: el dardo va al centro de la pantalla (donde está la cruz) y, apuntando, la boca
+    de la pistola se lleva sola a ese centro (antes quedaba abajo a la derecha y la cruz parecía descentrada)."""
+    d = director()
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    d.set_darts(3)
+    d.set_editor_property('exertion', 0.0); d.set_editor_property('seen_sway', 0.0); d.set_editor_property('wounds', 0)
+    d.set_editor_property('aim_held', False); yield from _juego(0.8)
+    o = d.dart_screen_offset()
+    check('sin apuntar, el dardo va al centro (donde está el punto)', abs(o.x) < 0.004 and abs(o.y) < 0.004, '%.4f, %.4f' % (o.x, o.y))
+    d.set_editor_property('aim_held', True); yield from _juego(2.0)
+    o = d.dart_screen_offset()
+    m = d.aim_muzzle_offset()
+    sh = d.get_editor_property('aim_auto_shift')
+    check('apuntando, el dardo sigue al centro de la cruz', abs(o.x) < 0.004 and abs(o.y) < 0.004, '%.4f, %.4f' % (o.x, o.y))
+    check('apuntando, la boca de la pistola junto al centro (menos de 2,5 grados)', abs(m.x) < 0.026 and -0.01 < m.y < 0.045, 'tangentes %.3f, %.3f; corrido %.1f, %.1f cm' % (m.x, m.y, sh.y, sh.z))
+    d.set_editor_property('aim_held', False); yield from _juego(0.5)
+
+
+def prueba_objetos():
+    """Tanda I. El selector (rueda y 1-6, solo sin elecciones abiertas; el clic usa el elegido) y los objetos nuevos: se
+    recogen con la E en su sitio y desaparecen del mueble; tabaco (el guardia se para a fumar), somnífero (olla y
+    cantimplora), cizalla (paso en la malla; el guardia que ve el corte con luz da la alarma), walkie (de un caído, con la T;
+    una orden falsa) y espejo (vista por la esquina); el plano apunta rondas y relevos en el mapa mental."""
+    w = mundo()
+    d = director()
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    d.set_darts(3)
+    d.select_item(0); yield 0.1
+    # 1) el selector
+    check('al empezar, en mano los dardos', d.get_editor_property('item_sel') == 0 and d.item_count(0) == 3 and d.item_count(1) == -1, d.get_editor_property('item_sel'))
+    d.simulate_key('Three'); yield 0.2
+    check('la tecla 3: las latas', d.get_editor_property('item_sel') == 2 and d.item_name(2) == 'LATAS', d.get_editor_property('item_sel'))
+    d.simulate_key('MouseScrollDown'); yield 0.2
+    check('la rueda: el siguiente que tienes (el cable)', d.get_editor_property('item_sel') == 3, d.get_editor_property('item_sel'))
+    d.simulate_key('Six'); yield 0.2
+    check('sin tabaco, la 6 no cambia', d.get_editor_property('item_sel') == 3, d.get_editor_property('item_sel'))
+    d.press_key('P'); yield 0.2
+    d.simulate_key('One'); yield 0.2
+    check('con el menú abierto, las cifras no cambian de objeto', d.get_editor_property('item_sel') == 3, d.get_editor_property('item_sel'))
+    d.press_key('P'); yield 0.2
+    d.simulate_key('One'); yield 0.2
+    check('cerrado, la 1 vuelve a los dardos', d.get_editor_property('item_sel') == 0)
+    # 2) recogerlos
+    def coger(pid, bandera):
+        pt = [q for q in MISION['puntos'] if q['id'] == pid][0]
+        tp(pt['pos'][0], pt['pos'][1], 0.0)
+        yield 0.4
+        R['aviso'] = str(d.interact_prompt())
+        d.interact()
+        yield 0.4
+        tag = 'recoger_' + bandera
+        R['oculto'] = all(a.is_hidden() if hasattr(a, 'is_hidden') else a.get_editor_property('hidden') for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Actor) if a.actor_has_tag(tag))
+    R = {}
+    for pid, bandera in (('tabaco', 'obj_tabaco'), ('somnifero', 'obj_somnifero'), ('espejo', 'obj_espejo'), ('cizalla', 'obj_cizalla'), ('plano', 'dato_plano_rondas')):
+        yield from coger(pid, bandera)
+        check('%s: se coge con la E y desaparece del mueble' % pid, d.has_flag(bandera) and R['oculto'], '%s | %s' % (R['aviso'], R['oculto']))
+    check('tabaco: 3 cajetillas; somnífero: 2 dosis', d.item_count(4) == 3 and d.item_count(5) == 2, '%d %d' % (d.item_count(4), d.item_count(5)))
+    tx = d.get_editor_property('texts')
+    rondas = str(tx['dt_plano_rondas']) if 'dt_plano_rondas' in tx else ''
+    check('el plano: rondas y relevos en el mapa mental', d.fact_known('plano_rondas') and d.fact_known('plano_relevos') and ':' in rondas, rondas[:80])
+    aparte(); yield 0.3
+    # 3) tabaco: el que pasa se para a fumar
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and len(g.get_editor_property('patrol_points')) >= 2 and not g.get_actor_label().endswith('Ramos')]
+    g = ronda[0]
+    l = g.get_actor_location(); f = g.get_actor_forward_vector()
+    p = jugador()
+    p.set_actor_location(V(l.x + f.x * 260, l.y + f.y * 260, max(p.get_actor_location().z, 100)), False, True)
+    unreal.GameplayStatics.get_player_controller(w, 0).set_control_rotation(unreal.Rotator(0, 0, math.degrees(math.atan2(-f.y, -f.x)) + 180)); yield 0.2
+    d.simulate_key('Five'); yield 0.2
+    d.use_item(); yield 0.2
+    check('el tabaco, en el suelo', d.cigs_on_floor() == 1 and d.item_count(4) == 2, d.cigs_on_floor())
+    aparte(); yield 0.2
+    g.hold(0.0)
+    yield ('hasta', lambda: director().get_editor_property('cigs_smoked') >= 1, 25.0)
+    check('el guardia se para, la coge y fuma (con su ascua)', d.get_editor_property('cigs_smoked') == 1 and d.is_smoking(g), estado(g))
+    g.hold(3600.0)
+    # 4) somnífero en la olla: el que viene a comer se duerme
+    d.set_editor_property('sleep_delay', 3.0)
+    pot = d.get_editor_property('sleep_pot_loc')
+    tp(pot.x + 120, pot.y, 180.0); yield 0.3
+    d.simulate_key('Six'); yield 0.2
+    d.use_item(); yield 0.2
+    check('somnífero en la olla', d.get_editor_property('pot_drugged') and d.item_count(5) == 1, d.item_count(5))
+    aparte(); yield 0.2
+    h = [x for x in ronda if x != g][0]
+    h.set_actor_location(V(pot.x + 500, pot.y, suelo_z(w, V(pot.x + 500, pot.y, 0)) + 95), False, True)
+    h.hold(0.0)
+    yield ('hasta', lambda: director().get_editor_property('slept_by_drug') >= 1, 120.0)
+    check('el que viene a comer se duerme al rato (dormido, no muerto)', d.get_editor_property('slept_by_drug') >= 1 and estado(h) == 'DOWN', estado(h))
+    h.hold(3600.0)
+    # cantimplora: por la espalda
+    k = [x for x in ronda if x not in (g, h) and estado(x) != 'DOWN'][0]
+    detras_de(k, 90.0); yield 0.3
+    d.use_item(); yield 0.2
+    yield ('hasta', lambda: estado(k) == 'DOWN', 12.0)
+    check('en la cantimplora de uno, por la espalda: se duerme', estado(k) == 'DOWN' and d.item_count(5) == 0, estado(k))
+    aparte(); yield 0.3
+    # 5) cizalla: la valla del anillo oeste (fila 10), un paso en la malla
+    hit = None
+    for x in range(-1500, -150, 50):
+        r = unreal.SystemLibrary.line_trace_single(w, V(x, 1800, 110), V(x, 2400, 110), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+        if r and r.to_tuple()[9] and r.to_tuple()[9].get_actor_label().startswith('valla') and abs(x + 450) > 150:
+            hit = r.to_tuple()[4]; break
+    check('hay malla de valla donde probar', hit is not None)
+    if hit:
+        p = jugador()
+        p.set_actor_location(V(hit.x, hit.y - 80, max(p.get_actor_location().z, 100)), False, True)
+        unreal.GameplayStatics.get_player_controller(w, 0).set_control_rotation(unreal.Rotator(0, 0, 90)); yield 0.3
+        z0 = p.get_actor_location().z
+        p.set_actor_location(V(hit.x, hit.y + 80, z0), True, False); yield 0.1
+        check('sin cortar, la malla no se pasa', p.get_actor_location().y < hit.y, '%.0f' % (p.get_actor_location().y - hit.y))
+        p.set_actor_location(V(hit.x, hit.y - 80, z0), False, True); yield 0.2
+        d.simulate_key('MouseScrollDown'); yield 0.1
+        while d.get_editor_property('item_sel') != 6:
+            d.simulate_key('MouseScrollDown'); yield 0.1
+        d.use_item(); yield 0.3
+        check('cortada con la cizalla', d.get_editor_property('fence_cuts_made') == 1, d.get_editor_property('fence_cuts_made'))
+        p.set_actor_location(V(hit.x, hit.y - 40, z0), True, False); yield 0.2
+        p.set_actor_location(V(hit.x, hit.y + 80, z0), True, False); yield 0.2
+        check('por el corte se pasa', p.get_actor_location().y > hit.y + 40, '%.0f' % (p.get_actor_location().y - hit.y))
+        aparte(); yield 0.2
+        # de día, el que lo ve da la alarma
+        d.set_day(True); yield 0.3
+        c = ronda[-1]
+        c.set_actor_location(V(hit.x + 30, hit.y - 450, suelo_z(w, V(hit.x + 30, hit.y - 450, 0)) + 95), False, True)
+        c.set_actor_rotation(unreal.Rotator(0, 0, 90), False); yield 1.0
+        check('de día, el que ve el corte da la alarma', d.get_editor_property('fence_cuts_found') == 1 and d.get_editor_property('tension_t') > 100.0, '%d %.0f' % (d.get_editor_property('fence_cuts_found'), d.get_editor_property('tension_t')))
+        d.set_day(False)
+    # 6) walkie: de un caído, con la T; y una orden falsa
+    v = [x for x in ronda if estado(x) != 'DOWN' and x not in (g,)][0]
+    derribar(v); yield 1.0
+    junto_a(v, 70.0); yield 0.3
+    check('junto a un caído, la T le quita el walkie', 'WALKIE' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interrogate(); yield 0.3
+    check('walkie cogido (y en mano)', d.has_walkie() and d.get_editor_property('item_sel') == 7)
+    aparte(); yield 0.2
+    libres = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.get_actor_label().endswith('Ramos')]
+    for x in libres:
+        x.hold(0.0)
+    if libres:
+        q = libres[0].get_actor_location()
+        tp(q.x + 600, q.y)
+    yield 0.3
+    d.use_item(); yield 0.5
+    van = [x.get_actor_label() for x in libres if x.is_on_errand()]
+    check('orden falsa: van dos a otra zona', d.get_editor_property('fake_order_used') and len(van) == 2, van)
+    d.use_item(); yield 0.3
+    check('una sola vez', 'colaria' in str(d.get_editor_property('message')), str(d.get_editor_property('message'))[:40])
+    for x in guardias():
+        x.hold(3600.0)
+    # 7) espejo: mantener el clic
+    d.simulate_key('MouseScrollDown'); yield 0.1
+    while d.get_editor_property('item_sel') != 8:
+        d.simulate_key('MouseScrollDown'); yield 0.1
+    d.use_item(); yield 0.4
+    check('el espejo: con el clic, una vista por la esquina', d.get_editor_property('mirror_on'))
+    d.use_item_release(); yield 0.2
+    check('al soltar, se guarda', not d.get_editor_property('mirror_on'))
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos]]
 PRUEBAS = []
 
 

@@ -101,6 +101,10 @@ struct FTarsisPrint
 	bool bLeft = false;
 };
 
+// tanda I: una cajetilla en el suelo y un corte en la malla
+struct FTarsisCig { FVector Loc = FVector::ZeroVector; TWeakObjectPtr<class UStaticMeshComponent> Mesh; TWeakObjectPtr<class ATarsisGuard> Taker; bool bTaken = false; };
+struct FTarsisCut { FVector Loc = FVector::ZeroVector; FVector Normal = FVector::ZeroVector; TWeakObjectPtr<class UStaticMeshComponent> Mesh; bool bFound = false; };
+
 // tanda G: una trampa puesta (0 latas, 1 cable entre A y B)
 struct FTarsisTrap
 {
@@ -1218,6 +1222,93 @@ public:
 	/** Pone una trampa donde estas (como la E agachado): devuelve si ha podido. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Trampas")
 	bool PlaceTrap();
+
+	// ---- tanda I: la mira centrada, el selector de objetos y los objetos nuevos (TarsisObjetos.cpp)
+	/** Apuntando, los brazos se corren solos hasta que la boca de la pistola queda en el centro de la pantalla (donde va el
+	 *  dardo), AimSightDrop cm por debajo. AimAutoShift es lo que llevan corrido (se suma a AimArmsShift). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Apuntar")
+	float AimSightDrop = -2.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Apuntar")
+	FVector AimAutoShift = FVector::ZeroVector;
+	/** Donde se ve la boca de la pistola respecto al centro de la pantalla (fraccion del ancho y del alto; 0,0 = centro). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Apuntar")
+	FVector2D AimMuzzleOffset() const;
+	/** Donde iria el dardo ahora (a 10 m por la linea de tiro), en la pantalla respecto al centro (fraccion). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Apuntar")
+	FVector2D DartScreenOffset() const;
+
+	/** Objetos del selector: 0 dardo, 1 piedra, 2 latas, 3 cable, 4 tabaco, 5 somnifero, 6 cizalla, 7 walkie, 8 espejo.
+	 *  Rueda del raton o teclas 1-6 (si no hay una eleccion abierta); el clic izquierdo usa el elegido. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	int32 ItemSel = 0;
+	static constexpr int32 NumItems = 9;
+	/** Cuantos quedan (-1: herramienta que no se gasta; 0: no la tienes). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
+	int32 ItemCount(int32 Item) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
+	FString ItemName(int32 Item) const;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Objetos")
+	bool SelectItem(int32 Item);
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Objetos")
+	void CycleItem(int32 Dir);
+	/** El clic izquierdo con el objeto elegido (con el dardo, dispara). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Objetos")
+	void UseItem();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Objetos")
+	void UseItemRelease();
+	/** Tabaco: cajetillas (cada una para un guardia). Se coge en el barracon; el que la encuentra se para a fumar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	int32 Cigs = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	float SmokeSeconds = 30.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	float CigSeeDist = 500.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	int32 CigsSmoked = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
+	int32 CigsOnFloor() const { return CigPacks.Num(); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
+	bool IsSmoking(const class ATarsisGuard* G) const;
+	/** Somnifero: dosis; echado en la olla de la cocina (SleepPotLoc), los dos primeros que coman se duermen. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	int32 SleepDoses = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	FVector SleepPotLoc = FVector(5895.0f, 3645.0f, 0.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	float SleepDelay = 20.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	float SleepTime = 150.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	float SleepEveryS = 15.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	bool bPotDrugged = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	int32 SleptByDrug = 0;
+	/** Cizalla: corta la malla de una valla; por el corte se pasa. Un guardia que lo ve con luz da la alarma. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	float FenceSeeDist = 900.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	int32 FenceCutsMade = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	int32 FenceCutsFound = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
+	FVector FenceCutLoc(int32 Index) const { return FenceCuts.IsValidIndex(Index) ? FenceCuts[Index].Loc : FVector::ZeroVector; }
+	/** Walkie: oyes la red desde cualquier sitio; una vez, una orden falsa manda a dos guardias lejos. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	bool bFakeOrderUsed = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	bool bFakeOrderBlown = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Objetos")
+	TArray<FVector> FakeOrderZones = { FVector(6400.0f, -1250.0f, 0.0f), FVector(4900.0f, 6800.0f, 0.0f), FVector(7900.0f, 4200.0f, 0.0f), FVector(1500.0f, 2600.0f, 0.0f), FVector(-1000.0f, 3500.0f, 0.0f) };
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
+	bool HasWalkie() const;
+	/** Espejo: con el clic mantenido, una vista pequena por la esquina (o bajo la puerta, agachado). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
+	bool bMirrorOn = false;
+	UPROPERTY(Transient)
+	TObjectPtr<class UTextureRenderTarget2D> MirrorRT;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
+	FVector MirrorViewLoc() const;
 
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
@@ -2968,6 +3059,36 @@ private:
 	int32 TrapNear() const;
 	bool NarrowAt(const FVector& Where, const FVector& Fwd, FVector& OutA, FVector& OutB) const;
 	void RemoveTrap(int32 Index);
+	// tanda I (TarsisObjetos.cpp)
+	TArray<FTarsisCig> CigPacks;
+	TArray<FTarsisCut> FenceCuts;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, float> Smokers;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, TObjectPtr<class UPointLightComponent>> Embers;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, float> Sleepers;
+	TArray<TWeakObjectPtr<class ATarsisGuard>> Eaters;
+	TSet<FName> ItemsCounted;
+	TMap<TWeakObjectPtr<AActor>, FName> Pickups;
+	bool bPickupsScanned = false;
+	float EatNextT = 0.0f;
+	int32 FakeOrderDetections = 0;
+	bool bFenceIgnoring = false;
+	UPROPERTY()
+	TObjectPtr<class USceneCaptureComponent2D> MirrorCap;
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> ItemMeshes;
+	void ItemsTick(float DeltaSeconds);
+	void ItemPrev() { CycleItem(-1); }
+	void ItemNext() { CycleItem(1); }
+	void AimAlignTick(float DeltaSeconds);
+	bool ItemKeyAllowed() const;
+	bool WalkieLoot();
+	void DropCig();
+	void DrugPot();
+	void CutFence();
+	void FakeOrder();
+	void ComposePlan();
+	void StopSmoking(class ATarsisGuard* G);
 	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> ValveAudio;
