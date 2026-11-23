@@ -338,6 +338,10 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadWrite, Category = "Tarsis|Estado")
 	bool bMarked = false;
 
+	/** Tanda G: metido (derribado) en una taquilla o un cajon. Nadie lo ve al pasar: solo quien abra ese escondite. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Estado")
+	bool bStashed = false;
+
 	/** Derribado por la espalda: cae y duerme KnockOutTime segundos; si otro guardia lo ve, da la alarma. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis")
 	void KnockOut();

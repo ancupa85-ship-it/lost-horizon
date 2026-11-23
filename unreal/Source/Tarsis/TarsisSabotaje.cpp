@@ -89,6 +89,7 @@ bool ATarsisDirector::StartMissSearch(ATarsisGuard* G, bool bRadio)
 	M.Fallen = G;
 	M.Searcher = S;
 	M.bRadio = bRadio;
+	if (const FVector* First = MissFirst.Find(G)) { M.Extra = *First; M.bExtra = true; }   // tanda G: iba de recado
 	// empieza por el punto de su ronda que le queda mas cerca y la sigue en su orden
 	float BestD = TNumericLimits<float>::Max();
 	for (int32 i = 0; i < G->PatrolPoints.Num(); ++i)
@@ -130,10 +131,23 @@ void ATarsisDirector::MissTick(float DeltaSeconds)
 			Misses.RemoveAt(i);
 			continue;
 		}
-		if (S->AtErrand()) { S->EndErrandIn(1.5f); continue; }   // mira un momento y sigue
+		if (S->AtErrand())
+		{
+			// tanda G: abre las taquillas y cajones que tiene a mano en cada punto (solo asi se encuentra a uno escondido)
+			if (!M.bOpened)
+			{
+				M.bOpened = true;
+				OpenStashesNear(S, S->ErrandLoc, StashSearchDist);
+				// tanda G: buscando a proposito mira alrededor (no solo hacia delante): un caido a la vista cerca, lo ve
+				if (!S->BodyTarget) LookAroundFor(S, MissLookDist);
+			}
+			S->EndErrandIn(1.5f);
+			continue;
+		}
 		if (S->IsOnErrand() || S->IsHeld() || S->IsBusy()) continue;
 		if (S->State != ETarsisGuardState::Patrol && S->State != ETarsisGuardState::Return) continue;   // algo le ha distraido
-		const int32 N = G->PatrolPoints.Num();
+		const int32 NR = G->PatrolPoints.Num();
+		const int32 N = NR + (M.bExtra ? 1 : 0);
 		if (M.Steps >= N)
 		{
 			// toda su ronda y ni rastro: lo dice por radio y la base queda en guardia; sin red se lo guarda
@@ -144,10 +158,13 @@ void ATarsisDirector::MissTick(float DeltaSeconds)
 			Misses.RemoveAt(i);
 			continue;
 		}
-		const FVector P = G->PatrolPoints[(M.Start + M.Steps) % N];
-		const FVector Q = G->PatrolPoints[(M.Start + M.Steps + 1) % N];
+		auto Pt = [&](int32 K) { return (M.bExtra && K == 0) ? M.Extra : G->PatrolPoints[(M.Start + K - (M.bExtra ? 1 : 0)) % NR]; };
+		const FVector P = Pt(M.Steps);
+		const FVector Q = Pt((M.Steps + 1) % N);
 		const FVector Face = FVector::Dist2D(P, Q) > 10.0f ? Q : P + S->GetActorForwardVector() * 200.0f;
-		if (S->Errand(P, Face, 40.0f)) ++M.Steps;
+		// el tiempo del recado, segun lo lejos que este (a paso de ronda, con margen): si no, lo dejaba a medio camino
+		const float Secs = 25.0f + FVector::Dist2D(S->GetActorLocation(), P) / 90.0f;
+		if (S->Errand(P, Face, Secs)) { ++M.Steps; M.bOpened = false; }
 	}
 }
 

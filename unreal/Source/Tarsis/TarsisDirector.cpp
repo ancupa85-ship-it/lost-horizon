@@ -404,6 +404,9 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	PrintTick(DeltaSeconds);   // tanda D: huellas que se borran y guardias que las ven y las siguen
 	ReliefTick(DeltaSeconds);   // tanda D: relevo de las torres
 	SabotageTick(DeltaSeconds);   // tanda F: antena y gasoil
+	StashTick(DeltaSeconds);      // tanda G: cuerpos escondidos
+	PulseTick(DeltaSeconds);      // tanda G: pulso y respiracion al apuntar
+	TrapTick(DeltaSeconds);       // tanda G: latas y cable
 	AimTick(DeltaSeconds);
 	ThirdTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
@@ -490,7 +493,7 @@ ATarsisGuard* ATarsisDirector::DownedNear(float Radius) const
 	float BestD = Radius;
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
-		if (It->State != ETarsisGuardState::Down || *It == Dragged) continue;
+		if (It->State != ETarsisGuardState::Down || *It == Dragged || It->bStashed) continue;
 		const float D = FVector::Dist2D(It->GetActorLocation(), P->GetActorLocation());
 		if (D < BestD && FMath::Abs(It->GetActorLocation().Z - P->GetActorLocation().Z) < 150.0f) { BestD = D; Best = *It; }
 	}
@@ -507,6 +510,7 @@ FString ATarsisDirector::InteractPrompt() const
 	if (bCapturing) return FString();
 	if (bHiding) return Tx(TEXT("p_taquilla_salir"), TEXT("E   SALIR DE LA TAQUILLA"));
 	if (bRiding) return bDone ? FString() : Tx(TEXT("p_camion_bajar"), TEXT("E   BAJAR DEL CAMION"));
+	{ const FString SP = StashPrompt(); if (!SP.IsEmpty()) return SP; }   // tanda G: meter el cuerpo en una taquilla o un cajon
 	if (Dragged) return Tx(TEXT("p_soltar"), TEXT("E   SOLTAR EL CUERPO"));
 	if (bChoice) return Tx(TEXT("p_ramos_eleccion"), TEXT("1   VENTE CONMIGO        2   DERRIBARLO"));
 	// tanda 37: la escalera manda sobre lo demas (arriba, el centinela queda a un paso)
@@ -540,7 +544,7 @@ FString ATarsisDirector::InteractPrompt() const
 	if (NearPlayer(WicketLoc, 220.0f)) return Tx(TEXT("p_portillo"), TEXT("E   PORTILLO DE LA MARISMA"));
 	if (NearPlayer(GeneratorLoc, 230.0f)) return bPowerOff ? Tx(TEXT("p_generador_parado"), TEXT("GENERADOR: PARADO")) : Tx(TEXT("p_generador"), TEXT("E   CORTAR EL GENERADOR (apaga las luces)"));
 	if (HideSpotNear() >= 0) return Tx(TEXT("p_taquilla"), TEXT("E   ESCONDERTE EN LA TAQUILLA"));
-	return FString();
+	return TrapPrompt();   // tanda G: agachado y sin nada mas a mano, poner o recoger una trampa
 }
 
 FString ATarsisDirector::Objective() const
@@ -560,6 +564,7 @@ void ATarsisDirector::Interact()
 	if (bDone || bCapturing) return;
 	if (bHiding) { ExitHide(); return; }
 	if (bRiding) { LeaveTruck(false); return; }
+	if (StashInteract()) return;   // tanda G
 	if (Dragged) { StopDrag(); Teach(TEXT("ensena_cuerpo"), TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), {}, 3.0f); return; }
 	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
 	if (bClimbing) return;
@@ -653,6 +658,7 @@ void ATarsisDirector::Interact()
 		EnterHide(H);
 		return;
 	}
+	TrapInteract();   // tanda G
 }
 
 void ATarsisDirector::KeypadKey(FKey Key)
@@ -1122,6 +1128,7 @@ void ATarsisDirector::SprintOn()
 {
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (!C || Dragged || bDone || bRiding || bBoxOn) return;
+	if (AimAlpha > 0.5f) { HoldBreath(); return; }   // tanda G: apuntando, Mayus contiene la respiracion
 	if (BaseWalk <= 0.0f) BaseWalk = C->GetCharacterMovement()->MaxWalkSpeed;
 	bSprint = true;
 	C->GetCharacterMovement()->MaxWalkSpeed = BaseWalk * 1.5f;
@@ -1368,6 +1375,7 @@ int32 ATarsisDirector::HideSpotNear() const
 	if (!P || bHiding) return -1;
 	for (int32 i = 0; i < HideSpots.Num(); ++i)
 	{
+		if (StashBodies.IsValidIndex(i) && StashBodies[i].IsValid()) continue;   // tanda G: hay un cuerpo dentro, no cabes
 		const FVector Front = HideSpots[i] + FRotator(0.0f, HideYaws.IsValidIndex(i) ? HideYaws[i] : 0.0f, 0.0f).Vector() * 75.0f;
 		if (FVector::Dist2D(P->GetActorLocation(), Front) < 120.0f && FMath::Abs(P->GetActorLocation().Z - HideSpots[i].Z) < 200.0f) return i;
 	}
@@ -1817,7 +1825,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
 		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("farola") || Key == TEXT("apoyo") || Key == TEXT("voy") || Key == TEXT("perdido") || Key == TEXT("despierta")
-		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
+		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("lata") || Key == TEXT("tropiezo") || Key == TEXT("trampa") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -1865,6 +1873,9 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("antena")) T = TEXT("El cable de la antena... cortado. Esto no es el viento: hay alguien dentro.");
 	else if (Key == TEXT("antena_ve")) T = TEXT("Eh, el cable de la antena cuelga. Por eso no hay red.");
 	else if (Key == TEXT("gasoil")) T = TEXT("La llave del gasoil abierta! Esto no se abre solo. Cierro y aviso.");
+	else if (Key == TEXT("lata")) T = TEXT("Que demonios...? Latas en un alambre. Aqui ha estado alguien.");
+	else if (Key == TEXT("tropiezo")) T = TEXT("Agh! Un cable... Quien ha tendido esto?");
+	else if (Key == TEXT("trampa")) T = TEXT("Eh, mira esto: un alambre tendido. Lo quito y aviso.");
 	else if (Key == TEXT("huellas")) T = TEXT("Huellas... de bota. Frescas. Alguien ha pasado por aqui.");
 	else if (Key == TEXT("huellas_perro")) T = TEXT("Bah. Las del perro, otra vez suelto.");
 	else if (Key == TEXT("rastro_fin")) T = TEXT("Aqui se pierden. Tiene que estar cerca.");
@@ -2029,10 +2040,10 @@ void ATarsisDirector::RadioTick(float DeltaSeconds)
 		// su compañero, que tenia que cruzarselo, sale a buscarlo por su cuenta un rato despues
 		if (RadioDead())
 		{
-			if (!Missed.Contains(G) && G->DownTime() >= MissDelayOf(G) * MissNoRadioMul) StartMissSearch(G, false);
+			if (!Missed.Contains(G) && G->DownTime() >= MissDelayOf(G) * MissNoRadioMul * (G->bStashed ? MissStashMul : 1.0f)) StartMissSearch(G, false);
 			continue;
 		}
-		if (G->DownTime() < MissDelayOf(G)) continue;
+		if (G->DownTime() < MissDelayOf(G) * (G->bStashed ? MissStashMul : 1.0f)) continue;   // tanda G: escondido tarda mas
 		Called.Add(K);
 		if (Missed.Contains(G)) continue;   // ya lo esta buscando (o lo ha buscado) su compañero
 		ATarsisGuard* Best = nullptr;

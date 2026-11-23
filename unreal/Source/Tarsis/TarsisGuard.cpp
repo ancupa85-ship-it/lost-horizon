@@ -751,7 +751,7 @@ void ATarsisGuard::LookForBodies()
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		ATarsisGuard* O = *It;
-		if (O == this || O->State != ETarsisGuardState::Down || O->bFound) continue;
+		if (O == this || O->State != ETarsisGuardState::Down || O->bFound || O->bStashed) continue;   // tanda G: el de la taquilla no se ve
 		const FVector P = O->GetActorLocation();
 		const float D = FVector::Dist(Eye, P);
 		if (D > ViewDistance * 0.7f) continue;

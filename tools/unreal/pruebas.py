@@ -3869,6 +3869,19 @@ def prueba_paso():
     check('coste de no atravesarse (fotograma medio, %d guardias)' % len(guardias()), con < sin * 1.15 + 1.0, 'con %.2f ms, sin %.2f ms' % (con, sin))
 
 
+def _juego(seg):
+    """Espera seg segundos de tiempo de JUEGO (con el editor cargado el juego va más lento que el reloj)."""
+    t0 = unreal.GameplayStatics.get_time_seconds(mundo())
+    yield ('hasta', lambda: unreal.GameplayStatics.get_time_seconds(mundo()) - t0 >= seg, seg * 20.0 + 5.0)
+
+
+def _voces(d, v0):
+    """Las voces que han sonado desde que voices_played valía v0 (el registro solo guarda las 30 últimas)."""
+    n = d.get_editor_property('voices_played') - v0
+    l = [str(x) for x in d.get_editor_property('voice_log')]
+    return l[-n:] if n > 0 else []
+
+
 def _ronda_libre(solo):
     """Todos quietos salvo `solo` (los que no se mueven no los elige nadie para nada)."""
     for g in guardias():
@@ -4037,6 +4050,290 @@ def prueba_sabotaje():
           and not d.sabotage_trace_shown('sabotaje_chorro'), 'abierta %s, cerrado %s, charco %s, chorro %s, hallazgos %d' % (d.valve_open(), d.has_flag('gasoil_cerrado'),
           d.sabotage_trace_shown('sabotaje_gasoil'), d.sabotage_trace_shown('sabotaje_chorro'), d.get_editor_property('sabotage_found')))
     check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
+
+def _esconder(d, g, idx):
+    """Derriba a g junto al escondite idx, lo arrastra y lo mete (E, el tiempo que haga falta)."""
+    L = d.stash_slot_loc(idx)
+    l = g.get_actor_location()
+    g.set_actor_location(V(L.x + 40, L.y + 40, l.z), False, True); yield 0.2
+    derribar(g); yield 2.5
+    junto_a(g, 60.0); yield 0.3
+    d.interact(); yield 0.3   # agarrarlo
+    p = jugador().get_actor_location()
+    jugador().set_actor_location(V(L.x, L.y, p.z), False, True); yield 0.3
+
+
+def prueba_escondidos():
+    """Tanda G. Cuerpos en taquillas y cajones: arrastrándolo, E y unos segundos; dentro nadie lo ve al pasar, tardan más
+    en echarlo de menos (x1,6), en una taquilla ocupada no te puedes esconder y solo lo encuentra quien abra el escondite
+    (el compañero que lo busca abre los que tiene cerca de cada punto de la ronda)."""
+    d = director()
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    nh = len(d.get_editor_property('hide_spots'))
+    check('escondites: las taquillas y los cajones grandes', d.stash_slot_count() >= nh + 3, '%d (%d taquillas)' % (d.stash_slot_count(), nh))
+    ronda = sorted([g for g in guardias() if not g.get_editor_property('tower_sentry') and len(g.get_editor_property('patrol_points')) >= 2
+                    and not g.get_actor_label().endswith('Ramos')], key=_largo_ronda)
+    v, w = ronda[0], ronda[1]
+    # 1) al cajón
+    cj = nh
+    yield from _esconder(d, v, cj)
+    check('arrastrándolo junto al cajón, el aviso de la E', 'CAJON' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 1.0
+    check('meterlo lleva su tiempo', 0.1 < d.stash_progress() < 0.8 and not v.get_editor_property('stashed'), '%.2f' % d.stash_progress())
+    yield d.get_editor_property('stash_seconds')
+    check('dentro: oculto, sin colisión y ya no lo arrastras', v.get_editor_property('stashed') and v.get_editor_property('hidden') and d.stash_slot_body(cj) == v
+          and d.get_editor_property('dragged') is None, '%s %s' % (v.get_editor_property('stashed'), d.stash_slot_body(cj)))
+    # nadie lo ve al pasar
+    c = [g for g in ronda if g not in (v, w)][0]
+    L = d.stash_slot_loc(cj)
+    lc = c.get_actor_location()
+    c.set_actor_location(V(L.x + 250, L.y, lc.z), False, True)
+    c.set_actor_rotation(unreal.Rotator(0, 0, 180), False)
+    aparte(); yield 2.0
+    check('el que pasa al lado no lo ve', not v.get_editor_property('found') and estado(c) == 'PATROL', estado(c))
+    c.hold(3600.0)
+    # tardan más en echarlo de menos: sin abrir escondites, ni rastro
+    d.set_editor_property('miss_min', 6.0); d.set_editor_property('miss_max', 6.0); d.set_editor_property('stash_search_dist', 0.0)
+    _ronda_libre(guardias()); yield 0.2
+    b = d.buddy_of(v)
+    _ronda_libre([b])
+    t0 = v.down_time()
+    yield ('hasta', lambda: director().miss_searcher_of(v) is not None, 20.0)
+    t = v.down_time()
+    check('escondido, tardan más en echarlo de menos (x1,6)', d.miss_searcher_of(v) is not None and t >= 6.0 * 1.55, '%.1f s' % t)
+    b.hold(3600.0)
+    # solo lo encuentra quien abre el escondite
+    n = d.open_stashes_near(c, L, 300.0); yield 0.5
+    check('al abrir el cajón lo encuentra: el aviso de siempre', n == 1 and v.get_editor_property('found') and not v.get_editor_property('stashed') and not v.get_editor_property('hidden')
+          and any(x.endswith('_cuerpo') for x in vl()), '%d %s' % (n, vl()[-2:]))
+    # 2) a una taquilla: ocupada, no te escondes; y el que lo busca la abre al pasar por su punto
+    yield from _esconder(d, w, 0)
+    d.interact(); yield d.get_editor_property('stash_seconds') + 0.6
+    check('en la taquilla', w.get_editor_property('stashed') and d.stash_slot_body(0) == w)
+    sp = d.get_editor_property('hide_spots')[0]
+    yw = d.get_editor_property('hide_yaws')[0]
+    f = unreal.MathLibrary.get_forward_vector(unreal.Rotator(0, 0, yw))
+    p = jugador().get_actor_location()
+    jugador().set_actor_location(V(sp.x + f.x * 75, sp.y + f.y * 75, p.z), False, True); yield 0.3
+    check('con un cuerpo dentro, ahí no te puedes esconder', d.hide_spot_near() != 0 and 'ESCONDERTE' not in str(d.interact_prompt()), str(d.interact_prompt()))
+    aparte()
+    d.set_editor_property('stash_search_dist', 1e7)   # el que lo busca abre lo que tenga a mano en su primer punto
+    _ronda_libre(guardias()); yield 0.2
+    b2 = d.buddy_of(w)
+    _ronda_libre([b2])
+    yield ('hasta', lambda: w.get_editor_property('found'), 60.0)
+    check('el que lo busca abre la taquilla y lo encuentra', w.get_editor_property('found') and not w.get_editor_property('stashed') and d.get_editor_property('stashes_found') == 2,
+          d.get_editor_property('stashes_found'))
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
+
+def prueba_pulso():
+    """Tanda G. Pulso al apuntar: la mira se mueve sola, más tras correr, herido o con la base en alerta, y se calma; con
+    Mayús se contiene la respiración (quieta unos segundos) y luego tiembla más un rato."""
+    d = director()
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield from _juego(0.3)
+    d.set_darts(max(1, d.get_editor_property('darts')))
+    d.set_editor_property('exertion', 0.0); d.set_editor_property('seen_sway', 0.0); d.set_editor_property('wounds', 0)
+    d.set_editor_property('aim_held', False); yield from _juego(0.5)
+    check('sin apuntar la mira no se mueve', d.aim_wobble().pitch == 0.0 and d.aim_wobble().yaw == 0.0, d.aim_wobble())
+    d.set_editor_property('aim_held', True); yield from _juego(1.0)
+    pc = unreal.GameplayStatics.get_player_controller(mundo(), 0)
+    def recorrido(seg):
+        r0 = pc.get_control_rotation(); m = 0.0
+        t0 = unreal.GameplayStatics.get_time_seconds(mundo())
+        while unreal.GameplayStatics.get_time_seconds(mundo()) - t0 < seg:
+            yield 0.02
+            r = pc.get_control_rotation()
+            m = max(m, abs(r.yaw - r0.yaw) + abs(r.pitch - r0.pitch))
+        R['m'] = m
+    R = {}
+    a0 = d.aim_sway()
+    yield from recorrido(3.0); quieto = R['m']
+    check('apuntando, en calma: se mueve un poco', 0.05 < quieto < 1.5 and d.get_editor_property('aim_alpha') > 0.9, '%.2f grados, amplitud %.2f' % (quieto, a0))
+    d.set_editor_property('exertion', 1.0); yield from _juego(1.2)
+    a1 = d.aim_sway()
+    yield from recorrido(3.0); cansado = R['m']
+    check('tras correr, mucho más', a1 > a0 * 2.5 and cansado > quieto * 1.8, '%.2f -> %.2f (%.2f -> %.2f grados)' % (a0, a1, quieto, cansado))
+    yield from _juego(4.0)
+    check('y se calma con el tiempo', d.get_editor_property('exertion') < 0.6 and d.aim_sway() < a1, '%.2f' % d.get_editor_property('exertion'))
+    d.set_editor_property('exertion', 0.0); yield from _juego(1.5)
+    a0 = d.aim_sway()
+    d.set_editor_property('exertion', 0.0)
+    d.set_editor_property('wounds', 2); yield from _juego(1.2)
+    check('herido, más', d.aim_sway() > a0 * 1.8, '%.2f' % d.aim_sway())
+    d.set_editor_property('wounds', 0)
+    d.set_editor_property('seen_sway', 1.0); yield from _juego(1.2)
+    check('con la base en alerta, más', d.aim_sway() > a0 * 1.8, '%.2f' % d.aim_sway())
+    d.set_editor_property('seen_sway', 0.0); yield from _juego(1.5)
+    # contener la respiración (Mayús apuntando)
+    d.simulate_key('LeftShift'); yield from _juego(0.2)
+    check('Mayús apuntando contiene la respiración (no echa a correr)', d.breath_phase() == 1 and not d.get_editor_property('sprint'), '%d %s' % (d.breath_phase(), d.get_editor_property('sprint')))
+    yield from _juego(0.6)
+    yield from recorrido(1.8); conteniendo = R['m']
+    check('conteniendo: mucho más quieta', conteniendo < quieto * 0.6 and d.aim_sway() < a0 * 0.2, '%.2f grados (amplitud %.3f)' % (conteniendo, d.aim_sway()))
+    yield ('hasta', lambda: director().breath_phase() == 2, 3.0)
+    fase = d.breath_phase()
+    yield from recorrido(2.0); suelta = R['m']; amp = d.aim_sway()
+    check('luego tiembla más un rato', fase == 2 and amp > a0 * 1.8 and suelta > quieto * 1.1, '%.2f grados (amplitud %.2f)' % (suelta, amp))
+    yield ('hasta', lambda: director().breath_phase() == 0, 4.0)
+    check('y vuelve a lo normal', d.breath_phase() == 0)
+    d.set_editor_property('aim_held', False); yield from _juego(0.6)
+    check('al dejar de apuntar, la mira vuelve donde estaba', abs(d.aim_wobble().pitch) < 0.01 and abs(d.aim_wobble().yaw) < 0.01, d.aim_wobble())
+
+
+def _agachado(d, si=True):
+    if bool(jugador().get_editor_property('is_crouched')) != si:
+        d.simulate_key('C')
+
+
+def prueba_trampas():
+    """Tanda G. Trampas: agachado y con E, latas en el suelo y cable en un paso estrecho; se recogen. Las latas suenan y
+    atraen; el cable hace caer aturdido al que tropieza; con luz, un guardia la ve antes, la quita y avisa."""
+    w = mundo()
+    d = director()
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    d.set_editor_property('trap_cans', 2); d.set_editor_property('trap_wires', 1)
+    d.set_day(False); yield 0.3
+    # de pie no se pone nada
+    px, py0, py1 = -1050, 600, 1200
+    tp(px, 200, 90.0); yield 0.3
+    _agachado(d, False); yield 0.3
+    check('de pie, la E no pone trampas', 'LATAS' not in str(d.interact_prompt()) and 'CABLE' not in str(d.interact_prompt()), str(d.interact_prompt()))
+    _agachado(d); yield 0.4
+    check('agachado en abierto: colgar latas', 'LATAS' in str(d.interact_prompt()), str(d.interact_prompt()))
+    # en el pasillo de tablones: el cable
+    tp(px, (py0 + py1) / 2 - 80, 90.0); yield 0.3
+    _agachado(d); yield 0.4
+    check('agachado en un paso estrecho: tender el cable', 'CABLE' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.3
+    check('cable tendido de pared a pared', d.trap_count() == 1 and d.trap_kind(0) == 1 and d.get_editor_property('trap_wires') == 0, d.trap_count())
+    # recoger
+    d.interact(); yield 0.3
+    check('E junto a ella la recoge', d.trap_count() == 0 and d.get_editor_property('trap_wires') == 1)
+    d.interact(); yield 0.3
+    cable = d.trap_loc(0)
+    _agachado(d, False); aparte(); yield 0.4
+    # un guardia cruza el pasillo de noche (a oscuras no lo ve): tropieza
+    a = [g for g in guardias() if not g.get_editor_property('tower_sentry') and not g.get_actor_label().endswith('Ramos')][0]
+    za = suelo_z(w, V(px, py1 + 250, 0)) + 95
+    a.set_actor_location(V(px, py1 + 250, za), False, True)
+    a.hold(0.0)
+    a.errand(V(px, py0 - 250, za), V(px, py0 - 400, za), 40.0)
+    n0 = len(vl())
+    yield ('hasta', lambda: director().get_editor_property('traps_sprung') >= 1, 20.0)
+    yield 0.3
+    check('el que cruza el cable tropieza y cae aturdido', d.get_editor_property('traps_sprung') == 1 and a.is_stunned() and any(x.endswith('_tropiezo') for x in vl()[n0:]),
+          '%d %s %s' % (d.get_editor_property('traps_sprung'), a.is_stunned(), vl()[n0:]))
+    check('y el cable se rompe', d.trap_count() == 0)
+    a.hold(3600.0)
+    # las latas, en el patio (de noche, a oscuras): el que pasa las hace sonar y vienen los de cerca
+    tp(4300, 3950, 0.0); yield 0.3
+    _agachado(d); yield 0.4
+    d.interact(); yield 0.3
+    check('latas colgadas', d.trap_count() == 1 and d.trap_kind(0) == 0 and d.get_editor_property('trap_cans') == 1, d.trap_count())
+    t = d.trap_loc(0)
+    _agachado(d, False); aparte(); yield 0.3
+    b, c = [g for g in guardias() if not g.get_editor_property('tower_sentry') and not g.get_actor_label().endswith('Ramos') and g != a][:2]
+    zb = suelo_z(w, V(t.x - 400, t.y, 0)) + 95
+    b.set_actor_location(V(t.x - 400, t.y, zb), False, True); c.set_actor_location(V(t.x - 900, t.y + 600, zb), False, True)
+    b.hold(0.0)
+    b.errand(V(t.x + 400, t.y, zb), V(t.x + 600, t.y, zb), 40.0)
+    c.hold(0.0)
+    n1 = len(vl())
+    yield ('hasta', lambda: director().get_editor_property('traps_sprung') + director().get_editor_property('traps_found') >= 2, 20.0)
+    yield 0.5
+    if d.get_editor_property('traps_found') >= 1:
+        check('(con luz) el que pasa ve las latas antes y las quita', any(x.endswith('_trampa') for x in vl()[n1:]))
+    else:
+        check('las latas suenan: el que pasa y el de cerca van a mirar', d.get_editor_property('traps_sprung') == 2 and any(x.endswith('_lata') for x in vl()[n1:])
+              and estado(c) == 'SUSPICIOUS', '%s %s' % (vl()[n1:], estado(c)))
+    for g in (b, c):
+        g.hold(3600.0)
+    d.set_day(False)
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
+
+def prueba_trampas_luz():
+    """Tanda G. Con buena luz, el guardia que pasa ve la trampa antes de pisarla, la quita y avisa (la base en guardia)."""
+    w = mundo()
+    d = director()
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    d.set_editor_property('trap_cans', 2)
+    b = [g for g in guardias() if not g.get_editor_property('tower_sentry') and not g.get_actor_label().endswith('Ramos')][1]
+    d.set_day(True); yield 0.3
+    tp(4300, 3950, 0.0); yield 0.3
+    _agachado(d); yield 0.4
+    v2 = d.get_editor_property('voices_played')   # (a pleno día puede verla cualquiera que mire hacia allí)
+    d.interact(); yield 0.3
+    t = d.trap_loc(0)
+    _agachado(d, False); aparte(); yield 0.3
+    check('latas colgadas a pleno día', d.trap_count() == 1 or d.get_editor_property('traps_found') == 1, d.trap_count())
+    zb = suelo_z(w, V(t.x - 450, t.y, 0)) + 95
+    b.set_actor_location(V(t.x - 450, t.y, zb), False, True); b.set_actor_rotation(unreal.Rotator(0, 0, 0), False)
+    b.hold(0.0)
+    b.errand(V(t.x + 400, t.y, zb), V(t.x + 600, t.y, zb), 40.0)
+    yield ('hasta', lambda: director().get_editor_property('traps_found') >= 1, 12.0)
+    yield from _juego(3.0)
+    check('de día, el que pasa la ve antes, la quita y avisa: la base en guardia', d.get_editor_property('traps_found') >= 1 and any(x.endswith('_trampa') for x in _voces(d, v2))
+          and d.trap_count() == 0 and d.get_editor_property('tension_t') > 60.0, '%d %s %d %.0f' % (d.get_editor_property('traps_found'), _voces(d, v2), d.trap_count(), d.get_editor_property('tension_t')))
+    b.hold(3600.0)
+    d.set_day(False)
+
+
+def prueba_emboscada():
+    """Tanda G. El que sale a empalmar la antena va solo y sin radio; si lo tumbas allí, entra en las ausencias: su
+    compañero lo echa de menos (tarde y sin central) y lo busca empezando por la antena."""
+    w = mundo()
+    d = director()
+    vl = lambda: [str(x) for x in director().get_editor_property('voice_log')]
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    a = d.get_editor_property('antenna_loc')
+    tp(a.x, a.y + 110, -90.0); yield 0.3
+    d.interact(); yield d.get_editor_property('antenna_cut_seconds') + 0.6
+    check('antena cortada: sin red', d.antenna_cut() and d.radio_dead())
+    aparte()
+    ronda = sorted([g for g in guardias() if not g.get_editor_property('tower_sentry') and len(g.get_editor_property('patrol_points')) >= 2
+                    and not g.get_actor_label().endswith('Ramos')], key=_largo_ronda)
+    f = ronda[0]
+    _ronda_libre([f])
+    d.set_editor_property('radio_dead_t', d.get_editor_property('radio_dead_seconds') - 0.5)
+    yield ('hasta', lambda: director().emisora_fixer_now() is not None, 8.0)
+    check('sale uno, solo, a empalmarla', d.emisora_fixer_now() == f and f.is_on_errand(), d.emisora_fixer_now())
+    otros = [g for g in guardias() if g != f and not g.get_editor_property('tower_sentry') and dist2d(g.get_actor_location(), f.get_actor_location()) < 1500 and estado(g) != 'DOWN']
+    lf = f.get_actor_location()
+    f.set_actor_location(V(a.x + 60, a.y + d.get_editor_property('emisora_stand'), lf.z), False, True); yield 1.0
+    n0 = len(vl())
+    d.set_editor_property('miss_min', 6.0); d.set_editor_property('miss_max', 6.0)
+    f.set_editor_property('knock_out_time', 400.0)   # que no despierte antes de que llegue el que lo busca (la antena queda lejos)
+    v0 = d.get_editor_property('voices_played')
+    f.knock_out(); yield 1.0
+    check('lo tumbas allí y nadie se entera por radio', 'central_responde' not in vl()[n0:] and d.radio_dead(), vl()[n0:])
+    _ronda_libre(guardias()); yield 0.2
+    b = d.buddy_of(f)
+    _ronda_libre([b])
+    yield ('hasta', lambda: director().miss_searcher_of(f) is not None, 15.0)
+    check('su compañero lo echa de menos (x1,5, sin central)', d.miss_searcher_of(f) == b and 'central_responde' not in vl()[n0:] and f.down_time() >= 6.0 * 1.45,
+          '%s %.1f' % (d.miss_searcher_of(f), f.down_time()))
+    visto = lambda: any(x.endswith('_cuerpo') for x in _voces(director(), v0))
+    yield ('hasta', lambda: b.at_errand() or visto(), 150.0)
+    lb = b.get_actor_location()
+    check('y empieza a buscarlo por la antena (va derecho allí)', dist2d(lb, a) < 600, '%.0f cm de la antena' % dist2d(lb, a))
+    yield ('hasta', visto, 30.0)
+    check('lo encuentra allí (lo ve y da el aviso)', visto(), '%s, el caído %s a %.0f cm' % (estado(b), estado(f), dist2d(b.get_actor_location(), f.get_actor_location())))
 
 def prueba_relleno():
     """Tanda E1. Relleno visual del hangar (taller, Santana bajo lona, cajas LH), la enfermería con su cámara fría y la
@@ -4286,7 +4583,7 @@ def prueba_tactica():
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada]]
 PRUEBAS = []
 
 

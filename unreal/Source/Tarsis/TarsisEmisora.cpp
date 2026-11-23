@@ -117,7 +117,9 @@ void ATarsisDirector::EmisoraTick(float DeltaSeconds)
 	ATarsisGuard* F = EmisoraFixer.Get();
 	if (F && (F->State == ETarsisGuardState::Down || F->bAlly))
 	{
-		// lo has tumbado: tardan en echarlo de menos y sale otro
+		// lo has tumbado: tardan en echarlo de menos y sale otro. Tanda G: el que lo busque empieza por la antena o la
+		// emisora (adonde iba), y luego su ronda
+		MissFirst.Add(F, F->ErrandLoc);
 		EmisoraFixer = nullptr;
 		EmisoraFixT = 0.0f;
 		RadioDeadT = RadioDeadSeconds * 0.4f;

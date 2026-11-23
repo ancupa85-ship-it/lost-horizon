@@ -101,6 +101,19 @@ struct FTarsisPrint
 	bool bLeft = false;
 };
 
+// tanda G: una trampa puesta (0 latas, 1 cable entre A y B)
+struct FTarsisTrap
+{
+	int32 Kind = 0;
+	FVector Loc = FVector::ZeroVector;
+	FVector A = FVector::ZeroVector;
+	FVector B = FVector::ZeroVector;
+	TArray<TWeakObjectPtr<class UStaticMeshComponent>> Parts;
+	TWeakObjectPtr<class ATarsisGuard> Finder;
+	float FindT = 0.0f;
+	bool bDead = false;
+};
+
 // tanda F: un caido al que su compañero sale a buscar por su ronda
 struct FTarsisMiss
 {
@@ -109,6 +122,9 @@ struct FTarsisMiss
 	int32 Start = 0;
 	int32 Steps = 0;
 	bool bRadio = true;
+	bool bExtra = false;     // tanda G: primero adonde iba (el que salio a la antena)
+	bool bOpened = false;    // ya ha abierto los escondites de este punto
+	FVector Extra = FVector::ZeroVector;
 };
 
 // tanda D: un puesto fijo (torre) y su relevo (TarsisRelevo.cpp). Phase: 0 esperando su hora, 1 el relevo va al pie de
@@ -1056,6 +1072,105 @@ public:
 	float SabotageProgress() const;
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Sabotaje")
 	bool SabotageTraceShown(FName Tag) const;
+
+	// ---- tanda G: cuerpos escondidos, pulso al apuntar y trampas (TarsisTrampas.cpp)
+	/** Escondites para un cuerpo: las taquillas (HideSpots, mismo indice) y estos cajones grandes. Arrastrandolo, E y
+	 *  StashSeconds a su lado. Escondido, tardan MissStashMul veces mas en echarlo de menos, nadie lo ve al pasar y solo
+	 *  lo encuentra quien abra ese escondite (el que lo busca abre los que tiene a StashSearchDist de cada punto). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	TArray<FVector> BodyCrates = { FVector(5520.0f, 6500.0f, 0.0f), FVector(4960.0f, 7235.0f, 0.0f), FVector(1110.0f, 3270.0f, 0.0f) };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	float StashSeconds = 2.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	float StashReach = 170.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	float MissStashMul = 1.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Escondites")
+	float StashSearchDist = 450.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Escondites")
+	int32 BodiesStashed = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Escondites")
+	int32 StashesFound = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Escondites")
+	int32 StashSlotCount() const { return HideSpots.Num() + BodyCrates.Num(); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Escondites")
+	FVector StashSlotLoc(int32 Index) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Escondites")
+	class ATarsisGuard* StashSlotBody(int32 Index) const;
+	/** Escondite libre a mano del jugador (indice) o -1. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Escondites")
+	int32 StashSlotNear() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Escondites")
+	float StashProgress() const;
+	/** Un guardia abre los escondites a Radius de Where: si hay un cuerpo, lo encuentra. Devuelve cuantos cuerpos. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Escondites")
+	int32 OpenStashesNear(class ATarsisGuard* By, FVector Where, float Radius);
+	/** El que busca a un caido mira alrededor en cada punto: ve uno a menos de MissLookDist sin nada en medio. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ausencias")
+	float MissLookDist = 500.0f;
+	bool LookAroundFor(class ATarsisGuard* By, float Radius);
+
+	/** Pulso al apuntar: la mira se mueve sola (grados) mas tras correr, herido o con la base en alerta, y se calma con el
+	 *  tiempo. Mayus apuntando contiene la respiracion BreathHoldSeconds (casi quieta) y luego tiembla BreathShakeMul
+	 *  veces mas BreathShakeSeconds. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	bool bPulseRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	float AimSwayBase = 0.22f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	float AimSwayCalm = 0.12f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	float BreathHoldSeconds = 3.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	float BreathShakeSeconds = 3.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	float BreathShakeMul = 2.2f;
+	/** Cansancio (0-1): sube corriendo y baja con el tiempo; y la alerta reciente (0-1). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	float Exertion = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulso")
+	float SeenSway = 0.0f;
+	/** 0 normal, 1 conteniendo la respiracion, 2 recuperandola (tiembla). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulso")
+	int32 BreathPhase() const { return BreathState; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulso")
+	float AimSway() const { return SwayAmp; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulso")
+	FRotator AimWobble() const { return WobbleApplied; }
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pulso")
+	void HoldBreath();
+
+	/** Trampas: latas con piedras en un alambre (suenan y atraen) y cable a ras de suelo en un paso estrecho (el que
+	 *  tropieza cae aturdido WireStunSeconds). Agachado, E las pone delante y las recoge. Un guardia que la ve con luz
+	 *  (LightAt >= TrapSeeLight, a menos de TrapSeeDist) la desmonta y avisa. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Trampas")
+	int32 TrapCans = 2;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Trampas")
+	int32 TrapWires = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Trampas")
+	float TrapSeeDist = 520.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Trampas")
+	float TrapSeeLight = 0.3f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Trampas")
+	float CanNoiseRadius = 1500.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Trampas")
+	float WireStunSeconds = 4.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Trampas")
+	int32 TrapsSet = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Trampas")
+	int32 TrapsSprung = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Trampas")
+	int32 TrapsFound = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Trampas")
+	int32 TrapCount() const { return Traps.Num(); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Trampas")
+	FVector TrapLoc(int32 Index) const { return Traps.IsValidIndex(Index) ? Traps[Index].Loc : FVector::ZeroVector; }
+	/** 0 latas, 1 cable. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Trampas")
+	int32 TrapKind(int32 Index) const { return Traps.IsValidIndex(Index) ? Traps[Index].Kind : -1; }
+	/** Pone una trampa donde estas (como la E agachado): devuelve si ha podido. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Trampas")
+	bool PlaceTrap();
 
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
@@ -2781,6 +2896,31 @@ private:
 	bool bAntennaSeen = false;
 	bool bValveFirst = true;
 	TArray<TWeakObjectPtr<AActor>> SabTraces;
+	// tanda G (TarsisTrampas.cpp)
+	TArray<TWeakObjectPtr<class ATarsisGuard>> StashBodies;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, FVector> MissFirst;
+	FString StashPrompt() const;
+	bool StashInteract();
+	void StashTick(float DeltaSeconds);
+	void StashBody(int32 Index);
+	void UnstashBody(class ATarsisGuard* G);
+	int32 StashWorkIdx = -1;
+	float StashT = 0.0f;
+	void PulseTick(float DeltaSeconds);
+	int32 BreathState = 0;
+	float BreathT = 0.0f;
+	float SwayAmp = 0.0f;
+	float WobbleTime = 0.0f;
+	FRotator WobbleApplied = FRotator::ZeroRotator;
+	TArray<FTarsisTrap> Traps;
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> TrapMeshes;
+	FString TrapPrompt() const;
+	bool TrapInteract();
+	void TrapTick(float DeltaSeconds);
+	int32 TrapNear() const;
+	bool NarrowAt(const FVector& Where, const FVector& Fwd, FVector& OutA, FVector& OutB) const;
+	void RemoveTrap(int32 Index);
 	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> ValveAudio;
