@@ -78,6 +78,7 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	if (bAlly || bTowerSentry || !Player) return false;
 	ATarsisDirector* D = CombatDirector(this);
 	if (!D || !D->bArmedRule || D->bCapturing) return false;
+	if (bDisarmed) return DisarmedTick(DeltaSeconds, Player, V);   // tanda K: sin fusil no apunta ni dispara
 	if (ShotT > 0.0f) ShotT -= DeltaSeconds;
 	if (CoverT > 0.0f) CoverT -= DeltaSeconds;
 	AAIController* AI = Cast<AAIController>(GetController());

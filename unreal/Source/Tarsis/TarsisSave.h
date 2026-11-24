@@ -47,6 +47,11 @@ public:
 	UPROPERTY() TArray<FVector> TrapBs;
 	UPROPERTY() TArray<FVector> CutLocs;
 	UPROPERTY() TArray<FVector> CutNormals;
+	// tanda K: los fusiles en el suelo (y de quien son), los guardias sin fusil y los cartuchos del tuyo
+	UPROPERTY() TArray<FVector> FloorRifleLocs;
+	UPROPERTY() TArray<FString> FloorRifleOwners;
+	UPROPERTY() TArray<FString> DisarmedNames;
+	UPROPERTY() int32 ItemRifleAmmo = 0;
 
 	// ---- parte del día siguiente (hueco "TarsisParte"): lo que la misión 2 encuentra en la base
 	UPROPERTY() bool bByMarsh = false;

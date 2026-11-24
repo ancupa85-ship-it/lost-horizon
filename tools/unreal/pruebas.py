@@ -5066,10 +5066,129 @@ def prueba_pulido():
     d.set_day(True)
     check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
 
+def prueba_revolverse():
+    """Tanda K. Revolverse: cuando van a detenerte, un instante para la E; a tiempo le quitas el fusil (al suelo, con
+    física) y queda aturdido (la E lo derriba); si no, la detención de siempre. Al que te apunta en el alto, de cerca, la E
+    le golpea el fusil; desarmado va a por él (o lo recoge otro que pase). El fusil recogido entra en el selector: matar
+    y hacer ruido. La ventana se acorta en DIFÍCIL, herido o con dos encima, y todo vuelve con el punto de control."""
+    w = mundo()
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.get_actor_label().endswith('Ramos') and not x.get_editor_property('disarmed')]
+    yield ('hasta', lambda: len(ronda()) > 3, 30.0)
+    rs = ronda()
+    for x in guardias():
+        x.hold(3600.0)
+    d.set_editor_property('wounds', 0)
+    # 1) la ventana y la E a tiempo
+    g = rs[0]
+    junto_a(g, 110.0); yield 0.3
+    w1 = d.counter_window_now(g)
+    d.counter_or_capture(g); yield 0.05
+    check('van a detenerte: se abre la ventana (unos 0,6 s) con su aviso', P('counter_open') and 0.4 < P('counter_len') < 0.9 and 'REVOLVERSE' in str(d.interact_prompt()), '%.2f %s' % (P('counter_len'), d.interact_prompt()))
+    d.interact(); yield 0.3
+    g.hold(3600.0)
+    check('a tiempo: le quitas el fusil y queda aturdido', P('counters') == 1 and g.get_editor_property('disarmed') and g.is_stunned() and not P('capturing'), '%s %s %s' % (P('counters'), g.get_editor_property('disarmed'), estado(g)))
+    check('el fusil sale despedido al suelo', d.floor_rifle_count() == 1, d.floor_rifle_count())
+    check('y pide refuerzos', any(str(x).endswith('_desarmado') for x in P('voice_log')), [str(x) for x in P('voice_log')][-3:])
+    check('aturdido, la E lo derriba', 'DERRIBAR' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.4
+    check('derribado', estado(g) == 'DOWN', estado(g))
+    # 2) recoger el fusil
+    yield 1.5
+    rl = d.floor_rifle_loc(0)
+    p = jugador()
+    p.set_actor_location(V(rl.x + 60, rl.y, max(rl.z + 95, 100)), False, True); yield 0.3
+    check('junto al fusil: E   RECOGER EL FUSIL', 'RECOGER EL FUSIL' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.2
+    check('recogido: en el selector, con cartuchos', d.floor_rifle_count() == 0 and P('player_rifle_ammo') > 0 and P('item_sel') == 9 and d.item_name(9) == 'FUSIL', '%d %d' % (P('player_rifle_ammo'), P('item_sel')))
+    # 6) al que te apunta en el alto, de cerca, le golpeas el fusil; luego va a por él
+    h = rs[2]
+    d.set_editor_property('armed_aim', 0.0)
+    d.set_editor_property('player_speed_override', 0.0)
+    d.set_editor_property('armed_rule', True)   # (en las pruebas va apagado)
+    d.set_day(True); yield 0.3   # de día y a la vista: te ve seguro
+    a_la_vista_de(h, 700)
+    h.hold(0.0)
+    h.set_editor_property('view_distance', 3000.0)
+    for _ in range(3):
+        h.alarm(jugador().get_actor_location())
+        yield ('hasta', lambda: director().get_editor_property('halt'), 6.0)
+        if P('halt'):
+            break
+        a_la_vista_de(h, 600); yield 0.2
+    check('te apunta (el alto)', P('halt'), '%s vis=%.2f d=%.0f oculto=%s celda=%s' % (estado(h), h.visibility(jugador()), dist2d(h.get_actor_location(), jugador().get_actor_location()), jugador().get_editor_property('hidden'), estado(h)))
+    lejos = 'GOLPEAR' not in str(d.interact_prompt())
+    hl = h.get_actor_location(); pl = jugador().get_actor_location()
+    dd = (pl - hl); dd.z = 0
+    n = dd.length() or 1.0
+    jugador().set_actor_location(V(hl.x + dd.x / n * 150, hl.y + dd.y / n * 150, pl.z), False, True); yield 0.15
+    check('lejos no vale; a menos de 2,2 m: E   GOLPEAR EL FUSIL', lejos and 'GOLPEAR' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.2
+    check('le golpeas el fusil: al suelo', h.get_editor_property('disarmed') and d.floor_rifle_count() == 1, '%s %d' % (h.get_editor_property('disarmed'), d.floor_rifle_count()))
+    s0 = P('shots')
+    aparte(); yield 0.3
+    r0 = P('rifles_recovered')
+    yield ('hasta', lambda: director().get_editor_property('rifles_recovered') > r0, 25.0)
+    check('desarmado, no dispara y va a por su fusil (y lo recoge)', P('shots') == s0 and not h.get_editor_property('disarmed') and d.floor_rifle_count() == 0, '%s %d %s' % (h.get_editor_property('disarmed'), d.floor_rifle_count(), estado(h)))
+    d.set_day(False)
+    d.set_editor_property('armed_rule', False)
+    d.set_editor_property('player_speed_override', -1.0)
+    h.hold(3600.0)
+    # 3) disparar: letal y se oye
+    t = rs[1]
+    lt = t.get_actor_location()
+    a_la_vista_de(t, 500); yield 0.2
+    mirar(V(lt.x, lt.y, lt.z + 30)); yield 0.2
+    k0, a0 = P('kills'), P('player_rifle_ammo')
+    d.use_item(); yield 0.3
+    check('disparar con el fusil mata', P('kills') == k0 + 1 and t.get_editor_property('dead') and P('player_rifle_ammo') == a0 - 1, '%d %s' % (P('kills'), estado(t)))
+    check('y se oye: la base en guardia', P('tension_t') > 100.0, P('tension_t'))
+    # 4) el punto de control
+    d.test_checkpoint('PRUEBA K'); yield 0.2
+    am = P('player_rifle_ammo')
+    d.set_editor_property('player_rifle_ammo', 0)
+    d.test_load_checkpoint(); yield 0.4
+    check('al cargar, el fusil y sus cartuchos', P('player_rifle_ammo') == am, '%d/%d' % (P('player_rifle_ammo'), am))
+    # 5) la ventana se acorta: DIFÍCIL, herido
+    # (la dificultad la elige quien juega en Opciones: aquí se mira que la ventana sigue a la suya)
+    dif = P('difficulty')
+    mul = P('counter_easy_mul') if dif <= 0 else (P('counter_hard_mul') if dif >= 2 else 1.0)
+    wn = d.counter_window_now(rs[2])
+    d.set_editor_property('wounds', 1)
+    wh = d.counter_window_now(rs[2])
+    d.set_editor_property('wounds', 0)
+    check('ventana: FÁCIL la alarga, DIFÍCIL la acorta; herido, más corta', abs(wn - P('counter_window') * mul) < 0.02 and P('counter_easy_mul') > 1.0 > P('counter_hard_mul') and wh < wn,
+          'dificultad %d: %.2f (esperada %.2f), herido %.2f' % (dif, wn, P('counter_window') * mul, wh))
+    # 7) un fusil sin dueño que lo busque: lo recoge el primero que pase
+    o, q = rs[3], [x for x in ronda() if x not in rs[:4]]
+    junto_a(o, 110.0); yield 0.2
+    d.test_disarm(o); yield 0.3
+    derribar(o); yield 1.5
+    aparte(); yield 0.2
+    if q:
+        r = q[0]
+        rl = d.floor_rifle_loc(0)
+        r.set_actor_location(V(rl.x + 300, rl.y, r.get_actor_location().z), False, True)
+        r.hold(0.0); yield 0.2
+        r0 = P('rifles_recovered')
+        yield ('hasta', lambda: director().get_editor_property('rifles_recovered') > r0, 30.0)
+        check('otro que pasa lo ve y lo recoge', d.floor_rifle_count() == 0, '%d %s' % (d.floor_rifle_count(), estado(r)))
+        r.hold(3600.0)
+    # 8) fallar: la detención de siempre (al final: acaba en captura)
+    f = [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) != 'DOWN' and not x.get_editor_property('disarmed') and not x.get_actor_label().endswith('Ramos')][0]
+    junto_a(f, 110.0); yield 0.2
+    c0, f0 = P('captures'), P('counter_fails')
+    d.counter_or_capture(f)
+    yield ('hasta', lambda: director().get_editor_property('capturing') or director().get_editor_property('captures') > c0, 4.0)
+    check('si no te revuelves a tiempo, te detienen', P('counter_fails') == f0 + 1 and (P('capturing') or P('captures') > c0), '%d %s' % (P('counter_fails'), P('capturing')))
+    yield ('hasta', lambda: not director().get_editor_property('capturing'), 25.0)
+    check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido], [prueba_revolverse]]
 PRUEBAS = []
 
 

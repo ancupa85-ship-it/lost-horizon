@@ -25,7 +25,7 @@
 
 namespace
 {
-	const TCHAR* ItemNames[] = { TEXT("DARDOS"), TEXT("PIEDRAS"), TEXT("LATAS"), TEXT("CABLE"), TEXT("TABACO"), TEXT("SOMNIFERO"), TEXT("CIZALLA"), TEXT("WALKIE"), TEXT("ESPEJO") };
+	const TCHAR* ItemNames[] = { TEXT("DARDOS"), TEXT("PIEDRAS"), TEXT("LATAS"), TEXT("CABLE"), TEXT("TABACO"), TEXT("SOMNIFERO"), TEXT("CIZALLA"), TEXT("WALKIE"), TEXT("ESPEJO"), TEXT("FUSIL") };
 	const TCHAR* ZoneNames[] = { TEXT("la capilla"), TEXT("el hangar"), TEXT("la plaza de armas"), TEXT("el barracon oeste"), TEXT("el anillo oeste") };
 
 	struct FZone { const TCHAR* Name; float X, Y; };
@@ -120,6 +120,7 @@ int32 ATarsisDirector::ItemCount(int32 Item) const
 	case 6: return HasFlag(FName(TEXT("obj_cizalla"))) ? -1 : 0;
 	case 7: return HasWalkie() ? -1 : 0;
 	case 8: return HasFlag(FName(TEXT("obj_espejo"))) ? -1 : 0;
+	case 9: return PlayerRifleAmmo;   // tanda K: el fusil que le quitaste a un guardia
 	default: return 0;
 	}
 }
@@ -165,6 +166,7 @@ void ATarsisDirector::UseItem()
 	switch (ItemSel)
 	{
 	case 0: ShootDart(); break;
+	case 9: FireRifle(); break;   // tanda K
 	case 1: ThrowStone(); break;
 	case 2:
 	{

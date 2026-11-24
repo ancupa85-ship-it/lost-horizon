@@ -464,6 +464,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	TrapTick(DeltaSeconds);       // tanda G: latas y cable
 	ItemsTick(DeltaSeconds);      // tanda I: la mira, el selector y los objetos
 	PulidoTick(DeltaSeconds);     // tanda J: el humo, el cable, los agujeros y la animacion por distancia
+	CuerpoTick(DeltaSeconds);     // tanda K: revolverse, el desarme y los fusiles en el suelo
 	AimTick(DeltaSeconds);
 	ThirdTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
@@ -567,6 +568,7 @@ FString ATarsisDirector::InteractPrompt() const
 	if (bCapturing) return FString();
 	if (bHiding) return Tx(TEXT("p_taquilla_salir"), TEXT("E   SALIR DE LA TAQUILLA"));
 	if (bRiding) return bDone ? FString() : Tx(TEXT("p_camion_bajar"), TEXT("E   BAJAR DEL CAMION"));
+	{ const FString CP = CuerpoPrompt(); if (!CP.IsEmpty()) return CP; }   // tanda K: revolverse, golpear el fusil, recogerlo
 	{ const FString SP = StashPrompt(); if (!SP.IsEmpty()) return SP; }   // tanda G: meter el cuerpo en una taquilla o un cajon
 	if (Dragged) return Tx(TEXT("p_soltar"), TEXT("E   SOLTAR EL CUERPO"));
 	if (bChoice) return Tx(TEXT("p_ramos_eleccion"), TEXT("1   VENTE CONMIGO        2   DERRIBARLO"));
@@ -622,6 +624,7 @@ void ATarsisDirector::Interact()
 	if (bDone || bCapturing) return;
 	if (bHiding) { ExitHide(); return; }
 	if (bRiding) { LeaveTruck(false); return; }
+	if (CuerpoInteract()) return;   // tanda K
 	if (StashInteract()) return;   // tanda G
 	if (Dragged) { StopDrag(); Teach(TEXT("ensena_cuerpo"), TEXT("CUERPO ESCONDIDO\nEn la sombra, los guardias no lo ven si no pasan muy cerca."), {}, 3.0f); return; }
 	if (bChoice) { bChoice = false; if (ATarsisGuard* R = FindGuard(TEXT("Ramos"))) R->Hold(0.1f); MessageT = 0.0f; return; }
@@ -1891,7 +1894,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	// el «¡alto!» y el aviso por radio del cuerpo no pueden quedarse callados por un «¿quién anda ahí?» de antes
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
 		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("farola") || Key == TEXT("apoyo") || Key == TEXT("voy") || Key == TEXT("perdido") || Key == TEXT("despierta")
-		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("lata") || Key == TEXT("tropiezo") || Key == TEXT("trampa") || Key == TEXT("tabaco") || Key == TEXT("sueno") || Key == TEXT("valla") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
+		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("lata") || Key == TEXT("tropiezo") || Key == TEXT("trampa") || Key == TEXT("tabaco") || Key == TEXT("sueno") || Key == TEXT("valla") || Key == TEXT("desarmado") || Key == TEXT("mifusil") || Key == TEXT("fusil") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -1946,6 +1949,9 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	else if (Key == TEXT("rancho")) T = TEXT("A ver que hay en la olla... algo caliente, por fin.");
 	else if (Key == TEXT("sueno")) T = TEXT("Que sueno me ha entrado de golpe... solo un momento...");
 	else if (Key == TEXT("valla")) T = TEXT("La malla cortada! Por aqui ha entrado alguien. Aviso.");
+	else if (Key == TEXT("desarmado")) T = TEXT("Me ha quitado el arma! Central, intruso, me ha desarmado!");
+	else if (Key == TEXT("mifusil")) T = TEXT("Ya lo tengo. Ahora vas a ver.");
+	else if (Key == TEXT("fusil")) T = TEXT("Un fusil tirado? De quien es esto?");
 	else if (Key == TEXT("huellas")) T = TEXT("Huellas... de bota. Frescas. Alguien ha pasado por aqui.");
 	else if (Key == TEXT("huellas_perro")) T = TEXT("Bah. Las del perro, otra vez suelto.");
 	else if (Key == TEXT("rastro_fin")) T = TEXT("Aqui se pierden. Tiene que estar cerca.");

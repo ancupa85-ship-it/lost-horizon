@@ -1584,7 +1584,7 @@ void ATarsisGuard::Caught(APawn* Player)
 	{
 		// escena: «¡te tengo!», la cámara se vuelve hacia él, golpe y fundido a negro; luego Captured
 		if (D->bCapturing) return;
-		D->BeginCapture(this);
+		D->CounterOrCapture(this);   // tanda K: un instante para revolverse; si no, la escena de siempre
 	}
 	else if (AActor* Start = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
 	{

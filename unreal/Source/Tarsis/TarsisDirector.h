@@ -105,6 +105,9 @@ struct FTarsisPrint
 struct FTarsisCig { FVector Loc = FVector::ZeroVector; TWeakObjectPtr<class UStaticMeshComponent> Mesh; TWeakObjectPtr<class ATarsisGuard> Taker; bool bTaken = false; };
 struct FTarsisCut { FVector Loc = FVector::ZeroVector; FVector Normal = FVector::ZeroVector; TWeakObjectPtr<class UStaticMeshComponent> Mesh; bool bFound = false; };
 
+// tanda K: un fusil en el suelo (el que le quitaste a su dueno)
+struct FTarsisFloorRifle { TWeakObjectPtr<class AStaticMeshActor> Actor; TWeakObjectPtr<class ATarsisGuard> Owner; TWeakObjectPtr<class ATarsisGuard> Picker; };
+
 // tanda G: una trampa puesta (0 latas, 1 cable entre A y B)
 struct FTarsisTrap
 {
@@ -1241,7 +1244,7 @@ public:
 	 *  Rueda del raton o teclas 1-6 (si no hay una eleccion abierta); el clic izquierdo usa el elegido. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Objetos")
 	int32 ItemSel = 0;
-	static constexpr int32 NumItems = 9;
+	static constexpr int32 NumItems = 10;   // tanda K: 9 el fusil
 	/** Cuantos quedan (-1: herramienta que no se gasta; 0: no la tienes). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
 	int32 ItemCount(int32 Item) const;
@@ -1357,6 +1360,68 @@ public:
 	void TestCheckpoint(const FString& Name) { Checkpoint(Name); }
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pulido")
 	bool TestLoadCheckpoint() { return LoadCheckpoint(); }
+
+	// ---- tanda K: revolverse y desarmar (TarsisCuerpo.cpp)
+	/** Cuando van a detenerte (el que llega a por ti, el culatazo, el que te toca), un instante para revolverte con la E:
+	 *  le quitas el fusil, lo tiras al suelo y queda aturdido. Sin la regla, la detencion de siempre. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	bool bCounterRule = true;
+	/** Segundos de la ventana (NORMAL); FACIL la alarga y DIFICIL la acorta; herido o con dos encima, mas corta. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float CounterWindow = 0.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float CounterEasyMul = 1.35f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float CounterHardMul = 0.75f;
+	/** Al que te apunta en el alto: a menos de esto (cm), la E le golpea el fusil. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float DisarmDist = 220.0f;
+	/** Segundos que queda aturdido tras perder el fusil (la E, mientras, lo derriba). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float DisarmStun = 1.5f;
+	/** Cartuchos del fusil recogido (el cargador que le quedaba). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	int32 RifleAmmoPick = 8;
+	/** Hasta donde se oye tu disparo con el fusil (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float RifleHeard = 5000.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	bool bCounterOpen = false;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	float CounterLeft = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	float CounterLen = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	TObjectPtr<class ATarsisGuard> CounterGuard;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 Counters = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 CounterFails = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 Disarms = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	int32 PlayerRifleAmmo = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 RifleShots = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 RiflesRecovered = 0;
+	/** Lo que dura ahora la ventana con este guardia (para el aviso y las pruebas). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	float CounterWindowNow(const class ATarsisGuard* G) const;
+	/** Te van a detener: ventana para revolverte, o la escena de siempre. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Cuerpo")
+	void CounterOrCapture(class ATarsisGuard* G);
+	/** Pruebas: quitarle el fusil ya. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Cuerpo")
+	void TestDisarm(class ATarsisGuard* G) { DisarmGuard(G); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	int32 FloorRifleCount() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	FVector FloorRifleLoc(int32 Index) const;
+	/** El fusil de G, si esta en el suelo (para que vaya a por el). */
+	bool FloorRifleOf(const class ATarsisGuard* G, FVector& OutLoc) const;
+	/** G ha llegado a su fusil y lo coge. */
+	void RifleRecovered(class ATarsisGuard* G);
 
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
@@ -3157,6 +3222,20 @@ private:
 	TMap<TWeakObjectPtr<class ATarsisGuard>, int32> AnimLods;
 	float AnimLodT = 0.0f;
 	bool bCutsReset = false;
+	// tanda K (TarsisCuerpo.cpp)
+	void CuerpoTick(float DeltaSeconds);
+	bool CuerpoInteract();
+	FString CuerpoPrompt() const;
+	void DisarmGuard(class ATarsisGuard* G);
+	class ATarsisGuard* DisarmTarget() const;
+	int32 FloorRifleNear() const;
+	void SpawnFloorRifle(class UStaticMesh* Mesh, const FTransform& T, class ATarsisGuard* RifleOwner, const FVector& Impulse);
+	void FireRifle();
+	void SaveCuerpo(class UTarsisSave* S) const;
+	void LoadCuerpo(const class UTarsisSave* S);
+	TArray<FTarsisFloorRifle> FloorRifles;
+	float KickT = 0.0f;
+	bool bCounterSqueezed = false;
 	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> ValveAudio;

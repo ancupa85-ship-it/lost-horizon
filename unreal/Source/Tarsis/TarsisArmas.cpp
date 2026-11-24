@@ -103,7 +103,7 @@ void ATarsisGuard::RifleTick(float DeltaSeconds)
 	if (RifleSlungTick(DeltaSeconds)) return;   // tanda D: acariciando al lobo, el fusil a la espalda
 	// tumbado, con una animacion suelta de la persona (caer), en la escena de la detencion (culatazo) o en una reaccion
 	// a un golpe (tanda C), sin pose de fusil
-	const bool bOn = RifleRef && RifleBones.Num() > 0 && State != ETarsisGuardState::Down && !bSceneLock && !bGaspSingle && StunT <= 0.0f && HitAnimT <= 0.0f && !bRagdoll;
+	const bool bOn = RifleRef && RifleBones.Num() > 0 && State != ETarsisGuardState::Down && !bSceneLock && !bGaspSingle && StunT <= 0.0f && HitAnimT <= 0.0f && !bRagdoll && !bDisarmed;
 	RifleW = FMath::FInterpConstantTo(RifleW, bOn ? 1.0f : 0.0f, DeltaSeconds, 3.0f);
 	if (!RifleRef || RifleW <= 0.001f) return;
 	// alerta: apunta; si no, el fusil a la cadera

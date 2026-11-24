@@ -11,6 +11,22 @@ void ATarsisHUD::DrawItems(ATarsisDirector* D)
 	if (!D || D->bMenu || D->bCodec || D->bCine || D->bDone || D->bMindMap || D->bBinoculars) return;
 	const float S = UiScale();
 	const float X = Canvas->ClipX, Y = Canvas->ClipY;
+	// tanda K: revolverse, una E grande con un anillo que se cierra (lo que queda de la ventana)
+	if (D->bCounterOpen && D->CounterLen > 0.0f)
+	{
+		const float F = FMath::Clamp(D->CounterLeft / D->CounterLen, 0.0f, 1.0f);
+		const float Cx = X * 0.5f, Cy = Y * 0.62f, R = (34.0f + 46.0f * F) * S;
+		const int32 Seg = 40;
+		const FLinearColor C = FMath::Lerp(FLinearColor(1.0f, 0.25f, 0.15f), FLinearColor(1.0f, 0.95f, 0.8f), F);
+		for (int32 i = 0; i < Seg; ++i)
+		{
+			const float A0 = 2.0f * PI * i / Seg, A1 = 2.0f * PI * (i + 1) / Seg;
+			DrawLine(Cx + FMath::Cos(A0) * R, Cy + FMath::Sin(A0) * R, Cx + FMath::Cos(A1) * R, Cy + FMath::Sin(A1) * R, C, 4.0f * S);
+		}
+		Panel(Cx - 26.0f * S, Cy - 26.0f * S, 52.0f * S, 52.0f * S, FLinearColor(0.02f, 0.02f, 0.02f, 0.85f));
+		Text(TEXT("E"), Cx, Cy - 18.0f * S, FLinearColor::White, 1.6f * S, true);
+		Text(D->Tx(TEXT("p_revolverse_corto"), TEXT("REVUELVETE")), Cx, Cy + R + 10.0f * S, C, 0.9f * S, true);
+	}
 	// el espejo, en un recuadro
 	if (D->bMirrorOn && D->MirrorRT)
 	{

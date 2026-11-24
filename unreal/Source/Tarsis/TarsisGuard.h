@@ -512,6 +512,14 @@ public:
 	float RifleSway() const { return RifleMoveW; }
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
 	bool HasRifle() const { return Rifle != nullptr; }
+	// ---- tanda K (TarsisCuerpo.cpp): desarmado de un golpe; va a por su fusil (o, sin el, a por ti con las manos)
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	bool bDisarmed = false;
+	/** Pierde el fusil (se queda sin el en la mano) o lo recupera. */
+	void SetDisarmed(bool bOn);
+	/** Que vaya a por su fusil (o a por ti) aunque no te vea: queda en alerta. */
+	void GoForRifle(const FVector& Where);
+	bool DisarmedTick(float DeltaSeconds, APawn* Player, float V);
 	/** Peso actual de la pose de fusil (0 suelta, 1 entera). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
 	float RiflePoseWeight() const { return RifleW; }

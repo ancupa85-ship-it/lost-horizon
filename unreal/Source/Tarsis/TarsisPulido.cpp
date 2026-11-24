@@ -194,6 +194,7 @@ void ATarsisDirector::SaveItems(UTarsisSave* S) const
 	S->bItemFakeOrder = bFakeOrderUsed;
 	S->bItemPot = bPotDrugged;
 	S->ItemsCounted = ItemsCounted.Array();
+	SaveCuerpo(S);   // tanda K
 	for (const FTarsisTrap& T : Traps)
 	{
 		if (T.bDead) continue;
@@ -234,6 +235,7 @@ void ATarsisDirector::LoadItems(const UTarsisSave* S)
 	}
 	ClearCuts();
 	for (int32 i = 0; i < S->CutLocs.Num(); ++i) MakeCut(S->CutLocs[i], S->CutNormals.IsValidIndex(i) ? S->CutNormals[i] : FVector(1.0f, 0.0f, 0.0f));
+	LoadCuerpo(S);   // tanda K
 	if (!SelectItem(S->ItemSel)) CycleItem(1);
 }
 
