@@ -4952,10 +4952,124 @@ def prueba_objetos():
     check('al soltar, se guarda', not d.get_editor_property('mirror_on'))
     check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
 
+def prueba_pulido():
+    """Tanda J. Pulido: la cizalla deja un agujero en la malla (material) con su solapa; el ascua del que fuma se aviva
+    en cada calada y echa humo; el cable brilla con la linterna; objetos, trampas y cortes vuelven con el punto de
+    control; el plano dibuja rondas y relevos; los guardias lejos animan a menos pasos; los cajones grandes caben."""
+    w = mundo()
+    d = director()
+    for g in guardias():
+        g.hold(3600.0)
+    aparte(); yield 0.3
+    # 1) el cable con la linterna (el pasillo de tablones de la prueba de trampas)
+    d.set_editor_property('trap_cans', 2); d.set_editor_property('trap_wires', 1)
+    d.set_day(False); yield 0.3
+    px, py0, py1 = -1050, 600, 1200
+    tp(px, (py0 + py1) / 2 - 80, 90.0); yield 0.3
+    _agachado(d); yield 0.4
+    d.interact(); yield 0.3
+    check('cable tendido', d.trap_count() == 1 and d.trap_kind(0) == 1, d.trap_count())
+    _agachado(d, False); yield 0.3
+    cab = d.trap_loc(0)
+    tp(px, py0 - 250, 90.0); yield 0.3
+    mirar(V(cab.x, cab.y, cab.z + 12)); yield 0.2
+    d.set_torch(False); yield 0.3
+    sin = d.get_editor_property('wire_glint')
+    d.set_torch(True); yield 0.4
+    con = d.get_editor_property('wire_glint')
+    check('el cable brilla con la linterna (y sin ella, no)', sin == 0.0 and con > 0.3, '%.2f -> %.2f' % (sin, con))
+    unreal.GameplayStatics.get_player_controller(w, 0).set_control_rotation(unreal.Rotator(0, 0, -90)); yield 0.3
+    check('mirando a otro lado, no brilla', d.get_editor_property('wire_glint') < 0.05, '%.2f' % d.get_editor_property('wire_glint'))
+    d.set_torch(False)
+    # 2) la cizalla: agujero de verdad y la solapa de malla
+    d.set_editor_property('trap_wires', 0)
+    hit = None
+    for x in range(-1500, -150, 50):
+        r = unreal.SystemLibrary.line_trace_single(w, V(x, 1800, 110), V(x, 2400, 110), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+        if r and r.to_tuple()[9] and r.to_tuple()[9].get_actor_label().startswith('valla') and abs(x + 450) > 150:
+            hit = r.to_tuple()[4]; break
+    check('hay malla donde cortar', hit is not None)
+    if hit:
+        d.set_flag('obj_cizalla'); yield 0.2
+        p = jugador()
+        p.set_actor_location(V(hit.x, hit.y - 80, max(p.get_actor_location().z, 100)), False, True)
+        unreal.GameplayStatics.get_player_controller(w, 0).set_control_rotation(unreal.Rotator(0, 0, 90)); yield 0.3
+        d.select_item(6); yield 0.1
+        d.use_item(); yield 0.3
+        check('el corte abre un agujero en la malla y deja la solapa de malla', d.fence_holes_open() == 1 and d.fence_flap_is_mesh(0), '%d %s' % (d.fence_holes_open(), d.fence_flap_is_mesh(0)))
+        mpc = unreal.load_asset('/Game/Tarsis/Materiales/MPC_Cortes')
+        kml = getattr(unreal, 'KismetMaterialLibrary', None) or getattr(unreal, 'MaterialLibrary', None)
+        c0 = kml.get_vector_parameter_value(w, mpc, 'Corte0') if (mpc and kml) else None
+        check('el material sabe dónde está el agujero', c0 is not None and c0.a > 30 and abs(c0.r - hit.x) < 60, str(c0))
+    aparte(); yield 0.2
+    # 3) el punto de control guarda objetos, trampas puestas y cortes
+    d.set_editor_property('cigs', 2); d.set_editor_property('sleep_doses', 1)
+    d.set_editor_property('trap_cans', 1)
+    tp(px, 200, 90.0); yield 0.3
+    _agachado(d); yield 0.4
+    d.interact(); yield 0.3
+    _agachado(d, False); yield 0.2
+    traps = d.trap_count()
+    d.test_checkpoint('PRUEBA'); yield 0.2
+    d.set_editor_property('cigs', 0); d.set_editor_property('sleep_doses', 0)
+    d.set_editor_property('trap_cans', 0)
+    d.test_load_checkpoint(); yield 0.5
+    check('al cargar: tabaco, somnifero y latas como en el punto de control', d.get_editor_property('cigs') == 2 and d.get_editor_property('sleep_doses') == 1 and d.get_editor_property('trap_cans') == 0,
+          '%d %d %d' % (d.get_editor_property('cigs'), d.get_editor_property('sleep_doses'), d.get_editor_property('trap_cans')))
+    check('al cargar: las trampas puestas y el corte siguen', d.trap_count() == traps and d.fence_holes_open() == (1 if hit else 0), '%d/%d %d' % (d.trap_count(), traps, d.fence_holes_open()))
+    yield 0.6
+    check('las cajetillas no se suman otra vez al cargar', d.get_editor_property('cigs') == 2, d.get_editor_property('cigs'))
+    aparte(); yield 0.2
+    # 4) el ascua y el humo
+    ronda = [g for g in guardias() if not g.get_editor_property('tower_sentry') and len(g.get_editor_property('patrol_points')) >= 2 and not g.get_actor_label().endswith('Ramos')]
+    g = ronda[0]
+    l = g.get_actor_location(); f = g.get_actor_forward_vector()
+    p = jugador()
+    p.set_actor_location(V(l.x + f.x * 260, l.y + f.y * 260, max(p.get_actor_location().z, 100)), False, True)
+    mirar(l); yield 0.2
+    d.select_item(4); yield 0.1
+    d.use_item(); yield 0.2
+    aparte(); yield 0.2
+    g.hold(0.0)
+    yield ('hasta', lambda: director().get_editor_property('cigs_smoked') >= 1, 30.0)
+    check('se para a fumar', d.is_smoking(g), estado(g))
+    g.hold(3600.0)
+    glows = []
+    p0 = d.get_editor_property('smoke_puffs')
+    for _ in range(36):
+        yield 0.25
+        glows.append(d.ember_glow(g))
+    check('el ascua se ve (una brasa, no solo luz)', d.ember_visible(g))
+    check('en cada calada se aviva y luego vuelve a casi nada', max(glows) > 0.7 and min(glows) < 0.3, '%.2f..%.2f' % (min(glows), max(glows)))
+    check('al soltar la calada, humo', d.get_editor_property('smoke_puffs') > p0, '%d -> %d' % (p0, d.get_editor_property('smoke_puffs')))
+    # 5) el plano en el mapa mental
+    check('el plano tiene la planta de la base', len(d.get_editor_property('plan_rows')) > 10, len(d.get_editor_property('plan_rows')))
+    d.learn_fact('plano_rondas'); yield 0.2
+    check('con el plano, el mapa mental lo dibuja', d.plan_known())
+    d.set_editor_property('relief_rule', True); yield 0.5   # (en las pruebas va apagado)
+    hay = d.relief_post_count() > 0 and d.relief_post_loc(0).length() > 100
+    check('las torres del relevo, en su sitio', hay, d.relief_post_count())
+    d.set_editor_property('relief_rule', False)
+    d.toggle_mind_map(); yield 0.4
+    check('el mapa mental se abre con el plano', d.get_editor_property('mind_map'))
+    d.toggle_mind_map(); yield 0.3
+    # 6) animación por distancia
+    yield 0.6
+    pl = jugador().get_actor_location()
+    lejos = [x for x in guardias() if (x.get_actor_location() - pl).length() > 4000 and estado(x) != 'DOWN']
+    cerca = [x for x in guardias() if (x.get_actor_location() - pl).length() < 1200 and estado(x) != 'DOWN']
+    check('los guardias muy lejos animan a menos pasos', not lejos or all(d.anim_lod_level(x) == 2 for x in lejos), [d.anim_lod_level(x) for x in lejos][:6])
+    # 7) los cajones grandes: caben un cuerpo
+    cajones = [a for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.StaticMeshActor) if a.get_actor_label() in ('Atrezo_han_cajon_e3', 'Atrezo_han_cajon_f3', 'Atrezo_jef_baul')]
+    largos = [round(max(a.get_actor_bounds(False)[1].x, a.get_actor_bounds(False)[1].y) * 2) for a in cajones]
+    check('los tres cajones de esconder cuerpos miden más de 1,9 m', len(largos) == 3 and min(largos) >= 190, largos)
+    d.set_day(True)
+    check('ningún texto pedido falta', not list(d.get_editor_property('missing_texts')), list(d.get_editor_property('missing_texts')))
+
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido]]
 PRUEBAS = []
 
 

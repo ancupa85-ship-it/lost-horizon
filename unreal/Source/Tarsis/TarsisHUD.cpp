@@ -663,11 +663,15 @@ void ATarsisHUD::DrawMindMap(ATarsisDirector* D)
 {
 	// tanda 41: una ficha por soldado, con lo que sabes de cada uno, y lineas entre los que une algun dato
 	if (!D || !D->bMindMap || D->bMenu || D->bCodec) return;
-	const float X = Canvas->ClipX, Y = Canvas->ClipY, S = UiScale();
-	Panel(0.0f, 0.0f, X, Y, FLinearColor(0.01f, 0.015f, 0.012f, 0.9f));
+	// tanda J: con el plano de la jefatura, las fichas a la izquierda y el plano a la derecha
+	const bool bPlan = D->PlanKnown();
+	const float FullX = Canvas->ClipX, Y = Canvas->ClipY, S = UiScale();
+	const float X = bPlan ? FullX * 0.5f : FullX;
+	Panel(0.0f, 0.0f, FullX, Y, FLinearColor(0.01f, 0.015f, 0.012f, 0.9f));
+	if (bPlan) DrawPlan(D, FullX * 0.5f, 90.0f * S, FullX * 0.5f - 40.0f * S, Y - 150.0f * S);
 	TArray<FString> Cards;
 	for (const FTarsisFact& F : D->Facts) { Cards.AddUnique(F.Card); }
-	const int32 Cols = 4, Rows = FMath::Max(1, (Cards.Num() + Cols - 1) / Cols);
+	const int32 Cols = bPlan ? 2 : 4, Rows = FMath::Max(1, (Cards.Num() + Cols - 1) / Cols);
 	const float Mx = 40.0f * S, Top = 90.0f * S, Gap = 22.0f * S;
 	const float Cw = (X - 2.0f * Mx - Gap * (Cols - 1)) / Cols, Ch = FMath::Min(250.0f * S, (Y - Top - 60.0f * S - Gap * (Rows - 1)) / Rows);
 	auto Cx = [&](int32 i) { return Mx + (i % Cols) * (Cw + Gap); };
@@ -694,6 +698,7 @@ void ATarsisHUD::DrawMindMap(ATarsisDirector* D)
 		for (const FTarsisFact& F : D->Facts)
 		{
 			if (F.Card != Cards[i] || !D->FactKnown(F.Id)) continue;
+			if (Ly > Cy(i) + Ch - 24.0f * S) break;
 			const bool bNew = F.Id == D->LastFact;
 			Text(F.Kind.ToString().ToUpper(), Cx(i) + 12.0f * S, Ly, FLinearColor(0.85f, 0.7f, 0.3f), 0.62f * S);
 			Ly += 17.0f * S;
@@ -706,6 +711,8 @@ void ATarsisHUD::DrawMindMap(ATarsisDirector* D)
 			{
 				if (w == Words.Num() || Row.Len() + Words[w].Len() + 1 > MaxCh)
 				{
+					// tanda J: lo que no cabe en la ficha no se sale de ella
+					if (Ly > Cy(i) + Ch - 24.0f * S) { if (!Row.IsEmpty()) Text(TEXT("..."), Cx(i) + 12.0f * S, Ly, FLinearColor(0.6f, 0.6f, 0.55f), 0.74f * S); Row.Reset(); break; }
 					if (!Row.IsEmpty()) { Text(Row, Cx(i) + 12.0f * S, Ly, bNew ? FLinearColor(0.8f, 1.0f, 0.85f) : FLinearColor(0.85f, 0.85f, 0.8f), 0.74f * S); Ly += 19.0f * S; }
 					Row.Reset();
 				}

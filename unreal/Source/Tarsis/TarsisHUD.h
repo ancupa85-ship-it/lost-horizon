@@ -27,6 +27,7 @@ private:
 	void DrawBinoculars(class ATarsisDirector* D);
 	void DrawAim(class ATarsisDirector* D);
 	void DrawItems(class ATarsisDirector* D);   // tanda I (TarsisHUDObjetos.cpp)
+	void DrawPlan(class ATarsisDirector* D, float X, float Y, float W, float H);   // tanda J (TarsisHUDObjetos.cpp)
 	void DrawTalk(class ATarsisDirector* D);
 	void DrawMarked();
 	void DrawLastKnown(class ATarsisDirector* D);

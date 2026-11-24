@@ -32,6 +32,21 @@ public:
 	UPROPERTY() TArray<FVector> BrokenLamps;   // dónde están las farolas rotas de un dardo (tanda 27)
 	UPROPERTY() TArray<FString> CodecTaken;   // conversaciones del codec ya oidas (tanda 32)
 	UPROPERTY() int32 Weather = 0;
+	// tanda J: los objetos, el walkie (bandera), las trampas puestas y los cortes de la malla
+	UPROPERTY() int32 ItemCigs = -1;   // -1: partida guardada antes de la tanda J
+	UPROPERTY() int32 ItemDoses = 0;
+	UPROPERTY() int32 ItemCans = 0;
+	UPROPERTY() int32 ItemWires = 0;
+	UPROPERTY() int32 ItemSel = 0;
+	UPROPERTY() bool bItemFakeOrder = false;
+	UPROPERTY() bool bItemPot = false;
+	UPROPERTY() TArray<FName> ItemsCounted;
+	UPROPERTY() TArray<int32> TrapKinds;
+	UPROPERTY() TArray<FVector> TrapLocs;
+	UPROPERTY() TArray<FVector> TrapAs;
+	UPROPERTY() TArray<FVector> TrapBs;
+	UPROPERTY() TArray<FVector> CutLocs;
+	UPROPERTY() TArray<FVector> CutNormals;
 
 	// ---- parte del día siguiente (hueco "TarsisParte"): lo que la misión 2 encuentra en la base
 	UPROPERTY() bool bByMarsh = false;

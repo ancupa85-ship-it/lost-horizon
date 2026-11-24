@@ -463,6 +463,7 @@ void ATarsisDirector::Tick(float DeltaSeconds)
 	PulseTick(DeltaSeconds);      // tanda G: pulso y respiracion al apuntar
 	TrapTick(DeltaSeconds);       // tanda G: latas y cable
 	ItemsTick(DeltaSeconds);      // tanda I: la mira, el selector y los objetos
+	PulidoTick(DeltaSeconds);     // tanda J: el humo, el cable, los agujeros y la animacion por distancia
 	AimTick(DeltaSeconds);
 	ThirdTick(DeltaSeconds);
 	ArmedTick(DeltaSeconds);
@@ -3553,6 +3554,7 @@ void ATarsisDirector::Checkpoint(const FString& Name)
 	S->CodecTaken = CodecTaken;
 	S->Weather = Weather;
 	S->Flags = FlagList();
+	SaveItems(S);   // tanda J: objetos, trampas puestas y cortes de la malla
 	bHasSave = UGameplayStatics::SaveGameToSlot(S, TEXT("TarsisPartida"), 0) || bHasSave;
 }
 
@@ -3588,6 +3590,7 @@ bool ATarsisDirector::LoadCheckpoint()
 		bVetOpen = S->bVetOpen;
 	}
 	bRamosKnown = bRamosKnown || bLetter || bVetKey;
+	LoadItems(S);   // tanda J
 	Darts = S->Darts;
 	MissionTime = S->MissionTime;
 	Captures = FMath::Max(Captures, S->Captures);

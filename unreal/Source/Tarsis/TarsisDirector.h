@@ -1310,6 +1310,54 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Objetos")
 	FVector MirrorViewLoc() const;
 
+	// ---- tanda J: pulido (TarsisPulido.cpp)
+	/** La planta de la base (filas del mapa de base.json: '#' muro, 'W' pared, '_' suelo de dentro, '.' patio), para
+	 *  el plano de la jefatura en el mapa mental. La pone tools/unreal/visual_j.py. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulido")
+	TArray<FString> PlanRows;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulido")
+	float PlanCell = 200.0f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	FVector ReliefPostLoc(int32 Index) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	FString ReliefPostName(int32 Index) const;
+	/** Con el plano cogido, el mapa mental lo dibuja: rondas de cada guardia y torres con su proximo relevo. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	bool PlanKnown() const;
+	/** El que fuma da una calada cada DragEvery s: el ascua se aviva y al soltarla echa humo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulido")
+	float DragEvery = 6.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Pulido")
+	int32 SmokePuffs = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	float EmberGlow(const class ATarsisGuard* G) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	bool EmberVisible(const class ATarsisGuard* G) const;
+	/** Brillo del cable de una trampa con tu linterna (0..1, el mayor de todos). */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Pulido")
+	float WireGlint = 0.0f;
+	/** Agujeros abiertos en la malla (los cuatro primeros cortes: parametros CorteN de MPC_Cortes). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	int32 FenceHolesOpen() const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	bool FenceFlapIsMesh(int32 Index) const;
+	/** Rendimiento: los guardias lejos (o fuera de la vista) animan a menos pasos por segundo, y los muy lejos no hacen sombra. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulido")
+	bool bAnimLod = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulido")
+	float AnimLodNear = 1500.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulido")
+	float AnimLodFar = 3500.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Pulido")
+	float ShadowCullDist = 5000.0f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Pulido")
+	int32 AnimLodLevel(const class ATarsisGuard* G) const;
+	/** Pruebas: guardar y cargar el punto de control en el acto. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pulido")
+	void TestCheckpoint(const FString& Name) { Checkpoint(Name); }
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Pulido")
+	bool TestLoadCheckpoint() { return LoadCheckpoint(); }
+
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
@@ -3089,6 +3137,26 @@ private:
 	void FakeOrder();
 	void ComposePlan();
 	void StopSmoking(class ATarsisGuard* G);
+	// tanda J (TarsisPulido.cpp)
+	void PulidoTick(float DeltaSeconds);
+	void MakeCut(const FVector& Loc, const FVector& Normal);
+	void BuildTrapParts(FTarsisTrap& T);
+	void SaveItems(class UTarsisSave* S) const;
+	void LoadItems(const class UTarsisSave* S);
+	void ClearCuts();
+	UPROPERTY()
+	TObjectPtr<class UMaterialParameterCollection> CutMPC;
+	UPROPERTY()
+	TMap<TObjectPtr<class ATarsisGuard>, TObjectPtr<class UStaticMeshComponent>> EmberMeshes;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, float> EmberGlows;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, float> DragClock;
+	UPROPERTY()
+	TArray<TObjectPtr<class UStaticMeshComponent>> Puffs;
+	TArray<float> PuffAge;
+	TArray<FVector> PuffVel;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, int32> AnimLods;
+	float AnimLodT = 0.0f;
+	bool bCutsReset = false;
 	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> ValveAudio;

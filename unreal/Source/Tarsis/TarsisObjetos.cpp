@@ -294,20 +294,13 @@ void ATarsisDirector::CutFence()
 		return;
 	}
 	for (const FTarsisCut& K : FenceCuts) if (FVector::Dist2D(K.Loc, H.ImpactPoint) < 120.0f) return;
-	FTarsisCut K;
-	K.Loc = FVector(H.ImpactPoint.X, H.ImpactPoint.Y, Pl->GetActorLocation().Z - 80.0f);
-	K.Normal = H.ImpactNormal.GetSafeNormal2D();
-	// la malla abierta: una solapa de alambre doblada hacia fuera
-	const FRotator R = K.Normal.Rotation();
-	if (UStaticMeshComponent* M = AddBlock(K.Loc + K.Normal * 18.0f + FVector(0.0f, 0.0f, 75.0f), FVector(0.01f, 0.75f, 1.3f), FLinearColor(0.12f, 0.12f, 0.11f), false))
-	{
-		M->SetWorldRotation(FRotator(0.0f, R.Yaw + 35.0f, 0.0f));
-		ItemMeshes.Add(M);
-		K.Mesh = M;
-	}
-	FenceCuts.Add(K);
+	// tanda J: un agujero de verdad en la malla (material) y la solapa de alambre doblada hacia fuera
+	const FVector CutLoc(H.ImpactPoint.X, H.ImpactPoint.Y, Pl->GetActorLocation().Z - 80.0f);
+	FVector N = H.ImpactNormal.GetSafeNormal2D();
+	if (FVector::DotProduct(N, Pl->GetActorLocation() - CutLoc) < 0.0f) N = -N;   // la solapa, hacia tu lado
+	MakeCut(CutLoc, N);
 	++FenceCutsMade;
-	PlaySfx(TEXT("candado"), K.Loc + FVector(0.0f, 0.0f, 90.0f), 0.6f);
+	PlaySfx(TEXT("candado"), CutLoc + FVector(0.0f, 0.0f, 90.0f), 0.6f);
 	ShowMessage(Tx(TEXT("obj_corte"), TEXT("MALLA CORTADA\nPor aqui se pasa. Si un guardia ve el corte con luz, dara la alarma.")), 3.5f);
 }
 
@@ -495,10 +488,7 @@ void ATarsisDirector::ItemsTick(float DeltaSeconds)
 		ATarsisGuard* G = S.Key.Get();
 		S.Value -= DeltaSeconds;
 		if (!G || S.Value <= 0.0f || G->State == ETarsisGuardState::Down || G->State == ETarsisGuardState::Alert || G->State == ETarsisGuardState::Suspicious) { if (G) Done.Add(G); continue; }
-		if (TObjectPtr<UPointLightComponent>* L = Embers.Find(G))
-		{
-			if (*L) (*L)->SetIntensity(2.0f + 3.0f * FMath::Abs(FMath::Sin(Now * 2.3f + G->GetUniqueID())));   // la calada
-		}
+		// la calada (el ascua, el humo): PulidoTick, tanda J
 	}
 	for (ATarsisGuard* G : Done) { if (G->IsHeld() && G->State != ETarsisGuardState::Down) G->Hold(0.0f); StopSmoking(G); }
 	for (auto It = Smokers.CreateIterator(); It; ++It) if (!It->Key.IsValid()) It.RemoveCurrent();
@@ -611,7 +601,7 @@ void ATarsisDirector::ItemsTick(float DeltaSeconds)
 			MirrorCap->HiddenActors.Add(C);
 		}
 		APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
-		FVector Loc; FRotator Rot;
+		FVector Loc = FVector::ZeroVector; FRotator Rot = FRotator::ZeroRotator;
 		if (PC) PC->GetPlayerViewPoint(Loc, Rot);
 		const float Side = bLeanLeft ? -1.0f : 1.0f;
 		const FRotator R = C->bIsCrouched ? FRotator(0.0f, Rot.Yaw, 0.0f) : FRotator(0.0f, Rot.Yaw + Side * 75.0f, 0.0f);

@@ -2000,11 +2000,16 @@
    "nombre": "jef_baul",
    "modelo": "wooden_military_crate",
    "pos": [
-    1110,
+    1100,
     3270,
     60
    ],
-   "giro": 90
+   "giro": 90,
+   "escala": [
+    1.55,
+    1.3,
+    1.3
+   ]
   },
   {
    "nombre": "jef_municion",
@@ -3023,13 +3028,18 @@
     6500,
     60
    ],
-   "giro": 5
+   "giro": 5,
+   "escala": [
+    1.55,
+    1.3,
+    1.3
+   ]
   },
   {
    "nombre": "han_cajon_e4",
    "modelo": "wooden_military_crate",
    "pos": [
-    5640,
+    5690,
     6520,
     60
    ],
@@ -3186,7 +3196,12 @@
     7235,
     60
    ],
-   "giro": 90
+   "giro": 90,
+   "escala": [
+    1.55,
+    1.3,
+    1.3
+   ]
   },
   {
    "nombre": "han_jerry0",

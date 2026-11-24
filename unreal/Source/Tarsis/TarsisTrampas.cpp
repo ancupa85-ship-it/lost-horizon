@@ -258,11 +258,6 @@ void ATarsisDirector::PulseTick(float DeltaSeconds)
 
 namespace
 {
-	UStaticMesh* ShapeMesh(const TCHAR* Name)
-	{
-		return LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Engine/BasicShapes/%s.%s"), Name, Name));
-	}
-
 	float SegDist2D(const FVector& P, const FVector& A, const FVector& B)
 	{
 		const FVector2D p(P), a(A), b(B);
@@ -329,19 +324,11 @@ bool ATarsisDirector::PlaceTrap()
 	FTarsisTrap T;
 	T.Loc = Ahead;
 	FVector A, B;
-	const FLinearColor Wire(0.05f, 0.05f, 0.045f), Tin(0.38f, 0.37f, 0.33f);
 	if (TrapWires > 0 && NarrowAt(Ahead, Fwd, A, B))
 	{
 		T.Kind = 1;
 		T.A = FVector(A.X, A.Y, Ahead.Z + 12.0f);
 		T.B = FVector(B.X, B.Y, Ahead.Z + 12.0f);
-		const FVector Mid = (T.A + T.B) * 0.5f;
-		if (UStaticMeshComponent* M = AddBlock(Mid, FVector(FVector::Dist(T.A, T.B) / 100.0f, 0.006f, 0.006f), Wire, false))
-		{
-			M->SetWorldRotation((T.B - T.A).Rotation());
-			TrapMeshes.Add(M);
-			T.Parts.Add(M);
-		}
 		--TrapWires;
 	}
 	else if (TrapCans > 0)
@@ -351,29 +338,10 @@ bool ATarsisDirector::PlaceTrap()
 		const FVector R = FVector::CrossProduct(FVector::UpVector, Fwd);
 		T.A = Ahead - R * 45.0f;
 		T.B = Ahead + R * 45.0f;
-		if (UStaticMeshComponent* M = AddBlock(Ahead + FVector(0.0f, 0.0f, 22.0f), FVector(0.9f, 0.005f, 0.005f), Wire, false))
-		{
-			M->SetWorldRotation(R.Rotation());
-			TrapMeshes.Add(M);
-			T.Parts.Add(M);
-		}
-		for (const float s : { -1.0f, 1.0f })
-		{
-			if (UStaticMeshComponent* Post = AddBlock(Ahead + R * (45.0f * s) + FVector(0.0f, 0.0f, 12.0f), FVector(0.025f, 0.025f, 0.24f), FLinearColor(0.12f, 0.08f, 0.05f), false))
-			{
-				TrapMeshes.Add(Post);
-				T.Parts.Add(Post);
-			}
-			if (UStaticMeshComponent* Can = AddBlock(Ahead + R * (14.0f * s) + FVector(0.0f, 0.0f, 13.0f), FVector(0.07f, 0.07f, 0.11f), Tin, false))
-			{
-				if (UStaticMesh* Cyl = ShapeMesh(TEXT("Cylinder"))) Can->SetStaticMesh(Cyl);
-				TrapMeshes.Add(Can);
-				T.Parts.Add(Can);
-			}
-		}
 		--TrapCans;
 	}
 	else return false;
+	BuildTrapParts(T);   // tanda J: las piezas, aparte (tambien al cargar el punto de control)
 	Traps.Add(T);
 	++TrapsSet;
 	PlaySfx(TEXT("llaves"), Ahead + FVector(0.0f, 0.0f, 20.0f), 0.25f);

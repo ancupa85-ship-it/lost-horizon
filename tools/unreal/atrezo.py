@@ -198,7 +198,8 @@ def colocar():
                 z = h.to_tuple()[4].z
         giro = p.get('giro', 0.0) + float(gm.get(p['modelo'], 0.0))
         a = eas.spawn_actor_from_object(m, unreal.Vector(x, y, z), unreal.Rotator(0.0, 0.0, giro))
-        a.set_actor_scale3d(unreal.Vector(*([p.get('escala', 1.0)] * 3)))
+        e = p.get('escala', 1.0)   # tanda J: un numero o [x, y, z] (el cajon donde cabe un cuerpo)
+        a.set_actor_scale3d(unreal.Vector(*(e if isinstance(e, list) else [e] * 3)))
         a.set_actor_label('Atrezo_' + p.get('nombre', p['modelo']))
         a.set_folder_path('Atrezo')
         c = a.get_component_by_class(unreal.StaticMeshComponent)
