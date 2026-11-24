@@ -1423,6 +1423,25 @@ public:
 	/** G ha llegado a su fusil y lo coge. */
 	void RifleRecovered(class ATarsisGuard* G);
 
+	// ---- tanda L: el golpe que se ve, el fusil en tus manos y la E por mirada (TarsisCuerpo.cpp)
+	/** El fusil en tus manos (primera persona), respecto al agarre de la mano derecha (HandGrip_R). Se puede afinar en
+	 *  el director sin compilar: se aplica en cada fotograma mientras llevas el fusil. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	FTransform FPRifleGrip = FTransform::Identity;   // medido en el PC: el M14 ya sale con el canon al frente y el alza arriba
+	/** Segundos que dura el golpe de Cuttlas (brazo o culata hacia delante) al revolverse o desarmar. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float StrikeLen = 0.3f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	float StrikeT = 0.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 Strikes = 0;
+	/** Llevas el fusil en las manos (primera persona). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	bool FPRifleShown() const { return bFPRifle; }
+	/** Junto a un fusil del suelo con un guardia aturdido a mano: la E recoge el fusil si lo miras mas que al guardia. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	bool RiflePickFirst() const;
+
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
@@ -3236,6 +3255,12 @@ private:
 	TArray<FTarsisFloorRifle> FloorRifles;
 	float KickT = 0.0f;
 	bool bCounterSqueezed = false;
+	// tanda L
+	void WeaponTick(float DeltaSeconds);
+	bool bFPRifle = false;
+	UPROPERTY() TObjectPtr<class UStaticMesh> PistolMeshKeep;
+	UPROPERTY() TObjectPtr<class UStaticMesh> FPRifleMesh;
+	FTransform PistolGripKeep;
 	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> ValveAudio;

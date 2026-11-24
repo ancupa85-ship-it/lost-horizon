@@ -37,6 +37,7 @@ namespace
 void ATarsisGuard::SetDisarmed(bool bOn)
 {
 	bDisarmed = bOn;
+	if (bOn) RifleW = 0.0f;   // tanda L: los brazos sueltos ya, sin pasar por la pose de fusil
 	if (Rifle) Rifle->SetVisibility(!bOn, true);
 }
 
@@ -198,6 +199,8 @@ void ATarsisDirector::DisarmGuard(ATarsisGuard* G)
 	if (ArrestGuard == G) ArrestGuard = nullptr;
 	if (Aimer == G) Aimer = nullptr;
 	KickT = 0.25f;
+	StrikeT = StrikeLen;   // tanda L: se ve el golpe de Cuttlas
+	++Strikes;
 	if (P) PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.8f);
 }
 
@@ -249,7 +252,7 @@ FString ATarsisDirector::CuerpoPrompt() const
 {
 	if (bCounterOpen) return Tx(TEXT("p_revolverse"), TEXT("E   REVOLVERSE"));
 	if (DisarmTarget()) return Tx(TEXT("p_golpear_fusil"), TEXT("E   GOLPEAR EL FUSIL"));
-	if (!TakedownTarget() && FloorRifleNear() >= 0) return Tx(TEXT("p_recoger_fusil"), TEXT("E   RECOGER EL FUSIL"));
+	if ((!TakedownTarget() || RiflePickFirst()) && FloorRifleNear() >= 0) return Tx(TEXT("p_recoger_fusil"), TEXT("E   RECOGER EL FUSIL"));
 	return FString();
 }
 
@@ -269,6 +272,8 @@ bool ATarsisDirector::CuerpoInteract()
 			G->KnockOut();
 			++Takedowns;
 			KickT = 0.25f;
+			StrikeT = StrikeLen;
+			++Strikes;
 			PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.8f);
 			Teach(TEXT("ensena_revolverse_suelo"), TEXT("{0} AL SUELO\nSin fusil no ha podido contigo."), { G->GuardName.ToUpper() }, 3.5f);
 		}
@@ -280,7 +285,7 @@ bool ATarsisDirector::CuerpoInteract()
 		DisarmGuard(G);
 		return true;
 	}
-	if (TakedownTarget()) return false;
+	if (TakedownTarget() && !RiflePickFirst()) return false;   // tanda L: manda lo que miras
 	const int32 R = FloorRifleNear();
 	if (R >= 0)
 	{
@@ -334,6 +339,8 @@ void ATarsisDirector::FireRifle()
 		if (FVector::Dist(It->GetActorLocation(), Loc) < RifleHeard) It->HearNoise(Loc);
 	}
 	KickT = 0.18f;
+	RecoilT = 1.0f;
+	PC->SetControlRotation(PC->GetControlRotation() + FRotator(1.6f, FMath::FRandRange(-0.4f, 0.4f), 0.0f));   // el 7,62 patea
 	if (PlayerRifleAmmo == 0) { ShowMessage(Tx(TEXT("fusil_vacio"), TEXT("SIN CARTUCHOS\nEl cargador esta vacio.")), 2.5f); CycleItem(1); }
 }
 
@@ -343,6 +350,7 @@ void ATarsisDirector::CuerpoTick(float DeltaSeconds)
 {
 	UWorld* W = GetWorld();
 	if (!W) return;
+	WeaponTick(DeltaSeconds);   // tanda L
 	// la ventana: se cierra sola y te detienen como siempre
 	if (bCounterOpen)
 	{
@@ -449,5 +457,60 @@ void ATarsisDirector::LoadCuerpo(const UTarsisSave* S)
 	{
 		ATarsisGuard* RifleOwner = S->FloorRifleOwners.IsValidIndex(i) && !S->FloorRifleOwners[i].IsEmpty() ? FindGuard(*S->FloorRifleOwners[i]) : nullptr;
 		SpawnFloorRifle(Mesh, FTransform(FRotator(0.0f, 0.0f, 90.0f), S->FloorRifleLocs[i] + FVector(0.0f, 0.0f, 5.0f)), RifleOwner, FVector::ZeroVector);
+	}
+}
+
+// ---------------------------------------------------------------- tanda L: el fusil en tus manos y la E por mirada
+
+bool ATarsisDirector::RiflePickFirst() const
+{
+	const int32 R = FloorRifleNear();
+	const ATarsisGuard* G = TakedownTarget();
+	if (R < 0) return false;
+	if (!G) return true;
+	const AStaticMeshActor* A = FloorRifles[R].Actor.Get();
+	const APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!A || !PC) return false;
+	FVector Loc; FRotator Rot;
+	PC->GetPlayerViewPoint(Loc, Rot);
+	const FVector F = Rot.Vector();
+	const float ToRifle = FVector::DotProduct(F, (A->GetActorLocation() - Loc).GetSafeNormal());
+	const float ToGuard = FVector::DotProduct(F, (G->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f) - Loc).GetSafeNormal());
+	return ToRifle > ToGuard;   // el que esta mas cerca del centro de la vista
+}
+
+void ATarsisDirector::WeaponTick(float DeltaSeconds)
+{
+	if (StrikeT > 0.0f) StrikeT = FMath::Max(0.0f, StrikeT - DeltaSeconds);
+	if (!Pistol) return;
+	const bool bWant = ItemSel == 9 && PlayerRifleAmmo > 0;
+	if (bWant && !FPRifleMesh)
+	{
+		// el M14 de los guardias (el mismo modelo)
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It && !FPRifleMesh; ++It)
+		{
+			for (UActorComponent* C : It->GetComponents())
+			{
+				const UStaticMeshComponent* M = Cast<UStaticMeshComponent>(C);
+				if (M && M->GetStaticMesh() && M->GetStaticMesh()->GetName().Contains(TEXT("M14"))) { FPRifleMesh = M->GetStaticMesh(); break; }
+			}
+		}
+	}
+	if (bWant && FPRifleMesh)
+	{
+		if (!bFPRifle)
+		{
+			PistolMeshKeep = Pistol->GetStaticMesh();
+			PistolGripKeep = Pistol->GetRelativeTransform();
+			Pistol->SetStaticMesh(FPRifleMesh);
+			bFPRifle = true;
+		}
+		Pistol->SetRelativeTransform(FPRifleGrip);   // cada fotograma: se puede afinar en el director en marcha
+	}
+	else if (bFPRifle)
+	{
+		if (PistolMeshKeep) Pistol->SetStaticMesh(PistolMeshKeep);
+		Pistol->SetRelativeTransform(PistolGripKeep);
+		bFPRifle = false;
 	}
 }

@@ -34,7 +34,9 @@
    "render_c_vars": [
     "r.Nanite.Streaming.StreamingPoolSize=128",
     "r.ShadowQuality=3",
-    "r.Streaming.PoolSize=400"
+    "r.Streaming.PoolSize=300",
+    "r.LumenScene.SurfaceCache.AtlasSize=1024",
+    "r.Shadow.Virtual.MaxPhysicalPages=384"
    ],
    "shadow_tells": true,
    "torch_near_min": 0.008,

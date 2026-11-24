@@ -5091,6 +5091,17 @@ def prueba_revolverse():
     check('a tiempo: le quitas el fusil y queda aturdido', P('counters') == 1 and g.get_editor_property('disarmed') and g.is_stunned() and not P('capturing'), '%s %s %s' % (P('counters'), g.get_editor_property('disarmed'), estado(g)))
     check('el fusil sale despedido al suelo', d.floor_rifle_count() == 1, d.floor_rifle_count())
     check('y pide refuerzos', any(str(x).endswith('_desarmado') for x in P('voice_log')), [str(x) for x in P('voice_log')][-3:])
+    check('tanda L: se ve el golpe de Cuttlas (brazos hacia delante)', P('strikes') >= 1, P('strikes'))
+    # tanda L: la E por mirada, junto al fusil del suelo y con él aturdido a mano
+    rl0 = d.floor_rifle_loc(0)
+    if g.is_stunned():
+        mirar(V(rl0.x, rl0.y, rl0.z)); yield 0.05
+        a_fusil = str(d.interact_prompt())
+        gl0 = g.get_actor_location()
+        mirar(V(gl0.x, gl0.y, gl0.z + 20)); yield 0.05
+        a_guardia = str(d.interact_prompt())
+        if dist2d(rl0, jugador().get_actor_location()) < 140:
+            check('tanda L: mirando el fusil, E lo recoge; mirando al guardia, E lo derriba', 'RECOGER' in a_fusil and 'DERRIBAR' in a_guardia, '%s | %s' % (a_fusil, a_guardia))
     check('aturdido, la E lo derriba', 'DERRIBAR' in str(d.interact_prompt()), str(d.interact_prompt()))
     d.interact(); yield 0.4
     check('derribado', estado(g) == 'DOWN', estado(g))
@@ -5101,6 +5112,8 @@ def prueba_revolverse():
     p.set_actor_location(V(rl.x + 60, rl.y, max(rl.z + 95, 100)), False, True); yield 0.3
     check('junto al fusil: E   RECOGER EL FUSIL', 'RECOGER EL FUSIL' in str(d.interact_prompt()), str(d.interact_prompt()))
     d.interact(); yield 0.2
+    yield 0.3
+    check('tanda L: el fusil en tus manos (primera persona)', d.fp_rifle_shown(), d.fp_rifle_shown())
     check('recogido: en el selector, con cartuchos', d.floor_rifle_count() == 0 and P('player_rifle_ammo') > 0 and P('item_sel') == 9 and d.item_name(9) == 'FUSIL', '%d %d' % (P('player_rifle_ammo'), P('item_sel')))
     # 6) al que te apunta en el alto, de cerca, le golpeas el fusil; luego va a por él
     h = rs[2]
