@@ -35,7 +35,7 @@
     "r.Nanite.Streaming.StreamingPoolSize=128",
     "r.ShadowQuality=3",
     "r.Streaming.PoolSize=300",
-    "r.LumenScene.SurfaceCache.AtlasSize=1024",
+    "r.LumenScene.SurfaceCache.AtlasSize=1536",
     "r.Shadow.Virtual.MaxPhysicalPages=384"
    ],
    "shadow_tells": true,
