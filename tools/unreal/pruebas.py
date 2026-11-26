@@ -5101,8 +5101,12 @@ def prueba_revolverse():
         gl0 = g.get_actor_location()
         mirar(V(gl0.x, gl0.y, gl0.z + 20)); yield 0.05
         a_guardia = str(d.interact_prompt())
-        if dist2d(rl0, jugador().get_actor_location()) < 140:
+        # (tanda M: la reaccion de Lyra lo echa atras; solo vale si el fusil y el guardia siguen los dos a mano)
+        if dist2d(rl0, jugador().get_actor_location()) < 140 and dist2d(gl0, jugador().get_actor_location()) < 160:
             check('tanda L: mirando el fusil, E lo recoge; mirando al guardia, E lo derriba', 'RECOGER' in a_fusil and 'DERRIBAR' in a_guardia, '%s | %s' % (a_fusil, a_guardia))
+    junto_a(g, 100.0); yield 0.05   # tanda M: tras el traspie, un paso hasta el
+    gl0 = g.get_actor_location()
+    mirar(V(gl0.x, gl0.y, gl0.z + 20)); yield 0.05
     check('aturdido, la E lo derriba', 'DERRIBAR' in str(d.interact_prompt()), str(d.interact_prompt()))
     d.interact(); yield 0.4
     check('derribado', estado(g) == 'DOWN', estado(g))

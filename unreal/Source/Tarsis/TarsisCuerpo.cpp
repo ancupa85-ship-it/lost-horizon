@@ -188,9 +188,18 @@ void ATarsisDirector::DisarmGuard(ATarsisGuard* G)
 			if (S && S->GetStaticMesh() && S->GetStaticMesh()->GetName().Contains(TEXT("M14"))) { Mesh = S->GetStaticMesh(); T = S->GetComponentTransform(); break; }
 		}
 		if (!Mesh) Mesh = LoadObject<UStaticMesh>(nullptr, RiflePath);
-		// tanda M: arrancado hacia un lado (antes caia detras del guardia, en la linea de la vista: la E dudaba entre los dos)
-		const FVector Side = FVector::CrossProduct(FVector::UpVector, Away) * (FMath::RandBool() ? 1.0f : -1.0f) * FMath::FRandRange(0.75f, 1.0f);
-		SpawnFloorRifle(Mesh, T, G, Away * 140.0f + Side * 250.0f + FVector(0.0f, 0.0f, 260.0f));
+		// tanda M: arrancado hacia un lado (antes caia detras del guardia, en la linea de la vista: la E dudaba entre los dos),
+		// hacia el lado con sitio libre: contra una pared o un contenedor se quedaba encima o donde el guardia no llega
+		const FVector R = FVector::CrossProduct(FVector::UpVector, Away);
+		const FVector From = G->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(FusilLado), false, G);
+		if (P) Q.AddIgnoredActor(P);
+		auto Libre = [&](const FVector& Dir) { FHitResult H; return !GetWorld()->LineTraceSingleByChannel(H, From, From + Dir * 320.0f, ECC_Visibility, Q); };
+		float Sign = FMath::RandBool() ? 1.0f : -1.0f;
+		if (!Libre(R * Sign)) Sign = -Sign;
+		const bool bSide = Libre(R * Sign);
+		const FVector Side = R * Sign * FMath::FRandRange(0.6f, 0.8f);
+		SpawnFloorRifle(Mesh, T, G, bSide ? Away * 170.0f + Side * 220.0f + FVector(0.0f, 0.0f, 240.0f) : Away * 240.0f + FVector(0.0f, 0.0f, 240.0f));
 		G->SetDisarmed(true);
 		++Disarms;
 		GuardSay(G, TEXT("desarmado"), true);
