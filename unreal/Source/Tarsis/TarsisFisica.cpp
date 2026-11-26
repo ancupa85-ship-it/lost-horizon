@@ -21,6 +21,7 @@
 #include "Components/PoseableMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
@@ -47,7 +48,16 @@ bool ATarsisGuard::PhysicsCanRun() const
 	const USkeletalMeshComponent* M = GetMesh();
 	if (!bPhysicsRule || !GaspBody || !M || !M->GetPhysicsAsset() || !GetWorld()) return false;
 	const APawn* Pl = UGameplayStatics::GetPlayerPawn(this, 0);
-	return !Pl || FVector::Dist(Pl->GetActorLocation(), GetActorLocation()) < PhysicsNear;
+	if (Pl && FVector::Dist(Pl->GetActorLocation(), GetActorLocation()) >= PhysicsNear) return false;
+	// tanda N2: como mucho MaxAwakeRagdolls cuerpos con fisica despierta a la vez (con tres se iba a 16 fps)
+	if (!bRagdoll)
+	{
+		int32 Awake = 0, Cap = 2;
+		for (TActorIterator<ATarsisDirector> Dt(GetWorld()); Dt; ++Dt) { Cap = Dt->MaxAwakeRagdolls; break; }
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) if (It->bRagdoll && !It->bRagdollSlept) ++Awake;
+		if (Awake >= Cap) return false;
+	}
+	return true;
 }
 
 void ATarsisGuard::LoadHitAnims()

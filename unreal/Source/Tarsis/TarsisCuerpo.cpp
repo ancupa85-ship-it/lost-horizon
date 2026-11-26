@@ -264,13 +264,17 @@ void ATarsisDirector::RifleRecovered(ATarsisGuard* G)
 FString ATarsisDirector::CuerpoPrompt() const
 {
 	if (bCounterOpen) return Tx(TEXT("p_revolverse"), TEXT("E   REVOLVERSE"));
+	if (DuelGuard.IsValid() && DuelPhaseN == 4) return Tx(TEXT("p_soltarse"), TEXT("E   SOLTARSE"));
 	if (DisarmTarget()) return Tx(TEXT("p_golpear_fusil"), TEXT("E   GOLPEAR EL FUSIL"));
+	if (DuelGuard.IsValid() && DuelPhaseN != 5) return Tx(TEXT("p_duelo"), TEXT("{0}   GOLPEAR        {1}   PARAR"), { KeyLabel(14), KeyLabel(15) });
 	if ((!TakedownTarget() || RiflePickFirst()) && FloorRifleNear() >= 0) return Tx(TEXT("p_recoger_fusil"), TEXT("E   RECOGER EL FUSIL"));
 	return FString();
 }
 
 bool ATarsisDirector::CuerpoInteract()
 {
+	// tanda N2: en el agarre, la E te suelta
+	if (DuelGuard.IsValid() && DuelPhaseN == 4) { bGrabFreed = true; return true; }
 	if (bCounterOpen)
 	{
 		ATarsisGuard* G = CounterGuard;
@@ -367,6 +371,8 @@ void ATarsisDirector::CuerpoTick(float DeltaSeconds)
 	WeaponTick(DeltaSeconds);   // tanda L
 	DisarmSceneTick(DeltaSeconds);   // tanda M
 	TakedownSceneTick(DeltaSeconds);   // tanda N
+	DuelTick(DeltaSeconds);   // tanda N2
+	CombatRolesTick(DeltaSeconds);
 	PeligroTick(DeltaSeconds);
 	HeroSlingTick();
 	// la ventana: se cierra sola y te detienen como siempre

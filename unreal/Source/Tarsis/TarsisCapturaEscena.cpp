@@ -612,14 +612,27 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	if (!A || !V) return false;
 	TSComp = RootAt(Pr.RootV, Pr.YawV).Inverse() * GuardFrame;
 	const FTransform HeroRoot = RootAt(Pr.RootA, Pr.YawA) * TSComp;
+	// tanda N2: contra el entorno (muro, mesa, barandilla a menos de WallTakedownDist detras del guardia): mas rapido y
+	// mas ruidoso; cae contra eso
+	{
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisRemateMuro), false, G);
+		Q.AddIgnoredActor(C);
+		FHitResult H;
+		const FVector Away = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
+		const FVector From = G->GetActorLocation() + FVector(0.0f, 0.0f, 10.0f);
+		bTSWall = GetWorld()->LineTraceSingleByChannel(H, From, From + Away * WallTakedownDist, ECC_Visibility, Q) && !Cast<ATarsisGuard>(H.GetActor());
+	}
+	const float LeadIn = bTSWall ? TakedownLeadIn * 0.5f : TakedownLeadIn;
 	// las dos partes empiezan avanzadas: el golpe llega TakedownLeadIn despues de la E
-	const float T0 = FMath::Max(0.0f, Pr.Hit - TakedownLeadIn);
+	const float T0 = FMath::Max(0.0f, Pr.Hit - LeadIn);
 	TSGuardRel = GuardRel;
 	G->ScenePlay(V);
 	G->GetMesh()->SetWorldTransform(TSComp);
 	G->GetMesh()->SetPosition(FMath::Min(T0, V->GetPlayLength() - 0.05f), false);
 	G->bSceneFallPending = true;
-	TSFallAt = FMath::Max(Pr.Fall - T0, TakedownLeadIn + 0.1f);
+	TSFallAt = bTSWall ? LeadIn + 0.08f : FMath::Max(Pr.Fall - T0, TakedownLeadIn + 0.1f);
+	TSHitAt = LeadIn;
+	if (bTSWall) ++WallTakedowns;
 	TSEndAt = TSFallAt + 0.25f;
 	TSFallDir = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
 	// Cuttlas: se abalanza a su sitio mirando al guardia
@@ -633,7 +646,7 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	{
 		HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		HeroDriver->PlayAnimation(A, false);
-		HeroDriver->SetPosition(FMath::Min(FMath::Max(0.0f, Pr.Hit - TakedownLeadIn), A->GetPlayLength() - 0.05f), false);
+		HeroDriver->SetPosition(FMath::Min(T0, A->GetPlayLength() - 0.05f), false);
 		HeroDriver->SetWorldTransform(TSComp);
 		bSceneHero = true;
 		bTSHero = true;
@@ -666,9 +679,10 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 		PC->SetControlRotation(R);
 	}
 	if (bTSHero && HeroDriver) HeroDriver->SetWorldTransform(TSComp);
-	if (!bTSHit && TST >= TakedownLeadIn)
+	if (!bTSHit && TST >= TSHitAt)
 	{
 		bTSHit = true;
+		if (bTSWall) { DuelNoise(G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f)); PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 1.0f); }
 		if (USoundBase* S = Sfx(FString::Printf(TEXT("golpe_seco_%d"), FMath::RandRange(1, 2)))) UGameplayStatics::PlaySoundAtLocation(this, S, G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 1.0f, FMath::FRandRange(0.95f, 1.05f), 0.0f, Atten);
 		else PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.9f);
 		KickT = FMath::Max(KickT, 0.2f);
@@ -690,7 +704,7 @@ void ATarsisDirector::TakedownSceneFall()
 	G->bSceneLock = false;
 	if (G->PhysicsCanRun())
 	{
-		G->PendingFallDir = TSFallDir;
+		G->PendingFallDir = TSFallDir * (bTSWall ? 2.0f : 1.0f);
 		G->DriverRel = TSGuardRel;   // al despertar vuelve a su sitio de la capsula, no al de la escena
 		G->bDriverRelSaved = true;
 		G->StartRagdoll();

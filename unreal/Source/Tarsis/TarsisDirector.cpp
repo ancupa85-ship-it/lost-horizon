@@ -3940,7 +3940,7 @@ const TCHAR* ATarsisDirector::ActionName(int32 I)
 {
 	static const TCHAR* N[NumActions] = { TEXT("AGACHARSE"), TEXT("USAR / DERRIBAR (E)"), TEXT("LANZAR PIEDRA"), TEXT("PRISMATICOS"), TEXT("CORRER"), TEXT("CAMBIAR CLIMA"), TEXT("LINTERNA"), TEXT("RADIO"),
 		TEXT("CAJA DE CARTON"), TEXT("MAPA MENTAL"), TEXT("INTERROGAR (por la espalda)"), TEXT("ASOMARSE A LA IZQUIERDA"), TEXT("ASOMARSE A LA DERECHA"),
-		TEXT("MATAR (por la espalda)") };
+		TEXT("MATAR (por la espalda)"), TEXT("GOLPEAR (cuerpo a cuerpo)"), TEXT("PARAR / ESQUIVAR") };
 	return (I >= 0 && I < NumActions) ? N[I] : TEXT("");
 }
 
@@ -3960,6 +3960,8 @@ void ATarsisDirector::DefaultKeys()
 	ActionKeys[11] = EKeys::Z;
 	ActionKeys[12] = EKeys::V;
 	ActionKeys[13] = EKeys::K;   // tanda H
+	ActionKeys[14] = EKeys::H;   // tanda N2: golpear
+	ActionKeys[15] = EKeys::LeftAlt;   // tanda N2: parar / esquivar
 }
 
 void ATarsisDirector::BindAll()
@@ -3982,6 +3984,10 @@ void ATarsisDirector::BindAll()
 	InputComponent->BindKey(ActionKeys[12], IE_Pressed, this, &ATarsisDirector::LeanRightOn);
 	InputComponent->BindKey(ActionKeys[12], IE_Released, this, &ATarsisDirector::LeanRightOff);
 	InputComponent->BindKey(ActionKeys[13], IE_Pressed, this, &ATarsisDirector::KillAction);   // tanda H: matar por la espalda
+	// tanda N2: el cuerpo a cuerpo
+	InputComponent->BindKey(ActionKeys[14], IE_Pressed, this, &ATarsisDirector::MeleeStrike);
+	InputComponent->BindKey(ActionKeys[15], IE_Pressed, this, &ATarsisDirector::BlockOn);
+	InputComponent->BindKey(ActionKeys[15], IE_Released, this, &ATarsisDirector::BlockOff);
 	InputComponent->BindKey(EKeys::G, IE_Pressed, this, &ATarsisDirector::ToggleThird);   // tanda 47: tercera persona (fija)
 	InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ATarsisDirector::AimOn);   // tanda 47: apuntar (fija)
 	InputComponent->BindKey(EKeys::RightMouseButton, IE_Released, this, &ATarsisDirector::AimOff);

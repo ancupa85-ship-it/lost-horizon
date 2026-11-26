@@ -658,7 +658,7 @@ bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
 	if (!Who || bAlly || State == ETarsisGuardState::Down) return false;   // tanda 37: al centinela de la torre tambien, si has subido (la altura lo decide)   // a un aliado (Ramos) no se le derriba por error
 	const FVector D = Who->GetActorLocation() - GetActorLocation();
 	// aturdido por un empujón: se le derriba por cualquier lado
-	if (StunT > 0.0f) return D.Size2D() <= 170.0f && FMath::Abs(D.Z) <= 120.0f;
+	if (StunT > 0.0f) return D.Size2D() <= 215.0f && FMath::Abs(D.Z) <= 120.0f;
 	if (D.Size2D() > 160.0f || FMath::Abs(D.Z) > 120.0f) return false;
 	// por la espalda: el jugador queda detrás de él (o de lado-atrás); de frente solo si no te ve venir
 	return FVector::DotProduct(GetActorForwardVector(), D.GetSafeNormal2D()) < -0.2f;

@@ -245,3 +245,15 @@ Medida con el editor recién abierto y M_LH puesto de verdad (GTX 1050, Media, r
 Lectura: la tanda cuesta de 3,5 a 6,5 fps (lo más, en el patio central: cielo entero, más halos y más suelo con el material nuevo). Sin tirones: el peor 1 % va 2 o 3 fps por debajo de la media en todos los sitios. La memoria de vídeo no sube. Hubo algo de uso del PC durante la medida, sin efecto visible. Lo que cuesta: los ruidos del material maestro (losas, manchas, regueros), nueve luces de relleno sin sombras y trece esferas translúcidas de halo. El barracón oeste se queda por debajo de 30 fps: es lo primero que hay que recortar (candidatos: menos octavas de ruido en `suelo_int` y `pared`, que por dentro apenas se leen).
 
 El ajuste 25c (albedos, luna y luz ambiente, cielo, estrellas, haz de la torre) no añade luces ni material: no debería cambiar estas cifras.
+
+## Tanda N2: pelea cuerpo a cuerpo, flanqueo y tres guardias en alerta
+
+Medida de noche (GTX 1050, Media, ventana de 2032 x 1125, Blender cerrado) con los tres guardias más cercanos en alerta contra ti en cada sitio: fijan, flanquean y disparan con trazadora (puntería a 0, sin heridas). fps medio / peor 1 %; entre paréntesis, la media de la tanda N1 sin alerta.
+
+| Sitio | fps | VRAM (MB) |
+|---|---|---|
+| Entrada | 37,6 / 26,8 (39,1) | 3328 |
+| Patio central | 33,7 / 28,1 (34,9) | 3370 |
+| Barracón oeste | 33,0 / 25,9 (33,2) | 3371 |
+
+Lectura: tres guardias en combate cuestan de 0,2 a 1,5 fps de media. El peor 1 % baja a 26–28 fps por los fogonazos y las trazadoras, sin tirones visibles. La memoria de vídeo queda 110 MB por debajo de la tanda N1 y lejos del techo de 3,7 GB: el duelo, el flanqueo y el tope de dos ragdolls despiertos no cargan texturas nuevas.

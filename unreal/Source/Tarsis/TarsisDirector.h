@@ -1557,6 +1557,113 @@ public:
 	FString TakedownScenePair;
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Combate")
 	bool TakedownScenePlaying() const { return TSGuard.IsValid(); }
+	// ---- tanda N2 (TarsisDuelo.cpp): el cuerpo a cuerpo de ida y vuelta, el aguante y los guardias que se coordinan
+	/** Pelear de frente: GOLPEAR (H) a un guardia que te encara empieza el duelo; el guardia se cubre, amaga (gesto y
+	 *  roce de correa), da el culatazo o te agarra. Parar o esquivar (BLOQUEAR, Alt) a tiempo lo deja tambaleandose y la
+	 *  E lo remata. Sin aguante quedas vendido. Uno se gana con oficio, dos es muy dificil, tres: huye. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	bool bMeleeRule = true;
+	/** Por dificultad (FACIL, NORMAL, DIFICIL): ventana de la contra (s), golpes tuyos para tambalearlo, culatazos que aguantas. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	FVector MeleeCounterWindow = FVector(0.45f, 0.30f, 0.20f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	FIntVector MeleeHitsToStagger = FIntVector(2, 3, 4);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	FIntVector MeleeStrikesToDown = FIntVector(3, 2, 1);
+	/** Forcejeo del agarre: segundos para soltarte con la E (FACIL, NORMAL, DIFICIL). Si no, te detienen. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	FVector MeleeGrabWindow = FVector(1.2f, 0.9f, 0.6f);
+	/** Aguante: maximo, coste de golpear, de parar con el brazo y de esquivar, y lo que se recupera por segundo sin pelear. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float StaminaMax = 100.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float StaminaHitCost = 25.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float StaminaBlockCost = 20.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float StaminaDodgeCost = 15.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float StaminaRegen = 30.0f;
+	/** Tiempos del guardia: cubierto (min, max), amago, culatazo, tambaleo; probabilidad de agarrar en vez de golpear. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	FVector2D MeleeGuardUpSeconds = FVector2D(1.0f, 1.8f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float MeleeFeintSeconds = 0.55f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float MeleeStrikeSeconds = 0.35f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float MeleeStaggerSeconds = 1.4f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float MeleeGrabChance = 0.25f;
+	/** Cuanto se oye la pelea (cm): los golpes y culatazos atraen a los que esten cerca y libres. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float MeleeHeard = 1400.0f;
+	/** Fases del duelo para pruebas y HUD: 0 nada, 1 cubierto, 2 amago, 3 culatazo, 4 agarre, 5 tambaleo. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Duelo")
+	int32 DuelPhase() const { return DuelPhaseN; }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Duelo")
+	bool DuelActive() const { return DuelGuard.IsValid(); }
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Duelo")
+	float Stamina() const { return StaminaNow; }
+	/** La barra se ve: en un duelo o mientras no esta llena. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Duelo")
+	bool StaminaShown() const { return DuelGuard.IsValid() || StaminaNow < StaminaMax - 0.5f; }
+	/** GOLPEAR y BLOQUEAR (pulsar y soltar), tambien para las pruebas. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Duelo")
+	void MeleeStrike();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Duelo")
+	void BlockOn();
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Duelo")
+	void BlockOff();
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 Duels = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeBlocked = 0;      // golpes tuyos que paro el guardia
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeLanded = 0;       // golpes tuyos que entraron
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeParries = 0;      // contras a tiempo (parar o esquivar)
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeTaken = 0;        // culatazos que te dieron
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeStaggers = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeGrabs = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeGrabEscapes = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 MeleeNoises = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 WallTakedowns = 0;
+	/** Remate contra el muro, la mesa o la barandilla: si hay algo a menos de esto (cm) detras del guardia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float WallTakedownDist = 120.0f;
+	/** Como mucho tantos cuerpos con ragdoll despiertos a la vez (el tiron de 16 fps con tres); los demas, su caida. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	int32 MaxAwakeRagdolls = 2;
+	/** Coordinacion: uno te fija desde cubierto y hasta dos flanquean (a 60-110 grados, a esta distancia de ti). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	bool bFlankRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float FlankDistance = 550.0f;
+	/** Por debajo de esta luz un punto de flanqueo es oscuro (regla de la tanda 28: nadie entra solo a oscuras). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	float FlankDarkLight = 0.25f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 FlankOrders = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Duelo")
+	int32 FlankDarkAvoided = 0;
+	/** Papel de un guardia en la alerta (pruebas): 0 ninguno, 1 fija, 2 flanquea. */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Duelo")
+	int32 CombatRole(const class ATarsisGuard* G) const;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Duelo")
+	FVector FlankPointOf(const class ATarsisGuard* G) const;
+	/** Cuantos cuerpos hay ahora con ragdoll despierto (pruebas del tope). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Duelo")
+	int32 AwakeRagdolls() const;
+	/** Para las pruebas: el siguiente golpe del guardia en el duelo es culatazo o agarre (0 al azar, 1 culatazo, 2 agarre). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
+	int32 TestNextMelee = 0;
 	/** El guardia del remate va a cambiar de mano (arrastrarlo, otro golpe): cae ya. */
 	void TakedownSceneRelease(class ATarsisGuard* G) { if (TSGuard.Get() == G) TakedownSceneFall(); }
 
@@ -2732,7 +2839,7 @@ public:
 	int32 WaitKeyFor = -1;
 
 	/** Acciones con tecla configurable (nombre en pantalla y tecla actual). */
-	static constexpr int32 NumActions = 14;   // tanda H: MATAR (K)   // tanda 43: caja, mapa, interrogar y asomarse tambien se ven y se cambian en CONTROLES
+	static constexpr int32 NumActions = 16;   // tanda N2: GOLPEAR y BLOQUEAR   // tanda H: MATAR (K)   // tanda 43: caja, mapa, interrogar y asomarse tambien se ven y se cambian en CONTROLES
 	FKey ActionKeys[NumActions];
 	/** Nombre de la tecla de una accion, en mayusculas y sin tildes (ToUpper dejaba «MAYuS» con la u minuscula). */
 	FString KeyLabel(int32 I) const;
@@ -3392,6 +3499,24 @@ private:
 	bool bDSHero = false, bDSGuardOn = false;
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> HeroSling;
 	UPROPERTY() TObjectPtr<class UAnimationAsset> ArmsAnimKeep;
+	// tanda N2
+	void DuelTick(float DeltaSeconds);
+	void DuelEnd();
+	void DuelNoise(const FVector& Where);
+	void CombatRolesTick(float DeltaSeconds);
+	bool MeleeEngageTarget(class ATarsisGuard*& Out) const;
+	int32 DiffIdx() const { return FMath::Clamp(Difficulty, 0, 2); }
+	TWeakObjectPtr<class ATarsisGuard> DuelGuard;
+	int32 DuelPhaseN = 0;
+	float DuelT = 0.0f, DuelPhaseLen = 0.0f;
+	int32 DuelHits = 0, DuelStrikes = 0, DuelNext = 0;
+	float StaminaNow = 100.0f;
+	bool bBlockHeld = false;
+	double BlockPressAt = -1.0;
+	bool bGrabFreed = false;
+	float RolesT = 0.0f;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, int32> Roles;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, FVector> FlankPoints;
 	// tanda N
 	bool TakedownSceneBegin(class ATarsisGuard* G);
 	void TakedownSceneTick(float DeltaSeconds);
@@ -3405,7 +3530,8 @@ private:
 	FTransform TSComp, TSGuardRel;
 	FVector TSLungeFrom = FVector::ZeroVector, TSLungeTo = FVector::ZeroVector, TSFallDir = FVector::ZeroVector;
 	float TSYawTo = 0.0f;
-	bool bTSHero = false, bTSFell = false, bTSHit = false;
+	bool bTSHero = false, bTSFell = false, bTSHit = false, bTSWall = false;
+	float TSHitAt = 0.3f;
 	double SlowMoUntil = 0.0;
 	struct FTarsisTracer { TWeakObjectPtr<class UStaticMeshComponent> C; FVector From, To; float T = 0.0f, Len = 1.0f; };
 	TArray<FTarsisTracer> TracerList;

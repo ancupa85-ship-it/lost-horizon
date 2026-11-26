@@ -90,11 +90,15 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	// Y nadie detiene sin haber dado antes el alto: el que te encuentra escondido te apunta primero
 	const bool bWarned = D->bHalt && D->HaltT > D->HaltGrace;
 	if (V > 0.0f && Dist < CatchDistance && !D->bFleeing && bWarned && (D->ArrestGuard == this || PlSpeed < 40.0f)) { Caught(Player); return true; }
+	// tanda N2: si le toca flanquear, va a su punto (a un lado del que te fija, nunca a oscuras solo)
+	const FVector FlankP = D->FlankPointOf(this);
+	const bool bFlank = !FlankP.IsZero() && D->CombatRole(this) == 2 && !Near2D(FlankP, 120.0f);
 	if (V <= 0.0f)
 	{
 		// no te ve: aguanta en su sitio mirando a donde te perdio y luego avanza andando. Si le mandaron por radio,
 		// corre hasta estar cerca y el ultimo tramo lo hace con cuidado
 		AimT = 0.0f;
+		if (bFlank) { Walk(FlankP, RunSpeed * 0.85f); return true; }   // tanda N2: te cerca por un lado
 		if (D->ArrestGuard == this && UnseenT > 1.0f) D->ArrestGuard = nullptr;   // un parpadeo de la vista no le hace desistir
 		if (UnseenT < ArmedHoldSeconds && !bRadioCall)
 		{
@@ -123,6 +127,13 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 		AimT += DeltaSeconds;
 		D->ReportAim(this, Dist);
 		if (AimT > 0.5f && ShotT <= 0.0f) FireAt(Player, Dist, V, D);
+		return true;
+	}
+	// tanda N2: el que flanquea no se queda a cubierto delante de ti: rodea hasta su punto
+	if (bFlank && Dist > 300.0f)
+	{
+		Walk(FlankP, RunSpeed);
+		AimT = 0.0f;
 		return true;
 	}
 	// la cobertura se eligio para donde estabas: si te has movido mucho, ya no vale
@@ -202,7 +213,7 @@ void ATarsisGuard::FireAt(APawn* Player, float Dist, float V, ATarsisDirector* D
 	const float Off = bWarn ? FMath::FRandRange(90.0f, 160.0f) : FMath::Lerp(140.0f, 40.0f, FMath::Clamp(Chance, 0.0f, 1.0f)) * FMath::FRandRange(0.7f, 1.2f);
 	const FVector MissAim = FMath::RandBool()
 		? Player->GetActorLocation() + Side * Off + FVector(0.0f, 0.0f, FMath::FRandRange(-10.0f, 50.0f))
-		: Player->GetActorLocation() - ToP * FMath::FRandRange(60.0f, 180.0f) - FVector(0.0f, 0.0f, 90.0f) + Side * Off * 0.3f;   // al suelo, delante de ti
+		: Player->GetActorLocation() - ToP * FMath::FRandRange(150.0f, 400.0f) - FVector(0.0f, 0.0f, 90.0f) + Side * Off * 0.3f;   // al suelo, delante de ti (tanda N2: a 1,5-4 m, que se vea)
 	D->ShotFired(this, bHit, MissAim);
 }
 

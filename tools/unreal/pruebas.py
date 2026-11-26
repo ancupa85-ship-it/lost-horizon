@@ -2303,7 +2303,7 @@ def prueba_controles():
     d = director()
     yield from teclas(d, 'P', *(['Down'] * 9), 'Enter')
     ls = lineas(d)
-    check('CONTROLES abre la página de teclas', len(ls) == 16 and 'VOLVER' in ls[-1], ' / '.join(ls))   # 14 acciones (tanda H: MATAR)
+    check('CONTROLES abre la página de teclas', len(ls) == 18 and 'VOLVER' in ls[-1], ' / '.join(ls))   # 16 acciones (tanda N2: GOLPEAR y PARAR)
     tecla0 = ls[0]
     yield from teclas(d, 'Enter')
     check('Intro no se asigna a sí misma (espera tecla)', 'PULSA UNA TECLA' in lineas(d)[0], lineas(d)[0])
@@ -2314,7 +2314,7 @@ def prueba_controles():
     yield from teclas(d, 'Enter', 'E')
     ls = lineas(d)
     check('si la tecla choca, se intercambian', '[ E ]' in ls[0] and '[ X ]' in ls[1], '%s / %s' % (ls[0], ls[1]))
-    yield from teclas(d, *(['Down'] * 14), 'Enter')   # catorce acciones desde la tanda H
+    yield from teclas(d, *(['Down'] * 16), 'Enter')   # dieciseis acciones desde la tanda N2
     ls = lineas(d)
     check('TECLAS POR DEFECTO lo deshace', ls[0] == tecla0 and ls[1] == interact, '%s / %s' % (ls[0], ls[1]))
     yield from teclas(d, 'Escape')
@@ -5258,10 +5258,113 @@ def prueba_combate():
     aparte(); yield 0.5
     check('ningun texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_combate2():
+    """Tanda N2. El cuerpo a cuerpo de ida y vuelta: H empieza el duelo con el guardia que te encara; cubierto para tus
+    golpes, en el amago se le puede golpear; parar a tiempo (Alt) lo tambalea y la E lo remata; los culatazos que
+    aguantas dependen de la dificultad y al ultimo te detienen; el agarre se rompe con la E (si no, detencion en calma);
+    el aguante se gasta y se recupera; la pelea se oye. Y la coordinacion: uno fija y otro flanquea (nunca a un punto
+    oscuro solo). Y como mucho dos ragdolls despiertos a la vez."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.get_actor_label().endswith('Ramos')]
+    yield ('hasta', lambda: len(ronda()) > 4, 30.0)
+    rs = ronda()
+    for x in guardias():
+        x.hold(3600.0)
+    d.set_editor_property('armed_rule', True)
+    dif = P('difficulty')
+    idx = max(0, min(2, dif))
+    # 1) el duelo: empieza con H, cubierto para tus golpes
+    g = rs[0]
+    g.hold(0.0)
+    g.alarm(jugador().get_actor_location()); yield 0.2
+    a_la_vista_de(g, 130); yield 0.2
+    mirar(g.get_actor_location()); yield 0.1
+    g.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(g.get_actor_location(), jugador().get_actor_location()), False)
+    s0 = d.stamina()
+    d.melee_strike(); yield 0.1
+    check('H a un guardia que te encara empieza el duelo (cubierto)', d.duel_active() and d.duel_phase() == 1, '%s fase %d' % (d.duel_active(), d.duel_phase()))
+    check('golpear gasta aliento y la barra se ve', d.stamina() < s0 and d.stamina_shown(), '%.0f -> %.0f' % (s0, d.stamina()))
+    check('cubierto: tu golpe lo para', P('melee_blocked') >= 1, P('melee_blocked'))
+    # 2) parar a tiempo el culatazo: se tambalea; la E lo remata (amago y culatazo mas lentos solo para la prueba: las
+    # comprobaciones no van fotograma a fotograma)
+    fe0, st0 = P('melee_feint_seconds'), P('melee_strike_seconds')
+    d.set_editor_property('melee_feint_seconds', 1.2)
+    d.set_editor_property('melee_strike_seconds', 1.2)
+    d.set_editor_property('test_next_melee', 1)
+    yield ('hasta', lambda: director().duel_phase() == 3, 5.0)
+    check('amaga y lanza el culatazo', d.duel_phase() == 3, d.duel_phase())
+    yield 0.95   # justo antes del golpe (dentro de la ventana)
+    d.block_on(); yield 0.05
+    d.block_off()
+    yield ('hasta', lambda: director().duel_phase() != 3, 1.5)
+    d.set_editor_property('melee_feint_seconds', fe0)
+    d.set_editor_property('melee_strike_seconds', st0)
+    check('parado a tiempo: se tambalea (contra)', P('melee_parries') >= 1 and d.duel_phase() == 5 and g.is_stunned(), '%d fase %d' % (P('melee_parries'), d.duel_phase()))
+    check('tambaleandose, la E lo remata (pareja de derribo)', 'DERRIBAR' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.2
+    check('rematado: derribado y fin del duelo', estado(g) == 'DOWN' and not d.duel_active(), '%s %s' % (estado(g), d.duel_active()))
+    yield 2.0
+    # 3) el agarre: la E te suelta
+    h = rs[1]
+    h.hold(0.0)
+    h.alarm(jugador().get_actor_location()); yield 0.2
+    h.hold(1.5)   # en alerta se giraria o iria a cubrirse antes del golpe: quieto hasta que empiece el duelo
+    d.set_editor_property('stamina_regen', 1000.0); yield 0.2
+    a_la_vista_de(h, 130)   # delante de donde mira de verdad, y golpe en el mismo tick
+    _hl = h.get_actor_location(); _dv = jugador().get_actor_location() - _hl
+    _pre = 'al golpear: dist %.0f dot %.2f est %s' % (math.hypot(_dv.x, _dv.y), (h.get_actor_forward_vector().x * _dv.x + h.get_actor_forward_vector().y * _dv.y) / max(1.0, math.hypot(_dv.x, _dv.y)), estado(h))
+    _p0, _h0 = jugador().get_actor_location(), h.get_actor_location()
+    d.melee_strike(); yield 0.1
+    _pre += ' -> duelo %s' % d.duel_active()
+    d.set_editor_property('test_next_melee', 2)
+    yield ('hasta', lambda: director().duel_phase() == 4, 4.0)
+    _hl = h.get_actor_location(); _pl = jugador().get_actor_location(); _dv = _pl - _hl
+    _diag = 'jug movido %.0f guardia movido %.0f | estado %s dist %.0f dz %.0f dot %.2f aliento %.0f duelo %s' % ((_pl - _p0).length(), (_hl - _h0).length(), estado(h), math.hypot(_dv.x, _dv.y), _dv.z, (h.get_actor_forward_vector().x * _dv.x + h.get_actor_forward_vector().y * _dv.y) / max(1.0, math.hypot(_dv.x, _dv.y)), d.stamina(), d.duel_active())
+    check('a veces te agarra (E   SOLTARSE)', d.duel_phase() == 4 and 'SOLTARSE' in str(d.interact_prompt()), '%d %s | %s | %s' % (d.duel_phase(), d.interact_prompt(), _diag, _pre))
+    d.interact(); yield 0.1
+    check('con la E a tiempo te sueltas y se tambalea', P('melee_grab_escapes') >= 1 and d.duel_phase() == 5, '%d fase %d' % (P('melee_grab_escapes'), d.duel_phase()))
+    # 4) la pelea se oye
+    check('los golpes de la pelea se oyen', P('melee_noises') >= 1, P('melee_noises'))
+    # 5) sin parar: los culatazos que aguantas segun la dificultad, y al ultimo te detienen
+    c0, t0 = P('captures'), P('melee_taken')
+    d.set_editor_property('stamina_regen', 30.0)
+    grab0 = P('melee_grab_chance')
+    d.set_editor_property('melee_grab_chance', 0.0)
+    yield ('hasta', lambda: director().get_editor_property('capturing') or director().get_editor_property('captures') > c0, 25.0)
+    golpes = P('melee_taken') - t0
+    check('sin parar, al culatazo n.%d te detienen (dificultad %d)' % (d.get_editor_property('melee_strikes_to_down').get_editor_property(['x', 'y', 'z'][idx]), dif), (P('capturing') or P('captures') > c0) and golpes >= 1, '%d culatazos' % golpes)
+    d.set_editor_property('melee_grab_chance', grab0)
+    yield ('hasta', lambda: not director().get_editor_property('capturing'), 25.0)
+    yield 1.0
+    check('el aliento se recupera sin pelear', d.stamina() > P('stamina_max') - 1.0 or not d.stamina_shown(), '%.0f' % d.stamina())
+    # 6) coordinacion: uno fija, otro flanquea (a la luz)
+    d.set_day(True); yield 0.3
+    a, b = rs[2], rs[3]
+    for x in (a, b):
+        x.hold(0.0)
+    junto_a(a, 600.0); yield 0.2
+    b.set_actor_location(V(a.get_actor_location().x + 200, a.get_actor_location().y + 100, a.get_actor_location().z), False, True)
+    d.set_editor_property('player_speed_override', 0.0)
+    a.alarm(jugador().get_actor_location()); b.alarm(jugador().get_actor_location())
+    yield ('hasta', lambda: director().combat_role(a) + director().combat_role(b) == 3, 6.0)
+    fl = a if d.combat_role(a) == 2 else b
+    check('dos en alerta: uno fija y otro flanquea', d.combat_role(a) + d.combat_role(b) == 3 and P('flank_orders') > 0, '%d %d' % (d.combat_role(a), d.combat_role(b)))
+    fp = d.flank_point_of(fl)
+    check('el punto de flanqueo no esta a oscuras (regla de la tanda 28)', fp.z != 0 and a.light_at(mundo(), V(fp.x, fp.y, fp.z + 60)) >= P('flank_dark_light'), '%s luz %.2f' % (fp, a.light_at(mundo(), V(fp.x, fp.y, fp.z + 60))))
+    d.set_editor_property('player_speed_override', -1.0)
+    for x in (a, b):
+        x.hold(3600.0)
+    # 7) tope de ragdolls despiertos
+    check('como mucho %d ragdolls despiertos a la vez' % P('max_awake_ragdolls'), d.awake_ragdolls() <= P('max_awake_ragdolls'), d.awake_ragdolls())
+    d.set_editor_property('armed_rule', False)
+    aparte(); yield 0.5
+    check('ningun texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido], [prueba_revolverse], [prueba_combate]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido], [prueba_revolverse], [prueba_combate], [prueba_combate2]]
 PRUEBAS = []
 
 

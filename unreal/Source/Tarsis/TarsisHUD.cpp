@@ -480,6 +480,15 @@ void ATarsisHUD::DrawLight(ATarsisDirector* D, bool bCrouched)
 			Panel(X, Y - 36.0f * S, 240.0f * S, 30.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, B > 0 ? 0.55f : 0.35f));
 			Text(BT, X + 14.0f * S, Y - 32.0f * S, BC, 0.85f * S);
 		}
+		// tanda N2: el aguante, discreto: solo en un duelo o mientras no esta lleno
+		if (D->StaminaShown())
+		{
+			const float A = FMath::Clamp(D->Stamina() / FMath::Max(D->StaminaMax, 1.0f), 0.0f, 1.0f);
+			const float BX = X + 250.0f * S, BY = Y - 30.0f * S, BW = 170.0f * S, BH = 10.0f * S;
+			Text(D->Tx(TEXT("hud_aliento"), TEXT("ALIENTO")), BX, BY - 4.0f * S, FLinearColor(0.75f, 0.75f, 0.75f, 0.9f), 0.65f * S);
+			Panel(BX + 70.0f * S, BY, BW, BH, FLinearColor(1.0f, 1.0f, 1.0f, 0.12f));
+			Panel(BX + 70.0f * S, BY, BW * A, BH, A < 0.3f ? FLinearColor(1.0f, 0.45f, 0.25f, 0.9f) : FLinearColor(0.85f, 0.85f, 0.7f, 0.85f));
+		}
 		if (D->bPowerOff)
 		{
 			Panel(X + 250.0f * S, Y - 36.0f * S, 190.0f * S, 30.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
