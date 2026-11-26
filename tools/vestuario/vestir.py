@@ -20,6 +20,8 @@ import texturas
 ROOT = os.path.dirname(os.path.dirname(HERE))
 SRC = os.path.join(ROOT, 'assets', 'unreal', 'personas', 'sin_equipo')
 DST = os.path.join(ROOT, 'assets', 'unreal', 'personas')
+# LH_VARIANTE=_v2 lee <base>_v2.glb (esqueleto recolocado, esqueleto_v2.py) y escribe <nombre>_v2.glb
+SUF = os.environ.get('LH_VARIANTE', '')
 
 # Qué lleva cada uno. La silueta distingue a cada guardia de lejos y a oscuras.
 EQUIPO = {
@@ -153,7 +155,7 @@ def rbox(size, r=0.012, n=4):
 class Persona:
     def __init__(self, nombre, base=None):
         self.nombre = nombre
-        self.g = g = Glb(os.path.join(SRC, (base or nombre) + '.glb'))
+        self.g = g = Glb(os.path.join(SRC, (base or nombre) + SUF + '.glb'))
         j = g.j
         self.quitadas = g.remove_mesh_nodes(lambda s: 'short' in s or 'hair' in s)   # el pelo: va tapado
         skin = j['skins'][0]
@@ -901,8 +903,8 @@ def vestir(nombre):
         p.capote(capucha=eq['capote'] != 'sin_capucha')
     if eq.get('cabeza') == 'gorra':
         p.gorra()
-    n = g.save(os.path.join(DST, nombre + '.glb'))
-    print('   ->', os.path.join(DST, nombre + '.glb'), '%.0f KB' % (n / 1024))
+    n = g.save(os.path.join(DST, nombre + SUF + '.glb'))
+    print('   ->', os.path.join(DST, nombre + SUF + '.glb'), '%.0f KB' % (n / 1024))
 
 
 if __name__ == '__main__':
