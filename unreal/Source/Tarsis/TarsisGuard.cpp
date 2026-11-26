@@ -682,7 +682,11 @@ void ATarsisGuard::KnockOut()
 	bFound = false;
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);   // se le puede pasar por encima
 	USkeletalMeshComponent* M = GetMesh();
-	if (GaspBody && (bRagdoll || RagdollPendingT >= 0.0f || PhysicsCanRun()))
+	if (bSceneFallPending)
+	{
+		// tanda N: el remate con la pareja del GASP; la escena lo deja caer (ragdoll) en el segundo de la animacion
+	}
+	else if (GaspBody && (bRagdoll || RagdollPendingT >= 0.0f || PhysicsCanRun()))
 	{
 		// tanda C: cae con ragdoll (el dardo, tras su reaccion: DartHit dejo la caida pendiente)
 		if (bGaspSingle) GaspRestore();
@@ -1052,6 +1056,7 @@ void ATarsisGuard::TowerTick(float DeltaSeconds, APawn* Player, float V)
 
 void ATarsisGuard::SetState(ETarsisGuardState NewState)
 {
+	if (NewState == ETarsisGuardState::Alert && State != ETarsisGuardState::Alert) ShotsThisAlert = 0;   // tanda N: avisa otra vez
 	// tanda 26: cuando uno de abajo da la alarma, el foco de la torre que lo tenga a mano acude a ese sitio
 	if (NewState == ETarsisGuardState::Alert && State != ETarsisGuardState::Alert && !bTowerSentry && !bAlly && GetWorld())
 	{

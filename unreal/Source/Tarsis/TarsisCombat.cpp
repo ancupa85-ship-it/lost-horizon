@@ -179,7 +179,31 @@ void ATarsisGuard::FireAt(APawn* Player, float Dist, float V, ATarsisDirector* D
 	float Chance = FMath::Clamp(1.05f - Dist / 2200.0f, 0.15f, 0.9f) * FMath::Lerp(0.5f, 1.0f, FMath::Clamp(V, 0.0f, 1.0f));
 	if (C && C->bIsCrouched) Chance *= 0.7f;
 	if (Player->GetVelocity().Size2D() > 400.0f) Chance *= 0.7f;
-	D->ShotFired(this, FMath::FRand() < Chance * D->ArmedAim);
+	// tanda N: la punteria se asienta con el tiempo que lleva apuntando (el primer tiro a la carrera, peor)
+	const float AimNow = bTowerSentry ? TowerAimT : AimT;
+	Chance *= FMath::Lerp(D->AimSettleFrom, 1.0f, FMath::Clamp(AimNow / FMath::Max(D->AimSettleSeconds, 0.1f), 0.0f, 1.0f));
+	// a cubierto: con la cintura tapada (caja, murete) y la cabeza a la vista se acierta mucho menos
+	const FVector Muzzle = RifleMuzzle();
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisTiroCubierto), false, this);
+	Q.AddIgnoredActor(Player);
+	FHitResult H;
+	const FVector Hips = Player->GetActorLocation() - FVector(0.0f, 0.0f, 20.0f);
+	if (GetWorld()->LineTraceSingleByChannel(H, Muzzle, Hips, ECC_Visibility, Q)) Chance *= D->CoverHitMul;
+	Chance *= D->ArmedAim;
+	// los primeros tiros de cada alerta son de aviso: fallan cerca, a proposito
+	const bool bWarn = ShotsThisAlert < D->WarnShotsNow();
+	++ShotsThisAlert;
+	const bool bHit = !bWarn && FMath::FRand() < Chance;
+	D->LastShotChance = bWarn ? 0.0f : Chance;
+	if (bWarn) ++D->WarnShotsFired;
+	// el que falla da cerca: a un lado o al suelo delante (aviso, mas lejos; con buena punteria, mas cerca)
+	const FVector ToP = (Player->GetActorLocation() - Muzzle).GetSafeNormal();
+	const FVector Side = FVector::CrossProduct(ToP, FVector::UpVector).GetSafeNormal() * (FMath::RandBool() ? 1.0f : -1.0f);
+	const float Off = bWarn ? FMath::FRandRange(90.0f, 160.0f) : FMath::Lerp(140.0f, 40.0f, FMath::Clamp(Chance, 0.0f, 1.0f)) * FMath::FRandRange(0.7f, 1.2f);
+	const FVector MissAim = FMath::RandBool()
+		? Player->GetActorLocation() + Side * Off + FVector(0.0f, 0.0f, FMath::FRandRange(-10.0f, 50.0f))
+		: Player->GetActorLocation() - ToP * FMath::FRandRange(60.0f, 180.0f) - FVector(0.0f, 0.0f, 90.0f) + Side * Off * 0.3f;   // al suelo, delante de ti
+	D->ShotFired(this, bHit, MissAim);
 }
 
 // ---------------------------------------------------------------- el director: el alto, las heridas y los refuerzos
@@ -272,12 +296,13 @@ void ATarsisDirector::ArmedTick(float DeltaSeconds)
 	}
 }
 
-void ATarsisDirector::ShotFired(ATarsisGuard* G, bool bHit)
+void ATarsisDirector::ShotFired(ATarsisGuard* G, bool bHit, const FVector& MissAim)
 {
 	if (!G || bCapturing || bDone) return;
 	++Shots;
 	// tanda B: de la boca del M14 (socket Muzzle); sin fusil, delante del pecho como antes
 	const FVector Muzzle = G->RifleMuzzle();
+	ShotFx(G, Muzzle, bHit, MissAim);   // tanda N: impacto, trazadora, silbido
 	{
 		// 7,62 de verdad (Stein Games, CC0): cerca, a media distancia o lejos segun lo lejos que estes; si faltan, el de antes
 		APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);

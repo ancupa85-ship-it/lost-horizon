@@ -577,3 +577,144 @@ void ATarsisDirector::DisarmSceneEnd()
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0)) PC->SetIgnoreMoveInput(false);
 	DSGuard = nullptr;
 }
+
+// ---------------------------------------------------------------- tanda N: el remate con la pareja de derribo del GASP
+// La E por la espalda (o al aturdido) ya no tumba al guardia en el sitio: Cuttlas hace la parte _A del derribo parado
+// (takedown_stand) y el guardia la _V, colocados como en la detencion (la raiz de _V donde esta el guardia; Cuttlas se
+// abalanza hasta su raiz de _A). El guardia queda derribado al instante para la logica (State Down: las pruebas y el
+// sigilo no esperan a la animacion), pero su caida la pone la escena: en el segundo en que la _V pasaria a ragdoll
+// (Fall), suelta la animacion y cae con fisica. En el golpe (Hit) suena seco, la vista da un tiron y el tiempo va lento
+// un instante (SlowMo). Si alguien coge al guardia antes (arrastrarlo), cae ya (TakedownSceneRelease).
+bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!bTakedownAnimRule || !G || !C || !PC || bCapturing || !G->UsesGasp() || !G->GetMesh() || G->bRagdoll) return false;
+	if (TSGuard.IsValid()) TakedownSceneFall();
+	if (DSGuard.IsValid()) DisarmSceneEnd();
+	const FTransform GuardRel = G->GetMesh()->GetRelativeTransform();
+	const FTransform GuardFrame(FRotator(0.0f, G->GetActorRotation().Yaw + GuardRel.Rotator().Yaw, 0.0f), G->GetActorLocation() + GuardRel.GetLocation());
+	const FVector Local = GuardFrame.InverseTransformPosition(C->GetActorLocation()).GetSafeNormal2D();
+	int32 Best = INDEX_NONE;
+	float BestDot = -2.0f;
+	for (int32 i = 0; i < UE_ARRAY_COUNT(ScenePairs); ++i)
+	{
+		const FScenePair& Pr = ScenePairs[i];
+		if (FCString::Strcmp(Pr.Kind, TEXT("takedown")) != 0) continue;
+		const FVector Rel = RootAt(Pr.RootV, Pr.YawV).InverseTransformPosition(Pr.RootA).GetSafeNormal2D();
+		const float Dot = FVector::DotProduct(Local, Rel);
+		if (Dot > BestDot) { BestDot = Dot; Best = i; }
+	}
+	if (Best == INDEX_NONE) return false;
+	const FScenePair& Pr = ScenePairs[Best];
+	UAnimSequenceBase* A = LoadPairAnim(Pr, true);
+	UAnimSequenceBase* V = LoadPairAnim(Pr, false);
+	if (!A || !V) return false;
+	TSComp = RootAt(Pr.RootV, Pr.YawV).Inverse() * GuardFrame;
+	const FTransform HeroRoot = RootAt(Pr.RootA, Pr.YawA) * TSComp;
+	// las dos partes empiezan avanzadas: el golpe llega TakedownLeadIn despues de la E
+	const float T0 = FMath::Max(0.0f, Pr.Hit - TakedownLeadIn);
+	TSGuardRel = GuardRel;
+	G->ScenePlay(V);
+	G->GetMesh()->SetWorldTransform(TSComp);
+	G->GetMesh()->SetPosition(FMath::Min(T0, V->GetPlayLength() - 0.05f), false);
+	G->bSceneFallPending = true;
+	TSFallAt = FMath::Max(Pr.Fall - T0, TakedownLeadIn + 0.1f);
+	TSEndAt = TSFallAt + 0.25f;
+	TSFallDir = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
+	// Cuttlas: se abalanza a su sitio mirando al guardia
+	TSLungeFrom = C->GetActorLocation();
+	TSLungeTo = FVector(HeroRoot.GetLocation().X, HeroRoot.GetLocation().Y, C->GetActorLocation().Z);
+	if (FVector::Dist2D(TSLungeFrom, TSLungeTo) > 260.0f) TSLungeTo = TSLungeFrom;
+	TSYawTo = (G->GetActorLocation() - TSLungeTo).Rotation().Yaw;
+	PC->SetIgnoreMoveInput(true);
+	bTSHero = false;
+	if (HeroDriver && HeroBody && !bSceneHero)
+	{
+		HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		HeroDriver->PlayAnimation(A, false);
+		HeroDriver->SetPosition(FMath::Min(FMath::Max(0.0f, Pr.Hit - TakedownLeadIn), A->GetPlayLength() - 0.05f), false);
+		HeroDriver->SetWorldTransform(TSComp);
+		bSceneHero = true;
+		bTSHero = true;
+	}
+	TSGuard = G;
+	TST = 0.0f;
+	bTSFell = bTSHit = false;
+	++TakedownScenes;
+	TakedownScenePair = FString::Printf(TEXT("takedown_%s"), Pr.Dir);
+	return true;
+}
+
+void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
+{
+	ATarsisGuard* G = TSGuard.Get();
+	if (!G) return;
+	if (bCapturing) { TakedownSceneFall(); TakedownSceneEnd(); return; }
+	TST += DeltaSeconds;
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (C && TST <= DisarmLungeTime + DeltaSeconds)
+	{
+		const float S = FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(TST / FMath::Max(DisarmLungeTime, 0.01f), 0.0f, 1.0f));
+		C->SetActorLocation(FMath::Lerp(TSLungeFrom, TSLungeTo, S), true);
+	}
+	if (PC)
+	{
+		FRotator R = PC->GetControlRotation();
+		R.Yaw = FMath::RInterpTo(R, FRotator(R.Pitch, TSYawTo, 0.0f), DeltaSeconds, 12.0f).Yaw;
+		PC->SetControlRotation(R);
+	}
+	if (bTSHero && HeroDriver) HeroDriver->SetWorldTransform(TSComp);
+	if (!bTSHit && TST >= TakedownLeadIn)
+	{
+		bTSHit = true;
+		if (USoundBase* S = Sfx(FString::Printf(TEXT("golpe_seco_%d"), FMath::RandRange(1, 2)))) UGameplayStatics::PlaySoundAtLocation(this, S, G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 1.0f, FMath::FRandRange(0.95f, 1.05f), 0.0f, Atten);
+		else PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.9f);
+		KickT = FMath::Max(KickT, 0.2f);
+		SlowMo();
+	}
+	if (!bTSFell && TST >= TSFallAt) TakedownSceneFall();
+	if (TST >= TSEndAt) TakedownSceneEnd();
+}
+
+void ATarsisDirector::TakedownSceneFall()
+{
+	ATarsisGuard* G = TSGuard.Get();
+	if (!G || bTSFell) return;
+	bTSFell = true;
+	// suelta la animacion donde va y cae con fisica (o con la caida de la persona si la fisica no corre)
+	const FVector Root = G->GetMesh()->GetSocketLocation(TEXT("root"));
+	G->bSceneFallPending = false;
+	G->SceneEnd();
+	G->bSceneLock = false;
+	if (G->PhysicsCanRun())
+	{
+		G->PendingFallDir = TSFallDir;
+		G->DriverRel = TSGuardRel;   // al despertar vuelve a su sitio de la capsula, no al de la escena
+		G->bDriverRelSaved = true;
+		G->StartRagdoll();
+	}
+	else
+	{
+		G->GetMesh()->SetRelativeTransform(TSGuardRel);
+		G->SetActorLocation(FVector(Root.X, Root.Y, G->GetActorLocation().Z), true);
+		G->State = ETarsisGuardState::Patrol;   // KnockOut otra vez, ahora con su caida de siempre
+		G->KnockOut();
+	}
+}
+
+void ATarsisDirector::TakedownSceneEnd()
+{
+	if (!bTSFell) TakedownSceneFall();
+	if (bTSHero && HeroDriver)
+	{
+		ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+		if (C && HeroDriver->GetAttachParent() != C->GetCapsuleComponent()) HeroDriver->AttachToComponent(C->GetCapsuleComponent(), FAttachmentTransformRules::KeepWorldTransform);
+		HeroDriver->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+		bSceneHero = false;
+	}
+	bTSHero = false;
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0)) PC->SetIgnoreMoveInput(false);
+	TSGuard = nullptr;
+}

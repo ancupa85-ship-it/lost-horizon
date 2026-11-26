@@ -269,6 +269,7 @@ void ATarsisDirector::Takedown()
 {
 	ATarsisGuard* G = TakedownTarget();
 	if (!G) return;
+	TakedownSceneBegin(G);   // tanda N: con el GASP, la pareja de derribo (la caida la pone la escena)
 	G->KnockOut();
 	++Takedowns;
 	HintStep = 3;
@@ -808,6 +809,7 @@ void ATarsisDirector::StartDrag(ATarsisGuard* G)
 {
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 	if (!C || !G) return;
+	TakedownSceneRelease(G);   // tanda N: si aun estaba en el remate, cae ya
 	Dragged = G;
 	// tanda C: si el cuerpo esta con ragdoll, se agarra de los hombros con un tirador fisico y las piernas arrastran
 	if (G->IsRagdoll())
@@ -1642,7 +1644,7 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 	const FQuat Rel = FRotator(7.0f * RecoilT - (bFPRifle ? 16.0f : 14.0f) * Strike, 0.0f, 0.0f).Quaternion() * FRotator(0.0f, -90.0f, 0.0f).Quaternion();
 	// la cabeza del maniquí, en la cámara: así la pistola queda donde la llevaría alguien de tu altura
 	const FVector Head = Arms->GetBoneLocation(TEXT("head"), EBoneSpaces::ComponentSpace);
-	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + (AimArmsShift + AimAutoShift) * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT + (bFPRifle ? 24.0f : 32.0f) * Strike, -3.0f * Strike, -30.0f * (1.0f - ArmsShow) + (bFPRifle ? 4.0f : -3.0f) * Strike);
+	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + (bFPRifle ? FPRifleArmsShift : FVector::ZeroVector) + (AimArmsShift + AimAutoShift) * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT + (bFPRifle ? 24.0f : 32.0f) * Strike, -3.0f * Strike, -30.0f * (1.0f - ArmsShow) + (bFPRifle ? 4.0f : -3.0f) * Strike);
 	Arms->SetRelativeLocationAndRotation(Loc, Rel);
 }
 
@@ -1693,7 +1695,11 @@ void ATarsisDirector::SetupSound()
 		// tanda B: los disparos de 7,62 (cerca, media y lejos)
 		TEXT("disparo_cerca_1"), TEXT("disparo_cerca_2"), TEXT("disparo_cerca_3"), TEXT("disparo_cerca_4"),
 		TEXT("disparo_media_1"), TEXT("disparo_media_2"), TEXT("disparo_media_3"), TEXT("disparo_media_4"),
-		TEXT("disparo_lejos_1"), TEXT("disparo_lejos_2"), TEXT("disparo_lejos_3"), TEXT("disparo_lejos_4") };
+		TEXT("disparo_lejos_1"), TEXT("disparo_lejos_2"), TEXT("disparo_lejos_3"), TEXT("disparo_lejos_4"),
+		// tanda N: silbidos, impactos y el golpe seco de los remates
+		TEXT("silbido_1"), TEXT("silbido_2"), TEXT("silbido_3"), TEXT("impacto_tierra_1"), TEXT("impacto_tierra_2"), TEXT("impacto_tierra_3"),
+		TEXT("impacto_metal_1"), TEXT("impacto_metal_2"), TEXT("impacto_metal_3"), TEXT("impacto_madera_1"), TEXT("impacto_madera_2"),
+		TEXT("impacto_madera_3"), TEXT("golpe_seco_1"), TEXT("golpe_seco_2") };
 	for (const TCHAR* N : Pre) Sfx(N);
 	StoneSnd = LoadSnd(TEXT("piedra"));
 	DartSnd = LoadSnd(TEXT("dardo"));

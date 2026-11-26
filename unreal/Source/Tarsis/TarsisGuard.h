@@ -445,6 +445,8 @@ public:
 	 *  pone una animación suelta en el maniquí del GASP (la persona la copia con el retarget) y SceneEnd le devuelve el
 	 *  ABP; el director lo agacha y lo suelta al acabar. */
 	bool bSceneLock = false;
+	/** Tanda N: el remate lo hace la pareja del GASP; la caida (ragdoll) la pone la escena en su segundo. */
+	bool bSceneFallPending = false;
 	bool ScenePlay(class UAnimSequenceBase* A);
 	void SceneEnd();
 
@@ -1000,6 +1002,7 @@ private:
 	float TowerAimT = 0.0f;
 	FVector CoverThreat = FVector::ZeroVector;
 	float AimT = 0.0f;
+	int32 ShotsThisAlert = 0;   // tanda N: los primeros tiros de cada alerta son de aviso (fallan cerca)
 	float ShotT = 0.0f;
 	float CoverT = 0.0f;
 	float TowerT = 0.0f;

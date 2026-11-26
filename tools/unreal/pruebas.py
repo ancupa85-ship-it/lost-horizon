@@ -5210,10 +5210,58 @@ def prueba_revolverse():
     yield ('hasta', lambda: not director().get_editor_property('capturing'), 25.0)
     check('ningún texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+def prueba_combate():
+    """Tanda N. Que el combate se sienta: los primeros tiros de cada alerta son de aviso (fallan cerca: impacto, silbido,
+    la vista se encoge), de noche se ven las trazadoras, la punteria se asienta con el tiempo apuntando; y el derribo por
+    la espalda es la pareja de derribo del GASP (el guardia queda derribado al instante, cae con fisica al final y hay un
+    instante de camara lenta que vuelve solo)."""
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.get_actor_label().endswith('Ramos')]
+    yield ('hasta', lambda: len(ronda()) > 2, 30.0)
+    rs = ronda()
+    for x in guardias():
+        x.hold(3600.0)
+    # 1) el derribo por la espalda con la pareja del GASP
+    g = rs[0]
+    detras_de(g, 110.0); yield 0.2
+    t0, s0 = P('takedown_scenes'), P('slow_mos')
+    check('por la espalda: E   DERRIBAR', 'DERRIBAR' in str(d.interact_prompt()), str(d.interact_prompt()))
+    d.interact(); yield 0.1
+    check('derribado al instante (para el sigilo) y con la pareja de derribo', estado(g) == 'DOWN' and P('takedown_scenes') == t0 + 1 and str(P('takedown_scene_pair')).startswith('takedown_'), '%s %s %s' % (estado(g), P('takedown_scenes'), P('takedown_scene_pair')))
+    yield ('hasta', lambda: not director().takedown_scene_playing(), 4.0)
+    check('el golpe: un instante de camara lenta, que vuelve solo', P('slow_mos') == s0 + 1 and abs(unreal.GameplayStatics.get_global_time_dilation(mundo()) - 1.0) < 0.01, '%s %.2f' % (P('slow_mos'), unreal.GameplayStatics.get_global_time_dilation(mundo())))
+    check('al final cae con fisica y la escena acaba', not d.takedown_scene_playing() and g.is_ragdoll(), '%s %s' % (d.takedown_scene_playing(), g.is_ragdoll()))
+    # 2) los tiros: de aviso primero, luego en serio (de noche: trazadoras)
+    h = rs[1]
+    d.set_day(False); yield 0.3
+    d.set_editor_property('armed_rule', True)
+    d.set_editor_property('armed_aim', 0.0)
+    d.set_editor_property('player_speed_override', 0.0)
+    a_la_vista_de(h, 700)
+    d.set_torch(True)
+    h.hold(0.0)
+    h.alarm(jugador().get_actor_location())
+    yield ('hasta', lambda: director().get_editor_property('halt'), 8.0)
+    w0, sh0, tr0, im0, nm0 = P('warn_shots_fired'), P('shots'), P('tracers'), P('shot_impacts'), P('near_misses')
+    d.set_editor_property('player_speed_override', 350.0)
+    yield ('hasta', lambda: director().get_editor_property('shots') >= sh0 + 2, 15.0)
+    avisos = d.warn_shots_now()
+    check('los primeros tiros de la alerta son de aviso (segun la dificultad)', P('warn_shots_fired') - w0 == min(avisos, P('shots') - sh0) and P('wounds') == 0, '%d avisos de %d esperados, %d tiros' % (P('warn_shots_fired') - w0, avisos, P('shots') - sh0))
+    check('el tiro que falla da en algo cerca (impacto) o te pasa silbando', P('shot_impacts') > im0 or P('near_misses') > nm0, '%d impactos, %d silbidos' % (P('shot_impacts') - im0, P('near_misses') - nm0))
+    check('de noche, cada tiro con su trazadora', P('tracers') - tr0 == P('shots') - sh0, '%d de %d' % (P('tracers') - tr0, P('shots') - sh0))
+    check('la punteria del ultimo tiro se calculo (aviso: 0)', P('last_shot_chance') >= 0.0, P('last_shot_chance'))
+    d.set_editor_property('player_speed_override', -1.0)
+    d.set_editor_property('armed_rule', False)
+    d.set_torch(False)
+    h.hold(3600.0)
+    aparte(); yield 0.5
+    check('ningun texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
+
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido], [prueba_revolverse]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido], [prueba_revolverse], [prueba_combate]]
 PRUEBAS = []
 
 

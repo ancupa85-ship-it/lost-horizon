@@ -194,12 +194,12 @@ void ATarsisDirector::DisarmGuard(ATarsisGuard* G)
 		const FVector From = G->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(FusilLado), false, G);
 		if (P) Q.AddIgnoredActor(P);
-		auto Libre = [&](const FVector& Dir) { FHitResult H; return !GetWorld()->LineTraceSingleByChannel(H, From, From + Dir * 320.0f, ECC_Visibility, Q); };
+		auto Libre = [&](const FVector& Dir) { FHitResult H; return !GetWorld()->LineTraceSingleByChannel(H, From, From + Dir * 420.0f, ECC_Visibility, Q); };
 		float Sign = FMath::RandBool() ? 1.0f : -1.0f;
 		if (!Libre(R * Sign)) Sign = -Sign;
 		const bool bSide = Libre(R * Sign);
 		const FVector Side = R * Sign * FMath::FRandRange(0.6f, 0.8f);
-		SpawnFloorRifle(Mesh, T, G, bSide ? Away * 170.0f + Side * 220.0f + FVector(0.0f, 0.0f, 240.0f) : Away * 240.0f + FVector(0.0f, 0.0f, 240.0f));
+		SpawnFloorRifle(Mesh, T, G, bSide ? Away * 230.0f + Side * 320.0f + FVector(0.0f, 0.0f, 260.0f) : Away * 340.0f + FVector(0.0f, 0.0f, 260.0f));   // tanda N: mas lejos (en sitios estrechos lo recuperaba al instante)
 		G->SetDisarmed(true);
 		++Disarms;
 		GuardSay(G, TEXT("desarmado"), true);
@@ -281,7 +281,8 @@ bool ATarsisDirector::CuerpoInteract()
 		++Counters;
 		if (G->bDisarmed)
 		{
-			// ya sin fusil, a las manos: esta vez acaba en el suelo
+			// ya sin fusil, a las manos: esta vez acaba en el suelo (tanda N: con la pareja de derribo)
+			TakedownSceneBegin(G);
 			G->KnockOut();
 			++Takedowns;
 			KickT = 0.25f;
@@ -365,6 +366,8 @@ void ATarsisDirector::CuerpoTick(float DeltaSeconds)
 	if (!W) return;
 	WeaponTick(DeltaSeconds);   // tanda L
 	DisarmSceneTick(DeltaSeconds);   // tanda M
+	TakedownSceneTick(DeltaSeconds);   // tanda N
+	PeligroTick(DeltaSeconds);
 	HeroSlingTick();
 	// la ventana: se cierra sola y te detienen como siempre
 	if (bCounterOpen)

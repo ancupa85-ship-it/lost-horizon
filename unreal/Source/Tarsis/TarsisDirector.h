@@ -1476,6 +1476,90 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
 	FString FPRifleArmsAnimPath = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS.MF_Rifle_Idle_ADS");
 
+	// ---- tanda N, primera parte (TarsisPeligro.cpp, TarsisCombat.cpp, TarsisCapturaEscena.cpp): el combate se siente
+	/** Los tiros se ven y se oyen: impacto donde dan, trazadora de noche, silbido y vista que se encoge si pasan cerca. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	bool bShotFxRule = true;
+	/** Con el fusil en primera persona, los brazos se suben/adelantan esto (cm, ejes de ArmsOffset): se veian muy abajo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	FVector FPRifleArmsShift = FVector(2.0f, 0.0f, 2.0f);   // medido: con mas, el brazo izquierdo de Manny se mete en la camara
+	/** Tiros de aviso al empezar cada alerta (fallan cerca, a proposito) por dificultad: FACIL, NORMAL, DIFICIL. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	int32 WarnShotsEasy = 2;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	int32 WarnShotsNormal = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	int32 WarnShotsHard = 0;
+	/** Segundos apuntando hasta la punteria plena (empieza en AimSettleFrom). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float AimSettleSeconds = 1.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float AimSettleFrom = 0.55f;
+	/** Con la cintura tapada (caja, murete) y la cabeza a la vista, la punteria se multiplica por esto. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float CoverHitMul = 0.4f;
+	/** Una bala que pasa a menos de esto (cm) de tu cabeza silba y te encoge la vista. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float WhizRadius = 230.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	FString ImpactFxPath;   // vacio: el impacto propio (polvo y chispas, sin texturas); el de Twinblast cargaba ~110 Mpx de texturas
+	/** Impacto propio: material del polvo (translucido, parametro Opacidad) y cuanto crece y dura. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	FString DustMaterialPath = TEXT("/Game/Tarsis/Materiales/M_PolvoImpacto.M_PolvoImpacto");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float DustSize = 55.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float DustSeconds = 0.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float ImpactFxScale = 0.45f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	FString TracerMaterialPath = TEXT("/Game/Tarsis/Materiales/M_Trazadora.M_Trazadora");
+	/** Trazadora: velocidad (cm/s), largo (cm) y grosor (cm); solo de noche. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float TracerSpeed = 30000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float TracerLength = 260.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float TracerWidth = 1.6f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	int32 NearMisses = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	int32 WarnShotsFired = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	int32 ShotImpacts = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	int32 Tracers = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	float SuppressT = 0.0f;
+	/** Punteria del ultimo tiro (pruebas): probabilidad de dar con todo aplicado. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	float LastShotChance = 0.0f;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Combate")
+	int32 WarnShotsNow() const { return Difficulty <= 0 ? WarnShotsEasy : (Difficulty >= 2 ? WarnShotsHard : WarnShotsNormal); }
+	/** El remate (E por la espalda o al aturdido) con la pareja de derribo del GASP: Cuttlas _A, el guardia _V. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	bool bTakedownAnimRule = true;
+	/** Segundos desde la E hasta el golpe (la animacion empieza ya avanzada). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float TakedownLeadIn = 0.3f;
+	/** Un instante de camara lenta en el golpe: escala del tiempo y segundos reales. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	bool bSlowMoRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float SlowMoDilation = 0.3f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Combate")
+	float SlowMoSeconds = 0.22f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	int32 TakedownScenes = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	int32 SlowMos = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Combate")
+	FString TakedownScenePair;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Combate")
+	bool TakedownScenePlaying() const { return TSGuard.IsValid(); }
+	/** El guardia del remate va a cambiar de mano (arrastrarlo, otro golpe): cae ya. */
+	void TakedownSceneRelease(class ATarsisGuard* G) { if (TSGuard.Get() == G) TakedownSceneFall(); }
+
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
@@ -2490,7 +2574,7 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Armado")
 	TObjectPtr<class ATarsisGuard> Aimer;
 	void ReportAim(class ATarsisGuard* G, float Dist);
-	void ShotFired(class ATarsisGuard* G, bool bHit);
+	void ShotFired(class ATarsisGuard* G, bool bHit, const FVector& MissAim = FVector::ZeroVector);
 	void ArmedTick(float DeltaSeconds);
 	float HitFlashT = 0.0f;
 	float ShotFlashT = 0.0f;
@@ -3308,6 +3392,30 @@ private:
 	bool bDSHero = false, bDSGuardOn = false;
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> HeroSling;
 	UPROPERTY() TObjectPtr<class UAnimationAsset> ArmsAnimKeep;
+	// tanda N
+	bool TakedownSceneBegin(class ATarsisGuard* G);
+	void TakedownSceneTick(float DeltaSeconds);
+	void TakedownSceneFall();
+	void TakedownSceneEnd();
+	void SlowMo();
+	void PeligroTick(float DeltaSeconds);
+	void ShotFx(class ATarsisGuard* G, const FVector& Muzzle, bool bHit, const FVector& MissAim);
+	TWeakObjectPtr<class ATarsisGuard> TSGuard;
+	float TST = 0.0f, TSFallAt = 0.0f, TSEndAt = 0.0f;
+	FTransform TSComp, TSGuardRel;
+	FVector TSLungeFrom = FVector::ZeroVector, TSLungeTo = FVector::ZeroVector, TSFallDir = FVector::ZeroVector;
+	float TSYawTo = 0.0f;
+	bool bTSHero = false, bTSFell = false, bTSHit = false;
+	double SlowMoUntil = 0.0;
+	struct FTarsisTracer { TWeakObjectPtr<class UStaticMeshComponent> C; FVector From, To; float T = 0.0f, Len = 1.0f; };
+	TArray<FTarsisTracer> TracerList;
+	struct FTarsisPuff { TWeakObjectPtr<class UStaticMeshComponent> C; TWeakObjectPtr<class UMaterialInstanceDynamic> M; FVector P, V; float T = 0.0f; bool bSpark = false; };
+	TArray<FTarsisPuff> PuffList;
+	UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> PuffPool;
+	class UStaticMeshComponent* PuffGet(bool bSpark);
+	void ImpactPuff(const FVector& At, const FVector& Normal, bool bMetal);
+	UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> TracerPool;
+	UPROPERTY() TObjectPtr<class UPostProcessComponent> SuppressPP;
 	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> ValveAudio;
