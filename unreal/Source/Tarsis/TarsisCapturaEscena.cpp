@@ -458,3 +458,122 @@ void ATarsisDirector::SceneBlurTick(float DeltaSeconds)
 	ScenePP->BlendWeight = W;
 	ScenePP->SetVisibility(W > 0.0f);
 }
+
+// ---------------------------------------------------------------- tanda M: el golpe al fusil, la pareja al reves
+// Cuttlas hace la parte _A del empujon parado y el guardia la _V. El guardia no se mueve: su raiz de _V queda donde esta
+// (girado hacia ti si la pareja lo pide) y Cuttlas se abalanza en DisarmLungeTime hasta donde empieza su raiz de _A.
+// Las dos empiezan ya avanzadas (el contacto llega DisarmLeadIn tras la E); el guardia suelta su parte poco despues del
+// contacto, antes de la caida (el traspie lo sigue la reaccion de Lyra) y Cuttlas recupera el control enseguida.
+bool ATarsisDirector::DisarmSceneBegin(ATarsisGuard* G)
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!bDisarmAnimRule || !G || !C || !PC || bCapturing || !G->UsesGasp() || !G->GetMesh()) return false;
+	if (DSGuard.IsValid()) DisarmSceneEnd();
+	// la pareja cuyo atacante viene del lado en que estas tu respecto al guardia
+	const FTransform GuardRel = G->GetMesh()->GetRelativeTransform();
+	const float GroundZ = G->GetActorLocation().Z - G->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FTransform GuardFrame(FRotator(0.0f, G->GetActorRotation().Yaw + GuardRel.Rotator().Yaw, 0.0f),
+		FVector(G->GetActorLocation().X, G->GetActorLocation().Y, GroundZ + GuardRel.GetLocation().Z + G->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	const FVector Local = GuardFrame.InverseTransformPosition(C->GetActorLocation()).GetSafeNormal2D();
+	int32 Best = INDEX_NONE;
+	float BestDot = -2.0f;
+	for (int32 i = 0; i < UE_ARRAY_COUNT(ScenePairs); ++i)
+	{
+		const FScenePair& Pr = ScenePairs[i];
+		if (FCString::Strcmp(Pr.Kind, TEXT("shove")) != 0) continue;
+		const FVector Rel = RootAt(Pr.RootV, Pr.YawV).InverseTransformPosition(Pr.RootA).GetSafeNormal2D();
+		const float Dot = FVector::DotProduct(Local, Rel);
+		if (Dot > BestDot) { BestDot = Dot; Best = i; }
+	}
+	if (Best == INDEX_NONE) return false;
+	const FScenePair& Pr = ScenePairs[Best];
+	UAnimSequenceBase* A = LoadPairAnim(Pr, true);
+	if (!A) return false;
+	DSComp = RootAt(Pr.RootV, Pr.YawV).Inverse() * GuardFrame;
+	const FTransform HeroRoot = RootAt(Pr.RootA, Pr.YawA) * DSComp;
+	// el guardia: la parte _V del GASP acaba en el suelo (es la entrada al ragdoll) y, cortada, se le veia hundido; en su
+	// lugar la reaccion fuerte de Lyra, sin moverlo de su sitio (medido en las capturas de la tanda M)
+	DSGuardRel = GuardRel;
+	G->HitReact(G->GetActorLocation() - C->GetActorLocation(), true);
+	bDSGuardOn = false;
+	// Cuttlas: se abalanza hasta su sitio, mirando al guardia
+	DSLungeFrom = C->GetActorLocation();
+	DSLungeTo = FVector(HeroRoot.GetLocation().X, HeroRoot.GetLocation().Y, C->GetActorLocation().Z);
+	if (FVector::Dist2D(DSLungeFrom, DSLungeTo) > 260.0f) DSLungeTo = DSLungeFrom;   // muy lejos: sin abalanzarse
+	DSYawTo = (G->GetActorLocation() - DSLungeTo).Rotation().Yaw;
+	PC->SetIgnoreMoveInput(true);
+	bDSHero = false;
+	if (HeroDriver && HeroBody && !bSceneHero)
+	{
+		HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		HeroDriver->PlayAnimation(A, false);
+		HeroDriver->SetPosition(FMath::Min(FMath::Max(0.0f, Pr.Hit - DisarmLeadIn), A->GetPlayLength() - 0.05f), false);
+		HeroDriver->SetWorldTransform(DSComp);
+		bSceneHero = true;
+		bDSHero = true;
+	}
+	DSGuard = G;
+	DST = 0.0f;
+	++DisarmScenes;
+	DisarmScenePair = FString::Printf(TEXT("shove_%s"), Pr.Dir);
+	return true;
+}
+
+void ATarsisDirector::DisarmSceneTick(float DeltaSeconds)
+{
+	ATarsisGuard* G = DSGuard.Get();
+	if (!G) return;
+	if (bCapturing || G->State == ETarsisGuardState::Down) { DisarmSceneEnd(); return; }
+	DST += DeltaSeconds;
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (C && DST <= DisarmLungeTime + DeltaSeconds)
+	{
+		const float S = FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(DST / FMath::Max(DisarmLungeTime, 0.01f), 0.0f, 1.0f));
+		C->SetActorLocation(FMath::Lerp(DSLungeFrom, DSLungeTo, S), true);
+	}
+	if (PC)
+	{
+		FRotator R = PC->GetControlRotation();
+		R.Yaw = FMath::RInterpTo(R, FRotator(R.Pitch, DSYawTo, 0.0f), DeltaSeconds, 14.0f).Yaw;
+		PC->SetControlRotation(R);
+	}
+	if (bDSHero && HeroDriver) HeroDriver->SetWorldTransform(DSComp);
+	if (bDSGuardOn && DST >= DisarmLeadIn + DisarmGuardRelease)
+	{
+		// el guardia suelta su parte donde acabo su raiz y sigue con el traspie
+		const FVector Root = G->GetMesh()->GetSocketLocation(TEXT("root"));
+		G->GetMesh()->SetRelativeTransform(DSGuardRel);
+		G->SetActorLocation(FVector(Root.X, Root.Y, G->GetActorLocation().Z), true);
+		G->SceneEnd();
+		G->bSceneLock = false;
+		bDSGuardOn = false;
+		if (C) G->HitReact(G->GetActorLocation() - C->GetActorLocation(), true);
+	}
+	if (DST >= DisarmLeadIn + FMath::Max(DisarmHeroRelease, DisarmGuardRelease)) DisarmSceneEnd();
+}
+
+void ATarsisDirector::DisarmSceneEnd()
+{
+	ATarsisGuard* G = DSGuard.Get();
+	if (G && bDSGuardOn)
+	{
+		const FVector Root = G->GetMesh()->GetSocketLocation(TEXT("root"));
+		G->GetMesh()->SetRelativeTransform(DSGuardRel);
+		if (G->State != ETarsisGuardState::Down) G->SetActorLocation(FVector(Root.X, Root.Y, G->GetActorLocation().Z), true);
+		G->SceneEnd();
+		G->bSceneLock = false;
+	}
+	bDSGuardOn = false;
+	if (bDSHero && HeroDriver)
+	{
+		ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+		if (C && HeroDriver->GetAttachParent() != C->GetCapsuleComponent()) HeroDriver->AttachToComponent(C->GetCapsuleComponent(), FAttachmentTransformRules::KeepWorldTransform);
+		HeroDriver->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+		bSceneHero = false;   // GaspHeroTick vuelve a colocarlo con la capsula
+	}
+	bDSHero = false;
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0)) PC->SetIgnoreMoveInput(false);
+	DSGuard = nullptr;
+}

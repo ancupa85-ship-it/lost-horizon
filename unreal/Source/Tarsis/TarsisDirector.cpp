@@ -1615,8 +1615,8 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 	if (!Arms) return;
 	// con dardos y las manos libres, la pistola sube a la vista; si no, baja y se oculta
 	// tanda L: tambien con el fusil en la mano, y siempre durante el golpe (revolverse, desarmar)
-	const bool bWant = (Darts > 0 || (ItemSel == 9 && PlayerRifleAmmo > 0) || StrikeT > 0.0f) && !bCine && !bDone && !bBinoculars && !bKeypad && !Dragged && !bMenu && !bReport && !bChoice && !bHiding && !bRiding;
-	ArmsShow = StrikeT > 0.0f ? 1.0f : FMath::FInterpConstantTo(ArmsShow, bWant ? 1.0f : 0.0f, DeltaSeconds, 3.5f);
+	const bool bWant = (Darts > 0 || (ItemSel == 9 && PlayerRifleAmmo > 0) || StrikeT > 0.0f) && !bThirdShown && !bCine && !bDone && !bBinoculars && !bKeypad && !Dragged && !bMenu && !bReport && !bChoice && !bHiding && !bRiding;
+	ArmsShow = (StrikeT > 0.0f && !bThirdShown) ? 1.0f : FMath::FInterpConstantTo(ArmsShow, bWant ? 1.0f : 0.0f, DeltaSeconds, 3.5f);
 	const bool bVis = ArmsShow > 0.01f;
 	if (Arms->IsVisible() != bVis) Arms->SetVisibility(bVis, true);
 	bArmsVisible = ArmsShow > 0.99f;
@@ -1636,10 +1636,13 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 	RecoilT = FMath::Max(0.0f, RecoilT - DeltaSeconds * 5.0f);
 	// tanda L: el golpe, un empujon de brazos (o de culata) hacia delante y abajo que vuelve
 	const float Strike = StrikeT > 0.0f ? FMath::Sin(PI * (1.0f - StrikeT / FMath::Max(StrikeLen, 0.05f))) : 0.0f;
-	const FQuat Rel = FRotator(7.0f * RecoilT - 16.0f * Strike, 0.0f, 0.0f).Quaternion() * FRotator(0.0f, -90.0f, 0.0f).Quaternion();
+	// tanda M: el empujon va mas lejos y mas bajo, con las manos libres (la pistola se guarda): antes quedaba pegado a la camara
+	const bool bBare = Strike > 0.0f && !bFPRifle;
+	if (Pistol && Pistol->IsVisible() == bBare) Pistol->SetVisibility(!bBare);
+	const FQuat Rel = FRotator(7.0f * RecoilT - (bFPRifle ? 16.0f : 14.0f) * Strike, 0.0f, 0.0f).Quaternion() * FRotator(0.0f, -90.0f, 0.0f).Quaternion();
 	// la cabeza del maniquí, en la cámara: así la pistola queda donde la llevaría alguien de tu altura
 	const FVector Head = Arms->GetBoneLocation(TEXT("head"), EBoneSpaces::ComponentSpace);
-	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + (AimArmsShift + AimAutoShift) * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT + 24.0f * Strike, -3.0f * Strike, -30.0f * (1.0f - ArmsShow) + 4.0f * Strike);
+	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + (AimArmsShift + AimAutoShift) * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT + (bFPRifle ? 24.0f : 32.0f) * Strike, -3.0f * Strike, -30.0f * (1.0f - ArmsShow) + (bFPRifle ? 4.0f : -3.0f) * Strike);
 	Arms->SetRelativeLocationAndRotation(Loc, Rel);
 }
 

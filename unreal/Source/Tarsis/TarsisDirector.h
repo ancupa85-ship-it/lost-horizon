@@ -1442,6 +1442,40 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
 	bool RiflePickFirst() const;
 
+	// ---- tanda M: el golpe al fusil con animacion de verdad (TarsisCapturaEscena.cpp, la pareja de la detencion al reves)
+	/** Al golpear el fusil (revolverse o el alto), Cuttlas hace el empujon parado del GASP (_A) y el guardia la reaccion
+	 *  fuerte de Lyra; el guardia no se mueve: Cuttlas se abalanza hasta su sitio. Sin el GASP, el golpe de antes. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	bool bDisarmAnimRule = true;
+	/** Segundos desde la E hasta que las manos llegan al fusil (las animaciones empiezan ya avanzadas). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float DisarmLeadIn = 0.25f;
+	/** Tras el contacto: cuando el guardia deja su parte (sigue con el traspie de Lyra) y cuando Cuttlas recupera el control. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float DisarmGuardRelease = 0.3f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float DisarmHeroRelease = 0.45f;
+	/** Segundos del abalanzarse hasta el sitio de la pareja. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	float DisarmLungeTime = 0.12f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	int32 DisarmScenes = 0;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Cuerpo")
+	FString DisarmScenePair;
+	/** Esta en marcha la pareja del golpe al fusil (pruebas y capturas). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	bool DisarmScenePlaying() const { return DSGuard.IsValid(); }
+	/** El guardia de la pareja va a caer (derribo, dardo...): deja la pareja ya. */
+	void DisarmSceneRelease(class ATarsisGuard* G) { if (DSGuard.Get() == G) DisarmSceneEnd(); }
+	/** En tercera persona, con el fusil recogido, a la espalda (respecto a spine_03 del cuerpo de Cuttlas). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	FTransform HeroSlingXf = FTransform(FRotator(0.0f, 0.0f, 0.0f), FVector(-18.0f, 0.0f, 0.0f));
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Cuerpo")
+	bool HeroSlingShown() const;
+	/** Animacion de los brazos de primera persona con el fusil (dos manos). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpo")
+	FString FPRifleArmsAnimPath = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MF_Rifle_Idle_ADS.MF_Rifle_Idle_ADS");
+
 	// ---- tanda 35: el calabozo (TarsisCalabozo.cpp). Convencer al cabo Vidal en tres pasos o la llave bajo la losa
 	/** Con el puzle, la reja ya no se abre sola a los CellTime segundos. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Calabozo")
@@ -3261,6 +3295,19 @@ private:
 	UPROPERTY() TObjectPtr<class UStaticMesh> PistolMeshKeep;
 	UPROPERTY() TObjectPtr<class UStaticMesh> FPRifleMesh;
 	FTransform PistolGripKeep;
+	// tanda M
+	bool DisarmSceneBegin(class ATarsisGuard* G);
+	void DisarmSceneTick(float DeltaSeconds);
+	void DisarmSceneEnd();
+	void HeroSlingTick();
+	TWeakObjectPtr<class ATarsisGuard> DSGuard;
+	float DST = 0.0f;
+	FTransform DSComp, DSGuardRel;
+	FVector DSLungeFrom = FVector::ZeroVector, DSLungeTo = FVector::ZeroVector;
+	float DSYawTo = 0.0f;
+	bool bDSHero = false, bDSGuardOn = false;
+	UPROPERTY() TObjectPtr<class UStaticMeshComponent> HeroSling;
+	UPROPERTY() TObjectPtr<class UAnimationAsset> ArmsAnimKeep;
 	TWeakObjectPtr<class ATarsisGuard> ValveCloser;
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> ValveAudio;

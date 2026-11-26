@@ -114,6 +114,9 @@ void ATarsisGuard::RifleTick(float DeltaSeconds)
 		RifleRef->PlayAnimation(bAim ? RifleAimAnim.Get() : RifleIdleAnim.Get(), true);
 	}
 	RifleAimW = FMath::FInterpConstantTo(RifleAimW, bRifleAim ? 1.0f : 0.0f, DeltaSeconds, 4.0f);
+	// tanda M: de ronda, reposo bajo; mosqueado o buscando, a la cadera (sube rapido, baja despacio)
+	const bool bLow = bRifleLowRule && State == ETarsisGuardState::Patrol && !bRifleAim;
+	RifleLowW = FMath::FInterpConstantTo(RifleLowW, bLow ? 1.0f : 0.0f, DeltaSeconds, bLow ? 0.8f : 3.0f);
 	// tanda C: andando, el torso deja pasar mas de la locomocion y el fusil se mece con el paso (sin maniqui rigido)
 	const float Speed = GetVelocity().Size2D();
 	const float Move = FMath::Clamp(Speed / 170.0f, 0.0f, 1.0f);
@@ -189,9 +192,10 @@ bool ATarsisGuard::RifleHoldTransform(FTransform& Out) const
 	const float Roll = FMath::Sin(RiflePhase) * RifleSwayRoll * K;
 	// tanda F: con alguien al lado, el canon abajo y algo cruzado (sin apuntar)
 	const float Tk = FMath::SmoothStep(0.0f, 1.0f, RifleTuckW) * (1.0f - A);
-	const FVector Off = (FMath::Lerp(RifleHipButt, RifleAimButt, A) + FVector(4.0f, 0.0f, -2.0f) * Tk + FVector(0.0f, Side, Bob)) * RiflePersonaScale;
+	const float Lw = FMath::SmoothStep(0.0f, 1.0f, RifleLowW) * (1.0f - A) * (1.0f - Tk);   // tanda M: reposo bajo
+	const FVector Off = (FMath::Lerp(RifleHipButt, RifleAimButt, A) + RifleLowButtAdd * Lw + FVector(4.0f, 0.0f, -2.0f) * Tk + FVector(0.0f, Side, Bob)) * RiflePersonaScale;
 	const FVector Butt = Sh + F * Off.X + R * Off.Y + U * Off.Z;
-	const float P = FMath::DegreesToRadians(FMath::Lerp(FMath::Lerp(RifleHipPitch, RifleAimPitch, A), RifleTuckPitch, Tk));
+	const float P = FMath::DegreesToRadians(FMath::Lerp(FMath::Lerp(FMath::Lerp(RifleHipPitch, RifleLowPitch, Lw), RifleAimPitch, A), RifleTuckPitch, Tk));
 	const float Y = FMath::DegreesToRadians(FMath::Lerp(FMath::Lerp(RifleHipYaw, RifleAimYaw, A), RifleTuckYaw, Tk));
 	const FVector Barrel = (F * FMath::Cos(P) * FMath::Cos(Y) + R * FMath::Cos(P) * FMath::Sin(Y) + U * FMath::Sin(P)).GetSafeNormal();
 	const FVector Up = FQuat(Barrel, FMath::DegreesToRadians(Roll)).RotateVector(U);

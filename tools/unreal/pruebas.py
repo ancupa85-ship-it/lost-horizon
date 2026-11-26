@@ -5093,6 +5093,7 @@ def prueba_revolverse():
     check('y pide refuerzos', any(str(x).endswith('_desarmado') for x in P('voice_log')), [str(x) for x in P('voice_log')][-3:])
     check('tanda L: se ve el golpe de Cuttlas (brazos hacia delante)', P('strikes') >= 1, P('strikes'))
     # tanda L: la E por mirada, junto al fusil del suelo y con él aturdido a mano
+    yield 0.6   # tanda M: el fusil sale de lado y aun va por el aire; se mira donde ha caido
     rl0 = d.floor_rifle_loc(0)
     if g.is_stunned():
         mirar(V(rl0.x, rl0.y, rl0.z)); yield 0.05
@@ -5131,14 +5132,21 @@ def prueba_revolverse():
             break
         a_la_vista_de(h, 600); yield 0.2
     check('te apunta (el alto)', P('halt'), '%s vis=%.2f d=%.0f oculto=%s celda=%s' % (estado(h), h.visibility(jugador()), dist2d(h.get_actor_location(), jugador().get_actor_location()), jugador().get_editor_property('hidden'), estado(h)))
-    lejos = 'GOLPEAR' not in str(d.interact_prompt())
+    # tanda M: quieto mientras se mide (antes se acercaba a detenerte y a veces ya estaba a menos de 2,2 m: «lejos» fallaba)
+    h.hold(3600.0)
     hl = h.get_actor_location(); pl = jugador().get_actor_location()
     dd = (pl - hl); dd.z = 0
     n = dd.length() or 1.0
+    jugador().set_actor_location(V(hl.x + dd.x / n * 500, hl.y + dd.y / n * 500, pl.z), False, True); yield 0.15
+    p_lejos = str(d.interact_prompt())
     jugador().set_actor_location(V(hl.x + dd.x / n * 150, hl.y + dd.y / n * 150, pl.z), False, True); yield 0.15
-    check('lejos no vale; a menos de 2,2 m: E   GOLPEAR EL FUSIL', lejos and 'GOLPEAR' in str(d.interact_prompt()), str(d.interact_prompt()))
+    check('lejos no vale; a menos de 2,2 m: E   GOLPEAR EL FUSIL', 'GOLPEAR' not in p_lejos and 'GOLPEAR' in str(d.interact_prompt()), '%s | %s' % (p_lejos, d.interact_prompt()))
     d.interact(); yield 0.2
     check('le golpeas el fusil: al suelo', h.get_editor_property('disarmed') and d.floor_rifle_count() == 1, '%s %d' % (h.get_editor_property('disarmed'), d.floor_rifle_count()))
+    check('tanda M: con la pareja del empujon (Cuttlas _A, el guardia _V)', P('disarm_scenes') >= 1 and str(P('disarm_scene_pair')).startswith('shove_'), '%d %s' % (P('disarm_scenes'), P('disarm_scene_pair')))
+    yield 0.6
+    check('tanda M: la pareja acaba y devuelve el control', not d.disarm_scene_playing(), d.disarm_scene_playing())
+    h.hold(0.0)
     s0 = P('shots')
     aparte(); yield 0.3
     r0 = P('rifles_recovered')

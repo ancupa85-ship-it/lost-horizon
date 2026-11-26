@@ -502,6 +502,17 @@ public:
 	float RifleSwayRoll = 3.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
 	float RifleStepLength = 75.0f;
+	/** Tanda M: de ronda y tranquilo, el fusil en reposo bajo (canon hacia el suelo); al mosquearse sube a la cadera. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	bool bRifleLowRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	float RifleLowPitch = -36.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FVector RifleLowButtAdd = FVector(2.0f, 0.0f, -4.0f);
+	/** 0 a la cadera, 1 en reposo bajo (pruebas). */
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
+	float RifleLow() const { return RifleLowW; }
+	float RifleLowW = 0.0f;
 	/** La culata y el hombro derecho, en el mundo (pruebas: apuntando, la culata al hombro). */
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Armas")
 	FVector RifleButt() const;

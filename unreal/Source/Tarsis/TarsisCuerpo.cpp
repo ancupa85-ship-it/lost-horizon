@@ -11,6 +11,8 @@
 #include "TarsisSave.h"
 
 #include "AIController.h"
+#include "Animation/AnimationAsset.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
@@ -186,8 +188,9 @@ void ATarsisDirector::DisarmGuard(ATarsisGuard* G)
 			if (S && S->GetStaticMesh() && S->GetStaticMesh()->GetName().Contains(TEXT("M14"))) { Mesh = S->GetStaticMesh(); T = S->GetComponentTransform(); break; }
 		}
 		if (!Mesh) Mesh = LoadObject<UStaticMesh>(nullptr, RiflePath);
-		const FVector Side = FVector::CrossProduct(FVector::UpVector, Away) * FMath::FRandRange(-1.0f, 1.0f);
-		SpawnFloorRifle(Mesh, T, G, Away * 260.0f + Side * 180.0f + FVector(0.0f, 0.0f, 260.0f));
+		// tanda M: arrancado hacia un lado (antes caia detras del guardia, en la linea de la vista: la E dudaba entre los dos)
+		const FVector Side = FVector::CrossProduct(FVector::UpVector, Away) * (FMath::RandBool() ? 1.0f : -1.0f) * FMath::FRandRange(0.75f, 1.0f);
+		SpawnFloorRifle(Mesh, T, G, Away * 140.0f + Side * 250.0f + FVector(0.0f, 0.0f, 260.0f));
 		G->SetDisarmed(true);
 		++Disarms;
 		GuardSay(G, TEXT("desarmado"), true);
@@ -195,7 +198,8 @@ void ATarsisDirector::DisarmGuard(ATarsisGuard* G)
 		Teach(TEXT("ensena_desarme"), TEXT("DESARMADO\nLe has quitado el fusil. Aturdido, la E lo derriba; si no, ira a por el arma.\nEl fusil del suelo se recoge con la E."), {}, 5.0f);
 	}
 	G->Stun(DisarmStun);
-	G->LaunchCharacter(Away * 140.0f + FVector(0.0f, 0.0f, 40.0f), true, false);   // un traspie: sigue a mano para la E
+	// tanda M: con el GASP, el empujon de verdad (la pareja de la detencion al reves); si no, el traspie de antes
+	if (!DisarmSceneBegin(G)) G->LaunchCharacter(Away * 140.0f + FVector(0.0f, 0.0f, 40.0f), true, false);   // un traspie: sigue a mano para la E
 	if (ArrestGuard == G) ArrestGuard = nullptr;
 	if (Aimer == G) Aimer = nullptr;
 	KickT = 0.25f;
@@ -351,6 +355,8 @@ void ATarsisDirector::CuerpoTick(float DeltaSeconds)
 	UWorld* W = GetWorld();
 	if (!W) return;
 	WeaponTick(DeltaSeconds);   // tanda L
+	DisarmSceneTick(DeltaSeconds);   // tanda M
+	HeroSlingTick();
 	// la ventana: se cierra sola y te detienen como siempre
 	if (bCounterOpen)
 	{
@@ -504,6 +510,9 @@ void ATarsisDirector::WeaponTick(float DeltaSeconds)
 			PistolGripKeep = Pistol->GetRelativeTransform();
 			Pistol->SetStaticMesh(FPRifleMesh);
 			bFPRifle = true;
+			// tanda M: los brazos con la pose de fusil de Lyra (dos manos), no la de la pistola
+			if (Arms)
+				if (UAnimationAsset* RA = LoadObject<UAnimationAsset>(nullptr, *FPRifleArmsAnimPath)) Arms->PlayAnimation(RA, true);
 		}
 		Pistol->SetRelativeTransform(FPRifleGrip);   // cada fotograma: se puede afinar en el director en marcha
 	}
@@ -512,5 +521,29 @@ void ATarsisDirector::WeaponTick(float DeltaSeconds)
 		if (PistolMeshKeep) Pistol->SetStaticMesh(PistolMeshKeep);
 		Pistol->SetRelativeTransform(PistolGripKeep);
 		bFPRifle = false;
+		if (Arms)
+			if (UAnimationAsset* PA = LoadObject<UAnimationAsset>(nullptr, *ArmsAnimPath)) Arms->PlayAnimation(PA, true);
 	}
+}
+
+bool ATarsisDirector::HeroSlingShown() const
+{
+	return HeroSling && HeroSling->IsVisible();
+}
+
+void ATarsisDirector::HeroSlingTick()
+{
+	// tanda M: en tercera persona, el fusil recogido va a la espalda de Cuttlas (en primera lo llevas en las manos)
+	const bool bWant = HeroBody && bThirdShown && ItemCount(9) > 0 && !bCapturing;
+	if (bWant && !HeroSling && FPRifleMesh)
+	{
+		HeroSling = NewObject<UStaticMeshComponent>(this, TEXT("FusilEspalda"));
+		HeroSling->SetStaticMesh(FPRifleMesh);
+		HeroSling->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HeroSling->SetupAttachment(HeroBody, TEXT("spine_03"));
+		HeroSling->RegisterComponent();
+	}
+	if (!HeroSling) return;
+	if (HeroSling->IsVisible() != bWant) HeroSling->SetVisibility(bWant);
+	if (bWant) HeroSling->SetRelativeTransform(HeroSlingXf);   // se puede afinar en el director en marcha
 }

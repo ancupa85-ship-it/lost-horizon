@@ -27,6 +27,15 @@ Seis siluetas: Ibarra (capote y capucha), Moya (casco y correaje), Peris (gorra)
 
 Ojo: el esqueleto es el mismo en los tres cuerpos y no coincide con las mallas (codos y hombros hasta unos 8 cm fuera en Ibarra y Moya). Las medidas de las prendas se toman de la malla, no de los huesos.
 
+**Tanda M: esqueleto recolocado (`_v2`).** `tools/vestuario/esqueleto_v2.py` calcula hombro, codo, muñeca, cadera, rodilla y tobillo a partir de la malla y de sus pesos (eje principal de los vértices de cada hueso; la franja de pesos compartidos para los extremos) y mueve solo esas articulaciones: no gira huesos, no repesa y no toca la malla; rehace las matrices de enlace y las traslaciones de las animaciones del .glb. Cada cadena (brazo, pierna) se acepta solo si la malla se deforma mejor al doblarla (`esqueleto_medir.py`: estiramiento de aristas en la franja del codo, hombro o rodilla). Resultado en Ibarra, Moya y Cuttlas: los brazos, de unos 25 % a unos 15 % de estiramiento; en Peris los brazos ya estaban bien y solo cambian las piernas. Las `.glb` `_v2` no van en el repositorio porque salen igual cada vez; para regenerarlas (cualquier Python con numpy, por ejemplo el de Blender):
+
+    python tools/vestuario/esqueleto_v2.py            # sin_equipo/{ibarra,moya,peris}_v2.glb
+    # y en Python, para las seis siluetas vestidas y Cuttlas y Roig:
+    #   import esqueleto_v2 as E; [E.trasplantar(<sin_equipo>/<base>.glb, <p>.glb, <p>_v2.glb) for p, base in E.VESTIDOS.items()]
+    #   E.procesar(cuttlas.glb, cuttlas_v2.glb); E.procesar(roig.glb, roig_v2.glb)
+
+En el editor las monta `tools/unreal/esqueleto_v2_ue.py`: reimporta cada `_v2` en la misma carpeta y con los mismos nombres que la de antes (nada del nivel ni del código cambia) y rehace las poses de fusil retargeteadas. Para volver a la v1 de una persona: `LH_ESQ_VARIANTE=v1 LH_ESQ_SOLO=<persona>`.
+
 ### Perímetro, portones y camino (tanda 20)
 
 `tools/unreal/exportar_base.py` exporta la base con el muro perimetral 10 casillas (20 m) más afuera que el plano del juego (`LH_EXT`, por defecto 10; con `LH_EXT=0` sale la base original, idéntica). Lo levanta `build_exterior()` en `tools/blender/escena_base.py`: muro nuevo de 112 × 96 m, portón de entrada al oeste (hoja corredera cerrada) y de salida al este (hoja corrida), cada uno con su garita y su báculo; un camino de 6 m que cruza de portón a portón por la franja sur y sigue fuera por un terraplén sobre la marisma, y el portillo de la marisma en el muro sur. El tabique entre el patio norte y la zona este llega hasta el muro nuevo y tres vallas con paso agachado cruzan el anillo, para que no sirva de atajo entre zonas.

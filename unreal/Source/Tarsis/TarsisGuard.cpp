@@ -667,6 +667,8 @@ bool ATarsisGuard::CanBeTakenDown(const AActor* Who) const
 void ATarsisGuard::KnockOut()
 {
 	if (State == ETarsisGuardState::Down) return;
+	// tanda M: si estaba en la pareja del golpe al fusil, la suelta antes de caer
+	if (bSceneLock) for (TActorIterator<ATarsisDirector> It(GetWorld()); It; ++It) { It->DisarmSceneRelease(this); break; }
 	if (AAIController* AI = Cast<AAIController>(GetController())) AI->StopMovement();
 	State = ETarsisGuardState::Down;
 	StateT = 0.0f;
