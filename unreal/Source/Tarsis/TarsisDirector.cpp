@@ -269,6 +269,9 @@ void ATarsisDirector::Takedown()
 {
 	ATarsisGuard* G = TakedownTarget();
 	if (!G) return;
+	// tanda Q: la contra y el remate separados. La E pulsada al principio del tambaleo se guarda y sale a los
+	// StaggerRemateDelay (asi se ve la contra entera antes del remate)
+	if (G == DuelGuard.Get() && DuelPhaseN == 5 && DuelT < StaggerRemateDelay) { bRemateQueued = true; return; }
 	TakedownSceneBegin(G);   // tanda N: con el GASP, la pareja de derribo (la caida la pone la escena)
 	G->KnockOut();
 	++Takedowns;
@@ -1925,6 +1928,7 @@ void ATarsisDirector::GuardSay(ATarsisGuard* G, const FString& Key, bool bRadio)
 	const bool bUrgent = Key == TEXT("eh") || Key == TEXT("alto") || Key == TEXT("suelo") || Key == TEXT("puerta") || Key == TEXT("luz") || Key == TEXT("donde")
 		|| Key == TEXT("tengo") || Key == TEXT("cuerpo") || Key == TEXT("farol") || Key == TEXT("farola") || Key == TEXT("apoyo") || Key == TEXT("voy") || Key == TEXT("perdido") || Key == TEXT("despierta")
 		|| Key == TEXT("sinradio") || Key == TEXT("emisora") || Key == TEXT("antena") || Key == TEXT("antena_ve") || Key == TEXT("gasoil") || Key == TEXT("falta") || Key == TEXT("nirastro") || Key == TEXT("nirastro_solo") || Key == TEXT("lata") || Key == TEXT("tropiezo") || Key == TEXT("trampa") || Key == TEXT("tabaco") || Key == TEXT("sueno") || Key == TEXT("valla") || Key == TEXT("desarmado") || Key == TEXT("mifusil") || Key == TEXT("fusil") || Key == TEXT("papeles") || Key == TEXT("pase") || Key == TEXT("registro");
+	if (!bUrgent && FPlatformTime::Seconds() < VoicesQuietUntil) return;   // tanda Q: callados justo tras la contra o el remate
 	FString& Prev = VoicePrev.FindOrAdd(K);
 	// tras avisar por radio del cuerpo, la alarma que sigue no lo pisa con un «¡alto!»
 	if (Now < Next && (!bUrgent || Prev == TEXT("suelo"))) return;
@@ -4418,6 +4422,11 @@ void ATarsisDirector::CentralSay(const FString& Key, const FString& Text, float 
 		return;
 	}
 	if (bCine || bDone || RadioDead()) return;   // tanda 32: con la emisora muda la central no se oye
+	// tanda Q: la radio no pisa el momento fuerte (contra, remate): espera a que pase
+	{
+		const double NowQ = FPlatformTime::Seconds();
+		if (NowQ < VoicesQuietUntil) { CentralSay(Key, Text, float(VoicesQuietUntil - NowQ) + 0.1f); return; }
+	}
 	if (USoundBase* S = Sfx(TEXT("voz_central_") + Key)) UGameplayStatics::PlaySound2D(this, S, 0.8f);
 	else if (RadioSnd) UGameplayStatics::PlaySound2D(this, RadioSnd, 0.35f);
 	LastVoice = TEXT("central_") + Key;

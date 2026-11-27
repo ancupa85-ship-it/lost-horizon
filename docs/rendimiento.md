@@ -286,3 +286,17 @@ Lectura: la tanda P no cuesta.
 - **Patio central:** los 3 fps de menos respecto a la O llegan con la GPU subiendo de 58 a 77 °C durante la medida, igual que en las medidas en caliente.
 - **VRAM:** queda por debajo de la O. Los sonidos son cortos y las piezas de animación pequeñas.
 - **Tirones:** el peor 1 % de la entrada sigue con el tirón de los primeros disparos con trazadora, como en la N2 y la O.
+
+## Tanda Q: ritmo y turnos del combate
+
+Misma medida: de noche, tres guardias en alerta contra ti en cada sitio, con el editor recién abierto. La primera pasada salió a 18,6 / 14,1 / 16,8 fps, con el peor 1 % entre 3,8 y 6,7, y no cuenta. Fue el calentamiento: al editor recién abierto le tocaba crear los estados de render (PSO) de cero. La segunda, con la GPU de 68 a 75 °C y la ventana del PIE a 2032×1125, da lo siguiente. Entre paréntesis, la media de la tanda P.
+
+| Sitio | fps medio / peor 1 % | VRAM (MB) |
+|---|---|---|
+| Entrada | 38,2 / 32,8 (37,2) | 3353 |
+| Patio central | 34,1 / 31,0 (32,4) | 3353 |
+| Barracón oeste | 31,3 / 25,6 (33,4) | 3353 |
+
+Lectura: la tanda Q no cuesta. Solo cambia cuándo pasan las cosas, no cuántas. La VRAM sube 41 MB respecto a la P y queda lejos del techo de 3,7 GB. El peor 1 % de la entrada mejora (antes 19,7): con los turnos ya no disparan dos guardias a la vez.
+
+Hubo también una medida con el editor muy usado (después de las pruebas y las peleas) y la GPU a 82 °C: 39,1 / 36,8 / 34,8 fps y 3567 MB. Esa VRAM de más es de lo que el editor deja cargado, no del juego.

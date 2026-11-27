@@ -185,6 +185,8 @@ void ATarsisGuard::TowerShootTick(float DeltaSeconds, APawn* Player, float V)
 
 void ATarsisGuard::FireAt(APawn* Player, float Dist, float V, ATarsisDirector* D)
 {
+	// tanda Q: turnos. En el duelo, y 0,8 s despues de cada intercambio, nadie mas dispara; fuera, uno a la vez
+	if (D && !D->MayFire(this)) { ShotT = 0.3f; return; }
 	ShotT = D->ShotInterval * FMath::FRandRange(0.8f, 1.3f);
 	const ACharacter* C = Cast<ACharacter>(Player);
 	float Chance = FMath::Clamp(1.05f - Dist / 2200.0f, 0.15f, 0.9f) * FMath::Lerp(0.5f, 1.0f, FMath::Clamp(V, 0.0f, 1.0f));

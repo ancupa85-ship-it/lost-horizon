@@ -34,6 +34,19 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
+#include "EngineUtils.h"
+
+// tanda Q: giro de camara de escena con tope de velocidad (grados/s) y zona muerta (no persigue giros pequenos)
+static FRotator TarsisCapTurn(const FRotator& Cur, const FRotator& Want, float Dt, float Speed, float MaxDegS, float DeadZone)
+{
+	const FRotator Delta = (Want - Cur).GetNormalized();
+	if (DeadZone > 0.0f && FMath::Abs(Delta.Yaw) < DeadZone && FMath::Abs(Delta.Pitch) < DeadZone) return Cur;
+	FRotator Step = (FMath::RInterpTo(Cur, Want, Dt, Speed) - Cur).GetNormalized();
+	const float Cap = MaxDegS * Dt;
+	Step.Yaw = FMath::Clamp(Step.Yaw, -Cap, Cap);
+	Step.Pitch = FMath::Clamp(Step.Pitch, -Cap, Cap);
+	return Cur + Step;
+}
 
 namespace
 {
@@ -50,6 +63,7 @@ namespace
 	};
 	const FScenePair ScenePairs[] = {
 #include "TarsisCapturaDatos.inl"
+
 	};
 
 	UAnimSequenceBase* LoadPairAnim(const FScenePair& P, bool bAttacker)
@@ -225,7 +239,7 @@ void ATarsisDirector::SceneTick(float DeltaSeconds)
 		{
 			const FRotator Cur = PC->GetControlRotation();
 			const FRotator Want(-12.0f, Side.Rotation().Yaw + CaptureThirdSideYaw, 0.0f);
-			PC->SetControlRotation(FMath::RInterpTo(Cur, Want, DeltaSeconds, 2.5f));
+			PC->SetControlRotation(TarsisCapTurn(Cur, Want, DeltaSeconds, 2.5f, SceneTurnMaxSpeed, SceneTurnDeadZone));
 		}
 	}
 	// el guardia se pone en su sitio y empiezan las dos partes
@@ -545,7 +559,7 @@ void ATarsisDirector::DisarmSceneTick(float DeltaSeconds)
 	if (PC)
 	{
 		FRotator R = PC->GetControlRotation();
-		R.Yaw = FMath::RInterpTo(R, FRotator(R.Pitch, DSYawTo, 0.0f), DeltaSeconds, 14.0f).Yaw;
+		R.Yaw = TarsisCapTurn(R, FRotator(R.Pitch, DSYawTo, 0.0f), DeltaSeconds, 14.0f, SceneTurnMaxSpeed, 0.0f).Yaw;   // tanda Q: con tope
 		PC->SetControlRotation(R);
 	}
 	if (bDSHero && HeroDriver)
@@ -710,7 +724,7 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 	if (PC)
 	{
 		FRotator R = PC->GetControlRotation();
-		R.Yaw = FMath::RInterpTo(R, FRotator(R.Pitch, TSYawTo, 0.0f), DeltaSeconds, 12.0f).Yaw;
+		R.Yaw = TarsisCapTurn(R, FRotator(R.Pitch, TSYawTo, 0.0f), DeltaSeconds, 12.0f, SceneTurnMaxSpeed, 0.0f).Yaw;   // tanda Q: con tope
 		PC->SetControlRotation(R);
 	}
 	if (bTSHero && HeroDriver)
@@ -731,7 +745,11 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 		KickT = FMath::Max(KickT, 0.2f);
 		ContactHitStop(G, bTSWall ? 2.3f : 2.0f);   // tanda O: parada de golpe en el contacto, luego la camara lenta (P: mas larga)
 		++ContactEvents;
-		SlowMo();
+		ExchangeHappened(true);
+		// tanda Q: una camara lenta por encuentro, y solo si con el remate se acaba (nadie mas en alerta)
+		bool bOthers = false;
+		for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It) if (*It != G && It->State == ETarsisGuardState::Alert && !It->bAlly) { bOthers = true; break; }
+		if (!bOthers) SlowMo();
 	}
 	if (!bTSFell && TST >= TSFallAt) TakedownSceneFall();
 	if (TST >= TSEndAt) TakedownSceneEnd();
@@ -877,8 +895,7 @@ void ATarsisDirector::GrabSceneTick(float DeltaSeconds)
 			const float Pos = FMath::Max(0.0f, GSHit - (GSJitterSign > 0.0f ? 0.0f : GrabJitterAmount * FMath::FRandRange(0.5f, 1.0f)));
 			G->GetMesh()->SetPosition(Pos, false);
 			if (AI && GSHeroMontage) AI->Montage_SetPosition(GSHeroMontage, Pos);
-			KickT = FMath::Max(KickT, 0.06f);
-		}
+		}   // tanda Q: el forcejeo ya no sacude la vista
 	}
 }
 

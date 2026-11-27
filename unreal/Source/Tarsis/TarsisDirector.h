@@ -1586,7 +1586,7 @@ public:
 	float StaminaRegen = 30.0f;
 	/** Tiempos del guardia: cubierto (min, max), amago, culatazo, tambaleo; probabilidad de agarrar en vez de golpear. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
-	FVector2D MeleeGuardUpSeconds = FVector2D(1.0f, 1.8f);
+	FVector2D MeleeGuardUpSeconds = FVector2D(1.3f, 1.3f);   // tanda Q: constante, el hueco en el que te toca siempre igual
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
 	float MeleeFeintSeconds = 0.55f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
@@ -1711,6 +1711,57 @@ public:
 	FString GrabHeroAnimPath;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
 	float GrabHoldAt = 0.4f;
+	// ---- tanda Q: pulido de ritmo y legibilidad (sin mecanicas nuevas; docs/combate-diagnostico-q.md)
+	/** Turnos: mientras hay duelo y TurnQuietSeconds despues de cada intercambio, los demas no disparan (se colocan y
+	 *  apuntan); fuera del duelo, un solo tirador a la vez (ficha de disparo, ShooterTokenSeconds tras su ultimo tiro). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	bool bTurnRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float TurnQuietSeconds = 0.8f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float ShooterTokenSeconds = 1.5f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Ritmo")
+	int32 ShotsHeld = 0;
+	/** Pose final tras el culatazo (s): el guardia acaba su seguimiento antes de volver a la guardia. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float MeleeRecoverSeconds = 0.25f;
+	/** El remate en el tambaleo: la E se guarda hasta este segundo del tambaleo (contra y remate no se pisan). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float StaggerRemateDelay = 0.35f;
+	/** Distancia del duelo (cm): el guardia se coloca a ella sin saltos (DuelSpacingSpeed cm/s como mucho) y en el culatazo
+	 *  se acerca a MeleeContactDistance durante todo el golpe. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float DuelDistance = 120.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float DuelSpacingSpeed = 260.0f;
+	/** Camara: giro automatico de las escenas como mucho (grados/s) y solo si el otro se sale del encuadre mas de
+	 *  SceneTurnDeadZone grados; sacudida (grados por fotograma) solo en te da, contra y remate. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float SceneTurnMaxSpeed = 90.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float SceneTurnDeadZone = 30.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float KickAmplitude = 0.25f;
+	/** Voces de ambiente y radio calladas alrededor de una contra o un remate (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float BigHitQuietSeconds = 1.5f;
+	/** Cada cuanto se recalculan los puntos de flanqueo como mucho (s) y cuanto tiene que moverse uno para cambiarlo (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float FlankRefreshSeconds = 2.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Ritmo")
+	float FlankRefreshDistance = 150.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Ritmo")
+	int32 RematesQueued = 0;
+	/** Los demas pueden disparar ahora (turnos y ficha de disparo); si no, el guardia solo apunta. */
+	bool MayFire(const class ATarsisGuard* G);
+	/** Hubo un intercambio (golpe, parada, te da): silencio de disparos; bBig: contra o remate, y calla las voces. */
+	void ExchangeHappened(bool bBig);
+	double TurnQuietUntil = 0.0, VoicesQuietUntil = 0.0, LastImpactAt = 0.0, ShooterTokenAt = 0.0;
+	int32 LastImpactRank = 0;
+	TWeakObjectPtr<class ATarsisGuard> ShooterToken;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, double> FlankPointAt;
+	bool bRemateQueued = false;
+	bool bDuelRecovering = false;
 	/** Sonido del golpe en capas en At. Force: 0 ligero, 1 medio, 2 fuerte. Attacker: 0 Cuttlas, 1 guardia. */
 	void PlayImpact(const FVector& At, int32 Force, bool bWall, int32 Attacker, bool bVictimVoice = true);
 	/** El culatazo de Lyra (MM_Rifle_Melee): la culata arriba del todo (s) y el contacto (s), medidos en la animacion

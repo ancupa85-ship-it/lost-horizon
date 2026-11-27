@@ -120,7 +120,7 @@ bool ATarsisDirector::FloorRifleOf(const ATarsisGuard* G, FVector& OutLoc) const
 
 ATarsisGuard* ATarsisDirector::DisarmTarget() const
 {
-	if (!bHalt || bCapturing || bCounterOpen) return nullptr;
+	if (!bHalt || bCapturing || bCounterOpen || DuelGuard.IsValid()) return nullptr;   // tanda Q: en el duelo no (un aviso, una accion)
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!P) return nullptr;
 	ATarsisGuard* Best = nullptr;
@@ -265,8 +265,9 @@ FString ATarsisDirector::CuerpoPrompt() const
 {
 	if (bCounterOpen) return Tx(TEXT("p_revolverse"), TEXT("E   REVOLVERSE"));
 	if (DuelGuard.IsValid() && DuelPhaseN == 4) return Tx(TEXT("p_soltarse"), TEXT("E   SOLTARSE"));
-	if (DisarmTarget()) return Tx(TEXT("p_golpear_fusil"), TEXT("E   GOLPEAR EL FUSIL"));
+	// tanda Q: en el duelo, solo el aviso del duelo (antes salia el de desarmar los primeros segundos)
 	if (DuelGuard.IsValid() && DuelPhaseN != 5) return Tx(TEXT("p_duelo"), TEXT("{0}   GOLPEAR        {1}   PARAR"), { KeyLabel(14), KeyLabel(15) });
+	if (DisarmTarget()) return Tx(TEXT("p_golpear_fusil"), TEXT("E   GOLPEAR EL FUSIL"));
 	if ((!TakedownTarget() || RiflePickFirst()) && FloorRifleNear() >= 0) return Tx(TEXT("p_recoger_fusil"), TEXT("E   RECOGER EL FUSIL"));
 	return FString();
 }
@@ -396,8 +397,8 @@ void ATarsisDirector::CuerpoTick(float DeltaSeconds)
 		KickT -= DeltaSeconds;
 		if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 		{
-			PC->AddPitchInput(FMath::FRandRange(-0.6f, 0.6f));
-			PC->AddYawInput(FMath::FRandRange(-0.6f, 0.6f));
+			PC->AddPitchInput(FMath::FRandRange(-KickAmplitude, KickAmplitude));   // tanda Q: mas corta (antes 0,6)
+			PC->AddYawInput(FMath::FRandRange(-KickAmplitude, KickAmplitude));
 		}
 	}
 	// los fusiles del suelo

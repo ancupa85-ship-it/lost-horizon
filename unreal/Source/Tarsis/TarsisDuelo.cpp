@@ -85,8 +85,7 @@ void ATarsisDirector::MeleeStrike()
 	StaminaNow = FMath::Max(0.0f, StaminaNow - StaminaHitCost);
 	StrikeT = StrikeLen;   // el golpe que se ve (primera persona)
 	++Strikes;
-	KickT = FMath::Max(KickT, 0.1f);
-	HeroStrikeAnim();   // tanda O: en tercera, el puñetazo se ve
+	HeroStrikeAnim();   // tanda Q: sin sacudida por tu propio golpe   // tanda O: en tercera, el puñetazo se ve
 	const FVector At = G->GetActorLocation() + FVector(0.0f, 0.0f, 110.0f);
 	// tanda O: lo que se ve y se oye del golpe va en el contacto del puño (HeroContactLead), no al pulsar (ContactTick)
 	if (DuelPhaseN == DuelGuardUp || DuelPhaseN == DuelStrikeN)
@@ -141,6 +140,8 @@ void ATarsisDirector::DuelEnd()
 	{
 		if (G->bSceneLock && !G->bSceneFallPending && !TSGuard.IsValid() && !DSGuard.IsValid()) { G->SceneEnd(); G->bSceneLock = false; }
 	}
+	bDuelRecovering = false;
+	bRemateQueued = false;
 	DuelGuard = nullptr;
 	DuelPhaseN = DuelNone;
 }
@@ -167,6 +168,30 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 		G->SetActorRotation(FMath::RInterpTo(G->GetActorRotation(), Want, DeltaSeconds, 8.0f));
 	}
 	const FVector At = G->GetActorLocation() + FVector(0.0f, 0.0f, 110.0f);
+	// tanda Q: la distancia del duelo sin saltos: el guardia se coloca a DuelDistance andando (como mucho
+	// DuelSpacingSpeed) y en el culatazo se acerca a MeleeContactDistance a lo largo de todo el golpe
+	if (DuelPhaseN != DuelStagger && DuelPhaseN != DuelGrab && !GSGuard.IsValid())
+	{
+		float Want = DuelDistance;
+		if (DuelPhaseN == DuelStrikeN) Want = FMath::Lerp(DuelDistance, MeleeContactDistance, FMath::Clamp(DuelT / FMath::Max(DuelPhaseLen, 0.01f), 0.0f, 1.0f));
+		const FVector Away = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
+		const float Now2 = FVector::Dist2D(G->GetActorLocation(), C->GetActorLocation());
+		const float Step = FMath::Clamp(Want - Now2, -DuelSpacingSpeed * DeltaSeconds, DuelSpacingSpeed * DeltaSeconds);
+		if (FMath::Abs(Step) > 0.1f && !Away.IsNearlyZero()) G->SetActorLocation(G->GetActorLocation() + Away * Step, true);
+	}
+	// tanda Q: la pose final del culatazo (el seguimiento entero) antes de volver a la guardia
+	if (bDuelRecovering && DuelT >= MeleeRecoverSeconds)
+	{
+		bDuelRecovering = false;
+		G->SceneEnd();
+		G->bSceneLock = false;
+	}
+	// tanda Q: el remate pedido al principio del tambaleo sale cuando ya ha pasado la contra
+	if (bRemateQueued && (DuelPhaseN != DuelStagger || DuelT >= StaggerRemateDelay))
+	{
+		bRemateQueued = false;
+		if (DuelPhaseN == DuelStagger) { Takedown(); if (!DuelGuard.IsValid()) return; }
+	}
 	switch (DuelPhaseN)
 	{
 	case DuelGuardUp:
@@ -222,17 +247,7 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 		{
 			bDuelSwing = true;
 			G->GetMesh()->SetPlayRate(1.0f);
-			// se echa encima: al contacto, a MeleeContactDistance de ti (la culata llega)
-			DuelSwingAt = DuelT;
-			DuelStepFrom = G->GetActorLocation();
-			const FVector Away = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
-			DuelStepTo = FVector(C->GetActorLocation().X, C->GetActorLocation().Y, DuelStepFrom.Z) + Away * MeleeContactDistance;
-			if (FVector::Dist2D(DuelStepFrom, DuelStepTo) > 120.0f || FVector::Dist2D(DuelStepFrom, C->GetActorLocation()) < MeleeContactDistance) DuelStepTo = DuelStepFrom;
-		}
-		if (bDuelSwing)
-		{
-			const float S = FMath::Clamp((DuelT - DuelSwingAt) / FMath::Max(DuelPhaseLen - DuelSwingAt, 0.01f), 0.0f, 1.0f);
-			G->SetActorLocation(FMath::Lerp(DuelStepFrom, DuelStepTo, FMath::SmoothStep(0.0f, 1.0f, S)), true);
+			DuelSwingAt = DuelT;   // tanda Q: el acercamiento va repartido en todo el culatazo (arriba, sin saltos)
 		}
 		if (DuelT >= DuelPhaseLen)
 		{
@@ -241,8 +256,10 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 			const float Win = MeleeCounterWindow[DiffIdx()];
 			const bool bInWindow = BlockPressAt > 0.0 && Now - BlockPressAt <= Win + DeltaSeconds;
 			const bool bMoving = C->GetVelocity().Size2D() > 150.0f;
-			G->SceneEnd();
-			G->bSceneLock = false;
+			// tanda Q: la animacion del culatazo sigue (pose final, MeleeRecoverSeconds) salvo en la contra
+			bDuelRecovering = !(bInWindow && StaminaNow >= (bMoving ? StaminaDodgeCost : StaminaBlockCost) * 0.5f);
+			if (!bDuelRecovering) { G->SceneEnd(); G->bSceneLock = false; }
+			else G->GetMesh()->SetPlayRate(1.0f);
 			if (bInWindow && StaminaNow >= (bMoving ? StaminaDodgeCost : StaminaBlockCost) * 0.5f)
 			{
 				StaminaNow = FMath::Max(0.0f, StaminaNow - (bMoving ? StaminaDodgeCost : StaminaBlockCost));
@@ -264,7 +281,7 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 				}
 				DuelPhaseN = DuelStagger; DuelT = 0.0f; DuelPhaseLen = MeleeStaggerSeconds;
 				DuelNoise(At);
-				SlowMo();
+				ExchangeHappened(true);   // tanda Q: sin camara lenta en la contra (una por encuentro, en el remate)
 			}
 			else if (bBlockHeld && StaminaNow >= StaminaBlockCost)
 			{
@@ -272,7 +289,7 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 				++MeleeBlocked;
 				PlayImpact(C->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0, false, 1, false);
 				ContactHitStop(G, 0.7f, false);
-				KickT = FMath::Max(KickT, 0.12f);
+				ExchangeHappened(false);
 				DuelNoise(At);
 				DuelPhaseN = DuelGuardUp; DuelT = 0.0f; DuelPhaseLen = FMath::FRandRange(MeleeGuardUpSeconds.X, MeleeGuardUpSeconds.Y);
 			}
@@ -281,9 +298,10 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 				++MeleeTaken;
 				++DuelStrikes;
 				PlayImpact(C->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 2, false, 1, true);
-				KickT = FMath::Max(KickT, 0.3f);
+				KickT = FMath::Max(KickT, 0.2f);
 				HeroReactAnim();
 				ContactHitStop(G, 1.3f, false);
+				ExchangeHappened(false);
 				SuppressT = FMath::Max(SuppressT, 1.2f);
 				C->LaunchCharacter((C->GetActorLocation() - G->GetActorLocation()).GetSafeNormal2D() * 220.0f, true, false);
 				DuelNoise(At);
@@ -358,6 +376,8 @@ void ATarsisDirector::CombatRolesTick(float DeltaSeconds)
 	if (RolesT > 0.0f) return;
 	RolesT = 0.5f;
 	Roles.Reset();
+	// tanda Q: los puntos de flanqueo se conservan (recalcular cada 0,5 s los hacia corregir el rumbo sin parar)
+	TMap<TWeakObjectPtr<ATarsisGuard>, FVector> OldPoints = FlankPoints;
 	FlankPoints.Reset();
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!bFlankRule || !bArmedRule || !P || bCapturing) return;
@@ -405,8 +425,16 @@ void ATarsisDirector::CombatRolesTick(float DeltaSeconds)
 			if (!bLit) continue;   // todo oscuro: no flanquea (se queda con los demas)
 		}
 		Roles.Add(G, 2);
+		// tanda Q: el punto de antes sigue si es reciente y el nuevo no se aleja mucho de el
+		{
+			const double NowS = FPlatformTime::Seconds();
+			const FVector* Old = OldPoints.Find(G);
+			const double* OldAt = FlankPointAt.Find(G);
+			if (Old && OldAt && NowS - *OldAt < FlankRefreshSeconds && FVector::Dist2D(*Old, Pt) < FlankRefreshDistance * 2.0f) Pt = *Old;
+			else if (Old && FVector::Dist2D(*Old, Pt) < FlankRefreshDistance) Pt = *Old;
+			else { FlankPointAt.Add(G, NowS); ++FlankOrders; }
+		}
 		FlankPoints.Add(G, Pt);
-		++FlankOrders;
 		++Made;
 	}
 }
@@ -421,7 +449,7 @@ void ATarsisDirector::ContactHitStop(ATarsisGuard* G, float Scale, bool bGuardVi
 	if (HeroDriver)
 	{
 		if (bGuardVictim) HeroDriver->GlobalAnimRateScale = G ? G->HitStopAttackerRate : 0.05f;   // tu golpe sigue, muy despacio
-		else { HeroDriver->bPauseAnims = true; KickT = FMath::Max(KickT, 0.15f * Scale); }        // te dan: congelado y sacudida
+		else { HeroDriver->bPauseAnims = true; if (Scale >= 1.0f) KickT = FMath::Max(KickT, 0.15f * Scale); }   // te dan: congelado y sacudida (tanda Q: no en lo parado)
 		HeroHitStopUntil = FPlatformTime::Seconds() + S;
 	}
 	if (Arms && bGuardVictim) Arms->GlobalAnimRateScale = 0.05f;
@@ -444,15 +472,23 @@ void ATarsisDirector::PlayImpact(const FVector& At, int32 Force, bool bWall, int
 		return false;
 	};
 	static const float Vol[3] = { 0.55f, 0.8f, 1.0f };
+	// tanda Q: prioridad (HDR de DICE): ligero 2 capas, medio 3, fuerte 5 con voces; lo que suena 0,3 s despues de algo
+	// de mas rango baja 6 dB (la mitad)
+	const double NowI = FPlatformTime::Seconds();
+	const float Duck = (NowI - LastImpactAt < 0.3 && Force < LastImpactRank) ? 0.5f : 1.0f;
+	if (Force >= LastImpactRank || NowI - LastImpactAt >= 0.3) { LastImpactRank = Force; LastImpactAt = NowI; }
 	bool bAny = false;
 	if (bLayeredImpactRule)
 	{
-		if (Force >= 1 || FMath::RandBool()) bAny |= Capa(TEXT("golpe_grave"), 3, Vol[Force]);
-		bAny |= Capa(TEXT("golpe_medio"), 3, 0.7f * Vol[Force] + 0.2f);
-		bAny |= Capa(TEXT("golpe_chasquido"), 3, 0.45f + 0.25f * Force);
+		if (Force >= 1) bAny |= Capa(TEXT("golpe_grave"), 3, Vol[Force] * Duck);
+		bAny |= Capa(TEXT("golpe_medio"), 3, (0.7f * Vol[Force] + 0.2f) * Duck);
+		bAny |= Capa(TEXT("golpe_chasquido"), 3, (0.45f + 0.25f * Force) * Duck);
 		if (bWall) Capa(TEXT("golpe_pared"), 3, 1.0f);
-		Capa(Attacker == 0 ? TEXT("esfuerzo_cuttlas") : TEXT("esfuerzo_guardia"), 3, 0.75f);
-		if (bVictimVoice) Capa(Attacker == 0 ? TEXT("dolor_guardia") : TEXT("dolor_cuttlas"), Attacker == 0 ? 3 : 2, 0.85f);
+		if (Force >= 2)
+		{
+			Capa(Attacker == 0 ? TEXT("esfuerzo_cuttlas") : TEXT("esfuerzo_guardia"), 3, 0.75f);
+			if (bVictimVoice) Capa(Attacker == 0 ? TEXT("dolor_guardia") : TEXT("dolor_cuttlas"), Attacker == 0 ? 3 : 2, 0.85f);
+		}
 	}
 	if (!bAny)
 	{
@@ -524,8 +560,9 @@ void ATarsisDirector::ContactTick(float DeltaSeconds)
 		G->HitReact(G->GetActorLocation() - P->GetActorLocation(), false, TEXT("head"));   // tanda P: el punetazo, a la cara
 		if (DuelPhaseN == DuelStagger) G->StaggerSway(FMath::Max(DuelPhaseLen - DuelT, 0.3f));   // tanda O
 		ContactHitStop(G, 1.0f);
+		ExchangeHappened(false);
 	}
-	else ContactHitStop(G, 0.6f);
+	else { ContactHitStop(G, 0.6f); ExchangeHappened(false); }
 }
 
 void ATarsisDirector::ArmsPunch(float Lead)
@@ -544,4 +581,26 @@ void ATarsisDirector::ArmsPunch(float Lead)
 	ArmsPunchAge = 0.0f;
 	ArmsPunchContact = Lead;
 	++ArmsPunches;
+}
+
+// ---------------------------------------------------------------- tanda Q: turnos y silencio
+bool ATarsisDirector::MayFire(const ATarsisGuard* G)
+{
+	if (!bTurnRule || !G) return true;
+	const double Now = FPlatformTime::Seconds();
+	// en el duelo (y justo despues de cada intercambio) nadie mas dispara: un solo protagonista
+	if (G != DuelGuard.Get() && (DuelGuard.IsValid() || Now < TurnQuietUntil)) { ++ShotsHeld; return false; }
+	// fuera del duelo, un tirador a la vez: la ficha es de quien disparo hace menos de ShooterTokenSeconds
+	ATarsisGuard* T = ShooterToken.Get();
+	if (T && T != G && T->State == ETarsisGuardState::Alert && Now - ShooterTokenAt < ShooterTokenSeconds) { ++ShotsHeld; return false; }
+	ShooterToken = const_cast<ATarsisGuard*>(G);
+	ShooterTokenAt = Now;
+	return true;
+}
+
+void ATarsisDirector::ExchangeHappened(bool bBig)
+{
+	const double Now = FPlatformTime::Seconds();
+	TurnQuietUntil = FMath::Max(TurnQuietUntil, Now + TurnQuietSeconds);
+	if (bBig) VoicesQuietUntil = FMath::Max(VoicesQuietUntil, Now + BigHitQuietSeconds);
 }

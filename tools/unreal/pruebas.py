@@ -5304,7 +5304,10 @@ def prueba_combate2():
     check('parado a tiempo: se tambalea (contra)', P('melee_parries') >= 1 and d.duel_phase() == 5 and g.is_stunned(), '%d fase %d' % (P('melee_parries'), d.duel_phase()))
     _gl = g.get_actor_location(); _pl = jugador().get_actor_location()
     check('tambaleandose, la E lo remata (pareja de derribo)', 'DERRIBAR' in str(d.interact_prompt()), '%s | aturdido %s dist %.0f dz %.0f fase %d' % (d.interact_prompt(), g.is_stunned(), math.hypot(_gl.x - _pl.x, _gl.y - _pl.y), _gl.z - _pl.z, d.duel_phase()))
-    d.interact(); yield 0.2
+    d.interact(); yield 0.1
+    # tanda Q: la E al principio del tambaleo se guarda (StaggerRemateDelay): primero se ve la contra entera
+    check('la E pronto espera: contra y remate separados', estado(g) != 'DOWN' and d.duel_active(), '%s %s' % (estado(g), d.duel_active()))
+    yield 0.6
     check('rematado: derribado y fin del duelo', estado(g) == 'DOWN' and not d.duel_active(), '%s %s' % (estado(g), d.duel_active()))
     yield 2.0
     # 3) el agarre: la E te suelta
@@ -5401,8 +5404,8 @@ def prueba_contacto():
     yield 0.02
     yield 0.35
     check('en el contacto: golpe y parada de golpe', P('contact_events') == c0 + 1 and P('hit_stops_done') > h0, '%d %d' % (P('contact_events') - c0, P('hit_stops_done') - h0))
-    # tanda P: el golpe suena en capas (al menos 3: medio, chasquido y voz); las piezas propias, cargadas
-    check('el golpe suena en capas (3 o mas)', P('impact_layers_played') - l0 >= 3, P('impact_layers_played') - l0)
+    # tanda P: el golpe suena en capas; tanda Q: con prioridad (ligero 2 capas, medio 3, fuerte 5 con voces)
+    check('el golpe suena en capas (el ligero, 2: medio y chasquido)', P('impact_layers_played') - l0 >= 2, P('impact_layers_played') - l0)
     check('las piezas propias de Blender estan puestas (culatazo, punetazo, contra, agarre)', 'CQC' in P('melee_strike_anim_path') and 'CQC' in str(P('hero_punch_anim_paths')) and 'CQC' in P('hero_counter_anim_path') and 'CQC' in P('grab_guard_anim_path'),
           '%s | %s' % (P('melee_strike_anim_path'), P('grab_guard_anim_path')))
     # 2) contra a tiempo: tambaleo que se mueve, y tu puño en la parada
