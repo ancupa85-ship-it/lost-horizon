@@ -245,6 +245,15 @@ void ATarsisDirector::GaspHeroTick(ACharacter* C, bool bOut)
 	const float HalfH = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	const float UZ = -HalfH - HeroDriverBallZ + 2.0f;
 	HeroDriver->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, UZ), FRotator(0.0f, HeroDriverYaw, 0.0f));
+	// tanda R: al salir de una pareja, del sitio de la escena al de la capsula fundiendo (antes, de un fotograma)
+	if (HeroReturnT > 0.0f)
+	{
+		const float Dt = C->GetWorld() ? C->GetWorld()->GetDeltaSeconds() : 0.0f;
+		HeroReturnT = FMath::Max(0.0f, HeroReturnT - Dt);
+		const float S = FMath::SmoothStep(0.0f, 1.0f, 1.0f - HeroReturnT / FMath::Max(TakedownEndBlendSeconds, 0.01f));
+		FTransform X; X.Blend(HeroReturnFrom, HeroDriver->GetComponentTransform(), S);
+		HeroDriver->SetWorldTransform(X);
+	}
 	HeroBody->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, (-HalfH - HeroBodyBallZ + 2.0f) - UZ), FRotator(0.0f, HeroBodyYawGasp - HeroDriverYaw + HeroGaspYaw, 0.0f));
 	// en primera persona no se ve: el ABP sigue (la historia de poses y la trayectoria no dan saltos al salir a tercera)
 	// Gait del GASP segun la velocidad que pone el juego (andar 600, correr x1,5, arrastrar 180); agachado sale de IsCrouching

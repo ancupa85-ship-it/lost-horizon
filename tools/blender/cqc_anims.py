@@ -9,6 +9,10 @@ poses clave exageradas, que es lo que las charlas de combate (Cooper, Sekiro, Go
 Uso (Blender sin ventana):
   blender.exe -b --factory-startup --python tools/blender/cqc_anims.py -- <pieza> <fbx_base> <fbx_salida>
 Piezas: culatazo, punetazo, contra, agarre_guardia, agarre_cuttlas (ver PIEZAS). Imprime los segundos clave para el C++.
+
+Tanda R: las bases del punetazo y la contra (MM_Attack_01/02 de Lyra) son acometidas: la raiz avanza 151 y 90 cm. Con
+ACOMETIDA, la raiz se queda en esos cm (25) y los pies se clavan con IK en sus apoyos: el pie apoyado no se mueve en el
+mundo y el que va al aire llega a su sitio nuevo (lo que se le quita a la raiz se reparte en el paso). Luego se hornea.
 """
 import json, math, os, sys
 import bpy
@@ -39,6 +43,139 @@ PIEZAS = {
     'agarre_guardia': ([(0.0, 0.62), (0.40, 1.02), (0.70, 1.06)], [(0.25, 0.70, 1.25, BRAZOS)], {'manos': 0.40}),
     'agarre_cuttlas': ([(0.0, 0.62), (0.40, 1.02), (0.70, 1.06)], [(0.25, 0.70, 1.15, TRONCO)], {'manos': 0.40}),
 }
+
+
+# pieza -> (cm que avanza la raiz en la base, cm que se dejan)
+ACOMETIDA = {'punetazo': (151.0, 25.0), 'contra': (81.0, 25.0)}   # cm medidos en la pieza (de su primer a su ultimo fotograma)
+
+
+def clavar_pies(arm, n, base_cm, deja_cm):
+    """Baja la acometida de la raiz (el objeto de la armadura) a deja_cm y clava los pies con IK donde se apoyaban."""
+    sc = bpy.context.scene
+    L = []
+    for f in range(n + 1):
+        sc.frame_set(f)
+        L.append(arm.location.copy())
+    total = (L[-1] - L[0]).length
+    if total < 1e-6:
+        print('[cqc] sin acometida que bajar'); return
+    k = deja_cm / base_cm
+    u = total / base_cm   # unidades de Blender por cm
+    Lp = [L[0] + (l - L[0]) * k for l in L]
+    R = [l - lp for l, lp in zip(L, Lp)]   # lo que se le quita a la raiz en cada fotograma
+    # pies del original (mundo): posicion de la cabeza del pie y su giro
+    F = {s_: [] for s_ in ('l', 'r')}
+    Q = {s_: [] for s_ in ('l', 'r')}
+    for f in range(n + 1):
+        sc.frame_set(f)
+        for s_ in ('l', 'r'):
+            pb = arm.pose.bones['foot_' + s_]
+            m = arm.matrix_world @ pb.matrix
+            F[s_].append(m.translation.copy())
+            Q[s_].append(m.to_quaternion())
+    # apoyos: casi quieto y cerca de su altura mas baja
+    O = {}
+    for s_ in ('l', 'r'):
+        zmin = min(p.z for p in F[s_])
+        quieto = []
+        for f in range(n + 1):
+            a, b = F[s_][max(f - 1, 0)], F[s_][min(f + 1, n)]
+            v = (b - a).length / (2.0 / FPS)
+            quieto.append(v < 20 * u and F[s_][f].z < zmin + 4 * u)
+        # tramos de apoyo; en cada uno el pie se queda donde estaria al final del tramo (asi la pierna se encoge en vez de
+        # estirarse de mas: con la raiz atrasada, el pie de delante quedaria fuera de su alcance)
+        tramos_ap = []
+        f = 0
+        while f <= n:
+            if quieto[f]:
+                g = f
+                while g + 1 <= n and quieto[g + 1]:
+                    g += 1
+                tramos_ap.append((f, g))
+                f = g + 1
+            else:
+                f += 1
+        o = [None] * (n + 1)
+        for a_, b_ in tramos_ap:
+            for h in range(a_, b_ + 1):
+                o[h] = R[b_].copy()
+        # en el aire: del valor del apoyo de antes al del siguiente, con entrada y salida suaves
+        prev_end, prev_val = -1, R[0].copy()
+        idx = 0
+        f = 0
+        while f <= n:
+            if o[f] is not None:
+                prev_end, prev_val = f, o[f]
+                f += 1
+                continue
+            g = f
+            while g <= n and o[g] is None:
+                g += 1
+            dest = o[g] if g <= n else R[n]
+            for h in range(f, g if g <= n else n + 1):
+                w = (h - prev_end) / max((g if g <= n else n + 1) - prev_end, 1)
+                w = w * w * (3 - 2 * w)
+                o[h] = prev_val.lerp(dest, w)
+            f = g
+        O[s_] = o
+    # la raiz nueva
+    for f in range(n + 1):
+        arm.location = Lp[f]
+        arm.keyframe_insert('location', frame=f)
+    # IK de dos huesos a mano, fotograma a fotograma (el IK de Blender no sirve aqui: en el FBX los huesos no estan unidos,
+    # la cola de la pantorrilla no cae en el pie). En espacio de la armadura: rodilla en el plano de cadera, objetivo y
+    # rodilla original; el pie conserva su giro del original
+    for f in range(n + 1):
+        sc.frame_set(f)
+        bpy.context.view_layer.update()
+        inv = arm.matrix_world.inverted()
+        for s_ in ('l', 'r'):
+            th, ca, ft = arm.pose.bones['thigh_' + s_], arm.pose.bones['calf_' + s_], arm.pose.bones['foot_' + s_]
+            Hh, K, A = th.matrix.translation.copy(), ca.matrix.translation.copy(), ft.matrix.translation.copy()
+            T = inv @ (F[s_][f] - O[s_][f])
+            qf = (inv.to_quaternion() @ Q[s_][f]).normalized()
+            la, lb = (K - Hh).length, (A - K).length
+            d = min((T - Hh).length, (la + lb) * 0.999)
+            uu = (T - Hh).normalized()
+            vv = (K - Hh) - uu * (K - Hh).dot(uu)
+            if vv.length < 1e-6:
+                vv = (A - Hh).cross(uu).cross(uu)
+            vv.normalize()
+            ca_ = max(-1.0, min(1.0, (la * la + d * d - lb * lb) / (2 * la * d)))
+            K2 = Hh + uu * (la * ca_) + vv * (la * math.sqrt(1 - ca_ * ca_))
+            r1 = (K - Hh).rotation_difference(K2 - Hh)
+            th.matrix = Matrix.Translation(Hh) @ r1.to_matrix().to_4x4() @ Matrix.Translation(-Hh) @ th.matrix
+            bpy.context.view_layer.update()
+            K, A = ca.matrix.translation.copy(), ft.matrix.translation.copy()
+            T2 = Hh + uu * d
+            r2 = (A - K).rotation_difference(T2 - K)
+            ca.matrix = Matrix.Translation(K) @ r2.to_matrix().to_4x4() @ Matrix.Translation(-K) @ ca.matrix
+            bpy.context.view_layer.update()
+            m = ft.matrix.copy()
+            ft.matrix = Matrix.Translation(m.translation) @ qf.to_matrix().to_4x4() @ Matrix.Diagonal(m.to_scale()).to_4x4()
+            bpy.context.view_layer.update()
+            for pb in (th, ca, ft):
+                pb.keyframe_insert('rotation_quaternion', frame=f)
+                pb.keyframe_insert('location', frame=f)
+    # comprobacion: cuanto se mueve el pie apoyado en el mundo
+    peor, apoyos, falla = 0.0, [], 0.0
+    for s_ in ('l', 'r'):
+        ini = None
+        for f in range(n + 1):
+            sc.frame_set(f)
+            p = (arm.matrix_world @ arm.pose.bones['foot_' + s_].matrix).translation.copy()
+            falla = max(falla, (p - (F[s_][f] - O[s_][f])).length / u)
+            if f > 0 and O[s_][f] == O[s_][f - 1]:
+                if ini is None:
+                    ini = prev
+                peor = max(peor, (p - ini).length / u)
+            else:
+                if ini is not None:
+                    apoyos.append(s_)
+                ini = None
+            prev = p
+    print('[cqc] acometida %.0f -> %.0f cm (raiz %.1f -> %.1f u); el pie apoyado se desliza como mucho %.1f cm por apoyo (%d apoyos); el IK queda a %.1f cm de su objetivo como mucho' % (
+        base_cm, deja_cm, total, (Lp[-1] - Lp[0]).length, peor, len(apoyos), falla))
 
 
 def base_tiempo(tramos, t):
@@ -135,6 +272,8 @@ def main(pieza, fbx_in, fbx_out):
             pb.keyframe_insert('location', frame=i)
             pb.keyframe_insert('rotation_quaternion', frame=i)
     sc.frame_start, sc.frame_end = 0, n
+    if pieza in ACOMETIDA:
+        clavar_pies(arm, n, *ACOMETIDA[pieza])
     bpy.ops.object.select_all(action='DESELECT')
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm

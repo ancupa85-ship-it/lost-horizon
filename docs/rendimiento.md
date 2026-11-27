@@ -300,3 +300,17 @@ Misma medida: de noche, tres guardias en alerta contra ti en cada sitio, con el 
 Lectura: la tanda Q no cuesta. Solo cambia cuándo pasan las cosas, no cuántas. La VRAM sube 41 MB respecto a la P y queda lejos del techo de 3,7 GB. El peor 1 % de la entrada mejora (antes 19,7): con los turnos ya no disparan dos guardias a la vez.
 
 Hubo también una medida con el editor muy usado (después de las pruebas y las peleas) y la GPU a 82 °C: 39,1 / 36,8 / 34,8 fps y 3567 MB. Esa VRAM de más es de lo que el editor deja cargado, no del juego.
+
+## Tanda R: cuerpos y pelea con varios guardias
+
+Misma medida: de noche (23:48), tres guardias en alerta contra ti en cada sitio, con el editor recién abierto. La primera pasada es de calentamiento y no cuenta: 42,0 / 18,6 / 30,9 fps y 3603 MB, con los tirones de crear los estados de render. La GPU arrancó a 48 °C y acabó a 82; la ventana del PIE medía 1741×1102. Entre paréntesis, la media de la tanda Q.
+
+| Sitio | fps medio / peor 1 % | VRAM (MB) |
+|---|---|---|
+| Entrada | 43,0 / 17,3 (38,2) | 3357 |
+| Patio central | 39,8 / 34,6 (34,1) | 3358 |
+| Barracón oeste | 37,4 / 15,7 (31,3) | 3358 |
+
+Lectura: la tanda R no cuesta. Lo que añade (el root motion de Cuttlas, la separación en el remate, la evaluación de la pose al empezar la pareja) solo trabaja en el contacto. La VRAM queda como en la Q (3353) y por debajo del techo de 3,7 GB.
+
+La media sube 4–6 fps respecto a la Q, pero no es mérito de la tanda: aquella se midió por la tarde con la GPU ya caliente y esta de noche, arrancando en frío. El peor 1 % de la entrada y del barracón es el tirón de los primeros disparos con trazadora de cada alerta, como en la N2 y la O.

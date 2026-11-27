@@ -92,7 +92,11 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	if (V > 0.0f && Dist < CatchDistance && !D->bFleeing && bWarned && (D->ArrestGuard == this || PlSpeed < 40.0f)) { Caught(Player); return true; }
 	// tanda N2: si le toca flanquear, va a su punto (a un lado del que te fija, nunca a oscuras solo)
 	const FVector FlankP = D->FlankPointOf(this);
-	const bool bFlank = !FlankP.IsZero() && D->CombatRole(this) == 2 && !Near2D(FlankP, 120.0f);
+	// tanda R: llegar con holgura (120 cm) y no salir hasta alejarse 250; alli se queda apuntando, sin buscar cobertura
+	if (FlankP.IsZero() || D->CombatRole(this) != 2) bAtFlank = false;
+	else if (Near2D(FlankP, 120.0f)) bAtFlank = true;
+	else if (!Near2D(FlankP, 250.0f)) bAtFlank = false;
+	const bool bFlank = !FlankP.IsZero() && D->CombatRole(this) == 2 && !bAtFlank;
 	if (V <= 0.0f)
 	{
 		// no te ve: aguanta en su sitio mirando a donde te perdio y luego avanza andando. Si le mandaron por radio,
@@ -136,6 +140,16 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 		AimT = 0.0f;
 		return true;
 	}
+	// tanda R: el que flanquea ya esta en su punto: se queda (antes se iba a una cobertura y volvia, sin parar)
+	if (bAtFlank && V > 0.0f)
+	{
+		if (AI && AI->GetMoveStatus() != EPathFollowingStatus::Idle) AI->StopMovement();
+		FaceTowards(PL, DeltaSeconds, D->DuelActive() ? D->WaitTurnSpeed : 200.0f);
+		AimT += DeltaSeconds;
+		D->ReportAim(this, Dist);
+		if (D->bFleeing && AimT > 0.5f && ShotT <= 0.0f) FireAt(Player, Dist, V, D);
+		return true;
+	}
 	// la cobertura se eligio para donde estabas: si te has movido mucho, ya no vale
 	if (bHasCover && FVector::Dist2D(CoverThreat, PL) > 400.0f) { bHasCover = false; CoverT = FMath::Min(CoverT, 0.5f); }
 	if (!bHasCover && CoverT <= 0.0f)
@@ -161,7 +175,7 @@ bool ATarsisGuard::ArmedTick(float DeltaSeconds, APawn* Player, float V)
 	}
 	// en su sitio: quieto, te encara y te apunta (UpdateAnim pone la pose de apuntar al estar parado en alerta)
 	if (AI && AI->GetMoveStatus() != EPathFollowingStatus::Idle) AI->StopMovement();
-	FaceTowards(PL, DeltaSeconds);
+	FaceTowards(PL, DeltaSeconds, D->DuelActive() ? D->WaitTurnSpeed : 200.0f);   // tanda R: el que espera gira despacio
 	AimT += DeltaSeconds;
 	D->ReportAim(this, Dist);
 	if (D->bFleeing && AimT > 0.5f && ShotT <= 0.0f) FireAt(Player, Dist, V, D);

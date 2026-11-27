@@ -1139,13 +1139,13 @@ void ATarsisGuard::Walk(const FVector& Dest, float Speed)
 	}
 }
 
-void ATarsisGuard::FaceTowards(const FVector& Dest, float DeltaSeconds)
+void ATarsisGuard::FaceTowards(const FVector& Dest, float DeltaSeconds, float Rate)
 {
 	FVector Dir = Dest - GetActorLocation();
 	Dir.Z = 0.0f;
 	if (Dir.IsNearlyZero()) return;
 	const FRotator Want = Dir.Rotation();
-	SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.0f, Want.Yaw, 0.0f), DeltaSeconds, 200.0f));
+	SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.0f, Want.Yaw, 0.0f), DeltaSeconds, Rate));
 }
 
 // Tanda 25: lo que se pinta y lo que cuenta para el sigilo van por separado en las luces fuertes de fuera. Con los

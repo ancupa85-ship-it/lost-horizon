@@ -447,6 +447,8 @@ public:
 	bool bSceneLock = false;
 	/** Tanda N: el remate lo hace la pareja del GASP; la caida (ragdoll) la pone la escena en su segundo. */
 	bool bSceneFallPending = false;
+	/** Tanda R: ya llego a su punto de flanqueo (no lo deja hasta alejarse 250 cm: antes rondaba el punto sin parar). */
+	bool bAtFlank = false;
 	bool ScenePlay(class UAnimSequenceBase* A);
 	void SceneEnd();
 
@@ -1081,7 +1083,7 @@ private:
 
 	void SetState(ETarsisGuardState NewState);
 	void Walk(const FVector& Dest, float Speed);
-	void FaceTowards(const FVector& Dest, float DeltaSeconds);
+	void FaceTowards(const FVector& Dest, float DeltaSeconds, float Rate = 200.0f);
 	bool Near2D(const FVector& Dest, float Radius) const;
 	void Caught(APawn* Player);
 	void UpdateMark();

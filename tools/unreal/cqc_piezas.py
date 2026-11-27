@@ -19,6 +19,7 @@ EXPORTAR = ['/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01',
             '/Game/Characters/UEFN_Mannequin/Animations/Interactions/Shoves/M_relaxed_ragdoll_shove_stand_F_A',
             '/Game/Characters/UEFN_Mannequin/Animations/Interactions/Shoves/M_relaxed_ragdoll_shove_stand_F_V']
 # pieza -> (propiedad del director, segundos clave que se ponen)
+RAIZ = ('MM_Tarsis_Punetazo', 'MM_Tarsis_Contra')
 SEGUNDOS = {'MM_Tarsis_Culatazo': {'melee_windup_at': 0.45, 'melee_contact_at': 0.52},
             'MM_Tarsis_Punetazo': {}, 'MM_Tarsis_Contra': {'hero_counter_contact': 0.22},
             'MM_Tarsis_AgarreGuardia': {'grab_hold_at': 0.40}, 'MM_Tarsis_AgarreCuttlas': {}}
@@ -74,7 +75,9 @@ def importar():
             out.append('aviso %s: %s' % (nombre, str(e).splitlines()[0][:120]))
         a = unreal.load_asset('%s/%s' % (DEST, nombre))
         if isinstance(a, unreal.AnimSequence):
-            a.set_editor_property('enable_root_motion', False)
+            # tanda R: el punetazo y la contra llevan la acometida que queda (25 cm) como root motion, que el director le
+            # da a Cuttlas (HeroRootMotionTick); las demas, sin root motion
+            a.set_editor_property('enable_root_motion', nombre in RAIZ)
             unreal.EditorAssetLibrary.save_loaded_asset(a, False)
             hechas[nombre] = '%s/%s.%s' % (DEST, nombre, nombre)
             out.append('%s %.2f s' % (nombre, a.get_play_length()))
@@ -87,9 +90,9 @@ def importar():
     if 'MM_Tarsis_Culatazo' in hechas:
         d.set_editor_property('melee_strike_anim_path', hechas['MM_Tarsis_Culatazo'])
     if 'MM_Tarsis_Punetazo' in hechas:
-        # el propio y, de segunda, el de Lyra (alternan)
-        d.set_editor_property('hero_punch_anim_paths', [hechas['MM_Tarsis_Punetazo'], '/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_02.MM_Attack_02'])
-        d.set_editor_property('hero_punch_contact', [0.20, 0.40])
+        # tanda R: solo el propio (el segundo era MM_Attack_02 de Lyra tal cual, con su acometida de 90 cm)
+        d.set_editor_property('hero_punch_anim_paths', [hechas['MM_Tarsis_Punetazo']])
+        d.set_editor_property('hero_punch_contact', [0.20])
     if 'MM_Tarsis_Contra' in hechas:
         d.set_editor_property('hero_counter_anim_path', hechas['MM_Tarsis_Contra'])
     if 'MM_Tarsis_AgarreGuardia' in hechas and 'MM_Tarsis_AgarreCuttlas' in hechas:

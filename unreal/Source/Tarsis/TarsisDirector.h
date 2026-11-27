@@ -1762,6 +1762,54 @@ public:
 	TMap<TWeakObjectPtr<class ATarsisGuard>, double> FlankPointAt;
 	bool bRemateQueued = false;
 	bool bDuelRecovering = false;
+
+	// ---- tanda R: cuerpos que no se mueven raro y pelea con varios guardias (solo quitar, bajar, separar o corregir)
+	/** El punetazo y la contra propios (acometida bajada a 25 cm en Blender) llevan root motion: lo que avanza la raiz se
+	 *  le da a Cuttlas (con barrido, sin pasar de MeleeContactDistance - 15 cm del guardia), asi los pies no patinan. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	bool bHeroRootMotionRule = true;
+	/** Fundido de la malla del guardia a su sitio en la pareja de derribo y al soltarse del agarre (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float SceneAlignSeconds = 0.2f;
+	/** Al acabar el remate, Cuttlas sale de la pareja fundiendo (s): la animacion (montaje) y el sitio del maniqui. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float TakedownEndBlendSeconds = 0.5f;
+	/** La entrada del golpe de Cuttlas (s). Antes 0,08: al abrir el duelo la mano subia 30 cm de un fotograma. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float HeroStrikeBlendIn = 0.15f;
+	/** Distancia minima entre las pelvis de Cuttlas y el guardia en el remate (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float MinBodyGap = 35.0f;
+	/** Giro del guardia del duelo hacia ti, como mucho (grados/s). Antes, sin tope: 400-500 al abrir el duelo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float DuelTurnMaxSpeed = 180.0f;
+	/** El acercamiento a MeleeContactDistance se hace andando al final de la guardia (s antes del amago), con pasos del
+	 *  GASP; en el amago y el culatazo el guardia ya no se mueve (antes patinaba 25 cm en el golpe). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float DuelApproachSeconds = 0.45f;
+	/** El empujon a Cuttlas cuando le da el culatazo (cm/s). Antes 220: patinaba con los pies apoyados. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float HeroHitPushSpeed = 90.0f;
+	/** Giro de los guardias que esperan mientras hay duelo (grados/s; antes 200 como todos). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Varios")
+	float WaitTurnSpeed = 120.0f;
+	/** El que fija sigue fijando salvo que otro quede este tanto mas cerca de ti (cm). Antes, siempre el mas cercano. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Varios")
+	float FixerSwapMargin = 300.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")
+	float HeroRootMotionCm = 0.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")
+	int32 BodyGapPushes = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Varios")
+	int32 FixerSwaps = 0;
+	TWeakObjectPtr<class ATarsisGuard> LastFixer;
+	TMap<TWeakObjectPtr<class ATarsisGuard>, float> FlankAngles;
+	UPROPERTY() TObjectPtr<class UAnimMontage> TSHeroMontage;
+	float HeroReturnT = 0.0f;
+	bool bGrabReactPending = false;
+	FTransform HeroReturnFrom = FTransform::Identity;
+	/** Cuttlas avanza lo que diga el root motion de su golpe (tanda R). */
+	void HeroRootMotionTick();
 	/** Sonido del golpe en capas en At. Force: 0 ligero, 1 medio, 2 fuerte. Attacker: 0 Cuttlas, 1 guardia. */
 	void PlayImpact(const FVector& At, int32 Force, bool bWall, int32 Attacker, bool bVictimVoice = true);
 	/** El culatazo de Lyra (MM_Rifle_Melee): la culata arriba del todo (s) y el contacto (s), medidos en la animacion

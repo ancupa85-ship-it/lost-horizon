@@ -677,6 +677,24 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	G->ScenePlay(V);
 	G->GetMesh()->SetWorldTransform(TSComp);
 	G->GetMesh()->SetPosition(FMath::Min(T0, V->GetPlayLength() - 0.05f), false);
+	// tanda R: la pareja empieza avanzada (T0) y su raiz ya no esta donde empezo: la malla del guardia saltaba hasta
+	// 134 cm. Se evalua la pose en T0 y se lleva la malla para que la raiz quede donde esta el guardia; Cuttlas va a su
+	// sitio con la misma correccion
+	FVector TSFix = FVector::ZeroVector;
+	{
+		USkeletalMeshComponent* GM = G->GetMesh();
+		GM->TickAnimation(0.0f, false);
+		GM->RefreshBoneTransforms();
+		TSFix = GuardFrame.GetLocation() - GM->GetBoneLocation(TEXT("root"));
+		TSFix.Z = 0.0f;
+		if (TSFix.Size2D() < 300.0f)
+		{
+			GM->AddWorldOffset(TSFix);
+			TSComp.AddToTranslation(TSFix);
+		}
+		else TSFix = FVector::ZeroVector;
+	}
+	G->PoseBridge(SceneAlignSeconds);   // tanda R: y lo que quede, fundiendo
 	G->bSceneFallPending = true;
 	TSFallAt = bTSWall ? LeadIn + 0.08f : FMath::Max(Pr.Fall - T0, TakedownLeadIn + 0.1f);
 	TSHitAt = LeadIn;
@@ -685,7 +703,7 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	TSFallDir = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
 	// Cuttlas: se abalanza a su sitio mirando al guardia
 	TSLungeFrom = C->GetActorLocation();
-	TSLungeTo = FVector(HeroRoot.GetLocation().X, HeroRoot.GetLocation().Y, C->GetActorLocation().Z);
+	TSLungeTo = FVector(HeroRoot.GetLocation().X + TSFix.X, HeroRoot.GetLocation().Y + TSFix.Y, C->GetActorLocation().Z);
 	if (FVector::Dist2D(TSLungeFrom, TSLungeTo) > 260.0f) TSLungeTo = TSLungeFrom;
 	TSYawTo = (G->GetActorLocation() - TSLungeTo).Rotation().Yaw;
 	PC->SetIgnoreMoveInput(true);
@@ -693,9 +711,17 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	if (HeroDriver && HeroBody && !bSceneHero)
 	{
 		HeroSceneFrom = HeroDriver->GetComponentTransform();   // tanda O
-		HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-		HeroDriver->PlayAnimation(A, false);
-		HeroDriver->SetPosition(FMath::Min(T0, A->GetPlayLength() - 0.05f), false);
+		// tanda R: como montaje en la ranura del ABP (la pareja no lleva root motion: la raiz se anima igual), asi entra y
+		// sale fundiendo; antes, animacion suelta: al acabar, la mano de Cuttlas saltaba 67 cm de un fotograma
+		TSHeroMontage = nullptr;
+		UAnimInstance* HA = HeroDriver->GetAnimationMode() == EAnimationMode::AnimationBlueprint ? HeroDriver->GetAnimInstance() : nullptr;
+		if (HA) TSHeroMontage = HA->PlaySlotAnimationAsDynamicMontage(A, TEXT("DefaultSlot"), 0.15f, TakedownEndBlendSeconds, 1.0f, 1, -1.0f, FMath::Min(T0, A->GetPlayLength() - 0.05f));
+		if (!TSHeroMontage)
+		{
+			HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			HeroDriver->PlayAnimation(A, false);
+			HeroDriver->SetPosition(FMath::Min(T0, A->GetPlayLength() - 0.05f), false);
+		}
 		bSceneHero = true;
 		bTSHero = true;
 	}
@@ -732,6 +758,20 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 		const float S = FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(TST / FMath::Max(DisarmLungeTime, 0.01f), 0.0f, 1.0f));
 		FTransform X; X.Blend(HeroSceneFrom, TSComp, S);
 		HeroDriver->SetWorldTransform(X);
+	}
+	// tanda R: los cuerpos no se meten uno en otro (la pareja los juntaba a 19-24 cm de pelvis): se aparta al guardia
+	if (!bTSFell && HeroBody)
+	{
+		const FVector HP = HeroBody->GetSocketLocation(TEXT("pelvis"));
+		const FVector GP = G->PelvisLocation();
+		const float Gap = FVector::Dist2D(HP, GP);
+		if (Gap < MinBodyGap)
+		{
+			FVector Away = (GP - HP).GetSafeNormal2D();
+			if (Away.IsNearlyZero()) Away = TSFallDir;
+			G->GetMesh()->AddWorldOffset(Away * FMath::Min(MinBodyGap - Gap, 600.0f * DeltaSeconds));
+			++BodyGapPushes;
+		}
 	}
 	if (!bTSSounded && TST >= TSHitAt - ImpactSoundLead)
 	{
@@ -788,7 +828,16 @@ void ATarsisDirector::TakedownSceneEnd()
 	{
 		ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
 		if (C && HeroDriver->GetAttachParent() != C->GetCapsuleComponent()) HeroDriver->AttachToComponent(C->GetCapsuleComponent(), FAttachmentTransformRules::KeepWorldTransform);
-		HeroDriver->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+		// tanda R: sale de la pareja fundiendo: el montaje se va en TakedownEndBlendSeconds y el maniqui vuelve a su sitio
+		// en la capsula en ese mismo tiempo (GaspHeroTick)
+		if (TSHeroMontage)
+		{
+			if (UAnimInstance* HA = HeroDriver->GetAnimInstance()) HA->Montage_Stop(TakedownEndBlendSeconds, TSHeroMontage);
+			TSHeroMontage = nullptr;
+		}
+		else HeroDriver->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+		HeroReturnFrom = HeroDriver->GetComponentTransform();
+		HeroReturnT = TakedownEndBlendSeconds;
 		bSceneHero = false;
 	}
 	bTSHero = false;
