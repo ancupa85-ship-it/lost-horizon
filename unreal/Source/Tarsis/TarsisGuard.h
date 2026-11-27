@@ -450,6 +450,33 @@ public:
 	bool ScenePlay(class UAnimSequenceBase* A);
 	void SceneEnd();
 
+	/** Tanda O: al cambiar de animacion (ABP del GASP <-> animacion suelta, la reaccion, la escena) la pose saltaba de
+	 *  golpe. PoseBridge guarda la pose que se ve (mundo) y la funde con la nueva en PoseBridgeSeconds. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Animacion")
+	bool bPoseBridgeRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Animacion")
+	float PoseBridgeSeconds = 0.18f;
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Animacion")
+	void PoseBridge(float Seconds = -1.0f);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Animacion")
+	bool PoseBridging() const { return BridgeT > 0.0f; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Animacion")
+	int32 PoseBridges = 0;
+	/** Tanda O: parada de golpe en el contacto: la animacion se congela unos fotogramas (tiempo real, sin tocar el
+	 *  tiempo del juego: con el tiempo casi a cero el nodo de los pies del GASP daba NaN y cerraba el editor). */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Animacion")
+	void HitStop(float RealSeconds);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Animacion")
+	bool HitStopped() const { return HitStopUntil > 0.0; }
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Animacion")
+	int32 HitStops = 0;
+	TArray<FTransform> BridgeFrom;
+	float BridgeT = 0.0f;
+	float BridgeLen = 0.0f;
+	double HitStopUntil = 0.0;
+	void BridgeTick(float DeltaSeconds);
+	void HitStopTick();
+
 	// ---- tanda B (TarsisArmas.cpp): el fusil. Un M14 (/Game/Tarsis/Armas/M14/SM_M14, CC0 de Stein Games) en la mano
 	// derecha del cuerpo visible; de cintura para arriba, la pose de fusil de Lyra retargeteada a la persona
 	// (MM_Rifle_Idle_Hipfire_<persona> de ronda, MM_Rifle_Idle_ADS_<persona> en alerta) encima de la locomoción del GASP.
@@ -646,6 +673,36 @@ public:
 	float DartFallDelay = 0.35f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
 	float RagdollPush = 140.0f;
+	/** Tanda O: el remate contra la pared lo lanzaba por encima del muro (cuerpos metidos en la pared al pasar a fisica):
+	 *  velocidad maxima para salir de lo que solapa y tope de velocidad de la pelvis en los primeros segundos (cm/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float RagdollMaxDepenetration = 120.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float RagdollMaxSpeed = 650.0f;
+	/** Tanda O: el cuerpo caido seguia agitandose (piernas al aire): amortiguacion de giro y de velocidad del ragdoll. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float RagdollAngularDamping = 1.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float RagdollLinearDamping = 0.2f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Fisica")
+	int32 RagdollClamps = 0;
+	/** Tanda O: el tambaleo (tras tu contra o al soltarte) se veia de pie quieto: de cintura arriba con fisica blanda que
+	 *  tira hacia la animacion, y empujones a un lado y a otro cada StaggerKickEvery s. */
+	UFUNCTION(BlueprintCallable, Category = "Tarsis|Fisica")
+	void StaggerSway(float Seconds);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool Swaying() const { return StaggerT > 0.0f; }
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float StaggerBlend = 0.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float StaggerImpulse = 160.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float StaggerKickEvery = 0.38f;
+	/** Apaga ya la fisica de cintura arriba (tambaleo o reaccion): la escena del remate manda en la pose. */
+	void StopUpperPhysics();
+	float StaggerT = 0.0f;
+	float StaggerKickT = 0.0f;
+	float StaggerSide = 1.0f;
 	/** De la física a la animación al despertar (s). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
 	float WakeBlendSeconds = 0.8f;

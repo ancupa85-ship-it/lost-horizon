@@ -157,6 +157,7 @@ void ATarsisGuard::HitReact(FVector Dir, bool bHeavy)
 	if (!A) A = HitAnims[Side];
 	if (A)
 	{
+		PoseBridge(0.1f);   // tanda O: la reaccion entra rapida pero sin salto
 		if (bGaspSingle) GaspRestore();   // la persona vuelve a copiar al maniqui
 		M->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		M->PlayAnimation(A, false);
@@ -220,6 +221,15 @@ void ATarsisGuard::StartRagdoll()
 	M->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 	M->SetAllBodiesSimulatePhysics(true);
 	M->SetAllBodiesPhysicsBlendWeight(1.0f);
+	for (FBodyInstance* BI : M->Bodies)
+	{
+		if (!BI) continue;
+		// tanda O: sin salir disparado de lo que solapa, y sin agitarse en el suelo
+		BI->SetMaxDepenetrationVelocity(RagdollMaxDepenetration);
+		BI->AngularDamping = FMath::Max(BI->AngularDamping, RagdollAngularDamping);
+		BI->LinearDamping = FMath::Max(BI->LinearDamping, RagdollLinearDamping);
+		BI->UpdateDampingProperties();
+	}
 	M->WakeAllRigidBodies();
 	// sigue cayendo como iba (andando, o empujado por el dardo)
 	M->SetAllPhysicsLinearVelocity((GetVelocity() * 0.7f + PendingFallDir * RagdollPush).GetClampedToMaxSize(500.0f));
@@ -315,8 +325,26 @@ void ATarsisGuard::PhysicsTick(float DeltaSeconds)
 			SceneEnd();
 		}
 	}
+	// tanda O: el tambaleo, con fisica blanda y empujones alternos; al acabar se apaga como una reaccion
+	if (StaggerT > 0.0f && !bRagdoll)
+	{
+		StaggerT -= DeltaSeconds;
+		StaggerKickT -= DeltaSeconds;
+		if (State == ETarsisGuardState::Down || StaggerT <= 0.0f) { StaggerT = 0.0f; HitPhysT = HitSeconds; }
+		else
+		{
+			M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, StaggerBlend, false, true);
+			if (StaggerKickT <= 0.0f)
+			{
+				StaggerKickT = StaggerKickEvery * FMath::FRandRange(0.8f, 1.2f);
+				StaggerSide = -StaggerSide;
+				const FName Chest = FirstBody(M, { TEXT("spine_04"), TEXT("spine_03"), TEXT("spine_05"), TEXT("spine_02") });
+				if (!Chest.IsNone()) M->AddImpulse((GetActorRightVector() * StaggerSide - GetActorForwardVector() * 0.4f) * StaggerImpulse, Chest, true);
+			}
+		}
+	}
 	// los cuerpos de la reaccion se apagan poco a poco
-	if (HitPhysT > 0.0f && !bRagdoll)
+	else if (HitPhysT > 0.0f && !bRagdoll)
 	{
 		HitPhysT -= DeltaSeconds;
 		if (HitPhysT <= 0.0f)
@@ -335,6 +363,17 @@ void ATarsisGuard::PhysicsTick(float DeltaSeconds)
 	}
 	if (!bRagdoll) return;
 	RagdollT += DeltaSeconds;
+	// tanda O: si algo lo dispara (salir de una pared), se frena: nunca vuela
+	if (RagdollT < 2.5f && !bPhysDragged)
+	{
+		const FVector V = M->GetPhysicsLinearVelocity(GPelvis);
+		if (V.Size() > RagdollMaxSpeed)
+		{
+			const float K = RagdollMaxSpeed / V.Size();
+			for (FBodyInstance* BI : M->Bodies) if (BI) BI->SetLinearVelocity(BI->GetUnrealWorldVelocity() * K, false);
+			++RagdollClamps;
+		}
+	}
 	// la capsula, encima de la pelvis (los que buscan cuerpos miran donde esta el actor)
 	const FVector P = PelvisLocation();
 	SetActorLocation(FVector(P.X, P.Y, GetActorLocation().Z));
@@ -365,4 +404,92 @@ void ATarsisGuard::WakeBlendTick(float DeltaSeconds)
 		T.Blend(WakeFrom[i].GetRelativeTransform(CompXf), Cur[i], Alpha);
 		Pose->SetBoneTransformByName(Pose->GetBoneName(i), T, EBoneSpaces::ComponentSpace);
 	}
+}
+
+// ---------------------------------------------------------------- tanda O: puente de pose y parada de golpe
+// PoseBridge: la pose que se ve ahora (la de Pose, en mundo) y, en PoseBridgeSeconds, de ella a la nueva (BridgeTick, despues
+// de copiar la pose y del fusil). Lo llaman los cambios de animacion (ScenePlay, SceneEnd, HitReact, GaspSingle/Restore).
+void ATarsisGuard::PoseBridge(float Seconds)
+{
+	if (!bPoseBridgeRule || !Pose || bRagdoll || WakeT > 0.0f) return;
+	const float Len = Seconds >= 0.0f ? Seconds : PoseBridgeSeconds;
+	if (Len <= 0.0f) return;
+	const int32 N = Pose->GetNumBones();
+	BridgeFrom.SetNum(N);
+	for (int32 i = 0; i < N; ++i) BridgeFrom[i] = Pose->GetBoneTransformByName(Pose->GetBoneName(i), EBoneSpaces::WorldSpace);
+	BridgeT = BridgeLen = Len;
+	++PoseBridges;
+}
+
+void ATarsisGuard::BridgeTick(float DeltaSeconds)
+{
+	if (BridgeT <= 0.0f || !Pose) return;
+	const int32 N = Pose->GetNumBones();
+	if (bRagdoll || WakeT > 0.0f || BridgeFrom.Num() != N) { BridgeT = 0.0f; BridgeFrom.Reset(); return; }
+	if (!HitStopped()) BridgeT -= DeltaSeconds;
+	if (BridgeT <= 0.0f) { BridgeT = 0.0f; BridgeFrom.Reset(); return; }
+	const float Alpha = FMath::SmoothStep(0.0f, 1.0f, 1.0f - BridgeT / FMath::Max(BridgeLen, 0.01f));
+	TArray<FTransform> Cur;
+	Cur.SetNum(N);
+	for (int32 i = 0; i < N; ++i) Cur[i] = Pose->GetBoneTransformByName(Pose->GetBoneName(i), EBoneSpaces::ComponentSpace);
+	const FTransform CompXf = Pose->GetComponentTransform();
+	for (int32 i = 0; i < N; ++i)
+	{
+		FTransform T;
+		T.Blend(BridgeFrom[i].GetRelativeTransform(CompXf), Cur[i], Alpha);
+		Pose->SetBoneTransformByName(Pose->GetBoneName(i), T, EBoneSpaces::ComponentSpace);
+	}
+}
+
+void ATarsisGuard::HitStop(float RealSeconds)
+{
+	if (RealSeconds <= 0.0f || bRagdoll) return;
+	if (USkeletalMeshComponent* M = GetMesh()) M->bPauseAnims = true;
+	if (GaspBody) GaspBody->bPauseAnims = true;
+	HitStopUntil = FPlatformTime::Seconds() + RealSeconds;
+	++HitStops;
+}
+
+void ATarsisGuard::HitStopTick()
+{
+	if (HitStopUntil <= 0.0 || FPlatformTime::Seconds() < HitStopUntil) return;
+	HitStopUntil = 0.0;
+	if (USkeletalMeshComponent* M = GetMesh()) M->bPauseAnims = false;
+	if (GaspBody) GaspBody->bPauseAnims = false;
+}
+
+void ATarsisGuard::StaggerSway(float Seconds)
+{
+	USkeletalMeshComponent* M = GetMesh();
+	if (!M || bRagdoll || State == ETarsisGuardState::Down || !PhysicsCanRun()) return;
+	PhysicsBodies(true);
+	if (!HasPhysicsBodies()) return;
+	if (!PhysAnim)
+	{
+		PhysAnim = NewObject<UPhysicalAnimationComponent>(this, TEXT("AnimacionFisica"));
+		PhysAnim->RegisterComponent();
+	}
+	PhysAnim->SetSkeletalMeshComponent(M);
+	FPhysicalAnimationData D;
+	D.bIsLocalSimulation = true;
+	D.OrientationStrength = 600.0f;   // mas blanda que la reaccion: se le van los hombros
+	D.AngularVelocityStrength = 70.0f;
+	D.PositionStrength = 0.0f;
+	D.VelocityStrength = 0.0f;
+	PhysAnim->ApplyPhysicalAnimationSettingsBelow(GSpine1, D, true);
+	M->SetAllBodiesBelowSimulatePhysics(GSpine1, true, true);
+	M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, StaggerBlend, false, true);
+	StaggerT = Seconds;
+	StaggerKickT = 0.0f;
+	HitPhysT = FMath::Max(HitPhysT, 0.01f);
+}
+
+void ATarsisGuard::StopUpperPhysics()
+{
+	USkeletalMeshComponent* M = GetMesh();
+	StaggerT = 0.0f;
+	if (!M || bRagdoll || HitPhysT <= 0.0f) return;
+	HitPhysT = 0.0f;
+	M->SetAllBodiesBelowSimulatePhysics(GSpine1, false, true);
+	PhysicsBodies(false);
 }

@@ -257,3 +257,15 @@ Medida de noche (GTX 1050, Media, ventana de 2032 x 1125, Blender cerrado) con l
 | Barracón oeste | 33,0 / 25,9 (33,2) | 3371 |
 
 Lectura: tres guardias en combate cuestan de 0,2 a 1,5 fps de media. El peor 1 % baja a 26–28 fps por los fogonazos y las trazadoras, sin tirones visibles. La memoria de vídeo queda 110 MB por debajo de la tanda N1 y lejos del techo de 3,7 GB: el duelo, el flanqueo y el tope de dos ragdolls despiertos no cargan texturas nuevas.
+
+## Tanda O: acabado de animación y contacto del combate
+
+Misma medida que la N2: de noche, tres guardias en alerta contra ti en cada sitio, editor recién abierto y ya caliente (la primera pasada, con el editor aún compilando sombreadores e índices de PoseSearch, no vale). GPU a 62-72 °C. fps medio / peor 1 %; entre paréntesis, la media de la N2.
+
+| Sitio | fps | VRAM (MB) |
+|---|---|---|
+| Entrada | 38,4 / 18,5 (37,6) | 3424 |
+| Patio central | 35,7 / 31,4 (33,7) | 3424 |
+| Barracón oeste | 32,7 / 10,0 (33,0) | 3424 |
+
+Lectura: la tanda O no cuesta. El puente de pose, la parada de golpe, los puñetazos y el tambaleo con física solo trabajan en el contacto. Comparación A/B en la misma sesión (GPU caliente, a unos 80 °C): con sus reglas apagadas, 29,6 / 24,5 / 25,0; encendidas, 28,2 / 21,9 / 25,7, dentro del ruido. La VRAM sube unos 50 MB respecto a la N2 (el material de los brazos sin texturas, los puñetazos de Lyra y la pareja de empujón ya cargada), lejos del techo de 3,7 GB. El peor 1 % de la entrada y del barracón tiene algún tirón suelto (18,5 y 10,0): son los primeros disparos con trazadora y polvo de cada alerta, igual que en la N2.

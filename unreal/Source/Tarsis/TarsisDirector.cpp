@@ -1578,7 +1578,8 @@ void ATarsisDirector::SetupArms(ACharacter* C)
 	// caídos (fuera de la vista). Para la pistola se pone otro maniquí pegado a la cámara, con la cabeza en ella,
 	// solo para ti y con el campo de visión de primera persona (no se mete en las paredes)
 	UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>();
-	USkeletalMesh* SK = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
+	USkeletalMesh* SK = ArmsMeshPath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *ArmsMeshPath);   // tanda O: las mangas de Cuttlas
+	if (!SK) SK = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
 	if (!Cam || !SK) return;
 	Arms = NewObject<USkeletalMeshComponent>(C, TEXT("BrazosTarsis"));
 	Arms->SetSkeletalMeshAsset(SK);
@@ -1636,10 +1637,20 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 	const float Amp = Speed > 40.0f ? (C->bIsCrouched ? 0.35f : (bSprint ? 1.3f : 0.7f)) : 0.0f;
 	const FVector Bob(0.0f, FMath::Sin(BobPhase * 0.5f) * Amp * 0.8f, -FMath::Abs(FMath::Sin(BobPhase)) * Amp);
 	RecoilT = FMath::Max(0.0f, RecoilT - DeltaSeconds * 5.0f);
+	// tanda O: el puñetazo animado (ArmsPunch) manda; al acabar, la pose de siempre
+	if (ArmsPunchT > 0.0f)
+	{
+		ArmsPunchT -= DeltaSeconds;
+		if (ArmsPunchT <= 0.0f)
+		{
+			ArmsPunchT = 0.0f;
+			if (UAnimationAsset* PA = LoadObject<UAnimationAsset>(nullptr, bFPRifle ? *FPRifleArmsAnimPath : *ArmsAnimPath)) Arms->PlayAnimation(PA, true);
+		}
+	}
 	// tanda L: el golpe, un empujon de brazos (o de culata) hacia delante y abajo que vuelve
-	const float Strike = StrikeT > 0.0f ? FMath::Sin(PI * (1.0f - StrikeT / FMath::Max(StrikeLen, 0.05f))) : 0.0f;
+	const float Strike = (StrikeT > 0.0f && ArmsPunchT <= 0.0f) ? FMath::Sin(PI * (1.0f - StrikeT / FMath::Max(StrikeLen, 0.05f))) : 0.0f;
 	// tanda M: el empujon va mas lejos y mas bajo, con las manos libres (la pistola se guarda): antes quedaba pegado a la camara
-	const bool bBare = Strike > 0.0f && !bFPRifle;
+	const bool bBare = (Strike > 0.0f || ArmsPunchT > 0.0f) && !bFPRifle;
 	if (Pistol && Pistol->IsVisible() == bBare) Pistol->SetVisibility(!bBare);
 	const FQuat Rel = FRotator(7.0f * RecoilT - (bFPRifle ? 16.0f : 14.0f) * Strike, 0.0f, 0.0f).Quaternion() * FRotator(0.0f, -90.0f, 0.0f).Quaternion();
 	// la cabeza del maniquí, en la cámara: así la pistola queda donde la llevaría alguien de tu altura

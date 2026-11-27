@@ -176,6 +176,7 @@ void ATarsisGuard::GaspSingle(UAnimationAsset* A, bool bLoop)
 	if (!GaspBody || !A) return;
 	if (bGaspSingle && CurrentAnim == A) return;
 	GaspTurn.Stop(this);
+	PoseBridge();   // tanda O: sin salto al pasar a la animacion suelta
 	GaspBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	GaspBody->PlayAnimation(A, bLoop);
 	GaspBody->SetPlayRate(1.0f);
@@ -188,6 +189,7 @@ bool ATarsisGuard::ScenePlay(UAnimSequenceBase* A)
 	USkeletalMeshComponent* M = GetMesh();
 	if (!GaspBody || !M || !A) return false;
 	GaspTurn.Stop(this);
+	PoseBridge();   // tanda O: de la pose que se ve a la de la escena, sin salto
 	if (bGaspSingle) GaspRestore();   // la persona vuelve a copiar al maniquí
 	bSceneLock = true;
 	M->SetAnimationMode(EAnimationMode::AnimationSingleNode);
@@ -198,13 +200,18 @@ bool ATarsisGuard::ScenePlay(UAnimSequenceBase* A)
 void ATarsisGuard::SceneEnd()
 {
 	USkeletalMeshComponent* M = GetMesh();
-	if (M && M->GetAnimationMode() != EAnimationMode::AnimationBlueprint) M->SetAnimationMode(EAnimationMode::AnimationBlueprint);   // el ABP del GASP de nuevo
+	if (M && M->GetAnimationMode() != EAnimationMode::AnimationBlueprint)
+	{
+		PoseBridge();   // tanda O: de vuelta al ABP sin salto
+		M->SetAnimationMode(EAnimationMode::AnimationBlueprint);   // el ABP del GASP de nuevo
+	}
 	GaspGaitNow.Reset();
 }
 
 void ATarsisGuard::GaspRestore()
 {
 	if (!GaspBody || !GaspRetargetClass) return;
+	if (bGaspSingle) PoseBridge();   // tanda O
 	GaspBody->SetAnimationMode(EAnimationMode::AnimationBlueprint);
 	GaspBody->SetAnimInstanceClass(GaspRetargetClass);
 	GaspPointRetargeter();

@@ -211,10 +211,12 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 		YawRate = FMath::FInterpTo(YawRate, FMath::Abs(FMath::FindDeltaAngleDegrees(PrevYaw, Yaw)) / DeltaSeconds, DeltaSeconds, 8.0f);
 	}
 	PrevYaw = Yaw;
+	HitStopTick();   // tanda O: la parada de golpe acaba en tiempo real
 	if (!Pose) return;
 	Pose->CopyPoseFromSkeletalComponent(AnimBody());
 	RifleTick(DeltaSeconds);   // tanda B: de cintura para arriba, la pose de fusil
 	WakeBlendTick(DeltaSeconds);   // tanda C: al despertar, de la pose tumbada (fisica) a la animada
+	BridgeTick(DeltaSeconds);   // tanda O: de la pose de antes del cambio de animacion a la nueva
 	// adónde mira la cabeza, respecto al cuerpo: el cuerpo gira despacio y la cabeza se adelanta
 	auto Toward = [this](const FVector& P) -> float
 	{

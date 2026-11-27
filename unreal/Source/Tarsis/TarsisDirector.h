@@ -1664,6 +1664,53 @@ public:
 	/** Para las pruebas: el siguiente golpe del guardia en el duelo es culatazo o agarre (0 al azar, 1 culatazo, 2 agarre). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Duelo")
 	int32 TestNextMelee = 0;
+
+	// ---- tanda O: acabado de animacion y contacto del combate (sin mecanicas nuevas)
+	/** Parada de golpe en el contacto: las dos animaciones se congelan HitStopSeconds (tiempo real). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	bool bHitStopRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float HitStopSeconds = 0.06f;
+	/** El culatazo de Lyra (MM_Rifle_Melee): la culata arriba del todo (s) y el contacto (s), medidos en la animacion
+	 *  (tools/unreal/anim_contacto.py). El amago sube hasta arriba y se queda; el culatazo baja justo para el contacto. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float MeleeWindupAt = 0.27f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float MeleeContactAt = 0.34f;
+	/** Tu golpe (H) en tercera: el puñetazo de Lyra en el maniqui de Cuttlas, y el puño llega HeroContactLead tras la
+	 *  tecla (el contacto de MM_Attack_01/02 esta en 0,42 / 0,40 s). El efecto (reaccion, sonido, parada) va ahi. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	bool bHeroStrikeAnimRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float HeroContactLead = 0.12f;
+	/** En el culatazo el guardia se echa encima: a esta distancia (cm) del pecho al contacto (antes la culata no llegaba). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float MeleeContactDistance = 95.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 HeroReactAnims = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 ArmsPunches = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 HeroStrikeAnims = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 ContactEvents = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 HitStopsDone = 0;
+	/** El agarre: lo que tarda en echarte las manos (s) y el forcejeo (cada cuanto da un tiron, s; cuanto, s de animacion). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float GrabReachSeconds = 0.08f;   // tanda O: mas tiempo y la pareja ya te tiraba al suelo
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float GrabJitterEvery = 0.13f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float GrabJitterAmount = 0.05f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 GrabScenes = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Contacto")
+	bool GrabScenePlaying() const { return GSGuard.IsValid(); }
+	/** Parada de golpe sobre el guardia G y Cuttlas. */
+	void ContactHitStop(class ATarsisGuard* G, float Scale = 1.0f);
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Contacto")
+	bool HeroHitStopped() const { return HeroHitStopUntil > 0.0; }
 	/** El guardia del remate va a cambiar de mano (arrastrarlo, otro golpe): cae ya. */
 	void TakedownSceneRelease(class ATarsisGuard* G) { if (TSGuard.Get() == G) TakedownSceneFall(); }
 
@@ -2941,6 +2988,10 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Tarsis|Jugador")
 	bool bArmsVisible = false;
 
+	/** Tanda O: la malla de los brazos de primera persona. Una copia del maniqui con los materiales de Cuttlas (mangas y
+	 *  manos, tools/unreal/brazos_cuttlas.py); sin ella, el maniqui blanco de siempre. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Armas")
+	FString ArmsMeshPath = TEXT("/Game/Tarsis/Personas/Brazos/SKM_Brazos_Cuttlas.SKM_Brazos_Cuttlas");
 	/** Animación de los brazos sosteniendo la pistola y momento en que se congela (-1 = en bucle). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Jugador")
 	FString ArmsAnimPath = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MF_Pistol_Idle_ADS.MF_Pistol_Idle_ADS");
@@ -3497,6 +3548,21 @@ private:
 	FVector DSLungeFrom = FVector::ZeroVector, DSLungeTo = FVector::ZeroVector;
 	float DSYawTo = 0.0f;
 	bool bDSHero = false, bDSGuardOn = false;
+	bool bDSHit = false;   // tanda O: la reaccion del guardia en el contacto, no al pulsar
+	FTransform HeroSceneFrom = FTransform::Identity;   // tanda O: de donde estaba el maniqui de Cuttlas al empezar la pareja
+	// tanda O: contacto
+	double HeroHitStopUntil = 0.0;
+	float DuelContactT = -1.0f;
+	int32 DuelContactKind = 0;   // 1 tu golpe entra, 2 lo para
+	bool bDuelSwing = false;
+	int32 HeroStrikeIdx = 0;
+	FVector DuelStepFrom = FVector::ZeroVector, DuelStepTo = FVector::ZeroVector;
+	float DuelSwingAt = 0.0f;
+	void HeroStrikeAnim(float Lead = -1.0f, bool bAlways = false);
+	float ArmsPunchT = 0.0f;   // tanda O: en primera, el puñetazo de verdad en los brazos (no el empujon procedural)
+	void ArmsPunch(float Lead);
+	void HeroReactAnim();
+	void ContactTick(float DeltaSeconds);
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> HeroSling;
 	UPROPERTY() TObjectPtr<class UAnimationAsset> ArmsAnimKeep;
 	// tanda N2
@@ -3520,6 +3586,15 @@ private:
 	// tanda N
 	bool TakedownSceneBegin(class ATarsisGuard* G);
 	void TakedownSceneTick(float DeltaSeconds);
+	// tanda O: el agarre del duelo con la pareja de empujon del GASP, parada en el contacto (manos encima) y el forcejeo
+	bool GrabSceneBegin(class ATarsisGuard* G);
+	void GrabSceneTick(float DeltaSeconds);
+	void GrabSceneEnd(bool bEscaped);
+	TWeakObjectPtr<class ATarsisGuard> GSGuard;
+	FTransform GSComp, GSGuardRel;
+	float GST = 0.0f, GSHit = 0.0f, GSJitterT = 0.0f, GSJitterSign = 1.0f;
+	bool bGSFrozen = false;
+	UPROPERTY() TObjectPtr<class UAnimMontage> GSHeroMontage;
 	void TakedownSceneFall();
 	void TakedownSceneEnd();
 	void SlowMo();

@@ -214,7 +214,7 @@ void ATarsisDirector::DisarmGuard(ATarsisGuard* G)
 	KickT = 0.25f;
 	StrikeT = StrikeLen;   // tanda L: se ve el golpe de Cuttlas
 	++Strikes;
-	if (P) PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.8f);
+	if (P && !DSGuard.IsValid()) PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.8f);   // tanda O: con la escena, en el contacto
 }
 
 void ATarsisDirector::SpawnFloorRifle(UStaticMesh* Mesh, const FTransform& T, ATarsisGuard* RifleOwner, const FVector& Impulse)

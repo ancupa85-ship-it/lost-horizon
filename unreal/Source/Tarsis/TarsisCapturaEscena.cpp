@@ -19,6 +19,8 @@
 #include "TarsisGuard.h"
 
 #include "AIController.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
@@ -177,6 +179,9 @@ void ATarsisDirector::SceneCameraBegin(APlayerController* PC)
 			SceneCam->SetActorLocationAndRotation(PC->PlayerCameraManager->GetCameraLocation(), PC->PlayerCameraManager->GetCameraRotation());
 			SceneCam->GetCameraComponent()->SetFieldOfView(PC->PlayerCameraManager->GetFOVAngle());
 			PC->SetViewTarget(SceneCam);
+			// tanda O: con otra camara, el cuerpo de la plantilla (oculto solo para tu vista) se veia blanco y
+			// descolocado junto a Cuttlas: oculto mientras tanto (sigue dando sombra)
+			if (ACharacter* PCChar = Cast<ACharacter>(PC->GetPawn())) if (PCChar->GetMesh()) PCChar->GetMesh()->SetHiddenInGame(true);
 		}
 		if (Arms) Arms->SetVisibility(false, true);
 	}
@@ -369,6 +374,7 @@ void ATarsisDirector::SceneRestore(ACharacter* C)
 		G->Hold(1.0f);
 	}
 	if (PC && SceneCam && PC->GetViewTarget() == SceneCam) PC->SetViewTarget(C);
+	if (C && C->GetMesh() && C->GetMesh()->bHiddenInGame) C->GetMesh()->SetHiddenInGame(false);   // tanda O
 	if (Arms) Arms->SetVisibility(!bThirdShown, true);
 }
 
@@ -495,7 +501,9 @@ bool ATarsisDirector::DisarmSceneBegin(ATarsisGuard* G)
 	// el guardia: la parte _V del GASP acaba en el suelo (es la entrada al ragdoll) y, cortada, se le veia hundido; en su
 	// lugar la reaccion fuerte de Lyra, sin moverlo de su sitio (medido en las capturas de la tanda M)
 	DSGuardRel = GuardRel;
-	G->HitReact(G->GetActorLocation() - C->GetActorLocation(), true);
+	// tanda O: la reaccion (y el golpe) en el contacto, DisarmLeadIn despues de la E (antes reaccionaba al pulsar, antes
+	// de que llegaran tus manos): DisarmSceneTick
+	bDSHit = false;
 	bDSGuardOn = false;
 	// Cuttlas: se abalanza hasta su sitio, mirando al guardia
 	DSLungeFrom = C->GetActorLocation();
@@ -506,10 +514,10 @@ bool ATarsisDirector::DisarmSceneBegin(ATarsisGuard* G)
 	bDSHero = false;
 	if (HeroDriver && HeroBody && !bSceneHero)
 	{
+		HeroSceneFrom = HeroDriver->GetComponentTransform();   // tanda O: del sitio de antes al de la pareja, con el abalanzarse
 		HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		HeroDriver->PlayAnimation(A, false);
 		HeroDriver->SetPosition(FMath::Min(FMath::Max(0.0f, Pr.Hit - DisarmLeadIn), A->GetPlayLength() - 0.05f), false);
-		HeroDriver->SetWorldTransform(DSComp);
 		bSceneHero = true;
 		bDSHero = true;
 	}
@@ -539,7 +547,21 @@ void ATarsisDirector::DisarmSceneTick(float DeltaSeconds)
 		R.Yaw = FMath::RInterpTo(R, FRotator(R.Pitch, DSYawTo, 0.0f), DeltaSeconds, 14.0f).Yaw;
 		PC->SetControlRotation(R);
 	}
-	if (bDSHero && HeroDriver) HeroDriver->SetWorldTransform(DSComp);
+	if (bDSHero && HeroDriver)
+	{
+		// tanda O: antes saltaba al sitio de la pareja de golpe mientras la capsula aun se abalanzaba
+		const float S = FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(DST / FMath::Max(DisarmLungeTime, 0.01f), 0.0f, 1.0f));
+		FTransform X; X.Blend(HeroSceneFrom, DSComp, S);
+		HeroDriver->SetWorldTransform(X);
+	}
+	if (!bDSHit && DST >= DisarmLeadIn)
+	{
+		bDSHit = true;
+		if (C) G->HitReact(G->GetActorLocation() - C->GetActorLocation(), true);
+		PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.8f);
+		ContactHitStop(G, 1.0f);
+		++ContactEvents;
+	}
 	if (bDSGuardOn && DST >= DisarmLeadIn + DisarmGuardRelease)
 	{
 		// el guardia suelta su parte donde acabo su raiz y sigue con el traspie
@@ -557,6 +579,12 @@ void ATarsisDirector::DisarmSceneTick(float DeltaSeconds)
 void ATarsisDirector::DisarmSceneEnd()
 {
 	ATarsisGuard* G = DSGuard.Get();
+	if (G && !bDSHit)
+	{
+		// se corta antes del contacto: la reaccion igualmente
+		bDSHit = true;
+		if (ACharacter* C0 = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0))) G->HitReact(G->GetActorLocation() - C0->GetActorLocation(), true);
+	}
 	if (G && bDSGuardOn)
 	{
 		const FVector Root = G->GetMesh()->GetSocketLocation(TEXT("root"));
@@ -626,6 +654,7 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	// las dos partes empiezan avanzadas: el golpe llega TakedownLeadIn despues de la E
 	const float T0 = FMath::Max(0.0f, Pr.Hit - LeadIn);
 	TSGuardRel = GuardRel;
+	G->StopUpperPhysics();   // tanda O: sin el tambaleo encima de la pareja
 	G->ScenePlay(V);
 	G->GetMesh()->SetWorldTransform(TSComp);
 	G->GetMesh()->SetPosition(FMath::Min(T0, V->GetPlayLength() - 0.05f), false);
@@ -644,10 +673,10 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	bTSHero = false;
 	if (HeroDriver && HeroBody && !bSceneHero)
 	{
+		HeroSceneFrom = HeroDriver->GetComponentTransform();   // tanda O
 		HeroDriver->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		HeroDriver->PlayAnimation(A, false);
 		HeroDriver->SetPosition(FMath::Min(T0, A->GetPlayLength() - 0.05f), false);
-		HeroDriver->SetWorldTransform(TSComp);
 		bSceneHero = true;
 		bTSHero = true;
 	}
@@ -678,7 +707,12 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 		R.Yaw = FMath::RInterpTo(R, FRotator(R.Pitch, TSYawTo, 0.0f), DeltaSeconds, 12.0f).Yaw;
 		PC->SetControlRotation(R);
 	}
-	if (bTSHero && HeroDriver) HeroDriver->SetWorldTransform(TSComp);
+	if (bTSHero && HeroDriver)
+	{
+		const float S = FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(TST / FMath::Max(DisarmLungeTime, 0.01f), 0.0f, 1.0f));
+		FTransform X; X.Blend(HeroSceneFrom, TSComp, S);
+		HeroDriver->SetWorldTransform(X);
+	}
 	if (!bTSHit && TST >= TSHitAt)
 	{
 		bTSHit = true;
@@ -686,6 +720,8 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 		if (USoundBase* S = Sfx(FString::Printf(TEXT("golpe_seco_%d"), FMath::RandRange(1, 2)))) UGameplayStatics::PlaySoundAtLocation(this, S, G->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), 1.0f, FMath::FRandRange(0.95f, 1.05f), 0.0f, Atten);
 		else PlaySfx(TEXT("golpe"), G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0.9f);
 		KickT = FMath::Max(KickT, 0.2f);
+		ContactHitStop(G, 1.3f);   // tanda O: parada de golpe en el contacto, luego la camara lenta
+		++ContactEvents;
 		SlowMo();
 	}
 	if (!bTSFell && TST >= TSFallAt) TakedownSceneFall();
@@ -704,7 +740,7 @@ void ATarsisDirector::TakedownSceneFall()
 	G->bSceneLock = false;
 	if (G->PhysicsCanRun())
 	{
-		G->PendingFallDir = TSFallDir * (bTSWall ? 2.0f : 1.0f);
+		G->PendingFallDir = TSFallDir * (bTSWall ? 0.3f : 1.0f);   // tanda O: contra la pared se derrumba contra ella (con 2x salia volando por encima)
 		G->DriverRel = TSGuardRel;   // al despertar vuelve a su sitio de la capsula, no al de la escena
 		G->bDriverRelSaved = true;
 		G->StartRagdoll();
@@ -731,4 +767,112 @@ void ATarsisDirector::TakedownSceneEnd()
 	bTSHero = false;
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0)) PC->SetIgnoreMoveInput(false);
 	TSGuard = nullptr;
+}
+
+// ---------------------------------------------------------------- tanda O: el agarre del duelo
+// Antes el agarre no tenia animacion: el guardia seguia apuntando y solo salia el aviso. Ahora la pareja de empujon del
+// GASP como en la detencion (la raiz de _V donde esta Cuttlas, el guardia en la de _A): el guardia se echa encima en
+// GrabReachSeconds y se queda en el contacto (las manos en ti); Cuttlas (en tercera) hace la _V parada ahi. El forcejeo:
+// tirones de GrabJitterAmount s de animacion arriba y abajo, con sacudida. Al soltarte (E) o al acabar, cada uno a lo suyo.
+bool ATarsisDirector::GrabSceneBegin(ATarsisGuard* G)
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!G || !C || !G->UsesGasp() || !G->GetMesh() || G->bRagdoll || GSGuard.IsValid()) return false;
+	const float HalfH = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FTransform Here(FRotator(0.0f, C->GetActorRotation().Yaw + HeroDriverYaw, 0.0f),
+		FVector(C->GetActorLocation().X, C->GetActorLocation().Y, C->GetActorLocation().Z - HalfH - HeroDriverBallZ + 2.0f));
+	const FVector Local = Here.InverseTransformPosition(G->GetActorLocation()).GetSafeNormal2D();
+	int32 Best = INDEX_NONE;
+	float BestDot = -2.0f;
+	for (int32 i = 0; i < UE_ARRAY_COUNT(ScenePairs); ++i)
+	{
+		const FScenePair& Pr = ScenePairs[i];
+		if (FCString::Strcmp(Pr.Kind, TEXT("shove")) != 0) continue;
+		const FVector Rel = RootAt(Pr.RootV, Pr.YawV).InverseTransformPosition(Pr.RootA).GetSafeNormal2D();
+		const float Dot = FVector::DotProduct(Local, Rel);
+		if (Dot > BestDot) { BestDot = Dot; Best = i; }
+	}
+	if (Best == INDEX_NONE) return false;
+	const FScenePair& Pr = ScenePairs[Best];
+	UAnimSequenceBase* A = LoadPairAnim(Pr, true);
+	UAnimSequenceBase* V = LoadPairAnim(Pr, false);
+	if (!A) return false;
+	GSComp = RootAt(Pr.RootV, Pr.YawV).Inverse() * Here;
+	GSGuardRel = G->GetMesh()->GetRelativeTransform();
+	GSHit = Pr.Hit;
+	G->StopUpperPhysics();
+	G->ScenePlay(A);
+	G->GetMesh()->SetWorldTransform(GSComp);
+	G->GetMesh()->SetPosition(FMath::Max(0.0f, GSHit - GrabReachSeconds), false);
+	GSHeroMontage = nullptr;
+	if (V && HeroDriver && !bSceneHero && HeroDriver->GetAnimationMode() == EAnimationMode::AnimationBlueprint)
+	{
+		if (UAnimInstance* AI = HeroDriver->GetAnimInstance())
+		{
+			GSHeroMontage = AI->PlaySlotAnimationAsDynamicMontage(V, TEXT("DefaultSlot"), 0.15f, 0.25f, 1.0f, 1, -1.0f, FMath::Max(0.0f, GSHit - GrabReachSeconds));
+		}
+	}
+	GSGuard = G;
+	GST = 0.0f;
+	GSJitterT = 0.0f;
+	bGSFrozen = false;
+	++GrabScenes;
+	return true;
+}
+
+void ATarsisDirector::GrabSceneTick(float DeltaSeconds)
+{
+	ATarsisGuard* G = GSGuard.Get();
+	if (!G) return;
+	GST += DeltaSeconds;
+	G->GetMesh()->SetWorldTransform(GSComp);   // el duelo le gira la capsula: la malla se queda en su sitio de la pareja
+	UAnimInstance* AI = HeroDriver ? HeroDriver->GetAnimInstance() : nullptr;
+	if (!bGSFrozen && GST >= GrabReachSeconds)
+	{
+		// las manos encima: parado en el contacto, con su golpe
+		bGSFrozen = true;
+		G->GetMesh()->SetPlayRate(0.0f);
+		GSHit = FMath::Max(0.0f, GSHit - GrabJitterAmount);   // tanda O: justo antes del empujon (despues, Cuttlas ya cae)
+		G->GetMesh()->SetPosition(GSHit, false);
+		if (AI && GSHeroMontage) { AI->Montage_SetPlayRate(GSHeroMontage, 0.0f); AI->Montage_SetPosition(GSHeroMontage, GSHit); }
+		PlaySfx(TEXT("empujon"), G->GetActorLocation() + FVector(0.0f, 0.0f, 110.0f), 0.8f);
+		ContactHitStop(G, 0.8f);
+		KickT = FMath::Max(KickT, 0.18f);
+		++ContactEvents;
+	}
+	if (bGSFrozen)
+	{
+		GSJitterT -= DeltaSeconds;
+		if (GSJitterT <= 0.0f)
+		{
+			// el forcejeo: tirones cortos adelante y atras
+			GSJitterT = GrabJitterEvery * FMath::FRandRange(0.8f, 1.25f);
+			GSJitterSign = -GSJitterSign;
+			// hacia atras desde el contacto, nunca pasado (despues del empujon la pareja ya te tira al suelo)
+			const float Pos = FMath::Max(0.0f, GSHit - (GSJitterSign > 0.0f ? 0.0f : GrabJitterAmount * FMath::FRandRange(0.5f, 1.0f)));
+			G->GetMesh()->SetPosition(Pos, false);
+			if (AI && GSHeroMontage) AI->Montage_SetPosition(GSHeroMontage, Pos);
+			KickT = FMath::Max(KickT, 0.06f);
+		}
+	}
+}
+
+void ATarsisDirector::GrabSceneEnd(bool bEscaped)
+{
+	ATarsisGuard* G = GSGuard.Get();
+	if (G)
+	{
+		// la capsula, donde quedo la raiz de la pareja; la malla vuelve a la capsula (el puente de pose lo suaviza)
+		const FVector Root = G->GetMesh()->GetSocketLocation(TEXT("root"));
+		G->SceneEnd();
+		G->GetMesh()->SetRelativeTransform(GSGuardRel);
+		G->bSceneLock = false;
+		if (bEscaped) G->SetActorLocation(FVector(Root.X, Root.Y, G->GetActorLocation().Z), true);
+	}
+	if (HeroDriver && GSHeroMontage)
+	{
+		if (UAnimInstance* AI = HeroDriver->GetAnimInstance()) AI->Montage_Stop(0.25f, GSHeroMontage);
+	}
+	GSHeroMontage = nullptr;
+	GSGuard = nullptr;
 }

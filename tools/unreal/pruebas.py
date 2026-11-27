@@ -3415,7 +3415,8 @@ def prueba_fisica():
     check('y cae con ragdoll (no un corte a la pose tumbada)', h.is_ragdoll() and estado(h) == 'DOWN', '%s %s' % (h.is_ragdoll(), estado(h)))
     yield 4.0
     pz = h.pelvis_location().z - suelo(h)
-    check('en el suelo, en reposo', pz < 35, 'pelvis a %.0f cm del suelo' % pz)
+    # tanda O: con la amortiguacion del ragdoll (ya no se agita) queda algo mas recogido: 34-35 cm medidos (antes 19-34)
+    check('en el suelo, en reposo', pz < 40, 'pelvis a %.0f cm del suelo' % pz)
     check('la capsula le sigue (los demas lo encuentran donde cayo)', dist2d(h.get_actor_location(), h.pelvis_location()) < 15, '%.0f cm' % dist2d(h.get_actor_location(), h.pelvis_location()))
     # 3. arrastrarlo: de los hombros, con fisica
     junto_a(h); yield 0.3
@@ -5301,7 +5302,8 @@ def prueba_combate2():
     d.set_editor_property('melee_feint_seconds', fe0)
     d.set_editor_property('melee_strike_seconds', st0)
     check('parado a tiempo: se tambalea (contra)', P('melee_parries') >= 1 and d.duel_phase() == 5 and g.is_stunned(), '%d fase %d' % (P('melee_parries'), d.duel_phase()))
-    check('tambaleandose, la E lo remata (pareja de derribo)', 'DERRIBAR' in str(d.interact_prompt()), str(d.interact_prompt()))
+    _gl = g.get_actor_location(); _pl = jugador().get_actor_location()
+    check('tambaleandose, la E lo remata (pareja de derribo)', 'DERRIBAR' in str(d.interact_prompt()), '%s | aturdido %s dist %.0f dz %.0f fase %d' % (d.interact_prompt(), g.is_stunned(), math.hypot(_gl.x - _pl.x, _gl.y - _pl.y), _gl.z - _pl.z, d.duel_phase()))
     d.interact(); yield 0.2
     check('rematado: derribado y fin del duelo', estado(g) == 'DOWN' and not d.duel_active(), '%s %s' % (estado(g), d.duel_active()))
     yield 2.0
@@ -5361,10 +5363,116 @@ def prueba_combate2():
     aparte(); yield 0.5
     check('ningun texto pedido falta', not list(P('missing_texts')), list(P('missing_texts')))
 
+
+def prueba_contacto():
+    """Tanda O. Acabado de animacion y contacto del combate (sin mecanicas nuevas): tu golpe se ve (tercera: puñetazo en
+    el maniqui; primera: en los brazos) y su efecto llega en el contacto; parada de golpe; el tambaleo se mueve (fisica
+    blanda); el agarre tiene manos (pareja de empujon) y se suelta; los cambios de animacion del guardia se funden (puente
+    de pose); el remate contra la pared no lo lanza por encima del muro."""
+    import math
+    d = director()
+    P = lambda k: director().get_editor_property(k)
+    ronda = lambda: [x for x in guardias() if not x.get_editor_property('tower_sentry') and estado(x) == 'PATROL' and not x.get_actor_label().endswith('Ramos')]
+    yield ('hasta', lambda: len(ronda()) > 4, 30.0)
+    rs = ronda()
+    for x in guardias():
+        x.hold(3600.0)
+    d.set_editor_property('armed_rule', True)
+    d.set_day(True)
+    def duelo_con(g):
+        g.hold(0.0)
+        g.alarm(jugador().get_actor_location())
+        yield 0.2
+        g.hold(1.5)
+        yield 0.2
+        a_la_vista_de(g, 130)
+        mirar(g.get_actor_location())
+    if not d.third_now():
+        d.toggle_third(); yield 0.8
+    # 1) tercera: tu golpe se ve y su efecto llega en el contacto
+    g = rs[0]
+    yield from duelo_con(g)
+    a0, c0, h0 = P('hero_strike_anims'), P('contact_events'), P('hit_stops_done')
+    d.melee_strike()
+    # en el mismo fotograma de la tecla (con el editor a pocos fps, un fotograma ya pasa de los 0,12 s del puño)
+    check('en tercera, la H: Cuttlas da el puñetazo (animacion en el maniqui)', P('hero_strike_anims') == a0 + 1 and d.duel_active(), '%d %s' % (P('hero_strike_anims') - a0, d.duel_active()))
+    check('el efecto aun no: llega con el puño, no al pulsar', P('contact_events') == c0, P('contact_events') - c0)
+    yield 0.02
+    yield 0.35
+    check('en el contacto: golpe y parada de golpe', P('contact_events') == c0 + 1 and P('hit_stops_done') > h0, '%d %d' % (P('contact_events') - c0, P('hit_stops_done') - h0))
+    # 2) contra a tiempo: tambaleo que se mueve, y tu puño en la parada
+    fe0, st0 = P('melee_feint_seconds'), P('melee_strike_seconds')
+    d.set_editor_property('melee_feint_seconds', 1.2)
+    d.set_editor_property('melee_strike_seconds', 1.2)
+    d.set_editor_property('test_next_melee', 1)
+    yield ('hasta', lambda: director().duel_phase() == 3, 5.0)
+    yield 0.95
+    a1, gs0 = P('hero_strike_anims'), g.get_editor_property('hit_stops')
+    d.block_on(); yield 0.05
+    d.block_off()
+    yield ('hasta', lambda: director().duel_phase() != 3, 1.5)
+    d.set_editor_property('melee_feint_seconds', fe0)
+    d.set_editor_property('melee_strike_seconds', st0)
+    check('la contra: se tambalea con fisica (no de pie quieto)', d.duel_phase() == 5 and g.swaying(), 'fase %d %s' % (d.duel_phase(), g.swaying()))
+    check('la contra: tu puño y la parada de golpe en el guardia', P('hero_strike_anims') > a1 and g.get_editor_property('hit_stops') > gs0, '%d %d' % (P('hero_strike_anims') - a1, g.get_editor_property('hit_stops') - gs0))
+    check('los cambios de animacion del guardia se funden (puente de pose)', g.get_editor_property('pose_bridges') > 0, g.get_editor_property('pose_bridges'))
+    d.interact(); yield 2.0
+    check('rematado tras la contra', estado(g) == 'DOWN', estado(g))
+    yield 1.0
+    # 3) el agarre: manos encima (pareja de empujon) y al soltarte se acaba
+    h = rs[1]
+    yield from duelo_con(h)
+    d.set_editor_property('stamina_regen', 1000.0); yield 0.1
+    d.melee_strike(); yield 0.1
+    d.set_editor_property('test_next_melee', 2)
+    yield ('hasta', lambda: director().duel_phase() == 4, 4.0)
+    yield 0.4
+    check('el agarre tiene animacion: manos encima (pareja de empujon)', d.duel_phase() == 4 and d.grab_scene_playing(), '%d %s' % (d.duel_phase(), d.grab_scene_playing()))
+    d.interact(); yield 0.15
+    check('al soltarte: fin de la pareja, el guardia se tambalea', not d.grab_scene_playing() and h.swaying(), '%s %s' % (d.grab_scene_playing(), h.swaying()))
+    d.set_editor_property('stamina_regen', 30.0)
+    aparte(); yield 1.0
+    # 4) en primera: el puñetazo en tus brazos
+    if d.third_now():
+        d.toggle_third(); yield 0.8
+    k = rs[2]
+    yield from duelo_con(k)
+    p0 = P('arms_punches')
+    d.melee_strike(); yield 0.05
+    check('en primera, la H: el puñetazo en tus brazos', P('arms_punches') == p0 + 1, P('arms_punches') - p0)
+    aparte(); yield 1.0
+    # 5) remate contra la pared: cae contra ella, no sale volando
+    m = rs[3]
+    base = m.get_actor_location()
+    mejor = None
+    for a in range(0, 360, 15):
+        dv = V(math.cos(math.radians(a)), math.sin(math.radians(a)), 0)
+        r = unreal.SystemLibrary.line_trace_single(mundo(), V(base.x, base.y, base.z), V(base.x + dv.x * 800, base.y + dv.y * 800, base.z), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [jugador()] + list(guardias()), unreal.DrawDebugTrace.NONE, True)
+        if r:
+            hp = r.to_tuple()[4]
+            dd = math.hypot(hp.x - base.x, hp.y - base.y)
+            if mejor is None or dd < mejor[0]:
+                mejor = (dd, dv, hp)
+    if not mejor:
+        check('hay pared cerca para el remate contra ella', False); return
+    dd, dv, hp = mejor
+    m.set_actor_location(V(hp.x - dv.x * 70, hp.y - dv.y * 70, base.z), False, True)
+    m.set_actor_rotation(unreal.Rotator(roll=0.0, pitch=0.0, yaw=math.degrees(math.atan2(dv.y, dv.x))), False)
+    yield 0.2
+    detras_de(m, 115); mirar(m.get_actor_location()); yield 0.3
+    w0 = P('wall_takedowns')
+    z0 = m.get_actor_location().z
+    d.interact(); yield 2.5
+    pz = m.pelvis_location()
+    check('remate contra la pared', P('wall_takedowns') == w0 + 1 and estado(m) == 'DOWN', '%d %s' % (P('wall_takedowns') - w0, estado(m)))
+    check('cae contra la pared: no sale volando por encima', pz.z < z0 + 60 and math.hypot(pz.x - hp.x, pz.y - hp.y) < 260, 'pelvis %.0f cm sobre la capsula, a %.0f cm de la pared; frenados %d' % (pz.z - z0, math.hypot(pz.x - hp.x, pz.y - hp.y), m.get_editor_property('ragdoll_clamps')))
+    d.set_editor_property('armed_rule', False)
+    aparte(); yield 0.5
+
 FAMILIAS = [[prueba_intro, prueba_datos, prueba_zona, prueba_empezar], [prueba_guardias], [prueba_menu, prueba_musica, prueba_controles, prueba_opciones],
             [prueba_frente], [prueba_captura, prueba_perdido, prueba_calma], [prueba_dardos, prueba_punto_control, prueba_cambios, prueba_farol, prueba_final],
             [prueba_escondites], [prueba_cuerpo], [prueba_generador], [prueba_reserva], [prueba_perimetro, prueba_desgaste, prueba_charcos], [prueba_anillo, prueba_camion, prueba_viaje], [prueba_puertas],
-            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido], [prueba_revolverse], [prueba_combate], [prueba_combate2]]
+            [prueba_mojado, prueba_carteles, prueba_cobertura, prueba_gestos], [prueba_materia, prueba_cielo], [prueba_foco], [prueba_sombra], [prueba_farola], [prueba_radio], [prueba_apoyo], [prueba_codec], [prueba_esquinas], [prueba_linternas], [prueba_emisora], [prueba_calabozo], [prueba_equipo], [prueba_armados], [prueba_hangar], [prueba_cruce], [prueba_charlas], [prueba_bengala], [prueba_tactica, prueba_apuntar, prueba_tercera], [prueba_perro, prueba_lobo_piedra, prueba_lobo_caricia], [prueba_lobo_paso], [prueba_fusil, prueba_centinela], [prueba_fisica], [prueba_huellas], [prueba_relevo], [prueba_relleno], [prueba_paso], [prueba_ausencias], [prueba_sabotaje], [prueba_escondidos], [prueba_pulso], [prueba_trampas], [prueba_trampas_luz], [prueba_emboscada], [prueba_disparo], [prueba_letal], [prueba_vias], [prueba_mira], [prueba_objetos], [prueba_pulido], [prueba_revolverse], [prueba_combate], [prueba_combate2], [prueba_contacto]]
 PRUEBAS = []
 
 
