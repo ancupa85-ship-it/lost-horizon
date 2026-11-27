@@ -37,6 +37,8 @@ FRASES = {
     'papeles': ('Para ahí. Los papeles del porte.', False),
     'pase': ('Todo en orden. Tira.', False),
     'registro': ('Hay orden de mirar la carga. Abre atrás.', False),
+    # tanda P: el aviso del culatazo en el duelo (justo antes de bajar la culata)
+    'toma': ('¡Toma!', False),
 }
 # la central, por radio (voz_central_<clave>): el texto en pantalla lleva el nombre del guardia; la voz, no
 CENTRAL = ('-6%', '0.98')
@@ -117,6 +119,11 @@ def radio(x, sr):
     return np.concatenate([clic, np.zeros(int(0.04 * sr)), y, np.zeros(int(0.04 * sr)), clic * 0.6])
 
 if __name__ == '__main__':
+    # TARSIS_FRASES=toma,alto: solo esas frases (las demas ya estan generadas e importadas)
+    if os.environ.get('TARSIS_FRASES'):
+        _solo = set(os.environ['TARSIS_FRASES'].split(','))
+        FRASES = {k: v for k, v in FRASES.items() if k in _solo}
+        FRASES_CENTRAL = {k: v for k, v in FRASES_CENTRAL.items() if k in _solo}
     if os.name != 'nt':
         sys.exit('Las voces se generan con la síntesis de voz de Windows: ejecuta este script en Windows.')
     os.makedirs(OUT, exist_ok=True)

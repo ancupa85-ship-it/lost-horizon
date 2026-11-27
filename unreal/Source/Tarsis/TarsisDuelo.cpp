@@ -39,7 +39,6 @@
 namespace
 {
 	enum EDuel : int32 { DuelNone = 0, DuelGuardUp = 1, DuelFeint = 2, DuelStrikeN = 3, DuelGrab = 4, DuelStagger = 5 };
-	const TCHAR* MeleeAnimPath = TEXT("/Game/Tarsis/Armas/Anims/MM_Rifle_Melee.MM_Rifle_Melee");
 }
 
 bool ATarsisDirector::MeleeEngageTarget(ATarsisGuard*& Out) const
@@ -47,7 +46,7 @@ bool ATarsisDirector::MeleeEngageTarget(ATarsisGuard*& Out) const
 	Out = nullptr;
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!P || !bMeleeRule || bCapturing || bCine || bDone || bHiding || bRiding) return false;
-	float Best = 180.0f;
+	float Best = bThirdShown ? MeleeEngageRange : MeleeEngageRangeFP;   // tanda P: en primera, mas permisivo
 	for (TActorIterator<ATarsisGuard> It(GetWorld()); It; ++It)
 	{
 		ATarsisGuard* G = *It;
@@ -56,7 +55,7 @@ bool ATarsisDirector::MeleeEngageTarget(ATarsisGuard*& Out) const
 		const FVector D = P->GetActorLocation() - G->GetActorLocation();
 		const float Dist = D.Size2D();
 		if (Dist > Best || FMath::Abs(D.Z) > 120.0f) continue;
-		if (FVector::DotProduct(G->GetActorForwardVector(), D.GetSafeNormal2D()) < 0.2f) continue;   // te encara
+		if (FVector::DotProduct(G->GetActorForwardVector(), D.GetSafeNormal2D()) < (bThirdShown ? 0.2f : 0.0f)) continue;   // te encara
 		Best = Dist;
 		Out = G;
 	}
@@ -94,7 +93,7 @@ void ATarsisDirector::MeleeStrike()
 	{
 		// cubierto (o ya lanzado): lo para con el fusil
 		++MeleeBlocked;
-		DuelContactT = HeroContactLead; DuelContactKind = 2;
+		DuelContactT = HeroContactLead; DuelContactKind = 2; bDuelSounded = false;
 		DuelNoise(At);
 	}
 	else if (DuelPhaseN == DuelFeint)
@@ -102,7 +101,7 @@ void ATarsisDirector::MeleeStrike()
 		// en el amago esta abierto: el golpe entra y le corta el ataque
 		++MeleeLanded;
 		++DuelHits;
-		DuelContactT = HeroContactLead; DuelContactKind = 1;
+		DuelContactT = HeroContactLead; DuelContactKind = 1; bDuelSounded = false;
 		DuelNoise(At);
 		if (DuelHits >= MeleeHitsToStagger[DiffIdx()])
 		{
@@ -191,7 +190,7 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 				// el amago: levanta la culata despacio; suena el roce de la correa (se lee tambien a oscuras)
 				// tanda O: sube justo hasta arriba del todo (MeleeWindupAt) en lo que dura el amago y ahi se queda
 				DuelPhaseN = DuelFeint; DuelT = 0.0f; DuelPhaseLen = MeleeFeintSeconds;
-				if (UAnimSequenceBase* A = LoadObject<UAnimSequenceBase>(nullptr, MeleeAnimPath))
+				if (UAnimSequenceBase* A = LoadObject<UAnimSequenceBase>(nullptr, *MeleeStrikeAnimPath))
 				{
 					G->ScenePlay(A);
 					G->GetMesh()->SetPlayRate(MeleeWindupAt / FMath::Max(MeleeFeintSeconds, 0.05f));
@@ -208,6 +207,14 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 			G->GetMesh()->SetPlayRate(0.0f);
 			G->GetMesh()->SetPosition(MeleeWindupAt, false);
 			bDuelSwing = false;
+			// tanda P: el aviso con voz (gesto, sonido y voz a la vez: Sekiro, The Last of Us Part II)
+			{
+				const FString Who = G->bTowerSentry ? TEXT("centinela") : G->GuardName.ToLower();
+				USoundBase* V = Sfx(FString::Printf(TEXT("voz_%s_toma"), *Who));
+				if (!V) V = Sfx(TEXT("voz_moya_toma"));
+				if (V) UGameplayStatics::PlaySoundAtLocation(this, V, G->GetActorLocation() + FVector(0.0f, 0.0f, 150.0f), 1.2f, 1.0f, 0.0f, Atten);
+				++MeleeWarnings;
+			}
 		}
 		break;
 	case DuelStrikeN:
@@ -241,12 +248,12 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 				StaminaNow = FMath::Max(0.0f, StaminaNow - (bMoving ? StaminaDodgeCost : StaminaBlockCost));
 				++MeleeParries;
 				++MeleeStaggers;
-				PlaySfx(TEXT("golpe"), At, 0.7f);
+				PlayImpact(At, 2, false, 0, true);   // tanda P: en capas
 				HeroStrikeAnim(0.0f);   // tanda O: la contra se ve: tu puño llega con la parada
 				StrikeT = StrikeLen;
-				ContactHitStop(G, 1.4f);
+				ContactHitStop(G, 1.6f);
 				// reaccion ligera: se tambalea sin salirse del alcance del remate
-				G->HitReact(G->GetActorLocation() - C->GetActorLocation(), false);
+				G->HitReact(G->GetActorLocation() - C->GetActorLocation(), false, TEXT("spine_03"));   // tanda P: al pecho
 				G->Stun(MeleeStaggerSeconds);
 				G->StaggerSway(MeleeStaggerSeconds);   // tanda O: se tambalea de verdad
 				// tanda O: a tiro del remate (a veces quedaba a 225 cm, fuera del alcance de la E)
@@ -263,8 +270,8 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 			{
 				StaminaNow -= StaminaBlockCost;
 				++MeleeBlocked;
-				PlaySfx(TEXT("golpe"), At, 0.6f);
-				ContactHitStop(G, 0.7f);
+				PlayImpact(C->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 0, false, 1, false);
+				ContactHitStop(G, 0.7f, false);
 				KickT = FMath::Max(KickT, 0.12f);
 				DuelNoise(At);
 				DuelPhaseN = DuelGuardUp; DuelT = 0.0f; DuelPhaseLen = FMath::FRandRange(MeleeGuardUpSeconds.X, MeleeGuardUpSeconds.Y);
@@ -273,10 +280,10 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 			{
 				++MeleeTaken;
 				++DuelStrikes;
-				if (USoundBase* S = Sfx(FString::Printf(TEXT("golpe_seco_%d"), FMath::RandRange(1, 2)))) UGameplayStatics::PlaySound2D(this, S, 1.0f);
+				PlayImpact(C->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), 2, false, 1, true);
 				KickT = FMath::Max(KickT, 0.3f);
 				HeroReactAnim();
-				ContactHitStop(G, 1.0f);
+				ContactHitStop(G, 1.3f, false);
 				SuppressT = FMath::Max(SuppressT, 1.2f);
 				C->LaunchCharacter((C->GetActorLocation() - G->GetActorLocation()).GetSafeNormal2D() * 220.0f, true, false);
 				DuelNoise(At);
@@ -299,8 +306,8 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 		{
 			GrabSceneEnd(true);
 			++MeleeGrabEscapes;
-			PlaySfx(TEXT("empujon"), At, 0.8f);
-			G->HitReact(G->GetActorLocation() - C->GetActorLocation(), true);
+			PlayImpact(At, 1, false, 0, true);
+			G->HitReact(G->GetActorLocation() - C->GetActorLocation(), true, TEXT("spine_02"));
 			G->Stun(MeleeStaggerSeconds * 0.8f);
 			G->StaggerSway(MeleeStaggerSeconds * 0.8f);   // tanda O
 			ContactHitStop(G, 1.0f);
@@ -404,48 +411,88 @@ void ATarsisDirector::CombatRolesTick(float DeltaSeconds)
 	}
 }
 
-// ---------------------------------------------------------------- tanda O: contacto
-void ATarsisDirector::ContactHitStop(ATarsisGuard* G, float Scale)
+// ---------------------------------------------------------------- tanda O: contacto (tanda P: con temblor, escala, capas de sonido)
+void ATarsisDirector::ContactHitStop(ATarsisGuard* G, float Scale, bool bGuardVictim)
 {
+	// tanda P (Sakurai): mas fuerte, mas parada (con tope); el que recibe se congela y tiembla, el que pega sigue despacio
 	if (!bHitStopRule || HitStopSeconds <= 0.0f) return;
-	const float S = HitStopSeconds * Scale;
-	if (G) G->HitStop(S);
+	const float S = FMath::Min(HitStopSeconds * Scale, HitStopMax);
+	if (G) G->HitStop(S, bGuardVictim, G->HitStopShake * FMath::Clamp(Scale, 0.5f, 2.0f));
 	if (HeroDriver)
 	{
-		HeroDriver->bPauseAnims = true;
+		if (bGuardVictim) HeroDriver->GlobalAnimRateScale = G ? G->HitStopAttackerRate : 0.05f;   // tu golpe sigue, muy despacio
+		else { HeroDriver->bPauseAnims = true; KickT = FMath::Max(KickT, 0.15f * Scale); }        // te dan: congelado y sacudida
 		HeroHitStopUntil = FPlatformTime::Seconds() + S;
 	}
+	if (Arms && bGuardVictim) Arms->GlobalAnimRateScale = 0.05f;
 	++HitStopsDone;
+}
+
+void ATarsisDirector::PlayImpact(const FVector& At, int32 Force, bool bWall, int32 Attacker, bool bVictimVoice)
+{
+	// tanda P: el golpe en capas (Bourne Conspiracy, God of War): grave de fuerza, medio de carne y tela, chasquido agudo;
+	// pared si es contra el entorno; el esfuerzo del que pega y el dolor del que recibe. Variantes al azar
+	Force = FMath::Clamp(Force, 0, 2);
+	auto Capa = [&](const TCHAR* Base, int32 N, float Vol)
+	{
+		if (USoundBase* S = Sfx(FString::Printf(TEXT("%s_%d"), Base, FMath::RandRange(1, N))))
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, S, At, Vol, FMath::FRandRange(0.94f, 1.06f), 0.0f, Atten);
+			++ImpactLayersPlayed;
+			return true;
+		}
+		return false;
+	};
+	static const float Vol[3] = { 0.55f, 0.8f, 1.0f };
+	bool bAny = false;
+	if (bLayeredImpactRule)
+	{
+		if (Force >= 1 || FMath::RandBool()) bAny |= Capa(TEXT("golpe_grave"), 3, Vol[Force]);
+		bAny |= Capa(TEXT("golpe_medio"), 3, 0.7f * Vol[Force] + 0.2f);
+		bAny |= Capa(TEXT("golpe_chasquido"), 3, 0.45f + 0.25f * Force);
+		if (bWall) Capa(TEXT("golpe_pared"), 3, 1.0f);
+		Capa(Attacker == 0 ? TEXT("esfuerzo_cuttlas") : TEXT("esfuerzo_guardia"), 3, 0.75f);
+		if (bVictimVoice) Capa(Attacker == 0 ? TEXT("dolor_guardia") : TEXT("dolor_cuttlas"), Attacker == 0 ? 3 : 2, 0.85f);
+	}
+	if (!bAny)
+	{
+		if (USoundBase* S = Sfx(FString::Printf(TEXT("golpe_seco_%d"), FMath::RandRange(1, 2)))) UGameplayStatics::PlaySoundAtLocation(this, S, At, 0.8f, 1.0f, 0.0f, Atten);
+		else PlaySfx(TEXT("golpe"), At, 0.8f);
+	}
 }
 
 void ATarsisDirector::HeroStrikeAnim(float Lead, bool bAlways)
 {
-	// en tercera, Cuttlas da el puñetazo (Lyra, sin armas) por encima del ABP del GASP (su ranura DefaultSlot, mezclado);
-	// empieza avanzado para que el puño llegue Lead (HeroContactLead) despues de la tecla
+	// en tercera, Cuttlas da el puñetazo por encima del ABP del GASP (su ranura DefaultSlot, mezclado); empieza avanzado
+	// para que el puño llegue Lead (HeroContactLead) despues de la tecla. Lead 0 con HeroCounterAnimPath: la contra propia
 	if (Lead < 0.0f) Lead = HeroContactLead;
 	if (!bThirdShown) ArmsPunch(Lead);   // en primera, tus brazos
 	if (!bHeroStrikeAnimRule || (!bThirdShown && !bAlways) || !HeroDriver || bSceneHero) return;
 	if (HeroDriver->GetAnimationMode() != EAnimationMode::AnimationBlueprint) return;
 	UAnimInstance* AI = HeroDriver->GetAnimInstance();
-	if (!AI) return;
-	static const TCHAR* Paths[] = {
-		TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01.MM_Attack_01"),
-		TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_02.MM_Attack_02") };
-	static const float Contact[] = { 0.42f, 0.40f };
-	HeroStrikeIdx = (HeroStrikeIdx + 1) % 2;
-	UAnimSequenceBase* A = LoadObject<UAnimSequenceBase>(nullptr, Paths[HeroStrikeIdx]);
+	if (!AI || HeroPunchAnimPaths.Num() == 0) return;
+	UAnimSequenceBase* A = nullptr;
+	float Contact = 0.4f;
+	if (Lead <= 0.0f && !HeroCounterAnimPath.IsEmpty()) { A = LoadObject<UAnimSequenceBase>(nullptr, *HeroCounterAnimPath); Contact = HeroCounterContact; }
+	if (!A)
+	{
+		HeroStrikeIdx = (HeroStrikeIdx + 1) % HeroPunchAnimPaths.Num();
+		A = LoadObject<UAnimSequenceBase>(nullptr, *HeroPunchAnimPaths[HeroStrikeIdx]);
+		Contact = HeroPunchContact.IsValidIndex(HeroStrikeIdx) ? HeroPunchContact[HeroStrikeIdx] : 0.4f;
+	}
 	if (!A) return;
-	const float Start = FMath::Max(0.0f, Contact[HeroStrikeIdx] - Lead);
+	const float Start = FMath::Max(0.0f, Contact - Lead);
 	if (AI->PlaySlotAnimationAsDynamicMontage(A, TEXT("DefaultSlot"), 0.08f, 0.25f, 1.0f, 1, -1.0f, Start)) ++HeroStrikeAnims;
 }
 
 void ATarsisDirector::HeroReactAnim()
 {
-	// el culatazo te da: la reaccion fuerte de Lyra en el maniqui de Cuttlas (en tercera se ve; en primera, la sacudida)
+	// el culatazo te da: la reaccion fuerte de Lyra en el maniqui de Cuttlas (en tercera se ve; en primera, la sacudida).
+	// tanda P: sin fundido de entrada, como las de los guardias
 	if (!bHeroStrikeAnimRule || !HeroDriver || bSceneHero || HeroDriver->GetAnimationMode() != EAnimationMode::AnimationBlueprint) return;
 	UAnimInstance* AI = HeroDriver->GetAnimInstance();
 	UAnimSequenceBase* A = LoadObject<UAnimSequenceBase>(nullptr, TEXT("/Game/Characters/Mannequins/Anims/Rifle/HitReact/MM_HitReact_Front_Med_01.MM_HitReact_Front_Med_01"));
-	if (AI && A && AI->PlaySlotAnimationAsDynamicMontage(A, TEXT("DefaultSlot"), 0.05f, 0.3f, 1.0f, 1, -1.0f, 0.0f)) ++HeroReactAnims;
+	if (AI && A && AI->PlaySlotAnimationAsDynamicMontage(A, TEXT("DefaultSlot"), 0.0f, 0.3f, 1.0f, 1, -1.0f, 0.14f)) ++HeroReactAnims;
 }
 
 void ATarsisDirector::ContactTick(float DeltaSeconds)
@@ -453,48 +500,48 @@ void ATarsisDirector::ContactTick(float DeltaSeconds)
 	if (HeroHitStopUntil > 0.0 && FPlatformTime::Seconds() >= HeroHitStopUntil)
 	{
 		HeroHitStopUntil = 0.0;
-		if (HeroDriver) HeroDriver->bPauseAnims = false;
+		if (HeroDriver) { HeroDriver->bPauseAnims = false; HeroDriver->GlobalAnimRateScale = 1.0f; }
+		if (Arms) Arms->GlobalAnimRateScale = 1.0f;
 	}
 	if (DuelContactT < 0.0f) return;
 	DuelContactT -= DeltaSeconds;
-	if (DuelContactT > 0.0f) return;
-	DuelContactT = -1.0f;
 	ATarsisGuard* G = DuelGuard.Get();
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	// tanda P: el sonido, una pizca antes del fotograma de contacto
+	if (!bDuelSounded && DuelContactT <= ImpactSoundLead && G)
+	{
+		bDuelSounded = true;
+		PlayImpact(G->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), DuelContactKind == 1 ? 1 : 0, false, 0, DuelContactKind == 1);
+	}
+	if (DuelContactT > 0.0f) return;
+	DuelContactT = -1.0f;
 	if (!G || !P) return;
-	const FVector At = G->GetActorLocation() + FVector(0.0f, 0.0f, 110.0f);
 	++ContactEvents;
 	if (DuelContactKind == 1)
 	{
 		G->SceneEnd();
 		G->bSceneLock = false;
-		G->HitReact(G->GetActorLocation() - P->GetActorLocation(), false);
+		G->HitReact(G->GetActorLocation() - P->GetActorLocation(), false, TEXT("head"));   // tanda P: el punetazo, a la cara
 		if (DuelPhaseN == DuelStagger) G->StaggerSway(FMath::Max(DuelPhaseLen - DuelT, 0.3f));   // tanda O
-		if (USoundBase* S = Sfx(FString::Printf(TEXT("golpe_seco_%d"), FMath::RandRange(1, 2)))) UGameplayStatics::PlaySoundAtLocation(this, S, At, 0.8f, 1.1f, 0.0f, Atten);
 		ContactHitStop(G, 1.0f);
 	}
-	else
-	{
-		PlaySfx(TEXT("golpe"), At, 0.45f);
-		ContactHitStop(G, 0.6f);
-	}
+	else ContactHitStop(G, 0.6f);
 }
 
 void ATarsisDirector::ArmsPunch(float Lead)
 {
-	// en primera, el puñetazo de Lyra en los brazos de la vista (manos libres): el puño entra en el centro de la imagen
-	if (!bHeroStrikeAnimRule || !Arms || bThirdShown || bFPRifle) return;
-	static const TCHAR* Paths[] = {
-		TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01.MM_Attack_01"),
-		TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_02.MM_Attack_02") };
-	static const float Contact[] = { 0.42f, 0.40f };
-	const int32 I = HeroStrikeIdx % 2;
-	UAnimSequenceBase* A = LoadObject<UAnimSequenceBase>(nullptr, Paths[I]);
+	// en primera, el puñetazo en los brazos de la vista (manos libres); tanda P: exagerado hacia el centro (ArmsTick)
+	if (!bHeroStrikeAnimRule || !Arms || bThirdShown || bFPRifle || HeroPunchAnimPaths.Num() == 0) return;
+	const int32 I = HeroStrikeIdx % HeroPunchAnimPaths.Num();
+	UAnimSequenceBase* A = LoadObject<UAnimSequenceBase>(nullptr, *HeroPunchAnimPaths[I]);
 	if (!A) return;
+	const float Contact = HeroPunchContact.IsValidIndex(I) ? HeroPunchContact[I] : 0.4f;
 	Arms->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	Arms->PlayAnimation(A, false);
-	const float Start = FMath::Max(0.0f, Contact[I] - Lead);
+	const float Start = FMath::Max(0.0f, Contact - Lead);
 	Arms->SetPosition(Start, false);
 	ArmsPunchT = FMath::Min(A->GetPlayLength() - Start, Lead + 0.3f);
+	ArmsPunchAge = 0.0f;
+	ArmsPunchContact = Lead;
 	++ArmsPunches;
 }

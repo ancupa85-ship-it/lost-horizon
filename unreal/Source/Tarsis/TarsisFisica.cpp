@@ -25,6 +25,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
+#include "PhysicsControlComponent.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "TimerManager.h"
 
@@ -141,7 +142,13 @@ void ATarsisGuard::PhysicsWarm()
 	PhysWarmMs = (FPlatformTime::Seconds() - T0) * 1000.0;
 }
 
-void ATarsisGuard::HitReact(FVector Dir, bool bHeavy)
+namespace
+{
+	// tanda P: el pico de cada reaccion de Lyra (s), en el orden de HitAnims (Lgt F B L R, Med F B L R)
+	const float GHitPeak[8] = { 0.20f, 0.36f, 0.17f, 0.50f, 0.17f, 0.30f, 0.23f, 0.29f };
+}
+
+void ATarsisGuard::HitReact(FVector Dir, bool bHeavy, FName Bone)
 {
 	USkeletalMeshComponent* M = GetMesh();
 	if (!M || !GaspBody || State == ETarsisGuardState::Down || bSceneLock || bRagdoll) return;
@@ -153,15 +160,20 @@ void ATarsisGuard::HitReact(FVector Dir, bool bHeavy)
 	const float Fw = FVector::DotProduct(GetActorForwardVector(), From);
 	const float Rt = FVector::DotProduct(GetActorRightVector(), From);
 	const int32 Side = Fw > 0.7f ? 0 : (Fw < -0.7f ? 1 : (Rt < 0.0f ? 2 : 3));
-	UAnimSequenceBase* A = HitAnims[(bHeavy ? 4 : 0) + Side];
-	if (!A) A = HitAnims[Side];
+	int32 Idx = (bHeavy ? 4 : 0) + Side;
+	UAnimSequenceBase* A = HitAnims[Idx];
+	if (!A) { Idx = Side; A = HitAnims[Side]; }
 	if (A)
 	{
-		PoseBridge(0.1f);   // tanda O: la reaccion entra rapida pero sin salto
+		// tanda P: el golpe entra de golpe en la pose de dolor (God of War); la mezcla, para todo lo demas
+		if (bHitReactSnapRule) { BridgeT = 0.0f; BridgeFrom.Reset(); }
+		else PoseBridge(0.1f);
 		if (bGaspSingle) GaspRestore();   // la persona vuelve a copiar al maniqui
 		M->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		M->PlayAnimation(A, false);
-		HitAnimT = A->GetPlayLength();
+		const float Start = bHitReactSnapRule ? FMath::Clamp(GHitPeak[Idx] - HitReactPeakLead, 0.0f, A->GetPlayLength() - 0.05f) : 0.0f;
+		if (Start > 0.0f) M->SetPosition(Start, false);
+		HitAnimT = A->GetPlayLength() - Start;
 		HitAnimName = A->GetName();
 	}
 	// de la cintura para arriba, cuerpos con fisica que tiran hacia la animacion, y el empujon
@@ -183,13 +195,21 @@ void ATarsisGuard::HitReact(FVector Dir, bool bHeavy)
 	D.AngularVelocityStrength = 110.0f;
 	D.PositionStrength = 0.0f;
 	D.VelocityStrength = 0.0f;
-	PhysAnim->ApplyPhysicalAnimationSettingsBelow(GSpine1, D, true);
-	M->SetAllBodiesBelowSimulatePhysics(GSpine1, true, true);
-	M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, HitBlend, false, true);
-	const FName Chest = FirstBody(M, { TEXT("spine_04"), TEXT("spine_03"), TEXT("spine_05"), TEXT("spine_02") });
-	if (!Chest.IsNone()) M->AddImpulse(Dir * HitImpulse, Chest, true);
+	// tanda P: la fisica desde el hueso golpeado (la receta de Epic); la cabeza, desde el cuello. Sin hueso, de cintura arriba
+	FName Root = GSpine1;
+	if (!Bone.IsNone() && StaggerT <= 0.0f)
+	{
+		const FName Want = Bone == TEXT("head") ? FName(TEXT("neck_01")) : Bone;
+		if (M->GetBodyInstance(Want)) Root = Want;
+	}
+	HitPhysRoot = Root;
+	PhysAnim->ApplyPhysicalAnimationSettingsBelow(Root, D, true);
+	M->SetAllBodiesBelowSimulatePhysics(Root, true, true);
+	M->SetAllBodiesBelowPhysicsBlendWeight(Root, HitBlend, false, true);
+	const FName Hit = (!Bone.IsNone() && M->GetBodyInstance(Bone)) ? Bone : FirstBody(M, { TEXT("spine_04"), TEXT("spine_03"), TEXT("spine_05"), TEXT("spine_02") });
+	if (!Hit.IsNone()) M->AddImpulse(Dir * HitImpulse * (Root == GSpine1 ? 1.0f : 1.3f), Hit, true);
 	const FName HeadBody = FirstBody(M, { TEXT("head") });
-	if (!HeadBody.IsNone()) M->AddImpulse(Dir * HitImpulse * 0.6f, HeadBody, true);
+	if (!HeadBody.IsNone() && Hit != HeadBody) M->AddImpulse(Dir * HitImpulse * 0.6f, HeadBody, true);
 	HitPhysT = HitSeconds;
 }
 
@@ -236,6 +256,20 @@ void ATarsisGuard::StartRagdoll()
 	// tanda D: de que lado queda el pecho, medido de pie (para saber luego si cae boca arriba o boca abajo)
 	FrontSign = FVector::DotProduct(BodyFront(), GetActorForwardVector()) >= 0.0f ? 1.0f : -1.0f;
 	PendingFallDir = FVector::ZeroVector;
+	// tanda P: al caer, motores flojos que tiran hacia la ultima pose animada los primeros FallControlSeconds (cae
+	// con algo de tono, sin hacerse un trapo de golpe); luego se sueltan del todo
+	if (bPhysicsControlRule && PhysCtlEnsure())
+	{
+		PhysCtlClear();
+		FPhysicsControlData CD;
+		CD.AngularStrength = FallControlStrength;
+		CD.AngularDampingRatio = 1.0f;
+		CD.LinearStrength = 0.0f;
+		PhysCtl->CreateControlsFromSkeletalMeshBelow(M, GPelvis, false, EPhysicsControlType::ParentSpace, CD, TEXT("Caida"));
+		PCFallT = FallControlSeconds;
+		bPCAny = true;
+		++PhysicsControlUses;
+	}
 	bRagdoll = true;
 	bRagdollSlept = false;
 	RagdollT = 0.0f;
@@ -243,6 +277,7 @@ void ATarsisGuard::StartRagdoll()
 
 void ATarsisGuard::StopRagdoll(bool bBlend)
 {
+	PhysCtlClear();   // tanda P
 	USkeletalMeshComponent* M = GetMesh();
 	RagdollPendingT = -1.0f;
 	if (!bRagdoll || !M) return;
@@ -330,10 +365,21 @@ void ATarsisGuard::PhysicsTick(float DeltaSeconds)
 	{
 		StaggerT -= DeltaSeconds;
 		StaggerKickT -= DeltaSeconds;
-		if (State == ETarsisGuardState::Down || StaggerT <= 0.0f) { StaggerT = 0.0f; HitPhysT = HitSeconds; }
+		if (State == ETarsisGuardState::Down || StaggerT <= 0.0f)
+		{
+			StaggerT = 0.0f;
+			if (bPCStagger)
+			{
+				// de los motores a la fisica de siempre, que se apaga como una reaccion
+				PhysCtlClear();
+				M->SetAllBodiesBelowSimulatePhysics(GSpine1, true, true);
+				M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, HitBlend, false, true);
+			}
+			HitPhysT = HitSeconds;
+		}
 		else
 		{
-			M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, StaggerBlend, false, true);
+			if (!bPCStagger) M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, StaggerBlend, false, true);
 			if (StaggerKickT <= 0.0f)
 			{
 				StaggerKickT = StaggerKickEvery * FMath::FRandRange(0.8f, 1.2f);
@@ -352,8 +398,9 @@ void ATarsisGuard::PhysicsTick(float DeltaSeconds)
 			HitPhysT = 0.0f;
 			M->SetAllBodiesBelowSimulatePhysics(GSpine1, false, true);
 			PhysicsBodies(false);
+			HitPhysRoot = GSpine1;
 		}
-		else M->SetAllBodiesBelowPhysicsBlendWeight(GSpine1, HitBlend * HitPhysT / FMath::Max(HitSeconds, 0.01f), false, true);
+		else M->SetAllBodiesBelowPhysicsBlendWeight(HitPhysRoot, HitBlend * HitPhysT / FMath::Max(HitSeconds, 0.01f), false, true);
 	}
 	// el dardo: tras la reaccion, se desploma
 	if (RagdollPendingT >= 0.0f)
@@ -363,6 +410,19 @@ void ATarsisGuard::PhysicsTick(float DeltaSeconds)
 	}
 	if (!bRagdoll) return;
 	RagdollT += DeltaSeconds;
+	if (PCFallT > 0.0f && PhysCtl)
+	{
+		PCFallT -= DeltaSeconds;
+		if (PCFallT <= 0.0f) PhysCtlClear();
+		else
+		{
+			FPhysicsControlData CD;
+			CD.AngularStrength = FallControlStrength * PCFallT / FMath::Max(FallControlSeconds, 0.01f);
+			CD.AngularDampingRatio = 1.0f;
+			CD.LinearStrength = 0.0f;
+			PhysCtl->SetControlDatasInSet(TEXT("Caida"), CD);
+		}
+	}
 	// tanda O: si algo lo dispara (salir de una pared), se frena: nunca vuela
 	if (RagdollT < 2.5f && !bPhysDragged)
 	{
@@ -441,21 +501,62 @@ void ATarsisGuard::BridgeTick(float DeltaSeconds)
 	}
 }
 
-void ATarsisGuard::HitStop(float RealSeconds)
+void ATarsisGuard::HitStop(float RealSeconds, bool bVictim, float ShakeAmp)
 {
 	if (RealSeconds <= 0.0f || bRagdoll) return;
-	if (USkeletalMeshComponent* M = GetMesh()) M->bPauseAnims = true;
-	if (GaspBody) GaspBody->bPauseAnims = true;
+	USkeletalMeshComponent* M = GetMesh();
+	// tanda P (Sakurai): el que recibe se queda congelado en su pose de dolor y tiembla; el que pega sigue muy despacio
+	bHitStopVictim = bVictim;
+	HitStopLen = RealSeconds;
+	HitShakeNow = bVictim ? (ShakeAmp >= 0.0f ? ShakeAmp : HitStopShake) : 0.0f;
+	if (bVictim)
+	{
+		if (M) M->bPauseAnims = true;
+		if (GaspBody) GaspBody->bPauseAnims = true;
+	}
+	else if (M) M->GlobalAnimRateScale = HitStopAttackerRate;
 	HitStopUntil = FPlatformTime::Seconds() + RealSeconds;
 	++HitStops;
 }
 
 void ATarsisGuard::HitStopTick()
 {
-	if (HitStopUntil <= 0.0 || FPlatformTime::Seconds() < HitStopUntil) return;
+	if (HitStopUntil <= 0.0) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now < HitStopUntil)
+	{
+		// el temblor, fuerte al principio y apagandose (la malla visible; la capsula y la logica no se mueven)
+		if (bHitStopVictim && Pose && HitShakeNow > 0.0f)
+		{
+			const float K = FMath::Clamp(float(HitStopUntil - Now) / FMath::Max(HitStopLen, 0.001f), 0.0f, 1.0f);
+			Pose->SetRelativeLocation(FVector(FMath::FRandRange(-1.0f, 1.0f), FMath::FRandRange(-1.0f, 1.0f), FMath::FRandRange(-0.3f, 0.3f)) * HitShakeNow * K);
+		}
+		return;
+	}
 	HitStopUntil = 0.0;
-	if (USkeletalMeshComponent* M = GetMesh()) M->bPauseAnims = false;
+	if (USkeletalMeshComponent* M = GetMesh()) { M->bPauseAnims = false; M->GlobalAnimRateScale = 1.0f; }
 	if (GaspBody) GaspBody->bPauseAnims = false;
+	if (Pose) Pose->SetRelativeLocation(FVector::ZeroVector);
+}
+
+bool ATarsisGuard::PhysCtlEnsure()
+{
+	if (!PhysCtl)
+	{
+		PhysCtl = NewObject<UPhysicsControlComponent>(this, TEXT("ControlFisico"));
+		if (PhysCtl) PhysCtl->RegisterComponent();
+	}
+	return PhysCtl != nullptr;
+}
+
+void ATarsisGuard::PhysCtlClear()
+{
+	// tanda P: se destruye siempre lo creado (antes, al acabar el fundido de la caida, PCFallT ya era 0 y los controles se
+	// quedaban: el guardia no se levantaba del todo)
+	if (PhysCtl && bPCAny) PhysCtl->DestroyAllControlsAndBodyModifiers();
+	bPCAny = false;
+	bPCStagger = false;
+	PCFallT = 0.0f;
 }
 
 void ATarsisGuard::StaggerSway(float Seconds)
@@ -464,6 +565,26 @@ void ATarsisGuard::StaggerSway(float Seconds)
 	if (!M || bRagdoll || State == ETarsisGuardState::Down || !PhysicsCanRun()) return;
 	PhysicsBodies(true);
 	if (!HasPhysicsBodies()) return;
+	HitPhysRoot = GSpine1;
+	// tanda P: con PhysicsControl, motores que tiran hacia la animacion (ragdoll activo) en vez de la animacion fisica
+	if (bPhysicsControlRule && PhysCtlEnsure())
+	{
+		PhysCtlClear();
+		PhysAnimRelease();
+		FPhysicsControlData CD;
+		CD.AngularStrength = StaggerControlStrength;
+		CD.AngularDampingRatio = 1.0f;
+		CD.LinearStrength = 0.0f;
+		PhysCtl->CreateControlsFromSkeletalMeshBelow(M, GSpine1, true, EPhysicsControlType::ParentSpace, CD, TEXT("Tambaleo"));
+		PhysCtl->CreateBodyModifiersFromSkeletalMeshBelow(M, GSpine1, true, TEXT("Tambaleo"), FPhysicsControlModifierData());
+		bPCStagger = true;
+		bPCAny = true;
+		++PhysicsControlUses;
+		StaggerT = Seconds;
+		StaggerKickT = 0.0f;
+		HitPhysT = FMath::Max(HitPhysT, 0.01f);
+		return;
+	}
 	if (!PhysAnim)
 	{
 		PhysAnim = NewObject<UPhysicalAnimationComponent>(this, TEXT("AnimacionFisica"));
@@ -488,6 +609,7 @@ void ATarsisGuard::StopUpperPhysics()
 {
 	USkeletalMeshComponent* M = GetMesh();
 	StaggerT = 0.0f;
+	if (bPCStagger) PhysCtlClear();
 	if (!M || bRagdoll || HitPhysT <= 0.0f) return;
 	HitPhysT = 0.0f;
 	M->SetAllBodiesBelowSimulatePhysics(GSpine1, false, true);

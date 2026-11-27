@@ -1647,6 +1647,13 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 			if (UAnimationAsset* PA = LoadObject<UAnimationAsset>(nullptr, bFPRifle ? *FPRifleArmsAnimPath : *ArmsAnimPath)) Arms->PlayAnimation(PA, true);
 		}
 	}
+	// tanda P: en primera, el puño se exagera hacia el centro de la vista justo en el contacto (Arkane, Zeno Clash)
+	FVector PunchShift = FVector::ZeroVector;
+	if (ArmsPunchAge >= 0.0f)
+	{
+		ArmsPunchAge = ArmsPunchT > 0.0f ? ArmsPunchAge + DeltaSeconds : -1.0f;
+		if (ArmsPunchAge >= 0.0f) PunchShift = FPPunchCenterShift * FMath::Exp(-FMath::Square((ArmsPunchAge - ArmsPunchContact) / 0.09f));
+	}
 	// tanda L: el golpe, un empujon de brazos (o de culata) hacia delante y abajo que vuelve
 	const float Strike = (StrikeT > 0.0f && ArmsPunchT <= 0.0f) ? FMath::Sin(PI * (1.0f - StrikeT / FMath::Max(StrikeLen, 0.05f))) : 0.0f;
 	// tanda M: el empujon va mas lejos y mas bajo, con las manos libres (la pistola se guarda): antes quedaba pegado a la camara
@@ -1656,7 +1663,7 @@ void ATarsisDirector::ArmsTick(ACharacter* C, float DeltaSeconds)
 	// la cabeza del maniquí, en la cámara: así la pistola queda donde la llevaría alguien de tu altura
 	const FVector Head = Arms->GetBoneLocation(TEXT("head"), EBoneSpaces::ComponentSpace);
 	const FVector Loc = -Rel.RotateVector(Head) + ArmsOffset + (bFPRifle ? FPRifleArmsShift : FVector::ZeroVector) + (AimArmsShift + AimAutoShift) * AimAlpha + Bob * (1.0f - 0.7f * AimAlpha) + Sway * (1.0f - 0.7f * AimAlpha) + FVector(-5.0f * RecoilT + (bFPRifle ? 24.0f : 32.0f) * Strike, -3.0f * Strike, -30.0f * (1.0f - ArmsShow) + (bFPRifle ? 4.0f : -3.0f) * Strike);
-	Arms->SetRelativeLocationAndRotation(Loc, Rel);
+	Arms->SetRelativeLocationAndRotation(Loc + PunchShift, Rel);
 }
 
 void ATarsisDirector::BobTick(ACharacter* C, float DeltaSeconds)

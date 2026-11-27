@@ -269,3 +269,20 @@ Misma medida que la N2: de noche, tres guardias en alerta contra ti en cada siti
 | Barracón oeste | 32,7 / 10,0 (33,0) | 3424 |
 
 Lectura: la tanda O no cuesta. El puente de pose, la parada de golpe, los puñetazos y el tambaleo con física solo trabajan en el contacto. Comparación A/B en la misma sesión (GPU caliente, a unos 80 °C): con sus reglas apagadas, 29,6 / 24,5 / 25,0; encendidas, 28,2 / 21,9 / 25,7, dentro del ruido. La VRAM sube unos 50 MB respecto a la N2 (el material de los brazos sin texturas, los puñetazos de Lyra y la pareja de empujón ya cargada), lejos del techo de 3,7 GB. El peor 1 % de la entrada y del barracón tiene algún tirón suelto (18,5 y 10,0): son los primeros disparos con trazadora y polvo de cada alerta, igual que en la N2.
+
+## Tanda P: impacto, sonido en capas, PhysicsControl y piezas propias
+
+Misma medida: de noche, tres guardias en alerta contra ti en cada sitio, editor recién abierto y una pasada de calentamiento antes de medir. GPU de 58 a 77 °C. Entre paréntesis, la media de la tanda O.
+
+| Sitio | fps medio / peor 1 % | VRAM (MB) |
+|---|---|---|
+| Entrada | 37,2 / 19,7 (38,4) | 3312 |
+| Patio central | 32,4 / 29,6 (35,7) | 3312 |
+| Barracón oeste | 33,4 / 29,6 (32,7) | 3313 |
+
+Lectura: la tanda P no cuesta.
+
+- **PhysicsControl:** medido con y sin él en la misma sesión (GPU a 79–84 °C), da 36,0 / 32,1 / 31,6 frente a 36,2 / 32,2 / 32,0 fps, dentro del ruido. Añade 41 MB de VRAM.
+- **Patio central:** los 3 fps de menos respecto a la O llegan con la GPU subiendo de 58 a 77 °C durante la medida, igual que en las medidas en caliente.
+- **VRAM:** queda por debajo de la O. Los sonidos son cortos y las piezas de animación pequeñas.
+- **Tirones:** el peor 1 % de la entrada sigue con el tirón de los primeros disparos con trazadora, como en la N2 y la O.

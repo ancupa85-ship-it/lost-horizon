@@ -5393,6 +5393,7 @@ def prueba_contacto():
     g = rs[0]
     yield from duelo_con(g)
     a0, c0, h0 = P('hero_strike_anims'), P('contact_events'), P('hit_stops_done')
+    l0 = P('impact_layers_played')   # el sonido va una pizca antes del contacto: se cuenta desde la tecla
     d.melee_strike()
     # en el mismo fotograma de la tecla (con el editor a pocos fps, un fotograma ya pasa de los 0,12 s del puño)
     check('en tercera, la H: Cuttlas da el puñetazo (animacion en el maniqui)', P('hero_strike_anims') == a0 + 1 and d.duel_active(), '%d %s' % (P('hero_strike_anims') - a0, d.duel_active()))
@@ -5400,12 +5401,18 @@ def prueba_contacto():
     yield 0.02
     yield 0.35
     check('en el contacto: golpe y parada de golpe', P('contact_events') == c0 + 1 and P('hit_stops_done') > h0, '%d %d' % (P('contact_events') - c0, P('hit_stops_done') - h0))
+    # tanda P: el golpe suena en capas (al menos 3: medio, chasquido y voz); las piezas propias, cargadas
+    check('el golpe suena en capas (3 o mas)', P('impact_layers_played') - l0 >= 3, P('impact_layers_played') - l0)
+    check('las piezas propias de Blender estan puestas (culatazo, punetazo, contra, agarre)', 'CQC' in P('melee_strike_anim_path') and 'CQC' in str(P('hero_punch_anim_paths')) and 'CQC' in P('hero_counter_anim_path') and 'CQC' in P('grab_guard_anim_path'),
+          '%s | %s' % (P('melee_strike_anim_path'), P('grab_guard_anim_path')))
     # 2) contra a tiempo: tambaleo que se mueve, y tu puño en la parada
     fe0, st0 = P('melee_feint_seconds'), P('melee_strike_seconds')
     d.set_editor_property('melee_feint_seconds', 1.2)
     d.set_editor_property('melee_strike_seconds', 1.2)
     d.set_editor_property('test_next_melee', 1)
+    w0 = P('melee_warnings')
     yield ('hasta', lambda: director().duel_phase() == 3, 5.0)
+    check('el aviso del culatazo lleva voz', P('melee_warnings') == w0 + 1, P('melee_warnings') - w0)
     yield 0.95
     a1, gs0 = P('hero_strike_anims'), g.get_editor_property('hit_stops')
     d.block_on(); yield 0.05
@@ -5414,6 +5421,9 @@ def prueba_contacto():
     d.set_editor_property('melee_feint_seconds', fe0)
     d.set_editor_property('melee_strike_seconds', st0)
     check('la contra: se tambalea con fisica (no de pie quieto)', d.duel_phase() == 5 and g.swaying(), 'fase %d %s' % (d.duel_phase(), g.swaying()))
+    if g.get_editor_property('physics_control_rule'):
+        check('el tambaleo con PhysicsControl (motores hacia la animacion)', g.physics_control_active(), '%s usos %d' % (g.physics_control_active(), g.get_editor_property('physics_control_uses')))
+    check('la reaccion entra de golpe (sin fundido) en la pose de dolor', not g.pose_bridging() and 'HitReact' in str(g.last_hit_anim()), '%s %s' % (g.pose_bridging(), g.last_hit_anim()))
     check('la contra: tu puño y la parada de golpe en el guardia', P('hero_strike_anims') > a1 and g.get_editor_property('hit_stops') > gs0, '%d %d' % (P('hero_strike_anims') - a1, g.get_editor_property('hit_stops') - gs0))
     check('los cambios de animacion del guardia se funden (puente de pose)', g.get_editor_property('pose_bridges') > 0, g.get_editor_property('pose_bridges'))
     d.interact(); yield 2.0

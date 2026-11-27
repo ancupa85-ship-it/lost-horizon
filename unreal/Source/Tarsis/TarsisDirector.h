@@ -1670,7 +1670,49 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
 	bool bHitStopRule = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
-	float HitStopSeconds = 0.06f;
+	float HitStopSeconds = 0.07f;
+	/** Tanda P: la parada crece con la fuerza del golpe (Scale) hasta este tope (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float HitStopMax = 0.16f;
+	/** Tanda P: el sonido del golpe en capas (grave, medio, chasquido; pared; esfuerzo y dolor) y cuanto antes del
+	 *  fotograma de contacto suena (s), cuando el contacto se sabe de antemano. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	bool bLayeredImpactRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float ImpactSoundLead = 0.03f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 ImpactLayersPlayed = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Contacto")
+	int32 MeleeWarnings = 0;
+	/** Tanda P: en primera, el puño se lleva hacia el centro de la vista en el contacto (cm: adelante, a la derecha, arriba)
+	 *  y el alcance del golpe es mas permisivo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	FVector FPPunchCenterShift = FVector(12.0f, -10.0f, 4.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float MeleeEngageRange = 180.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float MeleeEngageRangeFP = 215.0f;
+	/** Tanda P: las animaciones del cuerpo a cuerpo, configurables (las piezas propias de Blender sustituyen a las de Lyra
+	 *  sin recompilar): el culatazo del guardia, tus dos punetazos y su contacto (s), la contra y la pareja del agarre
+	 *  (vacias: la pareja de empujon del GASP). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	FString MeleeStrikeAnimPath = TEXT("/Game/Tarsis/Armas/Anims/MM_Rifle_Melee.MM_Rifle_Melee");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	TArray<FString> HeroPunchAnimPaths = { TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01.MM_Attack_01"), TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_02.MM_Attack_02") };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	TArray<float> HeroPunchContact = { 0.42f, 0.40f };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	FString HeroCounterAnimPath;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float HeroCounterContact = 0.3f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	FString GrabGuardAnimPath;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	FString GrabHeroAnimPath;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
+	float GrabHoldAt = 0.4f;
+	/** Sonido del golpe en capas en At. Force: 0 ligero, 1 medio, 2 fuerte. Attacker: 0 Cuttlas, 1 guardia. */
+	void PlayImpact(const FVector& At, int32 Force, bool bWall, int32 Attacker, bool bVictimVoice = true);
 	/** El culatazo de Lyra (MM_Rifle_Melee): la culata arriba del todo (s) y el contacto (s), medidos en la animacion
 	 *  (tools/unreal/anim_contacto.py). El amago sube hasta arriba y se queda; el culatazo baja justo para el contacto. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Contacto")
@@ -1708,7 +1750,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Contacto")
 	bool GrabScenePlaying() const { return GSGuard.IsValid(); }
 	/** Parada de golpe sobre el guardia G y Cuttlas. */
-	void ContactHitStop(class ATarsisGuard* G, float Scale = 1.0f);
+	void ContactHitStop(class ATarsisGuard* G, float Scale = 1.0f, bool bGuardVictim = true);
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Contacto")
 	bool HeroHitStopped() const { return HeroHitStopUntil > 0.0; }
 	/** El guardia del remate va a cambiar de mano (arrastrarlo, otro golpe): cae ya. */
@@ -3555,6 +3597,9 @@ private:
 	float DuelContactT = -1.0f;
 	int32 DuelContactKind = 0;   // 1 tu golpe entra, 2 lo para
 	bool bDuelSwing = false;
+	bool bDuelSounded = false;
+	bool bTSSounded = false, bDSSounded = false, bGSSounded = false;
+	float ArmsPunchAge = -1.0f, ArmsPunchContact = 0.12f;
 	int32 HeroStrikeIdx = 0;
 	FVector DuelStepFrom = FVector::ZeroVector, DuelStepTo = FVector::ZeroVector;
 	float DuelSwingAt = 0.0f;

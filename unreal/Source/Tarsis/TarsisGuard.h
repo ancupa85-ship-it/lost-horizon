@@ -465,7 +465,21 @@ public:
 	/** Tanda O: parada de golpe en el contacto: la animacion se congela unos fotogramas (tiempo real, sin tocar el
 	 *  tiempo del juego: con el tiempo casi a cero el nodo de los pies del GASP daba NaN y cerraba el editor). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Animacion")
-	void HitStop(float RealSeconds);
+	void HitStop(float RealSeconds, bool bVictim = true, float ShakeAmp = -1.0f);
+	/** Tanda P (Sakurai): en la parada de golpe el que recibe tiembla (cm, se apaga) y el que pega sigue muy despacio. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Animacion")
+	float HitStopShake = 2.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Animacion")
+	float HitStopAttackerRate = 0.05f;
+	/** Tanda P (God of War): la reaccion entra de golpe en su pose de dolor (sin fundido), HitReactPeakLead s antes del pico
+	 *  de la animacion (medido: tools/unreal/anim_contacto.py, picos de 0,17 a 0,50 s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Animacion")
+	bool bHitReactSnapRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Animacion")
+	float HitReactPeakLead = 0.03f;
+	float HitStopLen = 0.0f;
+	float HitShakeNow = 0.0f;
+	bool bHitStopVictim = true;
 	UFUNCTION(BlueprintPure, Category = "Tarsis|Animacion")
 	bool HitStopped() const { return HitStopUntil > 0.0; }
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Animacion")
@@ -700,6 +714,29 @@ public:
 	float StaggerKickEvery = 0.38f;
 	/** Apaga ya la fisica de cintura arriba (tambaleo o reaccion): la escena del remate manda en la pose. */
 	void StopUpperPhysics();
+	/** Tanda P: de que hueso para abajo va la fisica de la reaccion (el golpeado; la cabeza, desde el cuello). */
+	FName HitPhysRoot = TEXT("spine_01");
+	/** Tanda P: PhysicsControl del motor (el de la muestra del GASP 5.8) para el tambaleo y la caida: los cuerpos tiran
+	 *  hacia la animacion con motores (ragdoll activo) en vez de la animacion fisica blanda. Se mide con y sin. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	bool bPhysicsControlRule = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float StaggerControlStrength = 6.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float FallControlStrength = 2.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Fisica")
+	float FallControlSeconds = 0.7f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Fisica")
+	int32 PhysicsControlUses = 0;
+	UFUNCTION(BlueprintPure, Category = "Tarsis|Fisica")
+	bool PhysicsControlActive() const { return bPCStagger || PCFallT > 0.0f; }
+	UPROPERTY()
+	TObjectPtr<class UPhysicsControlComponent> PhysCtl;
+	bool bPCStagger = false;
+	bool bPCAny = false;   // hay controles o modificadores creados (aunque ya no se usen): hay que destruirlos
+	float PCFallT = 0.0f;
+	bool PhysCtlEnsure();
+	void PhysCtlClear();
 	float StaggerT = 0.0f;
 	float StaggerKickT = 0.0f;
 	float StaggerSide = 1.0f;
@@ -708,7 +745,7 @@ public:
 	float WakeBlendSeconds = 0.8f;
 	/** Reacción a un golpe que viaja en la dirección Dir (mundo). bHeavy: la variante «Med» de Lyra. */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Fisica")
-	void HitReact(FVector Dir, bool bHeavy = false);
+	void HitReact(FVector Dir, bool bHeavy = false, FName Bone = NAME_None);
 	/** El dardo le alcanza viniendo en la dirección Dir: reacción y, tras DartFallDelay, ragdoll (lo llama el director
 	 *  antes de KnockOut). */
 	UFUNCTION(BlueprintCallable, Category = "Tarsis|Fisica")
