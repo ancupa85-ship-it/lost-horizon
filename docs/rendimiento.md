@@ -342,3 +342,15 @@ Lectura: la tanda T no cuesta.
 - El bloqueo de pies (dos IK por cuerpo) y la copia visible de Cuttlas solo trabajan durante el duelo, y aquí no hay duelo.
 - Los fps quedan dentro del ruido respecto a la S (−0,6 a +0,3).
 - La VRAM queda por debajo del techo de 3,7 GB.
+
+## Tanda T2: remate alineado y cámara del remate
+
+Misma medida: de noche (07:49), con el editor recién abierto y descartando la primera pasada. La GPU arrancó a 51 °C y acabó a 82; la ventana del PIE medía 1743×1105.
+
+| Sitio | fps medio / peor 1 % (media de la T) | VRAM (MB) |
+|---|---|---|
+| Entrada | 42,1 / 36,0 (42,2) | 3211 |
+| Patio central | 39,3 / 35,3 (38,5) | 3211 |
+| Barracón oeste | 36,4 / 32,9 (37,6) | 3211 |
+
+Lectura: no cuesta. La raíz de la pareja y el corte de cámara solo trabajan en el remate. La VRAM queda por debajo de 3,7 GB.

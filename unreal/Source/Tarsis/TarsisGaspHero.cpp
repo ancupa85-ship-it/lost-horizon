@@ -291,7 +291,9 @@ void ATarsisDirector::HeroFeetTick(float DeltaSeconds)
 		}
 		HeroFeet->CopyPoseFromSkeletalComponent(HeroBody);
 		const float GZ = C->GetActorLocation().Z - C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-		TarsisFootLockApply(HeroFeet, HeroFeetLock, DeltaSeconds, GZ, bOn);
+		FTarsisFootLockSettings FS;
+		FS.ReleaseDistance = FootLockReleaseCm;
+		TarsisFootLockApply(HeroFeet, HeroFeetLock, DeltaSeconds, GZ, bOn, FS);
 		HeroFeet->SetVisibility(true);
 		HeroBody->SetHiddenInGame(true);   // sigue evaluando (AlwaysTickPoseAndRefreshBones): de el sale la pose
 	}

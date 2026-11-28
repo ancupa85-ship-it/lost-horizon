@@ -1840,6 +1840,9 @@ public:
 	/** Bloqueo de pies propio (TarsisPies.h) para Cuttlas y el guardia durante el duelo. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
 	bool bFootLockRule = true;
+	/** Distancia a la que el pie clavado se suelta y da su paso (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float FootLockReleaseCm = 12.0f;   // tanda T2: con 12, pies de Cuttlas a 2-5 cm por apoyo y 1,3 pasos por segundo (con 18, 11-15 cm y 1,0)
 	/** En el tambaleo de la contra, Cuttlas va andando a su sitio de la pareja de derribo (antes saltaba alli al pulsar la
 	 *  E y las pelvis quedaban a 17-19 cm en el primer fotograma). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
@@ -1853,6 +1856,13 @@ public:
 	bool bHeroFeetOn = false;
 	bool bPrealigning = false;
 	float PrealignCamYaw = 0.0f;
+	/** Tanda T2: la malla que se ve del guardia copia la pose sin la traslacion de la raiz (el retarget no la pasa), asi
+	 *  que en la pareja de derribo salia en el origen de la pareja, encima de Cuttlas (pelvis a 17-23 cm). Se le da la
+	 *  raiz de la pista de su parte (V) fotograma a fotograma moviendo la malla. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	bool bTakedownRootFollowRule = true;
+	UPROPERTY() TObjectPtr<class UAnimSequenceBase> TSVAnim;
+	FVector TSPush = FVector::ZeroVector;
 	/** Para medir (tanda T): el sitio previsto antes del remate y adonde se abalanza Cuttlas al empezar. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")
 	FVector LastPrealignSpot = FVector::ZeroVector;

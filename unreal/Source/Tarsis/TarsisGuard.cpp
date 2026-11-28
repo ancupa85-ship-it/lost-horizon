@@ -220,7 +220,9 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 	// tanda T: el pie apoyado se queda clavado mientras la capsula se mueve (guardia del duelo)
 	{
 		const float GZ = GetActorLocation().Z - (GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.0f);
-		TarsisFootLockApply(Pose, FeetLock, DeltaSeconds, GZ, bFootLockOn && !bRagdoll && WakeT <= 0.0f);
+		FTarsisFootLockSettings FS;
+		FS.ReleaseDistance = FootReleaseCm;
+		TarsisFootLockApply(Pose, FeetLock, DeltaSeconds, GZ, bFootLockOn && !bRagdoll && WakeT <= 0.0f, FS);
 	}
 	// adónde mira la cabeza, respecto al cuerpo: el cuerpo gira despacio y la cabeza se adelanta
 	auto Toward = [this](const FVector& P) -> float

@@ -453,6 +453,7 @@ public:
 	/** Tanda T: bloqueo de pies (lo enciende el director para el guardia del duelo). */
 	FTarsisFootLock FeetLock[2];
 	bool bFootLockOn = false;
+	float FootReleaseCm = 18.0f;
 	bool ScenePlay(class UAnimSequenceBase* A);
 	void SceneEnd();
 

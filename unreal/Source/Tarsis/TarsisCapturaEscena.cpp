@@ -684,9 +684,15 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	FVector TSFix = FVector::ZeroVector;
 	{
 		USkeletalMeshComponent* GM = G->GetMesh();
-		GM->TickAnimation(0.0f, false);
-		GM->RefreshBoneTransforms();
-		TSFix = GuardFrame.GetLocation() - GM->GetBoneLocation(TEXT("root"));
+		// tanda T2: la raiz en T0 sale de la pista de la animacion. Antes se evaluaba la malla (TickAnimation y
+		// RefreshBoneTransforms) en el mismo fotograma en que se ponia la animacion: aun daba la raiz en el origen de la
+		// pareja y salia una correccion falsa de ~134 cm que llevaba al guardia hacia Cuttlas y a Cuttlas encima del guardia
+		if (UAnimSequence* VS = Cast<UAnimSequence>(V))
+		{
+			FTransform RootT0;
+			VS->GetBoneTransform(RootT0, FSkeletonPoseBoneIndex(0), FAnimExtractContext((double)FMath::Min(T0, V->GetPlayLength() - 0.05f)), false);
+			TSFix = GuardFrame.GetLocation() - (RootT0 * TSComp).GetLocation();
+		}
 		TSFix.Z = 0.0f;
 		if (TSFix.Size2D() < 300.0f)
 		{
@@ -698,6 +704,8 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 		// alla de Cuttlas (Cuttlas va a su sitio de la pareja como antes)
 		GM->AddWorldOffset((G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D() * TakedownPairGap);
 	}
+	TSVAnim = V;   // tanda T2
+	TSPush = FVector::ZeroVector;
 	G->PoseBridge(SceneAlignSeconds);   // tanda R: y lo que quede, fundiendo
 	G->bSceneFallPending = true;
 	TSFallAt = bTSWall ? LeadIn + 0.08f : FMath::Max(Pr.Fall - T0, TakedownLeadIn + 0.1f);
@@ -713,7 +721,18 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	if (FVector::Dist2D(TSLungeFrom, TSLungeTo) > 260.0f) TSLungeTo = TSLungeFrom;
 	TSYawTo = (G->GetActorLocation() - TSLungeTo).Rotation().Yaw;
 	// tanda T: en tercera, de lado y por el lado libre (detras de Cuttlas el guardia tapaba la vista casi todo el remate)
-	if (bThirdShown && TakedownCamSideYaw > 0.0f) TSYawTo = TakedownCamYaw(G, TSLungeTo);
+	if (bThirdShown && TakedownCamSideYaw > 0.0f)
+	{
+		// tanda T2: de un corte, al primer angulo (de frente, 45 o 90 grados a cada lado) desde el que el guardia no queda
+		// entre la camara y Cuttlas y nada tapa; si ninguno vale, como antes (detras de Cuttlas, mirando al guardia)
+		TSYawTo = TakedownCamYaw(G, TSLungeTo);
+		if (APlayerController* PCc = UGameplayStatics::GetPlayerController(this, 0))
+		{
+			FRotator R = PCc->GetControlRotation();
+			R.Yaw = TSYawTo;
+			PCc->SetControlRotation(R);
+		}
+	}
 	PC->SetIgnoreMoveInput(true);
 	bTSHero = false;
 	if (HeroDriver && HeroBody && !bSceneHero)
@@ -767,6 +786,16 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 		FTransform X; X.Blend(HeroSceneFrom, TSComp, S);
 		HeroDriver->SetWorldTransform(X);
 	}
+	// tanda T2: la raiz de la pista de su parte, a la malla (la copia que se ve no la lleva)
+	if (!bTSFell && bTakedownRootFollowRule)
+		if (UAnimSequence* VS = Cast<UAnimSequence>(TSVAnim.Get()))
+		{
+			FTransform RT;
+			VS->GetBoneTransform(RT, FSkeletonPoseBoneIndex(0), FAnimExtractContext((double)G->GetMesh()->GetPosition()), false);
+			FTransform X = FTransform(RT.GetRotation(), RT.GetTranslation()) * TSComp;
+			X.AddToTranslation(TSPush);
+			G->GetMesh()->SetWorldTransform(X);
+		}
 	// tanda R: los cuerpos no se meten uno en otro (la pareja los juntaba a 19-24 cm de pelvis): se aparta al guardia
 	if (!bTSFell && HeroBody)
 	{
@@ -777,7 +806,9 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 		{
 			FVector Away = (GP - HP).GetSafeNormal2D();
 			if (Away.IsNearlyZero()) Away = TSFallDir;
-			G->GetMesh()->AddWorldOffset(Away * FMath::Min(MinBodyGap - Gap, 600.0f * DeltaSeconds));
+			const FVector Push = Away * FMath::Min(MinBodyGap - Gap, 600.0f * DeltaSeconds);
+			G->GetMesh()->AddWorldOffset(Push);
+			TSPush += Push;   // tanda T2: se acumula (la raiz se vuelve a poner cada fotograma)
 			++BodyGapPushes;
 		}
 	}
@@ -809,6 +840,8 @@ void ATarsisDirector::TakedownSceneFall()
 	if (!G || bTSFell) return;
 	bTSFell = true;
 	// suelta la animacion donde va y cae con fisica (o con la caida de la persona si la fisica no corre)
+	// tanda T2: la malla de vuelta a la pareja (su propia pose ya lleva la raiz): sin esto, el ragdoll saldria desplazado
+	if (bTakedownRootFollowRule && TSVAnim) { FTransform X = TSComp; X.AddToTranslation(TSPush); G->GetMesh()->SetWorldTransform(X); }
 	const FVector Root = G->GetMesh()->GetSocketLocation(TEXT("root"));
 	G->bSceneFallPending = false;
 	G->SceneEnd();
@@ -1020,19 +1053,25 @@ bool ATarsisDirector::TakedownHeroSpot(ATarsisGuard* G, FVector& Out)
 
 float ATarsisDirector::TakedownCamYaw(ATarsisGuard* G, const FVector& HeroAt)
 {
+	// tanda T2: el primer angulo valido de: detras de Cuttlas mirando al guardia, y a 45 y 90 grados a cada lado. Valido:
+	// el guardia lejos de la linea camara-Cuttlas (mas de 60 cm) y la camara sin nada en medio
 	const float Base = (G->GetActorLocation() - HeroAt).Rotation().Yaw;
 	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	float BestFree = -1.0f, BestYaw = Base;
-	for (const float Sgn : { 1.0f, -1.0f })
+	const FVector Hero = HeroAt + FVector(0.0f, 0.0f, 60.0f);
+	const FVector Gd = G->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+	for (const float Off : { 0.0f, 45.0f, -45.0f, TakedownCamSideYaw, -TakedownCamSideYaw })
 	{
-		const float Y = Base + Sgn * TakedownCamSideYaw;
-		const FVector Mid = (G->GetActorLocation() + HeroAt) * 0.5f + FVector(0.0f, 0.0f, 60.0f);
-		const FVector Back = Mid - FRotator(0.0f, Y, 0.0f).Vector() * 350.0f;
+		const float Y = Base + Off;
+		const FVector Cam = Hero - FRotator(0.0f, Y, 0.0f).Vector() * 300.0f + FVector(0.0f, 0.0f, 40.0f);
+		const FVector Seg = Hero - Cam;
+		const float L2 = Seg.SizeSquared();
+		const float U = L2 > 1.0f ? FMath::Clamp(FVector::DotProduct(Gd - Cam, Seg) / L2, 0.0f, 1.0f) : 0.0f;
+		if (U > 0.02f && U < 0.98f && FVector::Dist(Cam + Seg * U, Gd) < 60.0f) continue;   // el guardia en medio
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisRemateCamara), false, G);
 		if (C) Q.AddIgnoredActor(C);
 		FHitResult H;
-		const float Free = GetWorld()->LineTraceSingleByChannel(H, Mid, Back, ECC_Camera, Q) ? H.Distance : 350.0f;
-		if (Free > BestFree) { BestFree = Free; BestYaw = Y; }
+		if (GetWorld()->LineTraceSingleByChannel(H, Hero, Cam, ECC_Camera, Q)) continue;
+		return Y;
 	}
-	return BestYaw;
+	return Base;
 }

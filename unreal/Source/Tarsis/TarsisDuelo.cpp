@@ -171,6 +171,7 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 	// tanda R: al colocarse andando no se gira hacia donde anda (daba media vuelta a 420 grados/s al retroceder)
 	if (G->GetCharacterMovement()) G->GetCharacterMovement()->bOrientRotationToMovement = false;
 	G->bFootLockOn = bFootLockRule;   // tanda T
+	G->FootReleaseCm = FootLockReleaseCm;
 	if (DuelPhaseN != DuelStagger)
 	{
 		const FRotator Want(0.0f, (C->GetActorLocation() - G->GetActorLocation()).Rotation().Yaw, 0.0f);
@@ -372,14 +373,7 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 		break;
 	case DuelStagger:
 		if (DuelT >= DuelPhaseLen) bPrealigning = false;
-		// tanda T: la camara ya va girando al lado del remate mientras Cuttlas se coloca
-		if (bPrealigning && bThirdShown && TakedownCamSideYaw > 0.0f)
-			if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
-			{
-				FRotator R = PC->GetControlRotation();
-				R.Yaw = FMath::RInterpConstantTo(FRotator(0.0f, R.Yaw, 0.0f), FRotator(0.0f, PrealignCamYaw, 0.0f), DeltaSeconds, SceneTurnMaxSpeed).Yaw;
-				PC->SetControlRotation(R);
-			}
+		// tanda T2: la camara del remate ya no gira durante el tambaleo: va de un corte al empezar el remate
 		if (bGrabReactPending && DuelT > 0.0f)
 		{
 			bGrabReactPending = false;
