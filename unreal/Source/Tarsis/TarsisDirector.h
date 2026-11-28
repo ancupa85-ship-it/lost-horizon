@@ -1862,6 +1862,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
 	bool bTakedownRootFollowRule = true;
 	UPROPERTY() TObjectPtr<class UAnimSequenceBase> TSVAnim;
+	UPROPERTY() TObjectPtr<class UAnimSequenceBase> TSAAnim;   // tanda T3: la parte de Cuttlas (su raiz, a su maniqui)
 	FVector TSPush = FVector::ZeroVector;
 	/** Para medir (tanda T): el sitio previsto antes del remate y adonde se abalanza Cuttlas al empezar. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")

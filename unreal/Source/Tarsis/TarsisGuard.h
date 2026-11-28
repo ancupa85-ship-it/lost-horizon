@@ -454,6 +454,11 @@ public:
 	FTarsisFootLock FeetLock[2];
 	bool bFootLockOn = false;
 	float FootReleaseCm = 18.0f;
+	/** Tanda T3: desplaza la copia que se ve W (mundo) durante Frames fotogramas. */
+	void HoldVisibleOffset(const FVector& W, int32 Frames) { VisOffsetW = W; VisOffsetFrames = Frames; }
+	FVector VisOffsetW = FVector::ZeroVector;
+	int32 VisOffsetFrames = 0;
+	bool bVisOffsetSet = false;
 	bool ScenePlay(class UAnimSequenceBase* A);
 	void SceneEnd();
 

@@ -705,6 +705,7 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 		GM->AddWorldOffset((G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D() * TakedownPairGap);
 	}
 	TSVAnim = V;   // tanda T2
+	TSAAnim = A;   // tanda T3
 	TSPush = FVector::ZeroVector;
 	G->PoseBridge(SceneAlignSeconds);   // tanda R: y lo que quede, fundiendo
 	G->bSceneFallPending = true;
@@ -784,6 +785,16 @@ void ATarsisDirector::TakedownSceneTick(float DeltaSeconds)
 	{
 		const float S = FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(TST / FMath::Max(DisarmLungeTime, 0.01f), 0.0f, 1.0f));
 		FTransform X; X.Blend(HeroSceneFrom, TSComp, S);
+		// tanda T3: la copia que se ve de Cuttlas tampoco lleva la raiz de su parte (avanza ~32 cm en el golpe): al
+		// maniqui, como al guardia
+		if (bTakedownRootFollowRule && TSHeroMontage)
+			if (UAnimSequence* AS = Cast<UAnimSequence>(TSAAnim.Get()))
+				if (UAnimInstance* HA = HeroDriver->GetAnimInstance())
+				{
+					FTransform RT;
+					AS->GetBoneTransform(RT, FSkeletonPoseBoneIndex(0), FAnimExtractContext((double)HA->Montage_GetPosition(TSHeroMontage)), false);
+					X = FTransform(RT.GetRotation(), RT.GetTranslation()) * X;
+				}
 		HeroDriver->SetWorldTransform(X);
 	}
 	// tanda T2: la raiz de la pista de su parte, a la malla (la copia que se ve no la lleva)
@@ -841,7 +852,14 @@ void ATarsisDirector::TakedownSceneFall()
 	bTSFell = true;
 	// suelta la animacion donde va y cae con fisica (o con la caida de la persona si la fisica no corre)
 	// tanda T2: la malla de vuelta a la pareja (su propia pose ya lleva la raiz): sin esto, el ragdoll saldria desplazado
-	if (bTakedownRootFollowRule && TSVAnim) { FTransform X = TSComp; X.AddToTranslation(TSPush); G->GetMesh()->SetWorldTransform(X); }
+	if (bTakedownRootFollowRule && TSVAnim)
+	{
+		const FVector Was = G->GetMesh()->GetComponentLocation();
+		FTransform X = TSComp; X.AddToTranslation(TSPush); G->GetMesh()->SetWorldTransform(X);
+		// tanda T3: los dos fotogramas hasta que la copia que se ve coge la pose de la fisica, se queda donde estaba
+		// (antes salia en el origen de la pareja, encima de Cuttlas: pelvis a 6-8 cm)
+		G->HoldVisibleOffset(Was - X.GetLocation(), 2);
+	}
 	const FVector Root = G->GetMesh()->GetSocketLocation(TEXT("root"));
 	G->bSceneFallPending = false;
 	G->SceneEnd();
