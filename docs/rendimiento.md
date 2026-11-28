@@ -314,3 +314,15 @@ Misma medida: de noche (23:48), tres guardias en alerta contra ti en cada sitio,
 Lectura: la tanda R no cuesta. Lo que añade (el root motion de Cuttlas, la separación en el remate, la evaluación de la pose al empezar la pareja) solo trabaja en el contacto. La VRAM queda como en la Q (3353) y por debajo del techo de 3,7 GB.
 
 La media sube 4–6 fps respecto a la Q, pero no es mérito de la tanda: aquella se midió por la tarde con la GPU ya caliente y esta de noche, arrancando en frío. El peor 1 % de la entrada y del barracón es el tirón de los primeros disparos con trazadora de cada alerta, como en la N2 y la O.
+
+## Tanda S: pies, remate y flanqueador
+
+Misma medida: de noche (03:35), tres guardias en alerta contra ti en cada sitio, con el editor recién abierto. La primera pasada es de calentamiento y no cuenta: 16,8 / 23,6 / 17,9 fps, mientras se crean los estados de render. La GPU arrancó a 50 °C y acabó a 75; la ventana del PIE medía 1743×1105. Entre paréntesis, la media de la tanda R.
+
+| Sitio | fps medio / peor 1 % | VRAM (MB) |
+|---|---|---|
+| Entrada | 42,7 / 36,9 (43,0) | 3228 |
+| Patio central | 39,1 / 35,8 (39,8) | 3228 |
+| Barracón oeste | 37,3 / 21,2 (37,4) | 3229 |
+
+Lectura: la tanda S no cuesta. Los fps son los de la R, dentro del ruido. La VRAM baja 130 MB, con la misma escena; puede deberse a lo que deja cargado el editor en cada arranque. El peor 1 % del barracón es el tirón de los primeros disparos con trazadora de cada alerta, como siempre.

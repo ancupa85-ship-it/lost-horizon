@@ -143,6 +143,8 @@ void ATarsisDirector::DuelEnd()
 	bDuelRecovering = false;
 	bRemateQueued = false;
 	bGrabReactPending = false;
+	bDuelStepping = false;
+	if (DuelGuard.IsValid()) FlankFrozenUntil = FPlatformTime::Seconds() + FlankFreezeAfterDuel;   // tanda S
 	if (ATarsisGuard* G = DuelGuard.Get()) if (G->GetCharacterMovement()) G->GetCharacterMovement()->bOrientRotationToMovement = true;   // tanda R
 	DuelGuard = nullptr;
 	DuelPhaseN = DuelNone;
@@ -177,14 +179,18 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 	// DuelSpacingSpeed) y en el culatazo se acerca a MeleeContactDistance a lo largo de todo el golpe
 	// tanda R: andando (entrada de movimiento: el GASP le pone pasos), no moviendo el actor; el acercamiento a
 	// MeleeContactDistance va al final de la guardia y en el amago y el culatazo ya no se mueve (patinaba 25 cm)
-	if (DuelPhaseN == DuelGuardUp && !GSGuard.IsValid() && !bDuelRecovering)
+	// tanda S: mientras Cuttlas da su paso, el guardia no se recoloca (retrocedia a la vez, sin pasos)
+	if (DuelPhaseN == DuelGuardUp && !GSGuard.IsValid() && !bDuelRecovering && HeroStepPending.IsNearlyZero())
 	{
 		const float Want = (DuelT >= DuelPhaseLen - DuelApproachSeconds) ? MeleeContactDistance : DuelDistance;
 		const FVector Away = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
 		const float Now2 = FVector::Dist2D(G->GetActorLocation(), C->GetActorLocation());
 		const float Speed = FMath::Clamp((Want - Now2) * 6.0f, -DuelSpacingSpeed, DuelSpacingSpeed);
 		const float Max = G->GetCharacterMovement() ? FMath::Max(G->GetCharacterMovement()->MaxWalkSpeed, 1.0f) : 1.0f;
-		if (FMath::Abs(Want - Now2) > 3.0f && !Away.IsNearlyZero()) G->AddMovementInput(Away * FMath::Sign(Speed), FMath::Min(FMath::Abs(Speed) / Max, 1.0f), true);
+		// tanda S: solo si le faltan DuelStepDeadband o mas, y entonces hasta llegar (un paso entero, no pasitos)
+		if (FMath::Abs(Want - Now2) >= DuelStepDeadband) bDuelStepping = true;
+		else if (FMath::Abs(Want - Now2) <= 3.0f) bDuelStepping = false;
+		if (bDuelStepping && !Away.IsNearlyZero()) G->AddMovementInput(Away * FMath::Sign(Speed), FMath::Min(FMath::Abs(Speed) / Max, 1.0f), true);
 	}
 	// tanda Q: la pose final del culatazo (el seguimiento entero) antes de volver a la guardia
 	if (bDuelRecovering && DuelT >= MeleeRecoverSeconds)
@@ -310,7 +316,9 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 				ContactHitStop(G, 1.3f, false);
 				ExchangeHappened(false);
 				SuppressT = FMath::Max(SuppressT, 1.2f);
-				C->LaunchCharacter((C->GetActorLocation() - G->GetActorLocation()).GetSafeNormal2D() * HeroHitPushSpeed, true, false);   // tanda R: antes 220 (patinaba)
+				// tanda S: retrocede andando (antes LaunchCharacter: la capsula salia y los pies patinaban)
+				if (bHeroStepRule) HeroStepPending += (C->GetActorLocation() - G->GetActorLocation()).GetSafeNormal2D() * HeroHitPushCm;
+				else C->LaunchCharacter((C->GetActorLocation() - G->GetActorLocation()).GetSafeNormal2D() * HeroHitPushSpeed, true, false);   // tanda R
 				DuelNoise(At);
 				if (DuelStrikes >= MeleeStrikesToDown[DiffIdx()])
 				{
@@ -390,6 +398,8 @@ void ATarsisDirector::CombatRolesTick(float DeltaSeconds)
 	RolesT -= DeltaSeconds;
 	if (RolesT > 0.0f) return;
 	RolesT = 0.5f;
+	// tanda S: justo despues de un duelo, todo como estaba (al caer el del duelo el flanqueador se recolocaba)
+	if (FPlatformTime::Seconds() < FlankFrozenUntil) return;
 	Roles.Reset();
 	// tanda Q: los puntos de flanqueo se conservan (recalcular cada 0,5 s los hacia corregir el rumbo sin parar)
 	TMap<TWeakObjectPtr<ATarsisGuard>, FVector> OldPoints = FlankPoints;
@@ -582,13 +592,45 @@ void ATarsisDirector::HeroRootMotionTick()
 		const float Floor = MeleeContactDistance - 15.0f;
 		if (After < Now && After < Floor) D *= FMath::Clamp((Now - Floor) / FMath::Max(Now - After, 0.01f), 0.0f, 1.0f);
 	}
-	P->AddActorWorldOffset(D, true);
 	HeroRootMotionCm += D.Size();
+	// tanda S: andando (el GASP pone pasos); si no, como en la R
+	if (bHeroStepRule) HeroStepPending += D;
+	else P->AddActorWorldOffset(D, true);
+}
+
+// tanda S: Cuttlas recorre andando lo pendiente (root motion de su golpe y el empujon del culatazo)
+void ATarsisDirector::HeroStepTick(float DeltaSeconds)
+{
+	if (!bHeroStepRule || HeroStepPending.IsNearlyZero()) return;
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!C || !C->GetCharacterMovement()) { HeroStepPending = FVector::ZeroVector; return; }
+	const float Left = HeroStepPending.Size2D();
+	if (Left < 2.0f) { HeroStepPending = FVector::ZeroVector; return; }
+	// sin meterse en el guardia del duelo: hacia el, nunca por debajo de MeleeContactDistance (la contra le llevaba a
+	// 22-25 cm de pelvis)
+	if (const ATarsisGuard* G = DuelGuard.Get())
+	{
+		const FVector ToG = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
+		if (FVector::DotProduct(HeroStepPending.GetSafeNormal2D(), ToG) > 0.0f && FVector::Dist2D(G->GetActorLocation(), C->GetActorLocation()) <= MeleeContactDistance)
+		{
+			HeroStepPending = FVector::ZeroVector;
+			return;
+		}
+	}
+	const float Max = FMath::Max(C->GetCharacterMovement()->GetMaxSpeed(), 1.0f);
+	const float Speed = FMath::Min(HeroStepSpeed, Left / 0.15f);
+	C->AddMovementInput(HeroStepPending.GetSafeNormal2D(), FMath::Min(Speed / Max, 1.0f), true);
+	// lo que la capsula ya ha recorrido en esa direccion se descuenta
+	const FVector V = C->GetVelocity();
+	const float Done = FMath::Max(0.0f, FVector::DotProduct(V, HeroStepPending.GetSafeNormal2D())) * DeltaSeconds;
+	HeroStepPending -= HeroStepPending.GetSafeNormal2D() * FMath::Min(Done, Left);
+	HeroStepCm += FMath::Min(Done, Left);
 }
 
 void ATarsisDirector::ContactTick(float DeltaSeconds)
 {
 	HeroRootMotionTick();
+	HeroStepTick(DeltaSeconds);   // tanda S
 	if (HeroHitStopUntil > 0.0 && FPlatformTime::Seconds() >= HeroHitStopUntil)
 	{
 		HeroHitStopUntil = 0.0;

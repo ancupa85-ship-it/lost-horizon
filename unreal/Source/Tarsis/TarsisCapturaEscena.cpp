@@ -693,6 +693,9 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 			TSComp.AddToTranslation(TSFix);
 		}
 		else TSFix = FVector::ZeroVector;
+		// tanda S: la pareja junta mucho los cuerpos (pelvis a 14-26 cm): solo el guardia empieza TakedownPairGap mas
+		// alla de Cuttlas (Cuttlas va a su sitio de la pareja como antes)
+		GM->AddWorldOffset((G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D() * TakedownPairGap);
 	}
 	G->PoseBridge(SceneAlignSeconds);   // tanda R: y lo que quede, fundiendo
 	G->bSceneFallPending = true;

@@ -1773,7 +1773,7 @@ public:
 	float SceneAlignSeconds = 0.2f;
 	/** Al acabar el remate, Cuttlas sale de la pareja fundiendo (s): la animacion (montaje) y el sitio del maniqui. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
-	float TakedownEndBlendSeconds = 0.5f;
+	float TakedownEndBlendSeconds = 0.7f;   // tanda S: antes 0,5 (salian los brazos a 17-18 cm por fotograma)
 	/** La entrada del golpe de Cuttlas (s). Antes 0,08: al abrir el duelo la mano subia 30 cm de un fotograma. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
 	float HeroStrikeBlendIn = 0.15f;
@@ -1807,9 +1807,38 @@ public:
 	UPROPERTY() TObjectPtr<class UAnimMontage> TSHeroMontage;
 	float HeroReturnT = 0.0f;
 	bool bGrabReactPending = false;
+
+	// ---- tanda S: pies que no patinan (con lo que ya trae el GASP: que el motion matching de pasos de verdad)
+	/** Lo que Cuttlas avanza por su golpe (root motion) o retrocede por el empujon se recorre andando, con entrada de
+	 *  movimiento (velocidad y aceleracion para el GASP): antes se desplazaba la capsula y las piernas, que salen de la
+	 *  locomocion, se quedaban quietas y patinaban 42-46 cm. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	bool bHeroStepRule = true;
+	/** Velocidad maxima de esos pasos (cm/s) y lo que retrocede Cuttlas cuando le da el culatazo (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float HeroStepSpeed = 160.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float HeroHitPushCm = 22.0f;
+	/** El guardia del duelo solo se recoloca si le faltan al menos estos cm (antes, cualquier diferencia: pasitos que
+	 *  patinaban 13-31 cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float DuelStepDeadband = 20.0f;
+	/** Remate: la pareja de derribo empieza con el guardia este tanto mas lejos de Cuttlas (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float TakedownPairGap = 0.0f;   // medido: con 12 y 20 el golpe tocaba peor y las pelvis no pasaban de 22-25 (lo que las juntaba era el paso de la contra)
+	/** Tras acabar un duelo, los papeles y puntos de flanqueo se quedan como estan este tiempo (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Varios")
+	float FlankFreezeAfterDuel = 4.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")
+	float HeroStepCm = 0.0f;
+	FVector HeroStepPending = FVector::ZeroVector;
+	double FlankFrozenUntil = 0.0;
+	bool bDuelStepping = false;
 	FTransform HeroReturnFrom = FTransform::Identity;
 	/** Cuttlas avanza lo que diga el root motion de su golpe (tanda R). */
 	void HeroRootMotionTick();
+	/** Cuttlas recorre andando lo pendiente (tanda S). */
+	void HeroStepTick(float DeltaSeconds);
 	/** Sonido del golpe en capas en At. Force: 0 ligero, 1 medio, 2 fuerte. Attacker: 0 Cuttlas, 1 guardia. */
 	void PlayImpact(const FVector& At, int32 Force, bool bWall, int32 Attacker, bool bVictimVoice = true);
 	/** El culatazo de Lyra (MM_Rifle_Melee): la culata arriba del todo (s) y el contacto (s), medidos en la animacion
