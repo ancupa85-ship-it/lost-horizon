@@ -11,6 +11,7 @@
 #include "GameFramework/Actor.h"
 #include "InputCoreTypes.h"
 #include "TarsisGaspTurn.h"
+#include "TarsisPies.h"
 #include "TarsisDirector.generated.h"
 
 /** Punto de interacción sencillo de la misión (assets/unreal/mision1.json, tools/unreal/mision.py): con la E, si tienes la
@@ -1834,6 +1835,37 @@ public:
 	FVector HeroStepPending = FVector::ZeroVector;
 	double FlankFrozenUntil = 0.0;
 	bool bDuelStepping = false;
+
+	// ---- tanda T: bloqueo de pies, remate alineado y camara del remate
+	/** Bloqueo de pies propio (TarsisPies.h) para Cuttlas y el guardia durante el duelo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	bool bFootLockRule = true;
+	/** En el tambaleo de la contra, Cuttlas va andando a su sitio de la pareja de derribo (antes saltaba alli al pulsar la
+	 *  E y las pelvis quedaban a 17-19 cm en el primer fotograma). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	bool bTakedownPrealignRule = true;
+	/** Camara del remate en tercera: de lado (grados respecto a la linea Cuttlas-guardia), por el lado libre. Antes,
+	 *  detras de Cuttlas: el guardia tapaba la vista en 41-52 de 52-64 fotogramas. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tarsis|Cuerpos")
+	float TakedownCamSideYaw = 90.0f;
+	UPROPERTY() TObjectPtr<class UPoseableMeshComponent> HeroFeet;
+	FTarsisFootLock HeroFeetLock[2];
+	bool bHeroFeetOn = false;
+	bool bPrealigning = false;
+	float PrealignCamYaw = 0.0f;
+	/** Para medir (tanda T): el sitio previsto antes del remate y adonde se abalanza Cuttlas al empezar. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")
+	FVector LastPrealignSpot = FVector::ZeroVector;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")
+	FVector LastLungeTo = FVector::ZeroVector;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tarsis|Cuerpos")
+	FVector LastTSFix = FVector::ZeroVector;
+	/** Yaw de la camara del remate: de lado (TakedownCamSideYaw) y por el lado libre. */
+	float TakedownCamYaw(class ATarsisGuard* G, const FVector& HeroAt);
+	/** Donde quedaria Cuttlas en la pareja de derribo contra G (sin la correccion de la raiz en T0). */
+	bool TakedownHeroSpot(class ATarsisGuard* G, FVector& Out);
+	void HeroFeetTick(float DeltaSeconds);
+	bool IsDuelGuard(const class ATarsisGuard* G) const { return G && DuelGuard.Get() == G; }
 	FTransform HeroReturnFrom = FTransform::Identity;
 	/** Cuttlas avanza lo que diga el root motion de su golpe (tanda R). */
 	void HeroRootMotionTick();

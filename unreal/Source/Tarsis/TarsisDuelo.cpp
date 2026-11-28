@@ -73,6 +73,7 @@ void ATarsisDirector::MeleeStrike()
 		if (!MeleeEngageTarget(G)) return;
 		// empieza el duelo: el guardia se planta y se cubre
 		DuelGuard = G;
+		if (AAIController* GAI = Cast<AAIController>(G->GetController())) GAI->StopMovement();   // tanda T: se va a cubrir y seguia andando en el duelo
 		DuelPhaseN = DuelGuardUp;
 		DuelT = 0.0f;
 		DuelPhaseLen = FMath::FRandRange(MeleeGuardUpSeconds.X, MeleeGuardUpSeconds.Y);
@@ -145,7 +146,8 @@ void ATarsisDirector::DuelEnd()
 	bGrabReactPending = false;
 	bDuelStepping = false;
 	if (DuelGuard.IsValid()) FlankFrozenUntil = FPlatformTime::Seconds() + FlankFreezeAfterDuel;   // tanda S
-	if (ATarsisGuard* G = DuelGuard.Get()) if (G->GetCharacterMovement()) G->GetCharacterMovement()->bOrientRotationToMovement = true;   // tanda R
+	if (ATarsisGuard* G = DuelGuard.Get()) { if (G->GetCharacterMovement()) G->GetCharacterMovement()->bOrientRotationToMovement = true; G->bFootLockOn = false; }   // tanda R, T
+	bPrealigning = false;
 	DuelGuard = nullptr;
 	DuelPhaseN = DuelNone;
 }
@@ -168,6 +170,7 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 	G->Hold(0.3f);
 	// tanda R: al colocarse andando no se gira hacia donde anda (daba media vuelta a 420 grados/s al retroceder)
 	if (G->GetCharacterMovement()) G->GetCharacterMovement()->bOrientRotationToMovement = false;
+	G->bFootLockOn = bFootLockRule;   // tanda T
 	if (DuelPhaseN != DuelStagger)
 	{
 		const FRotator Want(0.0f, (C->GetActorLocation() - G->GetActorLocation()).Rotation().Yaw, 0.0f);
@@ -294,7 +297,17 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 				}
 				DuelPhaseN = DuelStagger; DuelT = 0.0f; DuelPhaseLen = MeleeStaggerSeconds;
 				DuelNoise(At);
-				ExchangeHappened(true);   // tanda Q: sin camara lenta en la contra (una por encuentro, en el remate)
+				ExchangeHappened(true);
+				// tanda T: a su sitio de la pareja de derribo andando, durante el tambaleo (antes, de un salto al pulsar la E)
+				{
+					FVector Spot;
+					if (bTakedownPrealignRule && TakedownHeroSpot(G, Spot))
+					{
+						FVector Dd = Spot - C->GetActorLocation();
+						Dd.Z = 0.0f;
+						if (Dd.Size2D() < 120.0f) { HeroStepPending = Dd; bPrealigning = true; PrealignCamYaw = TakedownCamYaw(G, Spot); LastPrealignSpot = Spot; }
+					}
+				}   // tanda Q: sin camara lenta en la contra (una por encuentro, en el remate)
 			}
 			else if (bBlockHeld && StaminaNow >= StaminaBlockCost)
 			{
@@ -358,6 +371,15 @@ void ATarsisDirector::DuelTick(float DeltaSeconds)
 		}
 		break;
 	case DuelStagger:
+		if (DuelT >= DuelPhaseLen) bPrealigning = false;
+		// tanda T: la camara ya va girando al lado del remate mientras Cuttlas se coloca
+		if (bPrealigning && bThirdShown && TakedownCamSideYaw > 0.0f)
+			if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+			{
+				FRotator R = PC->GetControlRotation();
+				R.Yaw = FMath::RInterpConstantTo(FRotator(0.0f, R.Yaw, 0.0f), FRotator(0.0f, PrealignCamYaw, 0.0f), DeltaSeconds, SceneTurnMaxSpeed).Yaw;
+				PC->SetControlRotation(R);
+			}
 		if (bGrabReactPending && DuelT > 0.0f)
 		{
 			bGrabReactPending = false;
@@ -593,6 +615,7 @@ void ATarsisDirector::HeroRootMotionTick()
 		if (After < Now && After < Floor) D *= FMath::Clamp((Now - Floor) / FMath::Max(Now - After, 0.01f), 0.0f, 1.0f);
 	}
 	HeroRootMotionCm += D.Size();
+	if (bPrealigning && DuelPhaseN == 5) return;   // tanda T: va a su sitio del remate; el paso de la contra no cuenta
 	// tanda S: andando (el GASP pone pasos); si no, como en la R
 	if (bHeroStepRule) HeroStepPending += D;
 	else P->AddActorWorldOffset(D, true);
@@ -631,6 +654,7 @@ void ATarsisDirector::ContactTick(float DeltaSeconds)
 {
 	HeroRootMotionTick();
 	HeroStepTick(DeltaSeconds);   // tanda S
+	HeroFeetTick(DeltaSeconds);   // tanda T
 	if (HeroHitStopUntil > 0.0 && FPlatformTime::Seconds() >= HeroHitStopUntil)
 	{
 		HeroHitStopUntil = 0.0;

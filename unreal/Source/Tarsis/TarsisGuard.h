@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "TarsisGaspTurn.h"
+#include "TarsisPies.h"
 #include "TarsisGuard.generated.h"
 
 class UStaticMeshComponent;
@@ -449,6 +450,9 @@ public:
 	bool bSceneFallPending = false;
 	/** Tanda R: ya llego a su punto de flanqueo (no lo deja hasta alejarse 250 cm: antes rondaba el punto sin parar). */
 	bool bAtFlank = false;
+	/** Tanda T: bloqueo de pies (lo enciende el director para el guardia del duelo). */
+	FTarsisFootLock FeetLock[2];
+	bool bFootLockOn = false;
 	bool ScenePlay(class UAnimSequenceBase* A);
 	void SceneEnd();
 

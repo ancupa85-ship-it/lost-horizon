@@ -217,6 +217,11 @@ void ATarsisGuard::LookTick(float DeltaSeconds)
 	RifleTick(DeltaSeconds);   // tanda B: de cintura para arriba, la pose de fusil
 	WakeBlendTick(DeltaSeconds);   // tanda C: al despertar, de la pose tumbada (fisica) a la animada
 	BridgeTick(DeltaSeconds);   // tanda O: de la pose de antes del cambio de animacion a la nueva
+	// tanda T: el pie apoyado se queda clavado mientras la capsula se mueve (guardia del duelo)
+	{
+		const float GZ = GetActorLocation().Z - (GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.0f);
+		TarsisFootLockApply(Pose, FeetLock, DeltaSeconds, GZ, bFootLockOn && !bRagdoll && WakeT <= 0.0f);
+	}
 	// adónde mira la cabeza, respecto al cuerpo: el cuerpo gira despacio y la cabeza se adelanta
 	auto Toward = [this](const FVector& P) -> float
 	{

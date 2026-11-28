@@ -22,6 +22,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
+#include "Animation/AnimSequence.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -707,8 +708,12 @@ bool ATarsisDirector::TakedownSceneBegin(ATarsisGuard* G)
 	// Cuttlas: se abalanza a su sitio mirando al guardia
 	TSLungeFrom = C->GetActorLocation();
 	TSLungeTo = FVector(HeroRoot.GetLocation().X + TSFix.X, HeroRoot.GetLocation().Y + TSFix.Y, C->GetActorLocation().Z);
+	LastLungeTo = TSLungeTo;
+	LastTSFix = TSFix;
 	if (FVector::Dist2D(TSLungeFrom, TSLungeTo) > 260.0f) TSLungeTo = TSLungeFrom;
 	TSYawTo = (G->GetActorLocation() - TSLungeTo).Rotation().Yaw;
+	// tanda T: en tercera, de lado y por el lado libre (detras de Cuttlas el guardia tapaba la vista casi todo el remate)
+	if (bThirdShown && TakedownCamSideYaw > 0.0f) TSYawTo = TakedownCamYaw(G, TSLungeTo);
 	PC->SetIgnoreMoveInput(true);
 	bTSHero = false;
 	if (HeroDriver && HeroBody && !bSceneHero)
@@ -969,4 +974,65 @@ void ATarsisDirector::GrabSceneEnd(bool bEscaped)
 	}
 	GSHeroMontage = nullptr;
 	GSGuard = nullptr;
+}
+
+// tanda T: donde quedaria Cuttlas en la pareja de derribo contra G (misma eleccion que TakedownSceneBegin)
+bool ATarsisDirector::TakedownHeroSpot(ATarsisGuard* G, FVector& Out)
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!G || !C || !G->GetMesh()) return false;
+	const FTransform GuardRel = G->GetMesh()->GetRelativeTransform();
+	const FTransform GuardFrame(FRotator(0.0f, G->GetActorRotation().Yaw + GuardRel.Rotator().Yaw, 0.0f), G->GetActorLocation() + GuardRel.GetLocation());
+	const FVector Local = GuardFrame.InverseTransformPosition(C->GetActorLocation()).GetSafeNormal2D();
+	int32 Best = INDEX_NONE;
+	float BestDot = -2.0f;
+	for (int32 i = 0; i < UE_ARRAY_COUNT(ScenePairs); ++i)
+	{
+		const FScenePair& Pr = ScenePairs[i];
+		if (FCString::Strcmp(Pr.Kind, TEXT("takedown")) != 0) continue;
+		const FVector Rel = RootAt(Pr.RootV, Pr.YawV).InverseTransformPosition(Pr.RootA).GetSafeNormal2D();
+		const float Dot = FVector::DotProduct(Local, Rel);
+		if (Dot > BestDot) { BestDot = Dot; Best = i; }
+	}
+	if (Best == INDEX_NONE) return false;
+	const FScenePair& Pr = ScenePairs[Best];
+	const FTransform Comp = RootAt(Pr.RootV, Pr.YawV).Inverse() * GuardFrame;
+	FVector Root = (RootAt(Pr.RootA, Pr.YawA) * Comp).GetLocation();
+	// la misma correccion que TakedownSceneBegin: la pareja empieza avanzada (T0) y la raiz del guardia ya se ha movido
+	if (UAnimSequence* V = Cast<UAnimSequence>(LoadPairAnim(Pr, false)))
+	{
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisRemateMuro), false, G);
+		Q.AddIgnoredActor(C);
+		FHitResult H;
+		const FVector Away = (G->GetActorLocation() - C->GetActorLocation()).GetSafeNormal2D();
+		const FVector From = G->GetActorLocation() + FVector(0.0f, 0.0f, 10.0f);
+		const bool bWall = GetWorld()->LineTraceSingleByChannel(H, From, From + Away * WallTakedownDist, ECC_Visibility, Q) && !Cast<ATarsisGuard>(H.GetActor());
+		const float T0 = FMath::Max(0.0f, Pr.Hit - (bWall ? TakedownLeadIn * 0.5f : TakedownLeadIn));
+		FTransform RootT0;
+		V->GetBoneTransform(RootT0, FSkeletonPoseBoneIndex(0), FAnimExtractContext((double)FMath::Min(T0, V->GetPlayLength() - 0.05f)), false);
+		FVector Fix = GuardFrame.GetLocation() - (RootT0 * Comp).GetLocation();
+		Fix.Z = 0.0f;
+		if (Fix.Size2D() < 300.0f) Root += Fix;
+	}
+	Out = FVector(Root.X, Root.Y, C->GetActorLocation().Z);
+	return true;
+}
+
+float ATarsisDirector::TakedownCamYaw(ATarsisGuard* G, const FVector& HeroAt)
+{
+	const float Base = (G->GetActorLocation() - HeroAt).Rotation().Yaw;
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	float BestFree = -1.0f, BestYaw = Base;
+	for (const float Sgn : { 1.0f, -1.0f })
+	{
+		const float Y = Base + Sgn * TakedownCamSideYaw;
+		const FVector Mid = (G->GetActorLocation() + HeroAt) * 0.5f + FVector(0.0f, 0.0f, 60.0f);
+		const FVector Back = Mid - FRotator(0.0f, Y, 0.0f).Vector() * 350.0f;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(TarsisRemateCamara), false, G);
+		if (C) Q.AddIgnoredActor(C);
+		FHitResult H;
+		const float Free = GetWorld()->LineTraceSingleByChannel(H, Mid, Back, ECC_Camera, Q) ? H.Distance : 350.0f;
+		if (Free > BestFree) { BestFree = Free; BestYaw = Y; }
+	}
+	return BestYaw;
 }

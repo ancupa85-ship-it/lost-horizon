@@ -21,6 +21,7 @@
 #include "AssetRegistry/IAssetRegistry.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PoseableMeshComponent.h"
 #include "Components/ChildActorComponent.h"
 #include "Components/InputComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -217,6 +218,13 @@ bool ATarsisDirector::SetupGaspHero(ACharacter* C, USkeletalMesh* SK)
 	HeroBody->SetAnimInstanceClass(Rt);
 	bHeroRetargetSet = false;
 	HeroBody->SetVisibility(false);
+	// tanda T: la copia que se ve durante el duelo, con los pies clavados (TarsisPies.h)
+	HeroFeet = NewObject<UPoseableMeshComponent>(C, TEXT("PiesCuttlas"));
+	HeroFeet->SetupAttachment(HeroBody);
+	HeroFeet->SetSkinnedAssetAndUpdate(SK);
+	HeroFeet->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HeroFeet->RegisterComponent();
+	HeroFeet->SetVisibility(false);
 	HeroAnimNow = -1;
 	GaspHeroTick(C, false);
 	UE_LOG(LogTemp, Log, TEXT("Tarsis: Cuttlas anima con el GASP (retarget %s)"), *HeroRetargeter->GetName());
@@ -264,4 +272,35 @@ void ATarsisDirector::GaspHeroTick(ACharacter* C, bool bOut)
 	HeroGaspTurn.Tick(C, HeroDriver, C->GetVelocity().Size2D(), C->GetWorld() ? C->GetWorld()->GetDeltaSeconds() : 0.0f,
 		HeroGaspTurnFrom, HeroGaspTurnRelease, HeroGaspTurnMaxSeconds);
 	HeroAnimNow = C->bIsCrouched ? 2 : (C->GetVelocity().Size2D() > 20.0f ? 1 : 0);
+}
+
+// ---------------------------------------------------------------- tanda T: los pies de Cuttlas en el duelo
+void ATarsisDirector::HeroFeetTick(float DeltaSeconds)
+{
+	ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!HeroFeet || !HeroBody || !C) return;
+	// GetVisibleFlag, no IsVisible: IsVisible da falso con SetHiddenInGame (y lo ponemos nosotros: se alternaba cada fotograma)
+	const bool bOn = bFootLockRule && DuelGuard.IsValid() && bThirdShown && !bSceneHero && HeroBody->GetVisibleFlag();
+	const bool bBlending = HeroFeetLock[0].Alpha > 0.0f || HeroFeetLock[1].Alpha > 0.0f;
+	if ((bOn || bBlending) && HeroBody->GetVisibleFlag() && !bSceneHero)
+	{
+		if (!bHeroFeetOn)
+		{
+			for (int32 i = 0; i < HeroBody->GetNumMaterials(); ++i) HeroFeet->SetMaterial(i, HeroBody->GetMaterial(i));
+			bHeroFeetOn = true;
+		}
+		HeroFeet->CopyPoseFromSkeletalComponent(HeroBody);
+		const float GZ = C->GetActorLocation().Z - C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		TarsisFootLockApply(HeroFeet, HeroFeetLock, DeltaSeconds, GZ, bOn);
+		HeroFeet->SetVisibility(true);
+		HeroBody->SetHiddenInGame(true);   // sigue evaluando (AlwaysTickPoseAndRefreshBones): de el sale la pose
+	}
+	else if (bHeroFeetOn)
+	{
+		HeroFeet->SetVisibility(false);
+		HeroBody->SetHiddenInGame(false);
+		HeroFeetLock[0] = FTarsisFootLock();
+		HeroFeetLock[1] = FTarsisFootLock();
+		bHeroFeetOn = false;
+	}
 }

@@ -326,3 +326,19 @@ Misma medida: de noche (03:35), tres guardias en alerta contra ti en cada sitio,
 | Barracón oeste | 37,3 / 21,2 (37,4) | 3229 |
 
 Lectura: la tanda S no cuesta. Los fps son los de la R, dentro del ruido. La VRAM baja 130 MB, con la misma escena; puede deberse a lo que deja cargado el editor en cada arranque. El peor 1 % del barracón es el tirón de los primeros disparos con trazadora de cada alerta, como siempre.
+
+## Tanda T: bloqueo de pies y remate alineado
+
+Misma medida: de noche (06:07), tres guardias en alerta contra ti en cada sitio, con el editor recién abierto. La primera pasada es de calentamiento y no cuenta: 18,9 / 28,1 / 35,2 fps. La GPU arrancó a 48 °C y acabó a 82; la ventana del PIE medía 1743×1105. Entre paréntesis, la media de la tanda S.
+
+| Sitio | fps medio / peor 1 % | VRAM (MB) |
+|---|---|---|
+| Entrada | 42,2 / 27,5 (42,7) | 3163 |
+| Patio central | 38,5 / 29,4 (39,1) | 3163 |
+| Barracón oeste | 37,6 / 33,1 (37,3) | 3163 |
+
+Lectura: la tanda T no cuesta.
+
+- El bloqueo de pies (dos IK por cuerpo) y la copia visible de Cuttlas solo trabajan durante el duelo, y aquí no hay duelo.
+- Los fps quedan dentro del ruido respecto a la S (−0,6 a +0,3).
+- La VRAM queda por debajo del techo de 3,7 GB.
